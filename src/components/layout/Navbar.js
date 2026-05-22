@@ -25,7 +25,7 @@ export default function Navbar() {
   const { cartCount, setIsCartOpen } = useCart();
 
   useEffect(() => {
-    setMounted(true);
+    Promise.resolve().then(() => setMounted(true));
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };

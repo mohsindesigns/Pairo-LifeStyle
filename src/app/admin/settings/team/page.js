@@ -11,10 +11,6 @@ export default function StaffManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
-    fetchStaff();
-  }, []);
-
   const fetchStaff = async () => {
     try {
       const res = await fetch("/api/admin/staff");
@@ -26,6 +22,12 @@ export default function StaffManagement() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      fetchStaff();
+    });
+  }, []);
 
   const toggleStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';

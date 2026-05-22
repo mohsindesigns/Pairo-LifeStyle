@@ -24,61 +24,66 @@ import {
   Shield,
   UserPlus,
   History,
-  Code2
+  Code2,
+  Palette
 } from "lucide-react";
 
 import { signOut } from "next-auth/react";
 import { useRBAC } from "@/hooks/useRBAC";
 
+const NavLink = ({ href, icon: Icon, children, exact = false, permission, isSubmenu = false }) => {
+  const pathname = usePathname();
+  const { can } = useRBAC();
+  if (permission && !can(permission)) return null;
+  
+  const isActive = exact ? pathname === href : pathname.startsWith(href);
+  return (
+     <Link 
+       href={href}
+       className={`flex items-center gap-2 px-3 py-1.5 text-[14px] leading-[1.3] transition-all group ${
+         isActive 
+           ? "text-white font-medium bg-[#2271b1]" 
+           : isSubmenu ? "text-[#c3c4c7] hover:text-[#72aee6]" : "text-[#a7aaad] hover:text-[#72aee6]"
+       } ${isSubmenu ? "py-2 px-4 hover:bg-[#353c42]" : ""}`}
+     >
+       {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />}
+       <span>{children}</span>
+     </Link>
+  );
+};
+
+const FlyoutMenu = ({ title, icon: Icon, children, permission, activePath }) => {
+  const pathname = usePathname();
+  const { can } = useRBAC();
+  if (permission && !can(permission)) return null;
+  const isActive = pathname.includes(activePath);
+
+  return (
+      <div className="relative group/main">
+          <button 
+              className={`w-full flex items-center justify-between px-3 py-2 text-[14px] transition-all ${isActive ? "bg-[#2271b1] text-white font-bold" : "hover:bg-[#2c3338] hover:text-[#72aee6]"}`}
+          >
+              <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4" />
+                  <span>{title}</span>
+              </div>
+              <ChevronRight className="w-3 h-3 opacity-50" />
+          </button>
+          
+          {/* Flyout Submenu */}
+          <div className="invisible group-hover/main:visible absolute left-full top-0 w-[180px] bg-[#2c3338] shadow-xl border-l border-white/5 z-[60] py-1 translate-x-[-10px] group-hover/main:translate-x-0 transition-all opacity-0 group-hover/main:opacity-100">
+              <div className="px-4 py-2 border-b border-white/5 mb-1">
+                  <span className="text-[12px] font-bold text-[#72aee6] uppercase tracking-wider">{title}</span>
+              </div>
+              {children}
+          </div>
+      </div>
+  );
+};
+
 export default function AdminSidebar() {
   const pathname = usePathname();
   const { can } = useRBAC();
-  
-  const NavLink = ({ href, icon: Icon, children, exact = false, permission, isSubmenu = false }) => {
-      if (permission && !can(permission)) return null;
-      
-      const isActive = exact ? pathname === href : pathname.startsWith(href);
-      return (
-         <Link 
-           href={href}
-           className={`flex items-center gap-2 px-3 py-1.5 text-[14px] leading-[1.3] transition-all group ${
-             isActive 
-               ? "text-white font-medium bg-[#2271b1]" 
-               : isSubmenu ? "text-[#c3c4c7] hover:text-[#72aee6]" : "text-[#a7aaad] hover:text-[#72aee6]"
-           } ${isSubmenu ? "py-2 px-4 hover:bg-[#353c42]" : ""}`}
-         >
-           {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />}
-           <span>{children}</span>
-         </Link>
-      );
-  };
-
-  const FlyoutMenu = ({ title, icon: Icon, children, permission, activePath }) => {
-    if (permission && !can(permission)) return null;
-    const isActive = pathname.includes(activePath);
-
-    return (
-        <div className="relative group/main">
-            <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-[14px] transition-all ${isActive ? "bg-[#2271b1] text-white font-bold" : "hover:bg-[#2c3338] hover:text-[#72aee6]"}`}
-            >
-                <div className="flex items-center gap-2">
-                    <Icon className="w-4 h-4" />
-                    <span>{title}</span>
-                </div>
-                <ChevronRight className="w-3 h-3 opacity-50" />
-            </button>
-            
-            {/* Flyout Submenu */}
-            <div className="invisible group-hover/main:visible absolute left-full top-0 w-[180px] bg-[#2c3338] shadow-xl border-l border-white/5 z-[60] py-1 translate-x-[-10px] group-hover/main:translate-x-0 transition-all opacity-0 group-hover/main:opacity-100">
-                <div className="px-4 py-2 border-b border-white/5 mb-1">
-                    <span className="text-[12px] font-bold text-[#72aee6] uppercase tracking-wider">{title}</span>
-                </div>
-                {children}
-            </div>
-        </div>
-    );
-  };
 
   return (
     <aside className="w-[160px] bg-[#1d2327] text-[#f0f0f1] min-h-screen flex flex-col fixed left-0 top-0 z-50 font-sans border-r border-white/5 select-none overflow-visible">
@@ -106,6 +111,14 @@ export default function AdminSidebar() {
                 <NavLink href="/admin/pages" exact isSubmenu>Manage Pages</NavLink>
                 <NavLink href="/admin/pages/new" isSubmenu>Add New Page</NavLink>
            </FlyoutMenu>
+
+           {/* Appearance */}
+           {can("settings.view") && (
+              <Link href="/admin/appearance" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname === "/admin/appearance" ? "bg-[#2271b1] text-white" : "hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
+                 <Palette className="w-4 h-4" />
+                 <span>Appearance</span>
+              </Link>
+           )}
 
            {/* Blog Flyout */}
            <FlyoutMenu title="Blog" icon={FileText} permission="blogs.view" activePath="/admin/blogs">

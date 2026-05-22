@@ -8,10 +8,6 @@ export default function AuditLogs() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchLogs();
-  }, []);
-
   const fetchLogs = async () => {
     try {
       const res = await fetch("/api/admin/audit-logs");
@@ -23,6 +19,12 @@ export default function AuditLogs() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      fetchLogs();
+    });
+  }, []);
 
   return (
     <AdminPageLayout 

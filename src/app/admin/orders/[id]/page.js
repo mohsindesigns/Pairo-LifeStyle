@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   ChevronLeft, 
   User, 
@@ -21,7 +21,7 @@ export default function OrderDetailPage() {
   const [updating, setUpdating] = useState(false);
   const [newNote, setNewNote] = useState("");
 
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/orders/${id}`);
       const data = await res.json();
@@ -31,11 +31,13 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    fetchOrder();
-  }, [id]);
+    Promise.resolve().then(() => {
+      fetchOrder();
+    });
+  }, [fetchOrder]);
 
   const updateStatus = async (newStatus) => {
     setUpdating(true);

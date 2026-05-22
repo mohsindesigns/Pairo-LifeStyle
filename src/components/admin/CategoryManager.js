@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Search, Plus, Trash2, Edit, ExternalLink, ImageIcon, Check, FileText } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import Link from "next/link";
@@ -14,7 +14,7 @@ export default function CategoryManager({ type = "product", title = "Categories"
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/categories?type=${type}`);
@@ -27,11 +27,13 @@ export default function CategoryManager({ type = "product", title = "Categories"
     } finally {
       setLoading(false);
     }
-  };
+  }, [type]);
 
   useEffect(() => {
-    fetchCategories();
-  }, [type]);
+    Promise.resolve().then(() => {
+      fetchCategories();
+    });
+  }, [fetchCategories]);
 
   const handleDelete = async (id) => {
     if (!confirm("Are you sure?")) return;

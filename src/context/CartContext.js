@@ -16,16 +16,18 @@ export function CartProvider({ children }) {
   // Load cart from localStorage when storageKey changes
   useEffect(() => {
     const savedCart = localStorage.getItem(storageKey);
-    if (savedCart) {
-      try {
-        setCartItems(JSON.parse(savedCart));
-      } catch (e) {
-        console.error("Failed to parse cart", e);
+    Promise.resolve().then(() => {
+      if (savedCart) {
+        try {
+          setCartItems(JSON.parse(savedCart));
+        } catch (e) {
+          console.error("Failed to parse cart", e);
+          setCartItems([]);
+        }
+      } else {
         setCartItems([]);
       }
-    } else {
-      setCartItems([]);
-    }
+    });
   }, [storageKey]);
 
   // Save cart to localStorage on change

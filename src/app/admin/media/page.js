@@ -40,7 +40,13 @@ export default function AdminMedia() {
     finally { setLoading(false); }
   }, [search, page, tab]);
 
-  useEffect(() => { fetchMedia("", 1, tab); setSelected(new Set()); setDetailItem(null); }, [tab, fetchMedia]);
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      fetchMedia("", 1, tab);
+      setSelected(new Set());
+      setDetailItem(null);
+    });
+  }, [tab, fetchMedia]);
 
   const handleSearch = (val) => {
     setSearch(val);

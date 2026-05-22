@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { 
   Trash2, 
   RefreshCw, 
@@ -14,7 +14,7 @@ export default function AdminTrash() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchTrash = async () => {
+  const fetchTrash = useCallback(async () => {
     try {
       // For simplicity, we'll fetch deleted products and categories
       const [prodRes, catRes] = await Promise.all([
@@ -28,11 +28,13 @@ export default function AdminTrash() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchTrash();
-  }, []);
+    Promise.resolve().then(() => {
+      fetchTrash();
+    });
+  }, [fetchTrash]);
 
   return (
     <div className="space-y-10">

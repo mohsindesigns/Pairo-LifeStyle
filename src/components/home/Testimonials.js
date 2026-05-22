@@ -73,7 +73,7 @@ const TestimonialCard = ({ review, isActive, position, onSwipe, labels }) => {
       </div>
       <div className="w-full h-px bg-black/[0.05]" />
       <div style={{ transform: "translateZ(30px)" }} className="relative">
-        <p className="text-black text-xs md:text-lg font-medium leading-[1.5] heading-font tracking-tight italic">"{review.text}"</p>
+        <p className="text-black text-xs md:text-lg font-medium leading-[1.5] heading-font tracking-tight italic">&quot;{review.text}&quot;</p>
       </div>
       <div style={{ transform: "translateZ(40px)" }} className="flex items-center gap-3 pt-2">
         <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-black flex items-center justify-center"><CheckCircle2 className="w-3 h-3 md:w-4 md:h-4 text-white" /></div>

@@ -12,10 +12,6 @@ export default function RoleManagement() {
   const [saving, setSaving] = useState(false);
   const [expandedModules, setExpandedModules] = useState({});
 
-  useEffect(() => {
-    fetchRoles();
-  }, []);
-
   const fetchRoles = async () => {
     try {
       const res = await fetch("/api/admin/roles");
@@ -30,6 +26,12 @@ export default function RoleManagement() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      fetchRoles();
+    });
+  }, []);
 
   const togglePermission = (module, action) => {
     if (selectedRole?.slug === 'super-admin') return; // Super admin permissions are handled by bypass logic

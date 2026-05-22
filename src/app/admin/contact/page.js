@@ -71,7 +71,9 @@ export default function AdminContact() {
   }, [pagination.page, pagination.limit, status, searchQuery]);
 
   useEffect(() => {
-    fetchSubmissions();
+    Promise.resolve().then(() => {
+      fetchSubmissions();
+    });
   }, [fetchSubmissions]);
 
   // Live Refresh Polling

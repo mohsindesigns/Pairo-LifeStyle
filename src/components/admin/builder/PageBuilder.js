@@ -38,7 +38,8 @@ import {
   FileText,
   Clock,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  LayoutGrid
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { SECTION_SCHEMAS } from "@/lib/section-schemas";

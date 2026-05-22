@@ -1,32 +1,46 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Dynamic Brand Colors */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-secondary: var(--secondary);
+  --color-border: var(--border);
+  --color-card: var(--card);
+
+  /* Remap hardcoded utility colors to theme tokens to ensure global application */
+  --color-black: var(--primary);
+  --color-white: var(--background);
+  --color-gray-50: var(--secondary);
+  --color-gray-100: var(--muted);
+  --color-gray-200: var(--border);
+  --color-gray-800: var(--foreground);
+  --color-gray-900: var(--foreground);
+
+  /* Fonts */
+  --font-sans: var(--body-font, var(--font-inter)), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--brand-font), sans-serif;
 }
 
 :root {
   color-scheme: light;
   
-  /* --- FONT TESTING AREA (HOT SWAP) --- */
-  --brand-font: var(--font-space);   /* 1. Space Grotesk (Active) */
-  /* --brand-font: var(--font-manrope); */ /* 2. Manrope */
-  /* --brand-font: var(--font-inter); */   /* 3. Inter */
+  /* --- BRAND PALETTE DEFAULT FALLBACK (Admin & Initial Load) --- */
+  --brand-font: var(--font-space);
+  --font-sans: var(--font-inter);
   
-  /* --- BRAND PALETTE (WHITE & BLACK) --- */
   --background: #FFFFFF; 
   --foreground: #1A1A1A;
-  --black: #1A1A1A;
-  --white: #FFFFFF;
-  --sand: #FFFFFF; 
-  --secondary: #F9F9F9; 
+  --primary: #1A1A1A;
   --accent: #1A1A1A;
+  --card: #FFFFFF;
+  --secondary: #F9F9F9; 
   --muted: #F2F2F2;
   --border: rgba(26, 26, 26, 0.06);
   --rating: #1A1A1A; 
-  --discount-bg: rgba(26, 26, 26, 0.05);
-  --discount-text: #1A1A1A;
-  --verified: #1A1A1A;
 }
 
 html {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { 
   Plus, 
   Code2, 
@@ -26,7 +26,7 @@ export default function ScriptManagementPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  const fetchScripts = async () => {
+  const fetchScripts = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/scripts");
       const data = await res.json();
@@ -36,11 +36,13 @@ export default function ScriptManagementPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchScripts();
-  }, []);
+    Promise.resolve().then(() => {
+      fetchScripts();
+    });
+  }, [fetchScripts]);
 
   const toggleStatus = async (script) => {
     try {

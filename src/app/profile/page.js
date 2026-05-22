@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { User, Package, CreditCard, LogOut, Shield, ChevronRight, ShoppingBag, Trash2, Plus, Edit2, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -18,7 +18,7 @@ export default function ProfilePage() {
 
   const router = useRouter();
 
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async () => {
     try {
       const res = await fetch("/api/user/profile");
       if (res.ok) {
@@ -31,15 +31,17 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    } else if (status === "authenticated") {
-      fetchUserData();
-    }
-  }, [status, router]);
+    Promise.resolve().then(() => {
+      if (status === "unauthenticated") {
+        router.push("/login");
+      } else if (status === "authenticated") {
+        fetchUserData();
+      }
+    });
+  }, [status, router, fetchUserData]);
 
   const handleAction = async (action, data) => {
     setLoading(true);

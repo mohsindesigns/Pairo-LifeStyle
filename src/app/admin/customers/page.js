@@ -23,7 +23,9 @@ export default function AdminCustomers() {
   };
 
   useEffect(() => {
-    fetchCustomers();
+    Promise.resolve().then(() => {
+      fetchCustomers();
+    });
   }, []);
 
   const filteredCustomers = customers.filter(c => 

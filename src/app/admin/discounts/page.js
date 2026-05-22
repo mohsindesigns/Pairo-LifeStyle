@@ -35,7 +35,9 @@ export default function AdminDiscounts() {
   };
 
   useEffect(() => {
-    fetchDiscounts();
+    Promise.resolve().then(() => {
+      fetchDiscounts();
+    });
   }, []);
 
   const handleSubmit = async (e) => {

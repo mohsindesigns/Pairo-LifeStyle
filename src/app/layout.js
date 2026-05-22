@@ -14,6 +14,9 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
 
 export const dynamic = 'force-dynamic';
+// export const revalidate = 0;
+
+import ThemeStyle from "@/components/common/ThemeStyle";
 
 export const metadata = {
   title: "Pairo | Premium Shearling Jackets",
@@ -30,7 +33,7 @@ export default async function RootLayout({ children }) {
     console.error("Layout Data Fetch Error:", error);
   }
 
-  const finalConfig = config || { 
+  const sanitizedConfig = config ? JSON.parse(JSON.stringify(config)) : { 
     brand: { name: "Pairo", tagline: "Premium Shearling" },
     navigation: { links: [], offers: ["Welcome to Pairo Store"] },
     hero: { slides: [{ title: "Pairo", subtitle: "Handcrafted Luxury", image: "/placeholder.jpg", buttonText: "Shop Now" }], labels: { viewCollection: "View Collection" } },
@@ -38,12 +41,21 @@ export default async function RootLayout({ children }) {
     categories: { items: [] }
   };
 
-  const sanitizedConfig = JSON.parse(JSON.stringify(finalConfig));
+  // Skip theme injection for admin routes to keep dashboard UI consistent
+  const isAdminRoute = children?.props?.childProp?.segment === 'admin' || 
+                       (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
+  
+  // Using headers to detect admin route in server component
+  const { headers } = await import("next/headers");
+  const headerList = await headers();
+  const fullPath = headerList.get("x-invoke-path") || "";
+  const isActuallyAdmin = fullPath.startsWith('/admin');
 
   return (
     <html lang="en">
       <head>
         <ScriptLoader location="head" />
+        {!isActuallyAdmin && <ThemeStyle />}
       </head>
       <body className={`${inter.variable} ${spaceGrotesk.variable} ${manrope.variable} font-sans antialiased`}>
         <ScriptLoader location="body_top" />

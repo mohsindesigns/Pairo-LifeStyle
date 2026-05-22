@@ -112,7 +112,7 @@ export default async function BlogArchive() {
                         {featuredProduct.name}
                      </h3>
                      <p className="text-white/50 text-[10px] md:text-sm line-clamp-3">
-                        Featured in this season's archival entries.
+                        Featured in this season&apos;s archival entries.
                      </p>
                   </div>
                   <Link 

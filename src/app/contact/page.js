@@ -33,9 +33,11 @@ export default async function ContactPage() {
     notFound();
   }
 
+  const sanitizedSections = JSON.parse(JSON.stringify(page.sections || []));
+
   return (
     <main className="bg-white min-h-screen">
-      <SectionRenderer sections={page.sections} />
+      <SectionRenderer sections={sanitizedSections} />
     </main>
   );
 }

@@ -66,7 +66,7 @@ export default function ProfileOrdersPage() {
                   <ShoppingBag className="w-12 h-12 text-black/10 mx-auto" />
                   <div className="space-y-2">
                      <p className="text-sm font-bold uppercase tracking-widest">No orders yet</p>
-                     <p className="text-xs text-black/40">You haven't made any acquisitions yet.</p>
+                     <p className="text-xs text-black/40">You haven&apos;t made any acquisitions yet.</p>
                   </div>
                   <Link href="/shop" className="inline-block bg-black text-white px-8 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-black/90 transition-all">
                      Start Shopping

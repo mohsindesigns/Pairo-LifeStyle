@@ -308,7 +308,7 @@ export default function NewPromotion() {
                             />
                             <span className="text-[13px]">Apply Automatically</span>
                         </label>
-                        <p className="text-[11px] text-gray-500 ml-6">If enabled, customers don't need a code.</p>
+                        <p className="text-[11px] text-gray-500 ml-6">If enabled, customers don&apos;t need a code.</p>
                     </div>
 
                     {!formData.isAutomatic && (

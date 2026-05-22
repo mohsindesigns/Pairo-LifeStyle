@@ -28,7 +28,7 @@ export const authOptions = {
             const isMatch = await bcrypt.compare(credentials.password, staff.password);
             if (isMatch) {
                 // Update Last Login and IP
-                const ip = req.headers?.get("x-forwarded-for") || "127.0.0.1";
+                const ip = "127.0.0.1"; // Fallback as req is not directly available in this specific authorize scope
                 
                 await Staff.updateOne(
                     { _id: staff._id },

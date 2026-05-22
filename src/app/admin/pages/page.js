@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { 
   Plus, 
   FileText, 
@@ -24,7 +24,7 @@ export default function PagesManagementPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  const fetchPages = async () => {
+  const fetchPages = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/pages");
       const data = await res.json();
@@ -34,11 +34,13 @@ export default function PagesManagementPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchPages();
-  }, []);
+    Promise.resolve().then(() => {
+      fetchPages();
+    });
+  }, [fetchPages]);
 
   const deletePage = async (id, isSystem) => {
     if (isSystem) return toast.error("System pages cannot be deleted");

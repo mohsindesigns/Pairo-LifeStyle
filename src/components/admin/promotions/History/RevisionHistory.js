@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { History, RotateCcw, Clock, User, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function RevisionHistory({ promotionId, onRollback }) {
@@ -6,7 +6,7 @@ export default function RevisionHistory({ promotionId, onRollback }) {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
 
-  const fetchRevisions = async () => {
+  const fetchRevisions = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/promotions/${promotionId}/revisions`);
@@ -17,11 +17,15 @@ export default function RevisionHistory({ promotionId, onRollback }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [promotionId]);
 
   useEffect(() => {
-    if (promotionId) fetchRevisions();
-  }, [promotionId]);
+    if (promotionId) {
+      Promise.resolve().then(() => {
+        fetchRevisions();
+      });
+    }
+  }, [promotionId, fetchRevisions]);
 
   const handleRestore = async (version) => {
     if (!confirm(`Are you sure you want to rollback to Version ${version}? Current unsaved changes will be lost.`)) return;

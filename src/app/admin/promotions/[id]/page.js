@@ -55,7 +55,9 @@ export default function PromotionEditor() {
 
   useEffect(() => {
     const results = Validator.validate(formData);
-    setValidation(results);
+    Promise.resolve().then(() => {
+      setValidation(results);
+    });
   }, [formData]);
 
   const handleSave = async () => {

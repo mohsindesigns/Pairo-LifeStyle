@@ -463,7 +463,7 @@ export default function PageForm({ pageId }) {
                            </div>
                            <div className="flex items-center gap-2">
                               <input type="checkbox" id="noFollow" checked={page.seo?.noFollow} onChange={e=>setPage({...page, seo: {...page.seo, noFollow: e.target.checked}})} />
-                              <label htmlFor="noFollow" className="text-[12px] font-medium text-gray-700 cursor-pointer">No-Follow (Don't follow links)</label>
+                              <label htmlFor="noFollow" className="text-[12px] font-medium text-gray-700 cursor-pointer">No-Follow (Don&apos;t follow links)</label>
                            </div>
                         </div>
                      </div>

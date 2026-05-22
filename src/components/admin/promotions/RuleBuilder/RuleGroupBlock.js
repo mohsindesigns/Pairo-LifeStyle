@@ -96,7 +96,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
 
           {(!group.rules || group.rules.length === 0) && (
             <div className="text-[12px] text-gray-400 italic py-2 pl-2 border border-dashed border-gray-200 rounded-sm bg-gray-50">
-              No rules in this group. Click "Add Rule" to begin.
+              No rules in this group. Click &quot;Add Rule&quot; to begin.
             </div>
           )}
         </div>

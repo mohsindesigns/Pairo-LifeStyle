@@ -18,7 +18,7 @@ export default function CartPage() {
         </div>
         <div className="text-center space-y-3">
           <h1 className="text-3xl font-bold heading-font uppercase tracking-tight">Your Bag is Empty</h1>
-          <p className="text-black/40 text-sm max-w-xs mx-auto">Looks like you haven't added anything to your collection yet.</p>
+          <p className="text-black/40 text-sm max-w-xs mx-auto">Looks like you haven&apos;t added anything to your collection yet.</p>
         </div>
         <Link 
           href="/" 

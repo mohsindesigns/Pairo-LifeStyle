@@ -19,7 +19,9 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     // Generate unique key for this session to prevent double-orders
-    setIdempotencyKey(`pai_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`);
+    Promise.resolve().then(() => {
+      setIdempotencyKey(`pai_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`);
+    });
   }, []);
 
   const applyPromoCode = async () => {

@@ -1,11 +1,26 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ArrowRight, Package, Calendar, Mail } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function SuccessPage() {
-  const orderNumber = "PAI-" + Math.random().toString(36).substr(2, 9).toUpperCase();
+  const [orderNumber, setOrderNumber] = useState("");
+  const [orderDate, setOrderDate] = useState("");
+
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      const params = new URLSearchParams(window.location.search);
+      const orderNum = params.get("orderNumber");
+      if (orderNum) {
+        setOrderNumber(orderNum);
+      } else {
+        setOrderNumber("PAI-" + Math.random().toString(36).substring(2, 11).toUpperCase());
+      }
+      setOrderDate(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
+    });
+  }, []);
 
   return (
     <div className="bg-white min-h-[90vh] text-black font-sans selection:bg-black selection:text-white flex items-center justify-center py-12 px-6">
@@ -37,14 +52,14 @@ export default function SuccessPage() {
                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-black/[0.05]"><Package className="w-4 h-4 text-black/40" /></div>
                  <div>
                     <p className="text-[8px] font-bold text-black/30 uppercase tracking-widest">Order Number</p>
-                    <p className="text-xs font-bold tracking-tight">#{orderNumber}</p>
+                    <p className="text-xs font-bold tracking-tight">{orderNumber ? `#${orderNumber}` : "..."}</p>
                  </div>
               </div>
               <div className="flex items-center gap-4">
                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-black/[0.05]"><Calendar className="w-4 h-4 text-black/40" /></div>
                  <div>
                     <p className="text-[8px] font-bold text-black/30 uppercase tracking-widest">Order Date</p>
-                    <p className="text-xs font-bold tracking-tight">{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                    <p className="text-xs font-bold tracking-tight">{orderDate || "..."}</p>
                  </div>
               </div>
            </div>

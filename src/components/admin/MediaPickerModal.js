@@ -28,10 +28,10 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
   const fileInputRef              = useRef(null);
   const searchTimeout             = useRef(null);
 
-  const fetchMedia = useCallback(async (searchVal = search, pg = page) => {
+  const fetchMedia = useCallback(async (searchVal, pg) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ search: searchVal, page: pg, limit: 30 });
+      const params = new URLSearchParams({ search: searchVal || "", page: String(pg || 1), limit: "30" });
       const res = await fetch(`/api/admin/media?${params}`);
       if (!res.ok) throw new Error("Failed to fetch media");
       const data = await res.json();
@@ -46,10 +46,12 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
-      fetchMedia("", 1);
-      setSelected([]);
-      setTab("library");
-      setDetailItem(null);
+      Promise.resolve().then(() => {
+        fetchMedia("", 1);
+        setSelected([]);
+        setTab("library");
+        setDetailItem(null);
+      });
     } else {
       document.body.style.overflow = "auto";
     }

@@ -33,23 +33,30 @@ export default function SearchModal({ isOpen, onClose }) {
   }, [isOpen]);
 
   useEffect(() => {
-    if (searchQuery.trim().length > 1) {
-      const query = searchQuery.toLowerCase();
-      const allProducts = [...products.newArrivals, ...products.topSelling];
-      const filteredProducts = allProducts.filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.category.toLowerCase().includes(query)
-      ).slice(0, 8);
+    const runSearch = () => {
+      if (searchQuery.trim().length > 1) {
+        const query = searchQuery.toLowerCase();
+        const allProducts = [...products.newArrivals, ...products.topSelling];
+        const filteredProducts = allProducts.filter(p => 
+          p.name.toLowerCase().includes(query) || 
+          p.category.toLowerCase().includes(query)
+        ).slice(0, 8);
 
-      const filteredCategories = categories.items.filter(c => 
-        c.name.toLowerCase().includes(query) || 
-        c.slug.toLowerCase().includes(query)
-      ).slice(0, 4);
+        const filteredCategories = categories.items.filter(c => 
+          c.name.toLowerCase().includes(query) || 
+          c.slug.toLowerCase().includes(query)
+        ).slice(0, 4);
 
-      setResults({ products: filteredProducts, categories: filteredCategories });
-    } else {
-      setResults({ products: [], categories: [] });
-    }
+        setResults({ products: filteredProducts, categories: filteredCategories });
+      } else {
+        setResults((prev) => 
+          prev.products.length === 0 && prev.categories.length === 0 
+            ? prev 
+            : { products: [], categories: [] }
+        );
+      }
+    };
+    Promise.resolve().then(runSearch);
   }, [searchQuery, products, categories]);
 
   return (
@@ -170,7 +177,7 @@ export default function SearchModal({ isOpen, onClose }) {
                       </div>
                     ) : (
                       <div className="py-12 md:py-20 text-center bg-black/5 rounded-2xl md:rounded-3xl border border-dashed border-black/10">
-                        <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-black/30 italic px-4">{search.noProductsFound} "{searchQuery}"</p>
+                        <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-black/30 italic px-4">{search.noProductsFound} &quot;{searchQuery}&quot;</p>
                       </div>
                     )}
                   </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
   Search, 
   Plus, 
@@ -37,7 +37,7 @@ export default function AdminProducts() {
   const [bulkAction, setBulkAction] = useState("Bulk actions");
   const [counts, setCounts] = useState({ all: 0, published: 0, trash: 0 });
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       let url = "/api/admin/products";
@@ -60,9 +60,9 @@ export default function AdminProducts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [view]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/categories?type=product");
       const data = await res.json();
@@ -70,7 +70,7 @@ export default function AdminProducts() {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
 
   const handleTrash = async (id) => {
     if (!confirm("Move to trash?")) return;
@@ -145,9 +145,11 @@ export default function AdminProducts() {
   };
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, [view]);
+    Promise.resolve().then(() => {
+      fetchProducts();
+      fetchCategories();
+    });
+  }, [fetchProducts, fetchCategories]);
 
   const filteredProducts = products.filter(p => {
     const nameMatch = p.name?.toLowerCase().includes(searchTerm.toLowerCase());

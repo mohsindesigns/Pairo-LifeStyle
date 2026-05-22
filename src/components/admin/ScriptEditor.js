@@ -205,7 +205,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                         </div>
                       ) : (
                         <div className="text-center py-10 text-gray-500 italic">
-                          Selected template configuration coming soon. Use 'Custom Snippet' for now.
+                          Selected template configuration coming soon. Use &apos;Custom Snippet&apos; for now.
                         </div>
                       )}
                    </div>

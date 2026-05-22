@@ -103,7 +103,7 @@ function ShopContent() {
     router.push("/shop");
   };
 
-  const FilterSections = ({ isMobile = false }) => (
+  const renderFilterSections = (isMobile = false) => (
     <div className="space-y-10">
       <div className="pb-8 border-b border-black/5">
         <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-black/30 mb-6">Categories</h4>
@@ -193,7 +193,7 @@ function ShopContent() {
         </div>
 
         <div className="flex flex-col lg:grid lg:grid-cols-12 gap-16">
-          <aside className="hidden lg:block lg:col-span-3 h-fit sticky top-32"><FilterSections /></aside>
+          <aside className="hidden lg:block lg:col-span-3 h-fit sticky top-32">{renderFilterSections(false)}</aside>
           <main className="lg:col-span-9 min-h-[800px]">
             {loading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-10">
@@ -233,7 +233,7 @@ function ShopContent() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowFilters(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] lg:hidden" />
             <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 300 }} className="fixed right-0 top-0 bottom-0 w-[85vw] max-w-sm bg-white z-[110] lg:hidden flex flex-col">
               <div className="p-6 flex items-center justify-between border-b border-black/5"><h3 className="text-xl font-bold heading-font uppercase">Filters</h3><button onClick={() => setShowFilters(false)} className="p-2 hover:bg-black/5 rounded-full"><X className="w-6 h-6" /></button></div>
-              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide"><FilterSections isMobile={true} /></div>
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">{renderFilterSections(true)}</div>
               <div className="p-6"><button onClick={() => setShowFilters(false)} className="w-full bg-black text-white py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-xl">Apply</button></div>
             </motion.div>
           </>

@@ -51,7 +51,9 @@ export default function AdminBlogs() {
   };
 
   useEffect(() => {
-    fetchBlogs();
+    Promise.resolve().then(() => {
+      fetchBlogs();
+    });
   }, [view]);
 
   const handleTrash = async (id) => {

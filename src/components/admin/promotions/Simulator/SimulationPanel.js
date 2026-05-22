@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, ShoppingCart, Info, CheckCircle2, XCircle, Calculator, ChevronRight } from 'lucide-react';
+import { Play, ShoppingCart, Info, CheckCircle2, XCircle, Calculator, ChevronRight, AlertTriangle } from 'lucide-react';
 
 export default function SimulationPanel({ promotionData }) {
   const [cart, setCart] = useState({
@@ -153,7 +153,7 @@ export default function SimulationPanel({ promotionData }) {
                </div>
                <div className="text-center">
                   <div className="text-sm font-medium">Ready for simulation</div>
-                  <div className="text-[11px] opacity-60">Configure your rules and mock cart, then hit "Run Simulation"</div>
+                  <div className="text-[11px] opacity-60">Configure your rules and mock cart, then hit &quot;Run Simulation&quot;</div>
                </div>
             </div>
           )}

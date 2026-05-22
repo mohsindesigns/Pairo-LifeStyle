@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
+import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import siteData from "@/lib/data.json";
 
 export async function GET() {
   try {
-    await connectToDatabase();
+    await dbConnect();
     const { about } = siteData;
 
     const aboutPageData = {

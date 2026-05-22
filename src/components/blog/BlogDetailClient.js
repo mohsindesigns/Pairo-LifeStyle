@@ -184,7 +184,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
                        <div className="space-y-6">
                           {post.excerpt && (
                              <p className="text-lg md:text-xl font-medium leading-tight text-black tracking-tight border-l-2 border-black pl-5 italic">
-                                "{post.excerpt}"
+                                 &quot;{post.excerpt}&quot;
                              </p>
                           )}
                           <div 

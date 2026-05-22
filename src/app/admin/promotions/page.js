@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
   Search, 
   Plus, 
@@ -29,7 +29,7 @@ export default function PromotionsDashboard() {
   const [view, setView] = useState("all"); // all, running, paused, expired
   const [selectedIds, setSelectedIds] = useState([]);
 
-  const fetchPromotions = async () => {
+  const fetchPromotions = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/promotions");
@@ -40,11 +40,13 @@ export default function PromotionsDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchPromotions();
-  }, []);
+    Promise.resolve().then(() => {
+      fetchPromotions();
+    });
+  }, [fetchPromotions]);
 
   const handleToggleStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === "Active" ? "Paused" : "Active";
