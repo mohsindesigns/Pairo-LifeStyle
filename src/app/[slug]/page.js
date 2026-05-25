@@ -4,7 +4,7 @@ import Page from "@/models/Page";
 import SectionRenderer from "@/components/common/SectionRenderer";
 import { resolvePageSections } from "@/lib/page-data-resolver";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
-import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 import { RESERVED_SLUGS } from "@/lib/redirect-resolver";
 
 export const dynamic = "force-dynamic";
@@ -68,7 +68,7 @@ export default async function CatchAllCMSPage({ params }) {
       {structuredData && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
       <SectionRenderer sections={sortedSections} />

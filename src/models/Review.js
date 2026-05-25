@@ -38,11 +38,17 @@ const ReviewSchema = new mongoose.Schema({
   recommend: { type: Boolean, default: true },
   ipAddress: { type: String },
   userAgent: { type: String },
+  spamScore: { type: Number, default: 0 },
+  fingerprint: { type: String, index: true },
+  shadowBanned: { type: Boolean, default: false, index: true },
   isDeleted: { type: Boolean, default: false, index: true } // Soft delete support
 }, { timestamps: true });
 
 // Compound unique index: prevent duplicate reviews for the same product in the same order
 ReviewSchema.index({ productId: 1, orderId: 1 }, { unique: true });
+
+// Index for email duplicate checking
+ReviewSchema.index({ customerEmail: 1, productId: 1 });
 
 // Performance index for fetching reviews for a product (approved, sorted by helpfulness or date)
 ReviewSchema.index({ productId: 1, status: 1, isDeleted: 1, helpfulVotes: -1, createdAt: -1 });

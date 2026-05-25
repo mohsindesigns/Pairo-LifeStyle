@@ -38,6 +38,20 @@ export function validateAndParseJsonLd(jsonString) {
 }
 
 /**
+ * Safely stringifies and escapes JSON-LD objects to prevent script breakout injections.
+ * Replacing '<' with '\u003c', '>' with '\u003e', and '/' with '\u002f' ensures that
+ * any inner script tags written in reviews are safely escaped.
+ */
+export function escapeJsonLd(data) {
+  if (!data) return "";
+  const jsonString = typeof data === "string" ? data : JSON.stringify(data);
+  return jsonString
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/\//g, "\\u002f");
+}
+
+/**
  * Normalizes a URL to ensure uniqueness:
  * - lowercase pathname
  * - clean duplicate slashes

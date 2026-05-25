@@ -10,7 +10,7 @@ import ClientTabSystem from "@/components/product/ClientTabSystem";
 import ProductMainSection from "@/components/product/ProductMainSection";
 import { getOptimizedImage, getCloudinarySrcSet } from "@/lib/cloudinary";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
-import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 import Review from "@/models/Review";
 
 export const dynamic = "force-dynamic";
@@ -128,7 +128,7 @@ export default async function ProductDetailPage({ params }) {
       {structuredData && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
       <div className="container mx-auto px-4 sm:px-6 md:px-16 py-4 md:py-8">

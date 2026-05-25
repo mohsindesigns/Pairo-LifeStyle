@@ -6,7 +6,7 @@ import SiteConfig from "@/models/SiteConfig";
 
 export const dynamic = "force-dynamic";
 
-import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 import Page from "@/models/Page";
 
 export async function generateMetadata() {
@@ -103,7 +103,7 @@ export default async function BlogArchive() {
       {structuredData && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
       <section className="pt-32 pb-16 md:pt-48 md:pb-24 border-b border-black/5">

@@ -4,7 +4,17 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Star, User, Check, HelpCircle, ChevronDown, MessageSquareText } from "lucide-react";
 
-import ProductReviews from "./ProductReviews";
+import dynamic from "next/dynamic";
+
+const ProductReviews = dynamic(() => import("./ProductReviews"), {
+  ssr: false,
+  loading: () => (
+    <div className="py-20 flex flex-col items-center justify-center gap-4">
+      <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+      <span className="text-[10px] font-bold uppercase tracking-widest text-black/30 animate-pulse">Loading Reviews Engine...</span>
+    </div>
+  )
+});
 
 export default function ClientTabSystem({ product }) {
   const [activeTab, setActiveTab] = useState("Product Details");

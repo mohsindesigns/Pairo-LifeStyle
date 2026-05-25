@@ -6,7 +6,7 @@ import Product from "@/models/Product";
 import BlogDetailClient from "@/components/blog/BlogDetailClient";
 import mongoose from "mongoose";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
-import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +95,7 @@ export default async function BlogDetail({ params }) {
       {structuredData && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
       <BlogDetailClient

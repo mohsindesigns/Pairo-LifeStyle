@@ -13,5 +13,10 @@ export const siteConfig = {
     prefix: "INV-",
     footerMessage: "Each piece is meticulously inspected by our master craftsmen. Thank you for choosing Pairo.",
     logoUrl: "/logo-black.png"
+  },
+  reviews: {
+    limitByEmail: true,
+    editingWindowDays: 30,
+    profanityList: ['fuck', 'shit', 'asshole', 'bitch', 'crap', 'bastard', 'dick']
   }
 };

@@ -3,7 +3,7 @@ import Page from "@/models/Page";
 import SectionRenderer from "@/components/common/SectionRenderer";
 import { resolvePageSections } from "@/lib/page-data-resolver";
 import SiteConfig from "@/models/SiteConfig";
-import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +86,7 @@ export default async function Home() {
       {structuredData && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
       <SectionRenderer sections={sortedSections} />

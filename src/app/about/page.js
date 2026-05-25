@@ -2,7 +2,7 @@ import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import SectionRenderer from "@/components/common/SectionRenderer";
 import { notFound } from "next/navigation";
-import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 import { resolvePageSections } from "@/lib/page-data-resolver";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +48,7 @@ export default async function AboutPage() {
       {structuredData && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
       <SectionRenderer sections={sortedSections} />

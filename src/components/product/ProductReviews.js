@@ -14,9 +14,41 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Edit2,
+  Trash2,
+  UploadCloud,
+  Loader
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+
+// Helper to generate initials from customer name
+const getInitials = (name) => {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+};
+
+// Helper to generate color theme based on name hashing
+const getAvatarColor = (name) => {
+  if (!name) return "bg-neutral-100 text-neutral-400";
+  const colors = [
+    "bg-red-50 text-red-700 border-red-200",
+    "bg-blue-50 text-blue-700 border-blue-200",
+    "bg-green-50 text-green-700 border-green-200",
+    "bg-amber-50 text-amber-700 border-amber-200",
+    "bg-purple-50 text-purple-700 border-purple-200",
+    "bg-pink-50 text-pink-700 border-pink-200",
+    "bg-indigo-50 text-indigo-700 border-indigo-200"
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
 
 export default function ProductReviews({ productId, productName }) {
   const { data: session } = useSession();
@@ -24,7 +56,7 @@ export default function ProductReviews({ productId, productName }) {
   // State variables
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState({ rating: 0, reviewCount: 0, ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } });
-  const [pagination, setPagination] = useState({ page: 1, limit: 5, total: 0, totalPages: 1 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 5, total: 0, totalPages: 1, nextCursor: null });
   const [sort, setSort] = useState("newest");
   const [loading, setLoading] = useState(true);
   
@@ -41,10 +73,27 @@ export default function ProductReviews({ productId, productName }) {
     orderNumber: ""
   });
 
+  // Customer edit review drawer state
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    rating: 5,
+    title: "",
+    comment: "",
+    recommend: true,
+    guestEmail: "",
+    orderNumber: ""
+  });
+
+  // Mock File Upload State
+  const [mockFiles, setMockFiles] = useState([]);
+  const [dragActive, setDragActive] = useState(false);
+
   // Long review expand/collapse tracking
   const [expandedReviews, setExpandedReviews] = useState({});
-  // Session voting prevention
+  // Session voting prevention and loading
   const [votedReviews, setVotedReviews] = useState({});
+  const [votingIds, setVotingIds] = useState({});
 
   // Sync logged in user name
   useEffect(() => {
@@ -62,7 +111,7 @@ export default function ProductReviews({ productId, productName }) {
         const data = await res.json();
         setReviews(data.reviews || []);
         setStats(data.stats || { rating: 0, reviewCount: 0, ratingBreakdown: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } });
-        setPagination(data.pagination || { page: 1, limit: 5, total: 0, totalPages: 1 });
+        setPagination(data.pagination || { page: 1, limit: 5, total: 0, totalPages: 1, nextCursor: null });
       } else {
         toast.error("Failed to load reviews");
       }
@@ -77,7 +126,7 @@ export default function ProductReviews({ productId, productName }) {
     fetchReviews(1);
   }, [fetchReviews]);
 
-  // Form submit handler
+  // Form submit handler (POST)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -107,6 +156,7 @@ export default function ProductReviews({ productId, productName }) {
       if (res.ok) {
         toast.success(data.message || "Review submitted successfully!");
         setIsFormOpen(false);
+        setMockFiles([]);
         // Reset form
         setFormData({
           rating: 5,
@@ -129,12 +179,57 @@ export default function ProductReviews({ productId, productName }) {
     }
   };
 
+  // Form edit handler (PUT)
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const submitBody = {
+        reviewId: editingReviewId,
+        rating: editFormData.rating,
+        title: editFormData.title,
+        comment: editFormData.comment,
+        recommend: editFormData.recommend
+      };
+
+      if (!session) {
+        submitBody.guestEmail = editFormData.guestEmail;
+        submitBody.orderNumber = editFormData.orderNumber;
+      }
+
+      const res = await fetch(`/api/products/${productId}/reviews`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(submitBody)
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(data.message || "Review updated successfully!");
+        setIsEditOpen(false);
+        setEditingReviewId(null);
+        fetchReviews(1);
+      } else {
+        toast.error(data.error || "Failed to update review.");
+      }
+    } catch (err) {
+      toast.error("Failed to edit review. Connection error.");
+      console.error(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Helpful voting handler
   const handleVote = async (reviewId, type) => {
     if (votedReviews[reviewId]) {
       toast.error("You have already voted on this review.");
       return;
     }
+
+    setVotingIds(prev => ({ ...prev, [reviewId]: true }));
 
     // Optimistic UI update
     setReviews(prev => prev.map(r => {
@@ -178,6 +273,12 @@ export default function ProductReviews({ productId, productName }) {
       }
     } catch (err) {
       console.error("Voting error:", err);
+    } finally {
+      setVotingIds(prev => {
+        const next = { ...prev };
+        delete next[reviewId];
+        return next;
+      });
     }
   };
 
@@ -199,8 +300,62 @@ export default function ProductReviews({ productId, productName }) {
     }
   };
 
+  // Drag and drop mock file handlers
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const newFiles = Array.from(e.dataTransfer.files).map(f => ({
+        name: f.name,
+        size: (f.size / (1024 * 1024)).toFixed(2) + " MB",
+        preview: URL.createObjectURL(f)
+      }));
+      setMockFiles(prev => [...prev, ...newFiles].slice(0, 3));
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const newFiles = Array.from(e.target.files).map(f => ({
+        name: f.name,
+        size: (f.size / (1024 * 1024)).toFixed(2) + " MB",
+        preview: URL.createObjectURL(f)
+      }));
+      setMockFiles(prev => [...prev, ...newFiles].slice(0, 3));
+    }
+  };
+
+  const removeMockFile = (index) => {
+    setMockFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const toggleExpandReview = (reviewId) => {
     setExpandedReviews(prev => ({ ...prev, [reviewId]: !prev[reviewId] }));
+  };
+
+  // Load review data into edit form
+  const handleOpenEdit = (review) => {
+    setEditingReviewId(review._id);
+    setEditFormData({
+      rating: review.rating,
+      title: review.title || "",
+      comment: review.comment || "",
+      recommend: review.recommend,
+      guestEmail: "",
+      orderNumber: ""
+    });
+    setIsEditOpen(true);
   };
 
   // Star breakdown math helper
@@ -269,7 +424,7 @@ export default function ProductReviews({ productId, productName }) {
         </div>
       </div>
 
-      {/* Reviews Submission Form drawer */}
+      {/* Review Submission Form Drawer */}
       {isFormOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-end transition-opacity duration-300">
           <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 md:p-8 flex flex-col justify-between overflow-y-auto animate-slide-in">
@@ -412,10 +567,51 @@ export default function ProductReviews({ productId, productName }) {
                   </label>
                 </div>
 
-                {/* Media Uploader (Future Ready) */}
-                <div className="border border-dashed border-neutral-200 p-4 rounded-xl flex items-center justify-center gap-2 text-neutral-400 text-xs">
-                  <ImageIcon className="w-4 h-4" />
-                  <span>Media uploads (Images/Video) coming soon</span>
+                {/* Interactive Drag & Drop File Upload Mockup */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
+                    Add Photos/Videos
+                  </label>
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-xl p-6 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                      dragActive ? "border-black bg-neutral-50 scale-[0.99]" : "border-neutral-200 hover:border-black bg-white"
+                    }`}
+                    onClick={() => document.getElementById("fileUploadInput").click()}
+                  >
+                    <UploadCloud className="w-8 h-8 text-neutral-400 animate-bounce" />
+                    <span className="text-xs font-bold text-neutral-700">Drag files here or click to upload</span>
+                    <span className="text-[10px] text-neutral-400">PNG, JPG, MP4 (Max 3 files, mock verification)</span>
+                    <input
+                      id="fileUploadInput"
+                      type="file"
+                      multiple
+                      accept="image/*,video/*"
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                  </div>
+
+                  {/* Previews */}
+                  {mockFiles.length > 0 && (
+                    <div className="grid grid-cols-3 gap-3 pt-2">
+                      {mockFiles.map((file, idx) => (
+                        <div key={idx} className="relative aspect-square rounded-lg border border-neutral-100 overflow-hidden bg-neutral-50 group">
+                          <img src={file.preview} alt="upload preview" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); removeMockFile(idx); }}
+                            className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </form>
             </div>
@@ -434,6 +630,156 @@ export default function ProductReviews({ productId, productName }) {
                 className="w-2/3 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-300 transition-colors px-4 py-3 rounded-full text-xs font-bold uppercase tracking-[0.2em]"
               >
                 {submitting ? "Submitting..." : "Submit Review"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Edit Review Drawer */}
+      {isEditOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-end transition-opacity duration-300">
+          <div className="w-full max-w-xl bg-white h-full shadow-2xl p-6 md:p-8 flex flex-col justify-between overflow-y-auto animate-slide-in">
+            <div>
+              <div className="flex justify-between items-center border-b border-neutral-100 pb-4 mb-6">
+                <div>
+                  <h3 className="text-lg font-black heading-font uppercase text-black">
+                    Edit Review
+                  </h3>
+                  <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-0.5">
+                    Modifying review for {productName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setIsEditOpen(false); setEditingReviewId(null); }}
+                  className="p-2 hover:bg-neutral-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-neutral-500" />
+                </button>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="space-y-6">
+                {/* Rating selection */}
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
+                    Product Rating
+                  </label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setEditFormData(prev => ({ ...prev, rating: star }))}
+                        className="p-1 hover:scale-110 transition-transform"
+                      >
+                        <Star
+                          className={`w-8 h-8 ${
+                            star <= editFormData.rating ? "fill-[#FFC633] text-[#FFC633]" : "fill-neutral-200 text-neutral-200"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Verification fields for guests */}
+                {!session && (
+                  <div className="bg-neutral-50 border border-neutral-200/60 p-4 rounded-xl space-y-4">
+                    <div className="flex items-start gap-2.5 text-neutral-500 text-xs">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                      <p className="leading-relaxed">
+                        <strong>Verify Purchase Info:</strong> Provide your checkout details to modify this review.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                          Checkout Email
+                        </label>
+                        <input
+                          required
+                          type="email"
+                          placeholder="e.g. name@domain.com"
+                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
+                          value={editFormData.guestEmail}
+                          onChange={e => setEditFormData(prev => ({ ...prev, guestEmail: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
+                          Order Number
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="e.g. PO-89021"
+                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
+                          value={editFormData.orderNumber}
+                          onChange={e => setEditFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Review title */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
+                    Review Title
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Summarize your experience..."
+                    className="w-full border border-neutral-200 rounded-lg p-3 text-xs outline-none focus:border-black transition-colors"
+                    value={editFormData.title}
+                    onChange={e => setEditFormData(prev => ({ ...prev, title: e.target.value }))}
+                  />
+                </div>
+
+                {/* Review comment */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
+                    Review Description
+                  </label>
+                  <textarea
+                    rows={4}
+                    placeholder="Tell us what you liked or disliked about this product..."
+                    className="w-full border border-neutral-200 rounded-lg p-3 text-xs outline-none focus:border-black transition-colors resize-none"
+                    value={editFormData.comment}
+                    onChange={e => setEditFormData(prev => ({ ...prev, comment: e.target.value }))}
+                  />
+                </div>
+
+                {/* Recommend toggle */}
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="editRecommend"
+                    className="rounded text-black focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
+                    checked={editFormData.recommend}
+                    onChange={e => setEditFormData(prev => ({ ...prev, recommend: e.target.checked }))}
+                  />
+                  <label htmlFor="editRecommend" className="text-xs text-neutral-600 font-bold uppercase tracking-wider cursor-pointer">
+                    I recommend this product
+                  </label>
+                </div>
+              </form>
+            </div>
+
+            <div className="border-t border-neutral-100 pt-4 mt-8 flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setIsEditOpen(false); setEditingReviewId(null); }}
+                className="w-1/3 border border-neutral-200 hover:bg-neutral-50 px-4 py-3 rounded-full text-xs font-bold uppercase tracking-[0.1em] text-neutral-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSubmit}
+                disabled={submitting}
+                className="w-2/3 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-300 transition-colors px-4 py-3 rounded-full text-xs font-bold uppercase tracking-[0.2em]"
+              >
+                {submitting ? "Updating..." : "Save Changes"}
               </button>
             </div>
           </div>
@@ -462,15 +808,36 @@ export default function ProductReviews({ productId, productName }) {
         </div>
       )}
 
-      {/* Loading state */}
+      {/* Loading state with Animated Skeleton Loaders */}
       {loading ? (
-        <div className="py-20 text-center space-y-4">
-          <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold uppercase tracking-widest text-neutral-400">Loading reviews...</p>
+        <div className="space-y-6">
+          {[...Array(3)].map((_, idx) => (
+            <div key={idx} className="border-b border-black/5 pb-8 last:border-0 space-y-4 animate-pulse">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2 w-1/3">
+                  <div className="h-4 bg-neutral-200 rounded w-2/3" />
+                  <div className="h-3 bg-neutral-100 rounded w-1/2" />
+                </div>
+                <div className="h-3 bg-neutral-150 rounded w-16" />
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-neutral-200" />
+                <div className="h-3.5 bg-neutral-100 rounded w-24" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3.5 bg-neutral-100 rounded w-full" />
+                <div className="h-3.5 bg-neutral-100 rounded w-5/6" />
+              </div>
+              <div className="flex justify-between pt-2">
+                <div className="h-6 bg-neutral-150 rounded-full w-28" />
+                <div className="h-4 bg-neutral-100 rounded w-12" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : reviews.length === 0 ? (
         /* Empty state */
-        <div className="py-16 text-center border-2 border-dashed border-neutral-100 rounded-3xl">
+        <div className="py-16 text-center border-2 border-dashed border-neutral-150 rounded-3xl bg-neutral-50/30">
           <MessageSquare className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
           <h4 className="text-sm font-bold uppercase tracking-wider text-black mb-2">No reviews yet</h4>
           <p className="text-xs text-neutral-400 max-w-sm mx-auto leading-relaxed mb-6">
@@ -492,6 +859,12 @@ export default function ProductReviews({ productId, productName }) {
             const displayComment = needsTruncation && !isExpanded 
               ? `${review.comment.substring(0, 280)}...` 
               : review.comment;
+            
+            // Check if reviewer is owner of this review to allow editing
+            const isOwner = session && (
+              review.customerId === session.user.id || 
+              review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase()
+            );
 
             return (
               <div key={review._id} className="border-b border-black/5 pb-8 last:border-0 last:pb-0 space-y-4">
@@ -521,20 +894,30 @@ export default function ProductReviews({ productId, productName }) {
                   </span>
                 </div>
 
-                {/* Reviewer Details */}
-                <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                  <span>{review.customerName}</span>
-                  {review.verifiedPurchase && (
-                    <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-full border border-green-150">
-                      <CheckCircle className="w-3 h-3 fill-green-700 text-white" />
-                      Verified Purchase
-                    </span>
-                  )}
-                  {review.recommend ? (
-                    <span className="text-neutral-400">| Recommends Product</span>
-                  ) : (
-                    <span className="text-neutral-400">| Does Not Recommend</span>
-                  )}
+                {/* Reviewer Details with circular color-coded initials avatar */}
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-xs font-bold ${getAvatarColor(review.customerName)} shadow-sm shrink-0 select-none`}>
+                    {getInitials(review.customerName)}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
+                    <span>{review.customerName}</span>
+                    {review.verifiedPurchase && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-0.5 rounded-full border border-green-150 text-[9px] font-black uppercase tracking-wider shadow-sm select-none">
+                          <CheckCircle className="w-2.5 h-2.5 fill-green-700 text-white" />
+                          Verified Purchase
+                        </span>
+                        <span className="text-[9px] text-neutral-400 font-medium normal-case">
+                          Purchased on {new Date(review.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </span>
+                      </div>
+                    )}
+                    {review.recommend ? (
+                      <span className="text-neutral-400">| Recommends Product</span>
+                    ) : (
+                      <span className="text-neutral-400">| Does Not Recommend</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Review Message */}
@@ -569,7 +952,7 @@ export default function ProductReviews({ productId, productName }) {
                   </div>
                 )}
 
-                {/* Helpful & Report actions */}
+                {/* Helpful, Edit & Report actions */}
                 <div className="flex items-center justify-between pt-2">
                   <div className="flex items-center gap-4">
                     <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest">
@@ -578,32 +961,57 @@ export default function ProductReviews({ productId, productName }) {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleVote(review._id, "helpful")}
+                        disabled={votingIds[review._id]}
                         className={`p-1.5 rounded hover:bg-neutral-100 transition-colors flex items-center gap-1.5 text-neutral-500 hover:text-black ${
                           votedReviews[review._id] === "helpful" ? "text-black bg-neutral-100" : ""
                         }`}
                       >
-                        <ThumbsUp className="w-3.5 h-3.5" />
+                        {votingIds[review._id] && votedReviews[review._id] === "helpful" ? (
+                          <Loader className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        )}
                         <span className="text-xs font-bold">{review.helpfulVotes || 0}</span>
                       </button>
                       <button
                         onClick={() => handleVote(review._id, "unhelpful")}
+                        disabled={votingIds[review._id]}
                         className={`p-1.5 rounded hover:bg-neutral-100 transition-colors flex items-center gap-1.5 text-neutral-500 hover:text-red-600 ${
                           votedReviews[review._id] === "unhelpful" ? "text-red-600 bg-neutral-100" : ""
                         }`}
                       >
-                        <ThumbsDown className="w-3.5 h-3.5" />
+                        {votingIds[review._id] && votedReviews[review._id] === "unhelpful" ? (
+                          <Loader className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        )}
                         <span className="text-xs font-bold">{review.unhelpfulVotes || 0}</span>
                       </button>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleReport(review._id)}
-                    className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-red-600 font-bold uppercase tracking-wider"
-                  >
-                    <Flag className="w-3 h-3" />
-                    Report
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {/* Customer editing option if they are owners (30 day check is enforced on server) */}
+                    {(isOwner || !session) && (
+                      <button
+                        onClick={() => handleOpenEdit(review)}
+                        className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-black font-bold uppercase tracking-wider"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        Edit Review
+                      </button>
+                    )}
+                    
+                    {(isOwner || !session) && <span className="text-neutral-200 text-xs">|</span>}
+
+                    <button
+                      onClick={() => handleReport(review._id)}
+                      className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-red-600 font-bold uppercase tracking-wider"
+                    >
+                      <Flag className="w-3 h-3" />
+                      Report
+                    </button>
+                  </div>
                 </div>
               </div>
             );
