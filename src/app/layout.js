@@ -21,6 +21,15 @@ import ThemeStyle from "@/components/common/ThemeStyle";
 export const metadata = {
   title: "Pairo | Premium Shearling Jackets",
   description: "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pairo.store"),
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
 };
 
 export default async function RootLayout({ children }) {

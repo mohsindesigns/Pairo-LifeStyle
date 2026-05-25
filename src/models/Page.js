@@ -57,7 +57,7 @@ const PageSchema = new mongoose.Schema({
   seo: {
     title: String,
     description: String,
-    keywords: String,
+    keywords: [String],
     focusKeyword: String,
     secondaryKeywords: String,
     canonicalUrl: String,
@@ -79,4 +79,5 @@ const PageSchema = new mongoose.Schema({
 // Ensure slugs are indexable
 PageSchema.index({ slug: 1, tenantId: 1 }, { unique: true });
 
+delete mongoose.models.Page;
 export default mongoose.models.Page || mongoose.model("Page", PageSchema);

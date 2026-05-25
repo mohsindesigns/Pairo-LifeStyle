@@ -21,6 +21,7 @@ export default function BlogForm({ blogId }) {
    const router = useRouter();
    const [loading, setLoading] = useState(blogId ? true : false);
    const [saving, setSaving] = useState(false);
+   const [activeFormTab, setActiveFormTab] = useState("content");
    const [formData, setFormData] = useState({
       title: "",
       slug: "",
@@ -40,7 +41,18 @@ export default function BlogForm({ blogId }) {
       seo: {
          title: "",
          description: "",
-         keywords: ""
+         keywords: [],
+         focusKeyword: "",
+         canonicalUrl: "",
+         noIndex: false,
+         noFollow: false,
+         ogTitle: "",
+         ogDescription: "",
+         ogImage: "",
+         twitterTitle: "",
+         twitterDescription: "",
+         twitterImage: "",
+         structuredData: ""
       }
    });
 
@@ -48,30 +60,50 @@ export default function BlogForm({ blogId }) {
    const [products, setProducts] = useState([]);
 
    useEffect(() => {
-      fetch("/api/admin/categories?type=blog")
-         .then(res => res.json())
-         .then(data => setCategories(Array.isArray(data) ? data : []));
+      const fetchData = async () => {
+         try {
+            const [catsRes, prodsRes] = await Promise.all([
+               fetch("/api/admin/categories?type=blog"),
+               fetch("/api/admin/products")
+            ]);
 
-      // Fetch products for the dropdown
-      fetch("/api/admin/products")
-         .then(res => res.json())
-         .then(data => {
-            const productList = Array.isArray(data) ? data : (data.products || []);
-            setProducts(productList);
-         });
+            if (!catsRes.ok || !prodsRes.ok) {
+               throw new Error("Authentication failed or server returned an error.");
+            }
 
-      if (blogId) {
-         fetch(`/api/admin/blogs?id=${blogId}`)
-            .then(res => res.json())
-            .then(data => {
-               setFormData({
-                  ...data,
-                  category: data.category || "Uncategorized",
-                  seo: data.seo || { title: "", description: "", keywords: "" }
-               });
-               setLoading(false);
-            });
-      }
+            const cats = await catsRes.json();
+            const prods = await prodsRes.json();
+
+            setCategories(Array.isArray(cats) ? cats : []);
+            setProducts(Array.isArray(prods) ? prods : (prods.products || []));
+
+            if (blogId) {
+               const blogRes = await fetch(`/api/admin/blogs?id=${blogId}`);
+               if (!blogRes.ok) {
+                  throw new Error("Failed to fetch blog post details.");
+               }
+               const data = await blogRes.json();
+               setFormData(prev => ({
+                   ...prev,
+                   ...data,
+                   category: data.category || "Uncategorized",
+                   seo: {
+                     title: "", description: "", keywords: [], focusKeyword: "",
+                     canonicalUrl: "", noIndex: false, noFollow: false,
+                     ogTitle: "", ogDescription: "", ogImage: "",
+                     twitterTitle: "", twitterDescription: "", twitterImage: "",
+                     structuredData: "",
+                     ...(data.seo || {})
+                   }
+                }));
+            }
+            setLoading(false);
+         } catch (err) {
+            console.error("Fetch failed", err);
+            setLoading(false);
+         }
+      };
+      fetchData();
    }, [blogId]);
 
    const handleSubmit = async (e) => {
@@ -79,16 +111,21 @@ export default function BlogForm({ blogId }) {
       setSaving(true);
       try {
          const method = blogId ? "PUT" : "POST";
+         // Strip immutable Mongoose fields that cause _id update errors
+         const { _id, __v, createdAt, updatedAt, ...cleanData } = formData;
+         const payload = blogId ? { ...cleanData, id: blogId } : cleanData;
+         console.log("[BlogForm] Submitting seo:", payload.seo);
          const res = await fetch("/api/admin/blogs", {
             method,
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(blogId ? { ...formData, id: blogId } : formData)
+            body: JSON.stringify(payload)
          });
          if (res.ok) {
             router.push("/admin/blogs");
          } else {
-            const data = await res.json();
-            alert(`Error: ${data.error || "Failed to save blog"}`);
+            const errData = await res.json().catch(() => ({}));
+            alert(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
+            console.error("[BlogForm] Save failed:", errData);
          }
       } catch (err) {
          console.error(err);
@@ -98,9 +135,45 @@ export default function BlogForm({ blogId }) {
       }
    };
 
-   if (loading) return <div className="p-10 text-[13px] text-gray-400 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
-
-   return (
+    if (loading) return <div className="p-10 text-[13px] text-gray-400 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
+ 
+    if (blogId && !formData.title) {
+       return (
+          <div className="p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
+             <div className="bg-white p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
+                <h2 className="text-[#d63638] font-bold text-[16px] mb-2">
+                   Failed to load blog data
+                </h2>
+                <p className="text-gray-600 text-[13px] mb-6 leading-relaxed">
+                   Your administrator session may have expired, or the blog post you are trying to edit does not exist. Please try logging back in.
+                </p>
+                <div className="flex flex-col gap-2.5">
+                   <button 
+                      type="button" 
+                      onClick={() => window.location.reload()} 
+                      className="w-full bg-[#2271b1] text-white px-4 py-2 text-[12px] font-bold hover:bg-[#135e96] transition-all text-center rounded-sm"
+                   >
+                      Retry Connection / Reload
+                   </button>
+                   <a 
+                      href="/admin-login" 
+                      className="w-full border border-[#c3c4c7] text-gray-700 px-4 py-2 text-[12px] font-bold bg-[#f6f7f7] hover:bg-[#f0f0f1] transition-all text-center block rounded-sm"
+                   >
+                      Log In to Admin Panel
+                   </a>
+                   <a 
+                      href="/admin/blogs" 
+                      className="w-full text-[#2271b1] text-[12px] hover:underline text-center mt-2 block"
+                   >
+                      ← Back to Blogs List
+                   </a>
+                </div>
+             </div>
+          </div>
+       );
+    }
+ 
+    return (
     <AdminPageLayout 
       title={blogId ? "Edit Blog" : "Add New Blog"} 
       addNewLink="/admin/blogs/new"
@@ -114,7 +187,7 @@ export default function BlogForm({ blogId }) {
                   <input
                      required
                      placeholder="Enter title here"
-                     className="w-full border border-[#c3c4c7] outline-none px-3 py-2 text-[20px] bg-white shadow-inner font-semibold"
+                     className="w-full border border-[#c3c4c7] outline-none px-3 py-2 text-[20px] bg-white shadow-inner font-semibold post-title-input"
                      value={formData.title}
                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   />
@@ -124,66 +197,98 @@ export default function BlogForm({ blogId }) {
                   </div>
                </div>
 
-               {/* Content Meta Box (General) */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">General Content</div>
-                  <TiptapEditor
-                     content={formData.content}
-                     onChange={(html) => setFormData({ ...formData, content: html })}
-                  />
+               {/* Content / SEO Tabs */}
+               <div className="flex border-b border-[#ccd0d4] gap-1 bg-[#f0f2f1] p-1 rounded w-fit">
+                  <button
+                     type="button"
+                     onClick={() => setActiveFormTab("content")}
+                     className={`px-4 py-1.5 text-[13px] font-bold transition-all rounded ${
+                        activeFormTab === "content"
+                           ? "bg-white text-[#2271b1] shadow-sm border border-[#ccd0d4]/60"
+                           : "text-gray-600 hover:text-black hover:bg-[#f6f7f7]/50"
+                     }`}
+                  >
+                     Content Editor
+                  </button>
+                  <button
+                     type="button"
+                     onClick={() => setActiveFormTab("seo")}
+                     className={`px-4 py-1.5 text-[13px] font-bold transition-all rounded ${
+                        activeFormTab === "seo"
+                           ? "bg-white text-[#2271b1] shadow-sm border border-[#ccd0d4]/60"
+                           : "text-gray-600 hover:text-black hover:bg-[#f6f7f7]/50"
+                     }`}
+                  >
+                     SEO Settings
+                  </button>
                </div>
 
-               {/* Heritage Section */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Section 01: Heritage</div>
-                  <TiptapEditor
-                     content={formData.heritage}
-                     onChange={(html) => setFormData({ ...formData, heritage: html })}
-                  />
-               </div>
+               {activeFormTab === "content" ? (
+                  <>
+                     {/* Content Meta Box (General) */}
+                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
+                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">General Content</div>
+                        <TiptapEditor
+                           content={formData.content}
+                           onChange={(html) => setFormData({ ...formData, content: html })}
+                        />
+                     </div>
 
-               {/* Process Section */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Section 02: Process</div>
-                  <TiptapEditor
-                     content={formData.process}
-                     onChange={(html) => setFormData({ ...formData, process: html })}
-                  />
-               </div>
+                     {/* Heritage Section */}
+                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
+                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Section 01: Heritage</div>
+                        <TiptapEditor
+                           content={formData.heritage}
+                           onChange={(html) => setFormData({ ...formData, heritage: html })}
+                        />
+                     </div>
 
-               {/* Style Section */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Section 03: Style</div>
-                  <TiptapEditor
-                     content={formData.style}
-                     onChange={(html) => setFormData({ ...formData, style: html })}
-                  />
-               </div>
+                     {/* Process Section */}
+                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
+                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Section 02: Process</div>
+                        <TiptapEditor
+                           content={formData.process}
+                           onChange={(html) => setFormData({ ...formData, process: html })}
+                        />
+                     </div>
 
-               {/* Excerpt Meta Box */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Excerpt</div>
-                  <div className="p-0">
-                     <textarea
-                        rows={4}
-                        className="w-full p-4 text-[13px] outline-none border-none resize-none leading-relaxed bg-[#fcfcfc] focus:bg-white transition-colors"
-                        placeholder="Add a brief summary of the post..."
-                        value={formData.excerpt}
-                        onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
+                     {/* Style Section */}
+                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
+                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Section 03: Style</div>
+                        <TiptapEditor
+                           content={formData.style}
+                           onChange={(html) => setFormData({ ...formData, style: html })}
+                        />
+                     </div>
+
+                     {/* Excerpt Meta Box */}
+                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
+                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Excerpt</div>
+                        <div className="p-0">
+                           <textarea
+                              rows={4}
+                              className="w-full p-4 text-[13px] outline-none border-none resize-none leading-relaxed bg-[#fcfcfc] focus:bg-white transition-colors"
+                              placeholder="Add a brief summary of the post..."
+                              value={formData.excerpt}
+                              onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
+                           />
+                        </div>
+                     </div>
+                  </>
+               ) : (
+                  <div className="bg-white border border-[#c3c4c7] shadow-sm p-6">
+                     <h2 className="text-[14px] font-bold text-gray-700 mb-4 border-b border-gray-100 pb-2">SEO Configurations</h2>
+                     <SEOConfigPanel
+                        seo={formData.seo || {}}
+                        onChange={newSeo => setFormData(prev => ({ ...prev, seo: newSeo }))}
+                        parentTitle={formData.title}
+                        parentDescription={formData.excerpt || formData.content}
+                        parentSlug={formData.slug}
+                        parentImage={formData.image}
+                        parentType="blog"
                      />
                   </div>
-               </div>
-
-               {/* SEO Meta Box */}
-               <SEOConfigPanel
-                  seo={formData.seo || {}}
-                  onChange={newSeo => setFormData({ ...formData, seo: newSeo })}
-                  parentTitle={formData.title}
-                  parentDescription={formData.excerpt || formData.content}
-                  parentSlug={formData.slug}
-                  parentImage={formData.image}
-                  parentType="blog"
-               />
+               )}
             </div>
 
             {/* Sidebar */}

@@ -27,7 +27,7 @@ function AdminGuard({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f0f0f1] font-sans selection:bg-[#2271b1] selection:text-white">
+    <div className="min-h-screen bg-[#f0f0f1] font-sans selection:bg-[#2271b1] selection:text-white admin-dashboard-container">
       <AdminSidebar />
       <div className="pl-[160px] flex flex-col min-h-screen">
         <main className="flex-1 bg-[#f0f2f1]">

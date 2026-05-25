@@ -191,6 +191,7 @@ export default function PageForm({ pageId }) {
    const router = useRouter();
    const [loading, setLoading] = useState(true);
    const [saving, setSaving] = useState(false);
+   const [activeFormTab, setActiveFormTab] = useState("content");
    const [page, setPage] = useState(null);
    const [expandedSectionId, setExpandedSectionId] = useState(null);
    const [mediaPicker, setMediaPicker] = useState({ open: false, onSelect: null });
@@ -228,6 +229,7 @@ export default function PageForm({ pageId }) {
          } catch (err) {
             console.error("Fetch failed", err);
             toast.error("Failed to load page data");
+            setLoading(false);
          }
       };
       fetchData();
@@ -237,17 +239,25 @@ export default function PageForm({ pageId }) {
       if (e) e.preventDefault();
       setSaving(true);
       try {
+         // Strip immutable Mongoose fields that cause _id update errors
+         const { _id, __v, createdAt, updatedAt, ...cleanPage } = page;
+         console.log("[PageForm] Saving page seo:", cleanPage.seo);
          const res = await fetch(`/api/admin/pages/${pageId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(page)
+            body: JSON.stringify(cleanPage)
          });
          if (res.ok) {
             toast.success("Page updated successfully");
             router.push("/admin/pages");
+         } else {
+            const errData = await res.json().catch(() => ({}));
+            toast.error(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
+            console.error("[PageForm] Save failed:", errData);
          }
       } catch (err) {
-         toast.error("Failed to save changes");
+         toast.error(`Failed to save changes: ${err.message}`);
+         console.error(err);
       } finally {
          setSaving(false);
       }
@@ -343,12 +353,48 @@ export default function PageForm({ pageId }) {
             const oldIndex = prev.sections.findIndex(s => s.id === active.id);
             const newIndex = prev.sections.findIndex(s => s.id === over.id);
             const newSections = arrayMove(prev.sections, oldIndex, newIndex).map((s, i) => ({ ...s, order: i }));
-            return { ...prev, sections: newSections };
+           return { ...prev, sections: newSections };
          });
       }
    };
 
    if (loading) return <div className="p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading WordPress-style editor...</div>;
+
+   if (!page) {
+      return (
+         <div className="p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
+            <div className="bg-white p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
+               <h2 className="text-[#d63638] font-bold text-[16px] mb-2 flex items-center gap-2">
+                  Failed to load page data
+               </h2>
+               <p className="text-gray-600 text-[13px] mb-6 leading-relaxed">
+                  Your administrator session may have expired, or the page you are trying to edit does not exist. Please try logging back in.
+               </p>
+               <div className="flex flex-col gap-2.5">
+                  <button 
+                     type="button" 
+                     onClick={() => window.location.reload()} 
+                     className="w-full bg-[#2271b1] text-white px-4 py-2 text-[12px] font-bold hover:bg-[#135e96] transition-all text-center rounded-sm"
+                  >
+                     Retry Connection / Reload
+                  </button>
+                  <Link 
+                     href="/admin-login" 
+                     className="w-full border border-[#c3c4c7] text-gray-700 px-4 py-2 text-[12px] font-bold bg-[#f6f7f7] hover:bg-[#f0f0f1] transition-all text-center block rounded-sm"
+                  >
+                     Log In to Admin Panel
+                  </Link>
+                  <Link 
+                     href="/admin/pages" 
+                     className="w-full text-[#2271b1] text-[12px] hover:underline text-center mt-2 block"
+                  >
+                     ← Back to Pages List
+                  </Link>
+               </div>
+            </div>
+         </div>
+      );
+   }
 
    return (
       <AdminPageLayout 
@@ -365,7 +411,7 @@ export default function PageForm({ pageId }) {
                      <input
                         required
                         placeholder="Enter title here"
-                        className="w-full border border-[#c3c4c7] outline-none px-3 py-2 text-[20px] bg-white shadow-inner font-semibold"
+                        className="w-full border border-[#c3c4c7] outline-none px-3 py-2 text-[20px] bg-white shadow-inner font-semibold post-title-input"
                         value={page.title}
                         onChange={(e) => setPage({ ...page, title: e.target.value })}
                      />
@@ -377,71 +423,101 @@ export default function PageForm({ pageId }) {
                   </div>
                </div>
 
-               {/* Section Manager Meta Box */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-4 py-2 flex items-center justify-between">
-                     <span className="text-[13px] font-bold text-gray-700 uppercase tracking-tighter">Page Sections</span>
-                     <div className="relative group">
-                        <button type="button" className="text-[11px] font-bold text-[#2271b1] hover:text-black flex items-center gap-1">
-                           <Plus className="w-3.5 h-3.5" /> Add Section
-                        </button>
-                        <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-[#c3c4c7] shadow-xl z-50 hidden group-hover:block py-1">
-                           {Object.entries(SECTION_SCHEMAS).map(([type, s]) => (
-                              <button 
-                                 key={type} 
-                                 type="button"
-                                 onClick={() => {
-                                    const id = generateId();
-                                    const newSec = { id, type, enabled: true, order: page.sections.length, config: {} };
-                                    setPage({ ...page, sections: [...page.sections, newSec] });
-                                    setExpandedSectionId(id);
-                                 }}
-                                 className="w-full text-left px-4 py-1.5 text-[12px] hover:bg-[#2271b1] hover:text-white"
-                              >
-                                 {s.name}
-                              </button>
-                           ))}
-                        </div>
-                     </div>
-                  </div>
-                  <div className="p-4 bg-[#f0f2f1]/30">
-                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <SortableContext items={page.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                           <div className="space-y-1">
-                              {page.sections.map((s) => (
-                                 <SectionMetaBox 
-                                    key={s.id} 
-                                    section={s} 
-                                    isExpanded={expandedSectionId === s.id} 
-                                    onToggleExpand={(id) => setExpandedSectionId(expandedSectionId === id ? null : id)} 
-                                    onUpdate={updateSection} 
-                                    onDelete={(id) => setPage({ ...page, sections: page.sections.filter(x => x.id !== id) })} 
-                                    onDuplicate={(sec) => {
-                                       const id = generateId();
-                                       const newSec = { ...JSON.parse(JSON.stringify(sec)), id, order: page.sections.length };
-                                       setPage({ ...page, sections: [...page.sections, newSec] });
-                                       setExpandedSectionId(id);
-                                    }} 
-                                    onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })} 
-                                    renderField={renderField} 
-                                 />
-                              ))}
-                           </div>
-                        </SortableContext>
-                     </DndContext>
-                  </div>
+               {/* Content / SEO Tabs */}
+               <div className="flex border-b border-[#ccd0d4] gap-1 bg-[#f0f2f1] p-1 rounded w-fit">
+                  <button
+                     type="button"
+                     onClick={() => setActiveFormTab("content")}
+                     className={`px-4 py-1.5 text-[13px] font-bold transition-all rounded ${
+                        activeFormTab === "content"
+                           ? "bg-white text-[#2271b1] shadow-sm border border-[#ccd0d4]/60"
+                           : "text-gray-600 hover:text-black hover:bg-[#f6f7f7]/50"
+                     }`}
+                  >
+                     Content Editor
+                  </button>
+                  <button
+                     type="button"
+                     onClick={() => setActiveFormTab("seo")}
+                     className={`px-4 py-1.5 text-[13px] font-bold transition-all rounded ${
+                        activeFormTab === "seo"
+                           ? "bg-white text-[#2271b1] shadow-sm border border-[#ccd0d4]/60"
+                           : "text-gray-600 hover:text-black hover:bg-[#f6f7f7]/50"
+                     }`}
+                  >
+                     SEO Settings
+                  </button>
                </div>
 
-               {/* Advanced SEO & Social Meta Box */}
-               <SEOConfigPanel
-                  seo={page.seo || {}}
-                  onChange={newSeo => setPage({ ...page, seo: newSeo })}
-                  parentTitle={page.title}
-                  parentDescription={page.description}
-                  parentSlug={page.slug}
-                  parentImage=""
-                  parentType="page"
-               />
+               {activeFormTab === "content" ? (
+                  /* Section Manager Meta Box */
+                  <div className="bg-white border border-[#c3c4c7] shadow-sm">
+                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-4 py-2 flex items-center justify-between">
+                        <span className="text-[13px] font-bold text-gray-700 uppercase tracking-tighter">Page Sections</span>
+                        <div className="relative group">
+                           <button type="button" className="text-[11px] font-bold text-[#2271b1] hover:text-black flex items-center gap-1">
+                              <Plus className="w-3.5 h-3.5" /> Add Section
+                           </button>
+                           <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-[#c3c4c7] shadow-xl z-50 hidden group-hover:block py-1">
+                              {Object.entries(SECTION_SCHEMAS).map(([type, s]) => (
+                                 <button 
+                                    key={type} 
+                                    type="button"
+                                    onClick={() => {
+                                       const id = generateId();
+                                       const newSec = { id, type, enabled: true, order: page.sections.length, config: {} };
+                                       setPage({ ...page, sections: [...page.sections, newSec] });
+                                       setExpandedSectionId(id);
+                                    }}
+                                    className="w-full text-left px-4 py-1.5 text-[12px] hover:bg-[#2271b1] hover:text-white"
+                                 >
+                                    {s.name}
+                                 </button>
+                              ))}
+                           </div>
+                        </div>
+                     </div>
+                     <div className="p-4 bg-[#f0f2f1]/30">
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                           <SortableContext items={page.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                              <div className="space-y-1">
+                                 {page.sections.map((s) => (
+                                    <SectionMetaBox 
+                                       key={s.id} 
+                                       section={s} 
+                                       isExpanded={expandedSectionId === s.id} 
+                                       onToggleExpand={(id) => setExpandedSectionId(expandedSectionId === id ? null : id)} 
+                                       onUpdate={updateSection} 
+                                       onDelete={(id) => setPage({ ...page, sections: page.sections.filter(x => x.id !== id) })} 
+                                       onDuplicate={(sec) => {
+                                          const id = generateId();
+                                          const newSec = { ...JSON.parse(JSON.stringify(sec)), id, order: page.sections.length };
+                                          setPage({ ...page, sections: [...page.sections, newSec] });
+                                          setExpandedSectionId(id);
+                                       }} 
+                                       onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })} 
+                                       renderField={renderField} 
+                                    />
+                                 ))}
+                              </div>
+                           </SortableContext>
+                        </DndContext>
+                     </div>
+                  </div>
+               ) : (
+                  <div className="bg-white border border-[#c3c4c7] shadow-sm p-6">
+                     <h2 className="text-[14px] font-bold text-gray-700 mb-4 border-b border-gray-100 pb-2">SEO Configurations</h2>
+                     <SEOConfigPanel
+                        seo={page.seo || {}}
+                        onChange={newSeo => setPage(prev => ({ ...prev, seo: newSeo }))}
+                        parentTitle={page.title}
+                        parentDescription={page.description}
+                        parentSlug={page.slug}
+                        parentImage=""
+                        parentType="page"
+                     />
+                  </div>
+               )}
             </div>
 
             {/* Sidebar */}

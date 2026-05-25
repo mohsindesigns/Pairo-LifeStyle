@@ -19,7 +19,7 @@ export async function GET(req) {
   await dbConnect();
   try {
     if (id) {
-      const product = await Product.findById(id);
+      const product = await Product.findById(id).lean();
       return NextResponse.json(product);
     }
 
@@ -92,13 +92,21 @@ export async function PUT(req) {
 
   await dbConnect();
   try {
-    const { id, tenantId = "DEFAULT_STORE", ...data } = await req.json();
+    const rawBody = await req.json();
+    const { id, tenantId, _id, __v, createdAt, updatedAt, ...data } = rawBody;
     
-    // Scoped Update
-    const oldProduct = await Product.findOne({ _id: id, tenantId });
-    if (!oldProduct) return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    console.log("[Products PUT] Updating product:", id, "with seo:", data.seo);
+    
+    // Find by _id only (tenantId may not be present on legacy products)
+    const oldProduct = await Product.findById(id);
+    if (!oldProduct) {
+      console.error("[Products PUT] Product not found:", id);
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
 
-    const product = await Product.findOneAndUpdate({ _id: id, tenantId }, data, { new: true, runValidators: true });
+    // Use $set so nested objects (seo, narrative, etc.) are properly merged
+    const product = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: false });
+    console.log("[Products PUT] Saved seo:", product?.seo);
 
     // Update media usage tracking
     const oldImages = [

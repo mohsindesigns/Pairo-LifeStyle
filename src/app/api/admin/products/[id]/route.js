@@ -50,7 +50,7 @@ export async function PUT(req, { params }) {
       await registerRedirect(`/product/${oldProduct.slug}`, `/product/${data.slug}`);
     }
 
-    const product = await Product.findByIdAndUpdate(params.id, data, { new: true, runValidators: true });
+    const product = await Product.findByIdAndUpdate(params.id, { $set: data }, { new: true, runValidators: true });
     return NextResponse.json(product);
   } catch (error) {
     console.error("PUT Error:", error);

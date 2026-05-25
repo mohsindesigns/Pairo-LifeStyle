@@ -14,7 +14,7 @@ export async function GET(req) {
 
    try {
       if (id) {
-         const blog = await Blog.findById(id);
+         const blog = await Blog.findById(id).lean();
          return NextResponse.json(blog);
       }
       let query = { 
@@ -79,8 +79,9 @@ export async function PUT(req) {
 
    await dbConnect();
    try {
-      const data = await req.json();
-      const { id, tenantId = "DEFAULT_STORE", ...updateData } = data;
+      const rawData = await req.json();
+      const { id, tenantId, _id, __v, createdAt, updatedAt, ...updateData } = rawData;
+      console.log("[Blogs PUT] Updating blog:", id, "with seo:", updateData.seo);
 
       const oldBlog = await Blog.findById(id);
       if (!oldBlog) return NextResponse.json({ error: "Blog not found" }, { status: 404 });
@@ -94,7 +95,7 @@ export async function PUT(req) {
       if (updateData.slug) {
          let slug = updateData.slug;
          let count = 1;
-         while (await Blog.findOne({ slug, _id: { $ne: id }, tenantId })) {
+         while (await Blog.findOne({ slug, _id: { $ne: id } })) {
             slug = `${updateData.slug}-${count}`;
             count++;
          }
@@ -108,13 +109,15 @@ export async function PUT(req) {
       }
 
       console.log("UPDATING BLOG:", id, updateData);
-      const blog = await Blog.findOneAndUpdate({ _id: id, tenantId }, updateData, { new: true });
+      // Use $set so nested objects (seo, etc.) are properly merged without wiping other fields
+      const blog = await Blog.findByIdAndUpdate(id, { $set: updateData }, { new: true });
       return NextResponse.json(blog);
     } catch (err) {
       console.error("BLOG PUT ERROR:", err);
       return NextResponse.json({ error: err.message }, { status: 500 });
     }
 }
+
 
 export async function DELETE(req) {
    const session = await getServerSession(authOptions);

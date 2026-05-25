@@ -95,6 +95,8 @@ describe("SEO - Centralized Metadata Resolver", () => {
     expect(metadata.alternates.canonical).toBe("https://pairo.store/product/handcrafted-shearling-coat");
     expect(metadata.robots.index).toBe(true);
     expect(metadata.robots.follow).toBe(false);
+    expect(metadata.twitter.site).toBe("@pairostore");
+    expect(metadata.twitter.creator).toBe("@pairostore");
 
     expect(structuredData).toBeDefined();
     expect(structuredData["@type"]).toBe("Product");

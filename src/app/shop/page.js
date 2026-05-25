@@ -1,19 +1,23 @@
 import { Suspense } from "react";
 import dbConnect from "@/lib/db";
 import Category from "@/models/Category";
+import Page from "@/models/Page";
 import ShopContentClient from "./ShopContentClient";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata } from "@/lib/seo-resolver";
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ searchParams }) {
   const resolvedSearchParams = await searchParams;
   const categorySlug = resolvedSearchParams.category;
 
+  await dbConnect();
+
   if (categorySlug) {
     const currentPath = `/shop?category=${categorySlug}`;
     await checkAndApplyRedirect(currentPath);
 
-    await dbConnect();
     const category = await Category.findOne({ slug: categorySlug, type: "product" }).lean();
     if (category) {
       const { metadata } = resolveSEOMetadata({
@@ -25,13 +29,17 @@ export async function generateMetadata({ searchParams }) {
     }
   }
 
-  return {
-    title: "Shop All | Pairo Store",
-    description: "Browse Pairo's handcrafted premium shearling jackets, coats, and accessories.",
-    alternates: {
-      canonical: "https://pairo.store/shop"
-    }
-  };
+  // Check for dynamic shop page override from database
+  const shopPage = await Page.findOne({ slug: "shop" }).lean();
+  const { metadata } = resolveSEOMetadata({
+    entity: shopPage || {},
+    type: "page",
+    fallbackTitle: "Shop All | Pairo Store",
+    fallbackDesc: "Browse Pairo's handcrafted premium shearling jackets, coats, and accessories.",
+    path: "/shop"
+  });
+
+  return metadata;
 }
 
 export default async function ShopPage({ searchParams }) {

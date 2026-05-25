@@ -130,3 +130,64 @@ img {
 .animate-fadeIn {
   animation: fadeIn 0.3s ease;
 }
+
+/* Admin Dashboard Font Size Adjustments - WordPress compact style */
+.admin-dashboard-container {
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+}
+
+.admin-dashboard-container input:not([type="checkbox"]):not([type="radio"]),
+.admin-dashboard-container select,
+.admin-dashboard-container textarea,
+.admin-dashboard-container button {
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+}
+
+.admin-dashboard-container label,
+.admin-dashboard-container select option,
+.admin-dashboard-container p,
+.admin-dashboard-container span,
+.admin-dashboard-container a,
+.admin-dashboard-container li,
+.admin-dashboard-container td,
+.admin-dashboard-container th {
+  font-size: 13px;
+}
+
+.admin-dashboard-container table th {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.admin-dashboard-container table td {
+  font-size: 13px !important;
+}
+
+.admin-dashboard-container h1 {
+  font-size: 22px !important;
+  font-weight: 400 !important;
+}
+
+.admin-dashboard-container h2 {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+}
+
+.admin-dashboard-container h3 {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+/* Override custom larger font settings in admin panels */
+.admin-dashboard-container .text-\[20px\] {
+  font-size: 18px !important;
+}
+.admin-dashboard-container .text-\[23px\] {
+  font-size: 20px !important;
+}
+.admin-dashboard-container .text-\[14px\] {
+  font-size: 13px !important;
+}
+

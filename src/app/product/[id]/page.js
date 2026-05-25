@@ -12,6 +12,8 @@ import { getOptimizedImage, getCloudinarySrcSet } from "@/lib/cloudinary";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata } from "@/lib/seo-resolver";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }) {
   const resolvedParams = await params;
   await dbConnect();

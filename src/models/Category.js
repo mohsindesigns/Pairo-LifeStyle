@@ -32,4 +32,5 @@ const CategorySchema = new mongoose.Schema({
 // Compound index to allow same slug for DIFFERENT types, but unique for SAME type
 CategorySchema.index({ slug: 1, type: 1 }, { unique: true });
 
+delete mongoose.models.Category;
 export default mongoose.models.Category || mongoose.model('Category', CategorySchema);

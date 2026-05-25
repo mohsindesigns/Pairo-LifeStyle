@@ -6,10 +6,23 @@ import SiteConfig from "@/models/SiteConfig";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  title: "Journal | Pairo Editorial",
-  description: "Explore the stories, craftsmanship, and heritage behind Pairo's archival shearling collection.",
-};
+import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import Page from "@/models/Page";
+
+export async function generateMetadata() {
+  await dbConnect();
+  const page = await Page.findOne({ slug: "blog" }).lean();
+  
+  const { metadata } = resolveSEOMetadata({
+    entity: page || {},
+    type: "page",
+    fallbackTitle: "Journal | Pairo Editorial",
+    fallbackDesc: "Explore the stories, craftsmanship, and heritage behind Pairo's archival shearling collection.",
+    path: "/blog"
+  });
+  
+  return metadata;
+}
 
 const BlogCard = ({ post }) => (
   <Link href={`/blog/${post.slug}`} className="group cursor-pointer w-full block">
@@ -76,8 +89,23 @@ export default async function BlogArchive() {
   };
   const featuredProduct = JSON.parse(JSON.stringify(rawFeaturedProduct));
 
+  const page = await Page.findOne({ slug: "blog", status: "Published" }).lean();
+  const { structuredData } = resolveSEOMetadata({
+    entity: page || {},
+    type: "page",
+    fallbackTitle: "Journal | Pairo Editorial",
+    fallbackDesc: "Explore the stories, craftsmanship, and heritage behind Pairo's archival shearling collection.",
+    path: "/blog"
+  });
+
   return (
     <main className="bg-white min-h-screen">
+      {structuredData && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+      )}
       <section className="pt-32 pb-16 md:pt-48 md:pb-24 border-b border-black/5">
          <div className="container mx-auto px-4 md:px-8">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Eye, CheckCircle, AlertTriangle, RefreshCw, Smartphone, Monitor } from "lucide-react";
 import MediaPicker from "./MediaPicker";
 
@@ -14,6 +14,7 @@ export default function SEOConfigPanel({
   parentType = "product"
 }) {
   const [activePreviewTab, setActivePreviewTab] = useState("google-mobile");
+  const [activeSubTab, setActiveSubTab] = useState("general");
 
   // Initialize fields safely
   const title = seo.title || "";
@@ -151,7 +152,7 @@ export default function SEOConfigPanel({
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px] p-6 space-y-6">
       {/* Header and Auto Generator */}
-      <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-4">
         <div>
           <h3 className="text-[14px] font-bold text-gray-700">Search Engine Optimization (SEO)</h3>
           <p className="text-[12px] text-gray-400">Configure search indexing, metadata fallbacks, and social sharing templates.</p>
@@ -159,285 +160,244 @@ export default function SEOConfigPanel({
         <button
           type="button"
           onClick={handleAutoGenerate}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f6f7f7] border border-[#c3c4c7] hover:border-[#2271b1] hover:text-[#2271b1] text-gray-700 text-[12px] rounded-[3px] font-medium transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f6f7f7] border border-[#c3c4c7] hover:border-[#2271b1] hover:text-[#2271b1] text-gray-700 text-[12px] rounded-[3px] font-medium transition-all shrink-0"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Auto-Generate Fields
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Form Fields */}
-        <div className="lg:col-span-7 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold text-gray-500 uppercase block">Focus Keyword</label>
-              <input
-                type="text"
-                placeholder="e.g. shearling jacket"
-                className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
-                value={focusKeyword}
-                onChange={e => updateField("focusKeyword", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold text-gray-500 uppercase block">Keywords (Comma-separated)</label>
-              <input
-                type="text"
-                placeholder="jacket, leather, shearling"
-                className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
-                value={keywords}
-                onChange={e => updateField("keywords", e.target.value)}
-              />
-            </div>
-          </div>
+      {/* Sub-tab navigation */}
+      <div className="flex border-b border-gray-200 gap-4 pb-2 overflow-x-auto scrollbar-hide">
+        {[
+          { id: "general", label: "General SEO" },
+          { id: "robots", label: "Robots Directives" },
+          { id: "social", label: "Social Media" },
+          { id: "schema", label: "JSON-LD Schema" }
+        ].map(t => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setActiveSubTab(t.id)}
+            className={`pb-2 text-[12px] font-bold transition-all border-b-2 -mb-[9px] whitespace-nowrap ${
+              activeSubTab === t.id
+                ? "border-[#2271b1] text-[#2271b1]"
+                : "border-transparent text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-[11px] font-bold text-gray-500 uppercase">Meta Title</label>
-              <span className={`text-[11px] ${titleOk ? "text-green-600" : "text-amber-600"}`}>{titleLen}/60 chars</span>
+      {/* Tab Panels */}
+      <div className="space-y-6">
+        {/* GENERAL SEO TAB */}
+        {activeSubTab === "general" && (
+          <div className="space-y-6">
+            {/* Google Search Snippet Preview Box */}
+            <div className="border border-gray-200 rounded-[3px] bg-[#fdfdfd] overflow-hidden max-w-2xl">
+              <div className="bg-[#f6f7f7] border-b border-gray-200 px-3.5 py-2.5 flex justify-between items-center">
+                <span className="text-[12px] font-bold text-gray-700 flex items-center gap-1.5">
+                  <Eye className="w-4 h-4 text-gray-500" />
+                  Google Search Snippet Preview
+                </span>
+                <div className="flex bg-white border border-gray-200 rounded p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setActivePreviewTab("google-mobile")}
+                    className={`p-1 rounded ${activePreviewTab === "google-mobile" ? "bg-gray-100 text-gray-800" : "text-gray-400 hover:text-gray-600"}`}
+                    title="Google Mobile Preview"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePreviewTab("google-desktop")}
+                    className={`p-1 rounded ${activePreviewTab === "google-desktop" ? "bg-gray-100 text-gray-800" : "text-gray-400 hover:text-gray-600"}`}
+                    title="Google Desktop Preview"
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-4 bg-white min-h-[100px] flex flex-col justify-center">
+                {activePreviewTab === "google-mobile" ? (
+                  <div className="space-y-1 text-left">
+                    <div className="flex items-center gap-1 text-[12px] text-gray-600">
+                      <span className="font-semibold text-gray-800">pairo.store</span>
+                      <span>› {parentSlug || "slug"}</span>
+                    </div>
+                    <h4 className="text-[#1a0dab] text-[16px] leading-[20px] font-medium hover:underline cursor-pointer font-sans">
+                      {displayTitle}
+                    </h4>
+                    <p className="text-[#4d5156] text-[12px] leading-[18px] font-sans break-words">
+                      {displayDesc.substring(0, 155)}
+                      {displayDesc.length > 155 && "..."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1 text-left">
+                    <div className="text-[12px] text-gray-600">
+                      https://pairo.store › {parentSlug || "slug"}
+                    </div>
+                    <h4 className="text-[#1a0dab] text-[19px] leading-[24px] font-medium hover:underline cursor-pointer font-sans">
+                      {displayTitle}
+                    </h4>
+                    <p className="text-[#4d5156] text-[13px] leading-[22px] font-sans break-words">
+                      {displayDesc.substring(0, 155)}
+                      {displayDesc.length > 155 && "..."}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-            <input
-              type="text"
-              placeholder="Primary Brand Title | Category Description"
-              className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
-              value={title}
-              onChange={e => updateField("title", e.target.value)}
-            />
-            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-300 ${titleOk ? "bg-green-500" : titleLen > 60 ? "bg-red-500" : "bg-amber-400"}`}
-                style={{ width: `${Math.min((titleLen / 60) * 100, 100)}%` }}
-              ></div>
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-[11px] font-bold text-gray-500 uppercase">Meta Description</label>
-              <span className={`text-[11px] ${descOk ? "text-green-600" : "text-amber-600"}`}>{descLen}/160 chars</span>
-            </div>
-            <textarea
-              placeholder="Summarize page content for search result listings..."
-              rows={3}
-              className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
-              value={description}
-              onChange={e => updateField("description", e.target.value)}
-            />
-            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-300 ${descOk ? "bg-green-500" : descLen > 160 ? "bg-red-500" : "bg-amber-400"}`}
-                style={{ width: `${Math.min((descLen / 160) * 100, 100)}%` }}
-              ></div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[11px] font-bold text-gray-500 uppercase block">Canonical URL override</label>
-            <input
-              type="url"
-              placeholder="Leave empty for auto-generated canonical tag"
-              className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
-              value={canonicalUrl}
-              onChange={e => updateField("canonicalUrl", e.target.value)}
-            />
-          </div>
-
-          {/* Indexing Robots Controls */}
-          <div className="border border-gray-150 p-4 rounded-[3px] bg-[#fdfdfd] space-y-3">
-            <label className="text-[11px] font-bold text-gray-500 uppercase block">Robots Directives</label>
-            <div className="flex gap-6 text-[13px] text-gray-700">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="rounded text-[#2271b1] focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
-                  checked={noIndex}
-                  onChange={e => updateField("noIndex", e.target.checked)}
-                />
-                <span>noindex (Hide from search results)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="rounded text-[#2271b1] focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
-                  checked={noFollow}
-                  onChange={e => updateField("noFollow", e.target.checked)}
-                />
-                <span>nofollow (Do not follow links on page)</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Social OpenGraph Metadata */}
-          <div className="border-t border-gray-100 pt-5 space-y-4">
-            <h4 className="text-[12px] font-bold text-gray-700 uppercase tracking-wide">Social Sharing Preview (OG & Twitter)</h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <label className="text-[11px] font-bold text-gray-500 uppercase block">Facebook (Open Graph)</label>
+            {/* Inputs Container */}
+            <div className="space-y-5 max-w-2xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase block">Focus Keyword</label>
                   <input
                     type="text"
-                    placeholder="OG Share Title"
-                    className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1]"
-                    value={ogTitle}
-                    onChange={e => updateField("ogTitle", e.target.value)}
-                  />
-                  <textarea
-                    placeholder="OG Share Description"
-                    rows={2}
-                    className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1]"
-                    value={ogDescription}
-                    onChange={e => updateField("ogDescription", e.target.value)}
-                  />
-                  <MediaPicker
-                    value={ogImage}
-                    onChange={url => updateField("ogImage", url)}
-                    label="OG Social Image"
+                    placeholder="e.g. shearling jacket"
+                    className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
+                    value={focusKeyword}
+                    onChange={e => updateField("focusKeyword", e.target.value)}
                   />
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-[11px] font-bold text-gray-500 uppercase block">Twitter (Cards)</label>
                 <div className="space-y-2">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase block">Keywords (Comma-separated)</label>
                   <input
                     type="text"
-                    placeholder="Twitter Card Title"
-                    className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1]"
-                    value={twitterTitle}
-                    onChange={e => updateField("twitterTitle", e.target.value)}
-                  />
-                  <textarea
-                    placeholder="Twitter Card Description"
-                    rows={2}
-                    className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1]"
-                    value={twitterDescription}
-                    onChange={e => updateField("twitterDescription", e.target.value)}
-                  />
-                  <MediaPicker
-                    value={twitterImage}
-                    onChange={url => updateField("twitterImage", url)}
-                    label="Twitter Social Image"
+                    placeholder="jacket, leather, shearling"
+                    className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
+                    value={keywords}
+                    onChange={e => updateField("keywords", e.target.value)}
                   />
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Structured Schema JSON-LD */}
-          <div className="border-t border-gray-100 pt-5 space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="text-[11px] font-bold text-gray-500 uppercase">Custom JSON-LD Structured Data</label>
-              {jsonLdError ? (
-                <span className="flex items-center gap-1.5 text-red-500 text-[11px] font-medium">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  JSON Syntax Error
-                </span>
-              ) : structuredData.trim() ? (
-                <span className="flex items-center gap-1.5 text-green-600 text-[11px] font-medium">
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  Valid Schema
-                </span>
-              ) : (
-                <span className="text-gray-400 text-[11px]">Using fallback schemas</span>
-              )}
-            </div>
-            <textarea
-              placeholder={`{\n  "@context": "https://schema.org",\n  "@type": "Product",\n  "name": "Custom Shearling Jacket"\n}`}
-              rows={5}
-              className={`w-full font-mono text-[12px] p-2.5 border rounded-[3px] outline-none ${jsonLdError ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-[#2271b1]"}`}
-              value={structuredData}
-              onChange={e => updateField("structuredData", e.target.value)}
-            />
-            {jsonLdError && (
-              <p className="text-[11px] text-red-500 mt-1 bg-red-50 p-2 rounded">{jsonLdError}</p>
-            )}
-          </div>
-        </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase">Meta Title</label>
+                  <span className={`text-[11px] ${titleOk ? "text-green-600" : "text-amber-600"}`}>{titleLen}/60 chars</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Primary Brand Title | Category Description"
+                  className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none font-medium"
+                  value={title}
+                  onChange={e => updateField("title", e.target.value)}
+                />
+                <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${titleOk ? "bg-green-500" : titleLen > 60 ? "bg-red-500" : "bg-amber-400"}`}
+                    style={{ width: `${Math.min((titleLen / 60) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
 
-        {/* Right Column: Previews & SEO Scoring */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Preview Panel */}
-          <div className="border border-gray-200 rounded-[3px] bg-[#fdfdfd] overflow-hidden">
-            <div className="bg-[#f6f7f7] border-b border-gray-200 px-3.5 py-2.5 flex justify-between items-center">
-              <span className="text-[12px] font-bold text-gray-700 flex items-center gap-1.5">
-                <Eye className="w-4 h-4 text-gray-500" />
-                Live Previews
-              </span>
-              {/* Preview Selector buttons */}
-              <div className="flex bg-white border border-gray-200 rounded p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setActivePreviewTab("google-mobile")}
-                  className={`p-1 rounded ${activePreviewTab === "google-mobile" ? "bg-gray-100 text-gray-800" : "text-gray-400 hover:text-gray-600"}`}
-                  title="Google Mobile Preview"
-                >
-                  <Smartphone className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePreviewTab("google-desktop")}
-                  className={`p-1 rounded ${activePreviewTab === "google-desktop" ? "bg-gray-100 text-gray-800" : "text-gray-400 hover:text-gray-600"}`}
-                  title="Google Desktop Preview"
-                >
-                  <Monitor className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePreviewTab("facebook")}
-                  className={`text-[10px] px-1.5 py-1 rounded font-bold ${activePreviewTab === "facebook" ? "bg-blue-500 text-white" : "text-blue-500 hover:bg-gray-50"}`}
-                >
-                  FB
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePreviewTab("twitter")}
-                  className={`text-[10px] px-1.5 py-1 rounded font-bold ${activePreviewTab === "twitter" ? "bg-sky-500 text-white" : "text-sky-500 hover:bg-gray-50"}`}
-                >
-                  TW
-                </button>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase">Meta Description</label>
+                  <span className={`text-[11px] ${descOk ? "text-green-600" : "text-amber-600"}`}>{descLen}/160 chars</span>
+                </div>
+                <textarea
+                  placeholder="Summarize page content for search result listings..."
+                  rows={3}
+                  className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
+                  value={description}
+                  onChange={e => updateField("description", e.target.value)}
+                />
+                <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${descOk ? "bg-green-500" : descLen > 160 ? "bg-red-500" : "bg-amber-400"}`}
+                    style={{ width: `${Math.min((descLen / 160) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-gray-500 uppercase block">Canonical URL override</label>
+                <input
+                  type="url"
+                  placeholder="Leave empty for auto-generated canonical tag"
+                  className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] focus:border-[#2271b1] focus:ring-0 outline-none"
+                  value={canonicalUrl}
+                  onChange={e => updateField("canonicalUrl", e.target.value)}
+                />
               </div>
             </div>
 
-            <div className="p-4 bg-white min-h-[160px] flex flex-col justify-center">
-              {/* Google Mobile Preview */}
-              {activePreviewTab === "google-mobile" && (
-                <div className="space-y-1 text-left max-w-sm">
-                  <div className="flex items-center gap-1 text-[12px] text-gray-600">
-                    <span className="font-semibold text-gray-800">pairo.store</span>
-                    <span>› {parentSlug || "slug"}</span>
+            {/* SEO Checklist & Scores */}
+            <div className="border border-gray-200 rounded-[3px] bg-[#fdfdfd] p-4 space-y-4 max-w-2xl">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                <span className="text-[12px] font-bold text-gray-700">Optimization Checklist</span>
+                <span className={`px-2.5 py-1 text-[11px] font-bold rounded-full ${score >= 75 ? "bg-green-100 text-green-700" : score >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                  Score: {score}%
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                {checks.map((c, i) => (
+                  <div key={i} className="flex gap-2 text-[12px] border-b border-gray-50 pb-2 last:border-0 md:last:border-b last:pb-2">
+                    {c.status === "success" && <span className="text-green-500 font-bold">✓</span>}
+                    {c.status === "warning" && <span className="text-amber-500 font-bold">⚠</span>}
+                    {c.status === "error" && <span className="text-red-500 font-bold">✗</span>}
+                    <div>
+                      <div className="font-semibold text-gray-700">{c.label}</div>
+                      <div className="text-[11px] text-gray-400 mt-0.5">{c.message}</div>
+                    </div>
                   </div>
-                  <h4 className="text-[#1a0dab] text-[16px] leading-[20px] font-medium hover:underline cursor-pointer font-sans">
-                    {displayTitle}
-                  </h4>
-                  <p className="text-[#4d5156] text-[12px] leading-[18px] font-sans break-words">
-                    {displayDesc.substring(0, 155)}
-                    {displayDesc.length > 155 && "..."}
-                  </p>
-                </div>
-              )}
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
-              {/* Google Desktop Preview */}
-              {activePreviewTab === "google-desktop" && (
-                <div className="space-y-1 text-left">
-                  <div className="text-[12px] text-gray-600">
-                    https://pairo.store › {parentSlug || "slug"}
-                  </div>
-                  <h4 className="text-[#1a0dab] text-[19px] leading-[24px] font-medium hover:underline cursor-pointer font-sans">
-                    {displayTitle}
-                  </h4>
-                  <p className="text-[#4d5156] text-[13px] leading-[22px] font-sans break-words">
-                    {displayDesc.substring(0, 155)}
-                    {displayDesc.length > 155 && "..."}
-                  </p>
-                </div>
-              )}
+        {/* ROBOTS DIRECTIVES TAB */}
+        {activeSubTab === "robots" && (
+          <div className="space-y-4 max-w-2xl">
+            <div className="border border-gray-150 p-4 rounded-[3px] bg-[#fdfdfd] space-y-3">
+              <label className="text-[11px] font-bold text-gray-500 uppercase block">Robots Directives</label>
+              <div className="flex flex-col gap-3 text-[13px] text-gray-700">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded text-[#2271b1] focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
+                    checked={noIndex}
+                    onChange={e => updateField("noIndex", e.target.checked)}
+                  />
+                  <span>noindex (Hide from search results)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded text-[#2271b1] focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
+                    checked={noFollow}
+                    onChange={e => updateField("noFollow", e.target.checked)}
+                  />
+                  <span>nofollow (Do not follow links on page)</span>
+                </label>
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              By default, all pages are indexable and links will be crawled. Checking "noindex" instructs search engines not to display this page in their search results. Checking "nofollow" prevents search engines from following the links on this page.
+            </p>
+          </div>
+        )}
 
+        {/* SOCIAL MEDIA TAB */}
+        {activeSubTab === "social" && (
+          <div className="space-y-6 max-w-4xl">
+            {/* Live Card Previews */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Facebook Card Preview */}
-              {activePreviewTab === "facebook" && (
-                <div className="border border-[#dadde1] rounded-md overflow-hidden bg-[#f2f3f5] font-sans max-w-sm mx-auto text-left shadow-sm">
-                  <div className="w-full h-44 overflow-hidden bg-gray-200">
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-gray-500 uppercase block">Facebook Share Preview</label>
+                <div className="border border-[#dadde1] rounded-md overflow-hidden bg-[#f2f3f5] font-sans text-left shadow-sm">
+                  <div className="w-full h-44 overflow-hidden bg-gray-200 relative">
                     <img src={displayOgImage} alt="OG Card" className="w-full h-full object-cover" />
                   </div>
                   <div className="p-3 border-t border-[#dadde1] bg-white">
@@ -446,11 +406,12 @@ export default function SEOConfigPanel({
                     <div className="text-gray-500 text-[12px] mt-1 line-clamp-2 leading-relaxed">{displayOgDesc}</div>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Twitter Card Preview */}
-              {activePreviewTab === "twitter" && (
-                <div className="border border-[#e1e8ed] rounded-xl overflow-hidden bg-white font-sans max-w-sm mx-auto text-left shadow-sm">
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-gray-500 uppercase block">Twitter Card Preview</label>
+                <div className="border border-[#e1e8ed] rounded-xl overflow-hidden bg-white font-sans text-left shadow-sm">
                   <div className="w-full h-44 overflow-hidden bg-gray-200 relative">
                     <img src={displayTwImage} alt="Twitter Card" className="w-full h-full object-cover" />
                   </div>
@@ -460,40 +421,118 @@ export default function SEOConfigPanel({
                     <div className="text-[#4a4a4a] text-[12px] mt-0.5 line-clamp-2 leading-relaxed">{displayTwDesc}</div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
 
-          {/* SEO Checklist & Scores */}
-          <div className="border border-gray-200 rounded-[3px] bg-[#fdfdfd] p-4 space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-[12px] font-bold text-gray-700">Optimization Checklist</span>
-              <span className={`px-2.5 py-1 text-[11px] font-bold rounded-full ${score >= 75 ? "bg-green-100 text-green-700" : score >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
-                Score: {score}%
-              </span>
-            </div>
-            
-            <div className="space-y-2.5">
-              {checks.map((c, i) => (
-                <div key={i} className="flex gap-2 text-[12px] border-b border-gray-50 pb-2 last:border-0 last:pb-0">
-                  {c.status === "success" && (
-                    <span className="text-green-500 font-bold">✓</span>
-                  )}
-                  {c.status === "warning" && (
-                    <span className="text-amber-500 font-bold">⚠</span>
-                  )}
-                  {c.status === "error" && (
-                    <span className="text-red-500 font-bold">✗</span>
-                  )}
-                  <div>
-                    <div className="font-semibold text-gray-700">{c.label}</div>
-                    <div className="text-[11px] text-gray-400 mt-0.5">{c.message}</div>
+            {/* Inputs grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              <div className="space-y-3 bg-gray-50/50 p-4 border border-gray-100 rounded">
+                <label className="text-[11px] font-bold text-gray-500 uppercase block">Facebook (Open Graph)</label>
+                <div className="space-y-2.5 bg-white p-3 border border-gray-100 rounded shadow-inner">
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-gray-400">OG Share Title</label>
+                    <input
+                      type="text"
+                      placeholder="OG Share Title"
+                      className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1]"
+                      value={ogTitle}
+                      onChange={e => updateField("ogTitle", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-gray-400">OG Share Description</label>
+                    <textarea
+                      placeholder="OG Share Description"
+                      rows={2}
+                      className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1]"
+                      value={ogDescription}
+                      onChange={e => updateField("ogDescription", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-gray-400">OG Social Image</label>
+                    <MediaPicker
+                      value={ogImage}
+                      onChange={url => updateField("ogImage", url)}
+                      label="OG Social Image"
+                    />
                   </div>
                 </div>
-              ))}
+              </div>
+
+              <div className="space-y-3 bg-gray-50/50 p-4 border border-gray-100 rounded">
+                <label className="text-[11px] font-bold text-gray-500 uppercase block">Twitter (Cards)</label>
+                <div className="space-y-2.5 bg-white p-3 border border-gray-100 rounded shadow-inner">
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-gray-400">Twitter Card Title</label>
+                    <input
+                      type="text"
+                      placeholder="Twitter Card Title"
+                      className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1]"
+                      value={twitterTitle}
+                      onChange={e => updateField("twitterTitle", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-gray-400">Twitter Card Description</label>
+                    <textarea
+                      placeholder="Twitter Card Description"
+                      rows={2}
+                      className="w-full border border-gray-200 p-2.5 text-[13px] rounded-[3px] outline-none focus:border-[#2271b1]"
+                      value={twitterDescription}
+                      onChange={e => updateField("twitterDescription", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-gray-400">Twitter Social Image</label>
+                    <MediaPicker
+                      value={twitterImage}
+                      onChange={url => updateField("twitterImage", url)}
+                      label="Twitter Social Image"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* JSON-LD SCHEMA TAB */}
+        {activeSubTab === "schema" && (
+          <div className="space-y-4 max-w-2xl">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-[11px] font-bold text-gray-500 uppercase">Custom JSON-LD Structured Data</label>
+                {jsonLdError ? (
+                  <span className="flex items-center gap-1.5 text-red-500 text-[11px] font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    JSON Syntax Error
+                  </span>
+                ) : structuredData.trim() ? (
+                  <span className="flex items-center gap-1.5 text-green-600 text-[11px] font-medium">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Valid Schema
+                  </span>
+                ) : (
+                  <span className="text-gray-400 text-[11px]">Using fallback schemas</span>
+                )}
+              </div>
+              <textarea
+                placeholder={`{\n  "@context": "https://schema.org",\n  "@type": "Product",\n  "name": "Custom Shearling Jacket"\n}`}
+                rows={8}
+                className={`w-full font-mono text-[12px] p-2.5 border rounded-[3px] outline-none ${jsonLdError ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-[#2271b1]"}`}
+                value={structuredData}
+                onChange={e => updateField("structuredData", e.target.value)}
+              />
+              {jsonLdError && (
+                <p className="text-[11px] text-red-500 mt-1 bg-red-50 p-2 rounded">{jsonLdError}</p>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Add custom JSON-LD schema blocks to explicitly describe this entity to Google. Ensure the markup contains valid JSON syntax.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

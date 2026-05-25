@@ -3,33 +3,23 @@ import Page from "@/models/Page";
 import SectionRenderer from "@/components/common/SectionRenderer";
 import { resolvePageSections } from "@/lib/page-data-resolver";
 import SiteConfig from "@/models/SiteConfig";
+import { resolveSEOMetadata } from "@/lib/seo-resolver";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   await dbConnect();
-  try {
-    const homePage = await Page.findOne({ slug: 'home', status: 'Published' }).lean();
-    if (homePage) {
-      const { resolveSEOMetadata } = await import("@/lib/seo-resolver");
-      const { metadata } = resolveSEOMetadata({
-        entity: homePage,
-        type: "page",
-        path: "/"
-      });
-      return metadata;
-    }
-  } catch (error) {
-    console.error("Home generateMetadata error:", error);
-  }
+  const homePage = await Page.findOne({ slug: 'home' }).lean();
   
-  return {
-    title: "Pairo | Premium Handcrafted Shearling Jackets",
-    description: "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.",
-    alternates: {
-      canonical: "https://pairo.store"
-    }
-  };
+  const { metadata } = resolveSEOMetadata({
+    entity: homePage || {},
+    type: "page",
+    fallbackTitle: "Pairo | Premium Handcrafted Shearling Jackets",
+    fallbackDesc: "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.",
+    path: "/"
+  });
+
+  return metadata;
 }
 
 export default async function Home() {
@@ -74,7 +64,6 @@ export default async function Home() {
   // Generate dynamic Schema structured data
   let structuredData = null;
   if (pageData) {
-    const { resolveSEOMetadata } = await import("@/lib/seo-resolver");
     const seoRes = resolveSEOMetadata({
       entity: pageData,
       type: "page",

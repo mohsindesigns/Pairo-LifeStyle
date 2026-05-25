@@ -141,7 +141,7 @@ export function resolveSEOMetadata(options = {}) {
     siteName: "Pairo Store",
     images: [{ url: ogImgUrl }],
     locale: "en_US",
-    type: type === "product" ? "og:product" : type === "blog" ? "article" : "website",
+    type: type === "blog" ? "article" : "website",
   };
 
   // 6. Twitter Card Tags
@@ -150,6 +150,8 @@ export function resolveSEOMetadata(options = {}) {
     title: sanitizeSEOString(seo.twitterTitle || seo.ogTitle || metaTitle),
     description: sanitizeSEOString(seo.twitterDescription || seo.ogDescription || metaDescription),
     images: [twImgUrl],
+    site: "@pairostore",
+    creator: "@pairostore",
   };
 
   // 7. Structured Data Assembly

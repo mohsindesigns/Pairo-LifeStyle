@@ -2,27 +2,23 @@ import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import SectionRenderer from "@/components/common/SectionRenderer";
 import { notFound } from "next/navigation";
+import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import { resolvePageSections } from "@/lib/page-data-resolver";
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   await dbConnect();
   const page = await Page.findOne({ slug: "about" }).lean();
   if (!page) return { title: "About Us" };
 
-  return {
-    title: page.seo?.title || "About Us",
-    description: page.seo?.description || "Quality Jackets Made to Last",
-    openGraph: {
-      title: page.seo?.ogTitle || page.seo?.title,
-      description: page.seo?.ogDescription || page.seo?.description,
-      images: page.seo?.ogImage ? [{ url: page.seo.ogImage }] : [],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: page.seo?.twitterTitle || page.seo?.title,
-      description: page.seo?.twitterDescription || page.seo?.description,
-      images: [page.seo?.twitterImage || page.seo?.ogImage].filter(Boolean),
-    },
-  };
+  const { metadata } = resolveSEOMetadata({
+    entity: page,
+    type: "page",
+    path: "/about"
+  });
+
+  return metadata;
 }
 
 export default async function AboutPage() {
@@ -33,9 +29,29 @@ export default async function AboutPage() {
     notFound();
   }
 
+  let resolvedSections = [];
+  if (page.sections?.length > 0) {
+    resolvedSections = await resolvePageSections(page.sections);
+  }
+
+  // Ensure sections are sorted correctly
+  const sortedSections = JSON.parse(JSON.stringify(resolvedSections.sort((a, b) => a.order - b.order)));
+
+  const { structuredData } = resolveSEOMetadata({
+    entity: page,
+    type: "page",
+    path: "/about"
+  });
+
   return (
     <main className="bg-white">
-      <SectionRenderer sections={page.sections} />
+      {structuredData && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+      )}
+      <SectionRenderer sections={sortedSections} />
     </main>
   );
 }
