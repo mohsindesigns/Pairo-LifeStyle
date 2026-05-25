@@ -25,7 +25,18 @@ const BlogSchema = new mongoose.Schema({
   seo: {
     title: String,
     description: String,
-    keywords: String
+    keywords: [String],
+    focusKeyword: String,
+    canonicalUrl: String,
+    noIndex: { type: Boolean, default: false },
+    noFollow: { type: Boolean, default: false },
+    ogTitle: String,
+    ogDescription: String,
+    ogImage: String,
+    twitterTitle: String,
+    twitterDescription: String,
+    twitterImage: String,
+    structuredData: String // JSON-LD
   }
 }, { timestamps: true });
 

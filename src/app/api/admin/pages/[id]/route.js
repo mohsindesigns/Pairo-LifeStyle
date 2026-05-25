@@ -48,6 +48,19 @@ export async function PUT(req, { params }) {
         const existing = await Page.findById(id);
         if (!existing) return NextResponse.json({ error: "Page not found" }, { status: 404 });
 
+        // Prevent collisions with reserved system routes
+        const { isReservedPath, registerRedirect } = await import("@/lib/redirect-resolver");
+        if (body.slug) {
+            if (isReservedPath(body.slug)) {
+                return NextResponse.json({ error: "Slug collides with a reserved system route" }, { status: 400 });
+            }
+        }
+
+        // Register redirect if slug changed
+        if (body.slug && existing.slug && existing.slug !== body.slug) {
+            await registerRedirect(`/${existing.slug}`, `/${body.slug}`);
+        }
+
         const updated = await Page.findByIdAndUpdate(id, {
             ...body,
             updatedBy: session.user.id

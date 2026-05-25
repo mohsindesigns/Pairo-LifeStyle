@@ -82,6 +82,9 @@ export async function PUT(req) {
       const data = await req.json();
       const { id, tenantId = "DEFAULT_STORE", ...updateData } = data;
 
+      const oldBlog = await Blog.findById(id);
+      if (!oldBlog) return NextResponse.json({ error: "Blog not found" }, { status: 404 });
+
       // Auto-generate slug if missing
       if (!updateData.slug && updateData.title) {
          updateData.slug = updateData.title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
@@ -96,6 +99,12 @@ export async function PUT(req) {
             count++;
          }
          updateData.slug = slug;
+      }
+
+      // Register redirect if slug changed
+      const { registerRedirect } = await import("@/lib/redirect-resolver");
+      if (updateData.slug && oldBlog.slug && oldBlog.slug !== updateData.slug) {
+         await registerRedirect(`/blog/${oldBlog.slug}`, `/blog/${updateData.slug}`);
       }
 
       console.log("UPDATING BLOG:", id, updateData);

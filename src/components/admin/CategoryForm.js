@@ -5,6 +5,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPicker from "@/components/admin/MediaPicker";
 import { useRouter } from "next/navigation";
 import TiptapEditor from "@/components/admin/TiptapEditor";
+import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
 
 export default function CategoryForm({ categoryId = null, type = "product" }) {
   const router = useRouter();
@@ -207,62 +208,15 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
             </div>
 
             {/* SEO Settings */}
-            <div className="bg-white border border-[#c3c4c7] shadow-sm">
-               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 font-bold text-[13px] text-gray-700">Yoast SEO</div>
-               <div className="p-4 space-y-6">
-                  {/* SEO Preview */}
-                  <div className="bg-gray-50 p-4 border border-gray-200 space-y-1">
-                     <p className="text-[11px] text-gray-500 mb-2 uppercase font-bold tracking-wider">Search Engine Snippet Preview</p>
-                     <div className="text-[18px] text-[#1a0dab] truncate font-medium hover:underline cursor-pointer">{formData.seo?.title || formData.name || "Category Title"}</div>
-                     <div className="text-[13px] text-[#006621] truncate">https://pairo.store/{type}-category/{formData.slug || "slug"}</div>
-                     <div className="text-[13px] text-[#545454] line-clamp-2 mt-1">{formData.seo?.description || formData.description || "Provide a meta description to see how this category will appear in search results."}</div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div className="space-y-4">
-                        <div className="space-y-1">
-                           <div className="flex justify-between">
-                              <label className="text-[12px] font-bold text-gray-700">SEO Title</label>
-                              <span className={`text-[10px] ${(formData.seo?.title || "").length > 60 ? 'text-red-500' : 'text-gray-400'}`}>{(formData.seo?.title || "").length}/60</span>
-                           </div>
-                           <input className="w-full border border-[#c3c4c7] p-2 text-[13px] outline-none" value={formData.seo?.title || ""} onChange={e=>setFormData({...formData, seo: {...formData.seo, title: e.target.value}})} />
-                        </div>
-                        <div className="space-y-1">
-                           <div className="flex justify-between">
-                              <label className="text-[12px] font-bold text-gray-700">Meta Description</label>
-                              <span className={`text-[10px] ${(formData.seo?.description || "").length > 160 ? 'text-red-500' : 'text-gray-400'}`}>{(formData.seo?.description || "").length}/160</span>
-                           </div>
-                           <textarea className="w-full border border-[#c3c4c7] p-2 text-[13px] outline-none resize-none" rows={3} value={formData.seo?.description || ""} onChange={e=>setFormData({...formData, seo: {...formData.seo, description: e.target.value}})} />
-                        </div>
-                        <div className="space-y-1">
-                           <label className="text-[12px] font-bold text-gray-700">Canonical URL</label>
-                           <input className="w-full border border-[#c3c4c7] p-2 text-[13px] outline-none font-mono" placeholder="https://" value={formData.seo?.canonicalUrl || ""} onChange={e=>setFormData({...formData, seo: {...formData.seo, canonicalUrl: e.target.value}})} />
-                        </div>
-                     </div>
-
-                     <div className="space-y-4">
-                        <div className="space-y-1">
-                           <label className="text-[12px] font-bold text-gray-700">Open Graph Title (Social)</label>
-                           <input className="w-full border border-[#c3c4c7] p-2 text-[13px] outline-none" value={formData.seo?.ogTitle || ""} onChange={e=>setFormData({...formData, seo: {...formData.seo, ogTitle: e.target.value}})} />
-                        </div>
-                        <div className="space-y-1">
-                           <label className="text-[12px] font-bold text-gray-700">Open Graph Description</label>
-                           <textarea className="w-full border border-[#c3c4c7] p-2 text-[13px] outline-none resize-none" rows={2} value={formData.seo?.ogDescription || ""} onChange={e=>setFormData({...formData, seo: {...formData.seo, ogDescription: e.target.value}})} />
-                        </div>
-                        <div className="p-3 bg-[#f6f7f7] border border-[#c3c4c7] space-y-2">
-                           <label className="flex items-center gap-2 text-[12px] text-gray-700 cursor-pointer">
-                              <input type="checkbox" checked={formData.seo?.noIndex} onChange={e=>setFormData({...formData, seo: {...formData.seo, noIndex: e.target.checked}})} />
-                              No Index
-                           </label>
-                           <label className="flex items-center gap-2 text-[12px] text-gray-700 cursor-pointer">
-                              <input type="checkbox" checked={formData.seo?.noFollow} onChange={e=>setFormData({...formData, seo: {...formData.seo, noFollow: e.target.checked}})} />
-                              No Follow
-                           </label>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-            </div>
+            <SEOConfigPanel
+               seo={formData.seo || {}}
+               onChange={newSeo => setFormData({ ...formData, seo: newSeo })}
+               parentTitle={formData.name}
+               parentDescription={formData.description || formData.content}
+               parentSlug={formData.slug}
+               parentImage={formData.image}
+               parentType="category"
+            />
          </div>
 
          {/* Sidebar Column */}

@@ -107,6 +107,14 @@ export async function PUT(req) {
     const { id, ...data } = await req.json();
     const mongoose = require('mongoose');
     const oldCategory = await Category.findById(id);
+    if (!oldCategory) return NextResponse.json({ error: "Category not found" }, { status: 404 });
+
+    // Register redirect if slug changed
+    if (data.slug && oldCategory.slug && oldCategory.slug !== data.slug) {
+      const { registerRedirect } = await import("@/lib/redirect-resolver");
+      await registerRedirect(`/shop?category=${oldCategory.slug}`, `/shop?category=${data.slug}`);
+    }
+
     const category = await Category.findByIdAndUpdate(id, data, { new: true });
 
     // Handle Media Usage Tracking

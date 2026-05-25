@@ -5,23 +5,36 @@ import SiteConfig from "@/models/SiteConfig";
 import Product from "@/models/Product";
 import BlogDetailClient from "@/components/blog/BlogDetailClient";
 import mongoose from "mongoose";
+import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
+import { resolveSEOMetadata } from "@/lib/seo-resolver";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   await dbConnect();
+  
+  const currentPath = `/blog/${slug}`;
+  await checkAndApplyRedirect(currentPath);
+
   const post = await Blog.findOne({ slug, isDeleted: { $ne: true } }).lean();
   if (!post) return { title: 'Post Not Found' };
 
-  return {
-    title: `${post.title} | Pairo Journal`,
-    description: post.excerpt || post.seo?.description,
-  };
+  const { metadata } = resolveSEOMetadata({
+    entity: post,
+    type: "blog",
+    path: currentPath
+  });
+
+  return metadata;
 }
 
 export default async function BlogDetail({ params }) {
   const { slug } = await params;
+  
+  const currentPath = `/blog/${slug}`;
+  await checkAndApplyRedirect(currentPath);
+
   await dbConnect();
 
   const post = await Blog.findOne({ slug, isDeleted: { $ne: true } }).lean();
@@ -71,12 +84,26 @@ export default async function BlogDetail({ params }) {
 
   const postDate = new Date(post.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
+  const { structuredData } = resolveSEOMetadata({
+    entity: post,
+    type: "blog",
+    path: currentPath
+  });
+
   return (
-    <BlogDetailClient
-      post={serializedPost}
-      posts={serializedPosts}
-      featuredProduct={featuredProduct}
-      postDate={postDate}
-    />
+    <>
+      {structuredData && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+      )}
+      <BlogDetailClient
+        post={serializedPost}
+        posts={serializedPosts}
+        featuredProduct={featuredProduct}
+        postDate={postDate}
+      />
+    </>
   );
 }

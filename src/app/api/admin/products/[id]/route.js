@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
+import { registerRedirect } from "@/lib/redirect-resolver";
 
 // GET single product with relations
 export async function GET(req, { params }) {
@@ -36,9 +37,17 @@ export async function PUT(req, { params }) {
   try {
     const data = await req.json();
     
+    const oldProduct = await Product.findById(params.id);
+    if (!oldProduct) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
     // Auto-generate slug if it's being updated or missing
     if (data.name && (!data.slug || data.slug === "")) {
       data.slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
+
+    // Register redirect if slug changed
+    if (data.slug && oldProduct.slug && oldProduct.slug !== data.slug) {
+      await registerRedirect(`/product/${oldProduct.slug}`, `/product/${data.slug}`);
     }
 
     const product = await Product.findByIdAndUpdate(params.id, data, { new: true, runValidators: true });

@@ -36,6 +36,12 @@ export async function POST(req) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
+        // Prevent collisions with reserved system routes
+        const { isReservedPath } = await import("@/lib/redirect-resolver");
+        if (isReservedPath(slug)) {
+            return NextResponse.json({ error: "Slug collides with a reserved system route" }, { status: 400 });
+        }
+
         const existing = await Page.findOne({ slug, tenantId: 'DEFAULT_STORE' });
         if (existing) {
             return NextResponse.json({ error: "Page with this slug already exists" }, { status: 400 });

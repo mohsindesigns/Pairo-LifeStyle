@@ -30,6 +30,17 @@ export default withAuth(
         if (path.startsWith("/admin/settings/roles") && !isSuperAdmin && !permissions.staff?.includes("manage_roles")) {
             return NextResponse.redirect(new URL("/admin?error=NoPermission", req.url));
         }
+
+        // Inject custom headers to allow layout server components to identify admin area
+        const requestHeaders = new Headers(req.headers);
+        requestHeaders.set("x-is-admin", "true");
+        requestHeaders.set("x-pathname", path);
+
+        return NextResponse.next({
+          request: {
+            headers: requestHeaders,
+          },
+        });
     }
 
     return NextResponse.next();
@@ -43,6 +54,7 @@ export default withAuth(
 
 export const config = {
   matcher: [
+    "/admin",
     "/admin/:path*",
     "/api/admin/:path*"
   ],

@@ -71,9 +71,18 @@ const ProductSchema = new mongoose.Schema({
   seo: {
     title: String,
     description: String,
+    keywords: [String],
+    focusKeyword: String,
     canonicalUrl: String,
+    noIndex: { type: Boolean, default: false },
+    noFollow: { type: Boolean, default: false },
+    ogTitle: String,
+    ogDescription: String,
     ogImage: String,
-    keywords: [String]
+    twitterTitle: String,
+    twitterDescription: String,
+    twitterImage: String,
+    structuredData: String // JSON-LD
   },
 
   // Relations

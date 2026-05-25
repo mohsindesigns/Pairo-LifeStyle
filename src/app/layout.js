@@ -41,15 +41,16 @@ export default async function RootLayout({ children }) {
     categories: { items: [] }
   };
 
-  // Skip theme injection for admin routes to keep dashboard UI consistent
-  const isAdminRoute = children?.props?.childProp?.segment === 'admin' || 
-                       (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
-  
   // Using headers to detect admin route in server component
   const { headers } = await import("next/headers");
   const headerList = await headers();
-  const fullPath = headerList.get("x-invoke-path") || "";
-  const isActuallyAdmin = fullPath.startsWith('/admin');
+  const isAdminHeader = headerList.get("x-is-admin") === "true";
+  const pathnameHeader = headerList.get("x-pathname") || "";
+  const invokePath = headerList.get("x-invoke-path") || "";
+  
+  const isActuallyAdmin = isAdminHeader || 
+                          pathnameHeader.startsWith("/admin") || 
+                          invokePath.startsWith("/admin");
 
   return (
     <html lang="en">

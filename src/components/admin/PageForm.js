@@ -56,6 +56,7 @@ import Link from "next/link";
 import { SECTION_SCHEMAS } from "@/lib/section-schemas";
 import MediaPickerModal from "./MediaPickerModal";
 import AdminPageLayout from "./AdminPageLayout";
+import SEOConfigPanel from "./SEOConfigPanel";
 import * as LucideIcons from "lucide-react";
 
 /**
@@ -432,107 +433,15 @@ export default function PageForm({ pageId }) {
                </div>
 
                {/* Advanced SEO & Social Meta Box */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-4 py-2 flex items-center justify-between">
-                     <span className="text-[13px] font-bold text-gray-700 uppercase tracking-tighter">Advanced SEO Suite</span>
-                     <Globe className="w-4 h-4 text-gray-400" />
-                  </div>
-                  <div className="p-6 space-y-8">
-                     {/* Search Engine Optimization */}
-                     <div className="space-y-5">
-                        <h4 className="text-[12px] font-bold text-[#2271b1] border-b border-gray-100 pb-1 uppercase tracking-wider">Search Engine Optimization</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                           <div className="space-y-1.5">
-                              <label className="text-[11px] font-bold text-gray-400 uppercase">Focus Keyword</label>
-                              <input className="w-full border border-[#c3c4c7] p-2 text-[13px]" value={page.seo?.focusKeyword || ""} onChange={e=>setPage({...page, seo: {...page.seo, focusKeyword: e.target.value}})} placeholder="e.g. Handmade Leather Shoes" />
-                           </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[11px] font-bold text-gray-400 uppercase">Secondary Keywords</label>
-                              <input className="w-full border border-[#c3c4c7] p-2 text-[13px]" value={page.seo?.secondaryKeywords || ""} onChange={e=>setPage({...page, seo: {...page.seo, secondaryKeywords: e.target.value}})} placeholder="e.g. luxury, craft, pairo" />
-                           </div>
-                        </div>
-                        <div className="space-y-1.5">
-                           <label className="text-[11px] font-bold text-gray-400 uppercase">Canonical URL</label>
-                           <input className="w-full border border-[#c3c4c7] p-2 text-[13px] bg-gray-50 italic" value={page.seo?.canonicalUrl || `https://pairo.store/${page.slug}`} readOnly placeholder="Auto-detected from slug" />
-                           <p className="text-[10px] text-gray-400 italic">Auto-generated based on current slug.</p>
-                        </div>
-                        <div className="flex gap-10 p-4 bg-gray-50 border border-gray-100">
-                           <div className="flex items-center gap-2">
-                              <input type="checkbox" id="noIndex" checked={page.seo?.noIndex} onChange={e=>setPage({...page, seo: {...page.seo, noIndex: e.target.checked}})} />
-                              <label htmlFor="noIndex" className="text-[12px] font-medium text-gray-700 cursor-pointer">No-Index (Hide from Search Engines)</label>
-                           </div>
-                           <div className="flex items-center gap-2">
-                              <input type="checkbox" id="noFollow" checked={page.seo?.noFollow} onChange={e=>setPage({...page, seo: {...page.seo, noFollow: e.target.checked}})} />
-                              <label htmlFor="noFollow" className="text-[12px] font-medium text-gray-700 cursor-pointer">No-Follow (Don&apos;t follow links)</label>
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* Open Graph / Social */}
-                     <div className="space-y-5">
-                        <h4 className="text-[12px] font-bold text-[#2271b1] border-b border-gray-100 pb-1 uppercase tracking-wider">Open Graph (Facebook / Social)</h4>
-                        <div className="space-y-4">
-                           <div className="space-y-1.5">
-                              <label className="text-[11px] font-bold text-gray-400 uppercase">OG Title</label>
-                              <input className="w-full border border-[#c3c4c7] p-2 text-[13px]" value={page.seo?.ogTitle || ""} onChange={e=>setPage({...page, seo: {...page.seo, ogTitle: e.target.value}})} placeholder="Social share title..." />
-                           </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[11px] font-bold text-gray-400 uppercase">OG Description</label>
-                              <textarea className="w-full border border-[#c3c4c7] p-2 text-[13px]" rows={2} value={page.seo?.ogDescription || ""} onChange={e=>setPage({...page, seo: {...page.seo, ogDescription: e.target.value}})} />
-                           </div>
-                           <div className="space-y-1.5">
-                              <label className="text-[11px] font-bold text-gray-400 uppercase">OG Image</label>
-                              <div className="flex gap-2">
-                                 <input className="w-full border border-[#c3c4c7] p-2 text-[13px]" value={page.seo?.ogImage || ""} onChange={e=>setPage({...page, seo: {...page.seo, ogImage: e.target.value}})} />
-                                 <button type="button" onClick={() => setMediaPicker({ open: true, onSelect: (u) => setPage({...page, seo: {...page.seo, ogImage: u}}) })} className="bg-white border border-[#c3c4c7] px-4 text-[12px] font-bold hover:bg-gray-50">Choose</button>
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* Twitter Card */}
-                     <div className="space-y-5">
-                        <h4 className="text-[12px] font-bold text-[#2271b1] border-b border-gray-100 pb-1 uppercase tracking-wider">Twitter Card Settings</h4>
-                        <div className="space-y-4">
-                           <div className="space-y-1.5">
-                              <label className="text-[11px] font-bold text-gray-400 uppercase">Twitter Image</label>
-                              <div className="flex gap-2">
-                                 <input className="w-full border border-[#c3c4c7] p-2 text-[13px]" value={page.seo?.twitterImage || ""} onChange={e=>setPage({...page, seo: {...page.seo, twitterImage: e.target.value}})} />
-                                 <button type="button" onClick={() => setMediaPicker({ open: true, onSelect: (u) => setPage({...page, seo: {...page.seo, twitterImage: u}}) })} className="bg-white border border-[#c3c4c7] px-4 text-[12px] font-bold hover:bg-gray-50">Choose</button>
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* Structured Data */}
-                     <div className="space-y-3">
-                        <h4 className="text-[12px] font-bold text-[#2271b1] border-b border-gray-100 pb-1 uppercase tracking-wider">Schema / Structured Data</h4>
-                        <textarea 
-                           className="w-full border border-[#c3c4c7] p-3 text-[12px] font-mono bg-gray-900 text-green-400" 
-                           rows={6} 
-                           value={page.seo?.structuredData || ""} 
-                           onChange={e=>setPage({...page, seo: {...page.seo, structuredData: e.target.value}})}
-                           placeholder={`{ "@context": "https://schema.org", ... }`}
-                        />
-                        <button 
-                           type="button" 
-                           className="text-[10px] text-[#2271b1] hover:underline flex items-center gap-1"
-                           onClick={() => {
-                              const autoSchema = {
-                                 "@context": "https://schema.org",
-                                 "@type": "WebPage",
-                                 "name": page.title,
-                                 "description": page.seo?.description || page.description,
-                                 "url": `https://pairo.store/${page.slug}`
-                              };
-                              setPage({...page, seo: {...page.seo, structuredData: JSON.stringify(autoSchema, null, 2)}});
-                           }}
-                        >
-                           <Layers className="w-3 h-3" /> Auto-generate basic Schema from content
-                        </button>
-                     </div>
-                  </div>
-               </div>
+               <SEOConfigPanel
+                  seo={page.seo || {}}
+                  onChange={newSeo => setPage({ ...page, seo: newSeo })}
+                  parentTitle={page.title}
+                  parentDescription={page.description}
+                  parentSlug={page.slug}
+                  parentImage=""
+                  parentType="page"
+               />
             </div>
 
             {/* Sidebar */}

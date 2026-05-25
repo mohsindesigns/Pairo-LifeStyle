@@ -9,10 +9,16 @@ import ClientProductActions from "@/components/product/ClientProductActions";
 import ClientTabSystem from "@/components/product/ClientTabSystem";
 import ProductMainSection from "@/components/product/ProductMainSection";
 import { getOptimizedImage, getCloudinarySrcSet } from "@/lib/cloudinary";
+import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
+import { resolveSEOMetadata } from "@/lib/seo-resolver";
 
 export async function generateMetadata({ params }) {
   const resolvedParams = await params;
   await dbConnect();
+  
+  const currentPath = `/product/${resolvedParams.id}`;
+  await checkAndApplyRedirect(currentPath);
+
   const product = await Product.findOne({ 
     $or: [
       { id: parseInt(resolvedParams.id) || -1 },
@@ -22,22 +28,22 @@ export async function generateMetadata({ params }) {
 
   if (!product) return { title: "Product Not Found" };
 
-  return {
-    title: product.seo?.title || `${product.name} | Pairo Store`,
-    description: product.seo?.description || product.shortDescription,
-    openGraph: {
-      images: [product.seo?.ogImage || product.images?.[0] || product.image],
-    },
-    alternates: {
-      canonical: product.seo?.canonicalUrl || `/product/${product.slug || product.id}`,
-    }
-  };
+  const { metadata } = resolveSEOMetadata({
+    entity: product,
+    type: "product",
+    path: currentPath
+  });
+
+  return metadata;
 }
 
 export default async function ProductDetailPage({ params }) {
   const resolvedParams = await params;
   const { id: paramId } = resolvedParams;
   
+  const currentPath = `/product/${paramId}`;
+  await checkAndApplyRedirect(currentPath);
+
   await dbConnect();
   let product;
   
@@ -94,8 +100,20 @@ export default async function ProductDetailPage({ params }) {
   const sanitizedProduct = JSON.parse(JSON.stringify(product));
   const sanitizedRelated = JSON.parse(JSON.stringify(relatedProducts));
 
+  const { structuredData } = resolveSEOMetadata({
+    entity: product,
+    type: "product",
+    path: currentPath
+  });
+
   return (
     <div className="bg-white min-h-screen font-sans overflow-x-hidden">
+      {structuredData && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+      )}
       <div className="container mx-auto px-4 sm:px-6 md:px-16 py-4 md:py-8">
         <nav className="flex items-center gap-2 mb-6 text-[10px] md:text-xs font-bold uppercase tracking-[0.1em] text-black/30 border-b border-black/5 pb-4 overflow-x-auto whitespace-nowrap scrollbar-hide">
           <Link href="/" className="hover:text-black transition-colors shrink-0">Home</Link>

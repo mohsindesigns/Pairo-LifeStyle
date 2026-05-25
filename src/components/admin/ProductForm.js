@@ -23,6 +23,7 @@ import {
 
 const TiptapEditor = dynamic(() => import('./TiptapEditor'), { ssr: false });
 import MediaPicker from "./MediaPicker";
+import SEOConfigPanel from "./SEOConfigPanel";
 import MediaPickerModal from "./MediaPickerModal";
 import GallerySorter from "./GallerySorter";
 import AdminPageLayout from "./AdminPageLayout";
@@ -465,17 +466,15 @@ export default function ProductForm({ productId = null }) {
                         )}
 
                         {activeTab === "seo" && (
-                           <div className="space-y-6 max-w-2xl">
-                              <div className="space-y-2">
-                                 <label className="text-[11px] font-bold text-gray-400 uppercase">Meta Title</label>
-                                 <input className="w-full border border-gray-200 p-3 text-[14px]" value={formData.seo?.title} onChange={e=>setFormData({...formData, seo: {...formData.seo, title: e.target.value}})} />
-                              </div>
-                              <div className="space-y-2">
-                                 <label className="text-[11px] font-bold text-gray-400 uppercase">Meta Description</label>
-                                 <textarea className="w-full border border-gray-200 p-3 text-[14px]" rows={4} value={formData.seo?.description} onChange={e=>setFormData({...formData, seo: {...formData.seo, description: e.target.value}})} />
-                              </div>
-                              <MediaPicker value={formData.seo?.ogImage} onChange={url=>setFormData({...formData, seo: {...formData.seo, ogImage: url}})} label="Social Share Image" />
-                           </div>
+                           <SEOConfigPanel
+                              seo={formData.seo || {}}
+                              onChange={newSeo => setFormData({ ...formData, seo: newSeo })}
+                              parentTitle={formData.name}
+                              parentDescription={formData.shortDescription || formData.description}
+                              parentSlug={formData.slug}
+                              parentImage={formData.image || (formData.images && formData.images[0])}
+                              parentType="product"
+                           />
                         )}
                      </div>
                   </div>

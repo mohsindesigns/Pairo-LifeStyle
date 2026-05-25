@@ -15,6 +15,7 @@ import dynamic from 'next/dynamic';
 const TiptapEditor = dynamic(() => import('./TiptapEditor'), { ssr: false });
 import MediaPicker from "@/components/admin/MediaPicker";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
 
 export default function BlogForm({ blogId }) {
    const router = useRouter();
@@ -174,21 +175,15 @@ export default function BlogForm({ blogId }) {
                </div>
 
                {/* SEO Meta Box */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex items-center gap-2">
-                     <Globe className="w-4 h-4 text-gray-400" /> SEO Settings
-                  </div>
-                  <div className="p-6 space-y-6">
-                     <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">SEO Title</label>
-                        <input className="w-full border border-[#c3c4c7] p-2 text-[14px] outline-none focus:border-[#2271b1]" value={formData.seo?.title} onChange={(e) => setFormData({...formData, seo: {...formData.seo, title: e.target.value}})} />
-                     </div>
-                     <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Meta Description</label>
-                        <textarea rows={3} className="w-full border border-[#c3c4c7] p-2 text-[14px] outline-none focus:border-[#2271b1] resize-none" value={formData.seo?.description} onChange={(e) => setFormData({...formData, seo: {...formData.seo, description: e.target.value}})} />
-                     </div>
-                  </div>
-               </div>
+               <SEOConfigPanel
+                  seo={formData.seo || {}}
+                  onChange={newSeo => setFormData({ ...formData, seo: newSeo })}
+                  parentTitle={formData.title}
+                  parentDescription={formData.excerpt || formData.content}
+                  parentSlug={formData.slug}
+                  parentImage={formData.image}
+                  parentType="blog"
+               />
             </div>
 
             {/* Sidebar */}

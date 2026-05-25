@@ -13,12 +13,17 @@ const CategorySchema = new mongoose.Schema({
     title: String,
     description: String,
     keywords: [String],
+    focusKeyword: String,
     canonicalUrl: String,
     ogTitle: String,
     ogDescription: String,
     ogImage: String,
     noIndex: { type: Boolean, default: false },
-    noFollow: { type: Boolean, default: false }
+    noFollow: { type: Boolean, default: false },
+    twitterTitle: String,
+    twitterDescription: String,
+    twitterImage: String,
+    structuredData: String // JSON-LD
   },
   type: { type: String, enum: ['product', 'blog'], default: 'product' },
   productCount: { type: Number, default: 0 }

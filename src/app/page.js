@@ -6,6 +6,32 @@ import SiteConfig from "@/models/SiteConfig";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata() {
+  await dbConnect();
+  try {
+    const homePage = await Page.findOne({ slug: 'home', status: 'Published' }).lean();
+    if (homePage) {
+      const { resolveSEOMetadata } = await import("@/lib/seo-resolver");
+      const { metadata } = resolveSEOMetadata({
+        entity: homePage,
+        type: "page",
+        path: "/"
+      });
+      return metadata;
+    }
+  } catch (error) {
+    console.error("Home generateMetadata error:", error);
+  }
+  
+  return {
+    title: "Pairo | Premium Handcrafted Shearling Jackets",
+    description: "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.",
+    alternates: {
+      canonical: "https://pairo.store"
+    }
+  };
+}
+
 export default async function Home() {
   await dbConnect();
   
@@ -45,8 +71,35 @@ export default async function Home() {
   // Ensure sections are sorted correctly
   const sortedSections = JSON.parse(JSON.stringify(sections.sort((a, b) => a.order - b.order)));
 
+  // Generate dynamic Schema structured data
+  let structuredData = null;
+  if (pageData) {
+    const { resolveSEOMetadata } = await import("@/lib/seo-resolver");
+    const seoRes = resolveSEOMetadata({
+      entity: pageData,
+      type: "page",
+      path: "/"
+    });
+    structuredData = seoRes.structuredData;
+  }
+  if (!structuredData) {
+    structuredData = {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Pairo",
+      "url": "https://pairo.store",
+      "logo": "https://pairo.store/logo.png"
+    };
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
+      {structuredData && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+      )}
       <SectionRenderer sections={sortedSections} />
     </div>
   );
