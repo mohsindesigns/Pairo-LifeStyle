@@ -60,6 +60,7 @@ describe("Reviews Hardening Verification Suite", () => {
       tenantId: "DEFAULT_STORE",
       id: 9999,
       name: "Vitest Concurrency Test Jacket",
+      slug: "vitest-concurrency-test-jacket-" + Date.now(),
       price: 800,
       rating: 0,
       reviewCount: 0,

@@ -20,6 +20,7 @@ describe("Reviews Admin API Mongoose Level Lifecycle Verification", () => {
       tenantId: "DEFAULT_STORE",
       id: 8888,
       name: "Admin API Lifecycle Test Jacket",
+      slug: "admin-api-lifecycle-test-jacket-" + Date.now(),
       price: 250,
       rating: 0,
       reviewCount: 0,
