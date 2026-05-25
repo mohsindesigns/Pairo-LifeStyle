@@ -11,6 +11,7 @@ import ProductMainSection from "@/components/product/ProductMainSection";
 import { getOptimizedImage, getCloudinarySrcSet } from "@/lib/cloudinary";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata } from "@/lib/seo-resolver";
+import Review from "@/models/Review";
 
 export const dynamic = "force-dynamic";
 
@@ -30,10 +31,17 @@ export async function generateMetadata({ params }) {
 
   if (!product) return { title: "Product Not Found" };
 
+  const reviews = await Review.find({
+    productId: product._id,
+    status: "Approved",
+    isDeleted: { $ne: true }
+  }).limit(5).lean();
+
   const { metadata } = resolveSEOMetadata({
     entity: product,
     type: "product",
-    path: currentPath
+    path: currentPath,
+    reviews
   });
 
   return metadata;
@@ -102,10 +110,17 @@ export default async function ProductDetailPage({ params }) {
   const sanitizedProduct = JSON.parse(JSON.stringify(product));
   const sanitizedRelated = JSON.parse(JSON.stringify(relatedProducts));
 
+  const reviews = await Review.find({
+    productId: product._id,
+    status: "Approved",
+    isDeleted: { $ne: true }
+  }).limit(5).lean();
+
   const { structuredData } = resolveSEOMetadata({
     entity: product,
     type: "product",
-    path: currentPath
+    path: currentPath,
+    reviews
   });
 
   return (

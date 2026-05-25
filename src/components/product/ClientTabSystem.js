@@ -4,28 +4,11 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Star, User, Check, HelpCircle, ChevronDown, MessageSquareText } from "lucide-react";
 
+import ProductReviews from "./ProductReviews";
+
 export default function ClientTabSystem({ product }) {
   const [activeTab, setActiveTab] = useState("Product Details");
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
-
-  const reviews = [
-    { name: "Samantha D.", date: "August 14, 2023", text: "I absolutely love this jacket! The design is unique and the fabric feels so comfortable." },
-    { name: "Alex M.", date: "August 15, 2023", text: "The quality exceeded my expectations! The colors are vibrant and the craft quality is top-notch." },
-    { name: "Ethan R.", date: "August 16, 2023", text: "This is a must-have for anyone who appreciates good design. Minimalistic yet stylish." }
-  ];
-
-  const renderStars = (rating, size = "w-3 h-3") => {
-    const stars = [];
-    for (let i = 0; i < 5; i++) {
-      stars.push(
-        <Star 
-          key={i} 
-          className={`${size} ${i < Math.floor(rating || 5) ? 'fill-[#FFC633] text-[#FFC633]' : 'fill-black/5 text-black/5'}`} 
-        />
-      );
-    }
-    return stars;
-  };
 
   return (
     <div className="mt-12 md:mt-20 border-t border-black/5">
@@ -55,7 +38,7 @@ export default function ClientTabSystem({ product }) {
                    <div 
                       className="text-black/70 text-sm md:text-lg leading-relaxed font-medium prose-custom max-w-none"
                       dangerouslySetInnerHTML={{ __html: product.description || "Detailed overview coming soon..." }}
-                   />
+                    />
                 </div>
 
                 {/* Technical Grid */}
@@ -76,22 +59,8 @@ export default function ClientTabSystem({ product }) {
             )}
 
             {activeTab === "Rating & Reviews" && (
-              <motion.div key="reviews" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-8 md:space-y-12">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                   <div className="space-y-1">
-                      <h2 className="text-xl md:text-2xl font-bold uppercase tracking-tight text-black">Customer Perspectives</h2>
-                      <p className="text-[10px] text-black/30 font-bold uppercase tracking-widest">Verified Purchases Only</p>
-                   </div>
-                   <button className="w-full sm:w-auto h-12 px-8 bg-black text-white rounded-xl font-bold text-[9px] uppercase tracking-widest shadow-xl hover:bg-black/90 transition-colors">Submit Review</button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                   {reviews.map((review, i) => (
-                      <div key={i} className="p-6 md:p-10 bg-[#F9F9F9] border border-black/5 rounded-[32px] space-y-6 md:space-y-8 hover:bg-white hover:shadow-2xl hover:shadow-black/5 transition-all duration-300">
-                         <div className="flex justify-between items-center"><div className="flex gap-0.5">{renderStars(5, "w-3 h-3")}</div><span className="text-[7px] md:text-[8px] font-bold text-black/20 uppercase tracking-widest">{review.date}</span></div>
-                         <div className="space-y-4"><div className="flex items-center gap-2.5"><div className="w-8 h-8 bg-black text-white rounded-xl flex items-center justify-center font-bold text-[10px]">{review.name.charAt(0)}</div><h4 className="text-[11px] md:text-[12px] font-bold uppercase tracking-tight">{review.name}</h4><Check className="w-3 h-3 text-emerald-500" /></div><p className="text-black/60 text-[12px] md:text-base leading-relaxed font-medium italic">"{review.text}"</p></div>
-                      </div>
-                   ))}
-                </div>
+              <motion.div key="reviews" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <ProductReviews productId={product._id} productName={product.name} />
               </motion.div>
             )}
 

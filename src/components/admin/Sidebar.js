@@ -148,6 +148,7 @@ export default function AdminSidebar() {
            <FlyoutMenu title="Store" icon={ShoppingCart} permission="orders.view" activePath="/admin/orders">
                 <NavLink href="/admin/orders" isSubmenu>Orders</NavLink>
                 <NavLink href="/admin/customers" isSubmenu>Customers</NavLink>
+                <NavLink href="/admin/reviews" isSubmenu permission="reviews.view">Product Reviews</NavLink>
                 <NavLink href="/admin/promotions" isSubmenu>Promotions</NavLink>
                 <NavLink href="/admin/analytics" isSubmenu>Analytics</NavLink>
            </FlyoutMenu>

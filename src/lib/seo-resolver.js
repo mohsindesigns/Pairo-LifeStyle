@@ -90,7 +90,8 @@ export function resolveSEOMetadata(options = {}) {
     fallbackTitle = DEFAULT_SITE_TITLE,
     fallbackDesc = DEFAULT_SITE_DESC,
     fallbackImage = "/hero-image.png",
-    path = ""
+    path = "",
+    reviews = []
   } = options;
 
   const seo = entity.seo || {};
@@ -175,6 +176,41 @@ export function resolveSEOMetadata(options = {}) {
           "availability": entity.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
         }
       };
+
+      if (entity.reviewCount > 0) {
+        structuredDataJson.aggregateRating = {
+          "@type": "AggregateRating",
+          "ratingValue": entity.rating || 5,
+          "bestRating": "5",
+          "worstRating": "1",
+          "reviewCount": entity.reviewCount
+        };
+      }
+
+      if (reviews && Array.isArray(reviews) && reviews.length > 0) {
+        const approvedReviews = reviews
+          .filter(r => r.status === "Approved" && !r.isDeleted)
+          .slice(0, 5); // Limit payload size to top 5 reviews
+
+        if (approvedReviews.length > 0) {
+          structuredDataJson.review = approvedReviews.map(r => ({
+            "@type": "Review",
+            "author": {
+              "@type": "Person",
+              "name": r.customerName || "Anonymous"
+            },
+            "datePublished": r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            "reviewBody": r.comment || "",
+            "name": r.title || "",
+            "reviewRating": {
+              "@type": "Rating",
+              "bestRating": "5",
+              "ratingValue": r.rating,
+              "worstRating": "1"
+            }
+          }));
+        }
+      }
     } else if (type === "blog" && entity.title) {
       structuredDataJson = {
         "@context": "https://schema.org",

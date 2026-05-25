@@ -94,6 +94,14 @@ const ProductSchema = new mongoose.Schema({
   productType: { type: String, enum: ['simple', 'variable'], default: 'simple' },
   isDeleted: { type: Boolean, default: false },
   rating: { type: Number, default: 0 },
+  reviewCount: { type: Number, default: 0 },
+  ratingBreakdown: {
+    5: { type: Number, default: 0 },
+    4: { type: Number, default: 0 },
+    3: { type: Number, default: 0 },
+    2: { type: Number, default: 0 },
+    1: { type: Number, default: 0 }
+  },
   type: { type: String }, // Legacy type (newArrival, etc)
   id: { type: Number } // Legacy numeric ID
 }, { timestamps: true });

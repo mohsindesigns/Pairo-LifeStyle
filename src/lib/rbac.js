@@ -15,7 +15,8 @@ export const PERMISSION_MODULES = {
     SEO: 'seo',
     SCRIPTS: 'scripts',
     PAGES: 'pages',
-    SUBMISSIONS: 'submissions'
+    SUBMISSIONS: 'submissions',
+    REVIEWS: 'reviews'
 };
 
 export const ACTIONS = {
@@ -77,5 +78,6 @@ export const ALL_PERMISSIONS = {
     [PERMISSION_MODULES.ANALYTICS]: [ACTIONS.VIEW],
     [PERMISSION_MODULES.MEDIA]: [ACTIONS.MANAGE],
     [PERMISSION_MODULES.PAGES]: [ACTIONS.VIEW, ACTIONS.CREATE, ACTIONS.EDIT, ACTIONS.DELETE, ACTIONS.PUBLISH],
-    [PERMISSION_MODULES.SUBMISSIONS]: [ACTIONS.VIEW, 'reply', 'assign', ACTIONS.DELETE, 'export', 'manage_spam']
+    [PERMISSION_MODULES.SUBMISSIONS]: [ACTIONS.VIEW, 'reply', 'assign', ACTIONS.DELETE, 'export', 'manage_spam'],
+    [PERMISSION_MODULES.REVIEWS]: [ACTIONS.VIEW, ACTIONS.EDIT, ACTIONS.DELETE, 'moderate']
 };
