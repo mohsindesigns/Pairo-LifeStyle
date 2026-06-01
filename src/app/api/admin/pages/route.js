@@ -5,6 +5,8 @@ import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import { can } from "@/lib/rbac";
 import { logAction } from "@/lib/audit";
+import { TEMPLATE_REGISTRY, validateTemplateSections } from "@/lib/templates";
+import { randomUUID } from "crypto";
 
 export async function GET(req) {
     const session = await getServerSession(authOptions);
@@ -30,10 +32,24 @@ export async function POST(req) {
     await dbConnect();
     try {
         const body = await req.json();
-        const { title, slug, description } = body;
+        const { title, slug, template, sections } = body;
 
         if (!title || !slug) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
+
+        const templateKey = template || "default";
+        const templateConfig = TEMPLATE_REGISTRY[templateKey];
+        if (!templateConfig) {
+            return NextResponse.json({ error: `Template "${templateKey}" does not exist` }, { status: 400 });
+        }
+
+        // Validate sections structure and template constraints if sections are provided
+        if (sections && sections.length > 0) {
+            const { isValid, error } = validateTemplateSections(templateKey, sections);
+            if (!isValid) {
+                return NextResponse.json({ error }, { status: 400 });
+            }
         }
 
         // Prevent collisions with reserved system routes
@@ -47,8 +63,22 @@ export async function POST(req) {
             return NextResponse.json({ error: "Page with this slug already exists" }, { status: 400 });
         }
 
+        // Seed template default sections if no sections are explicitly provided
+        let pageSections = sections || [];
+        if (pageSections.length === 0 && templateConfig.defaultSections) {
+            pageSections = templateConfig.defaultSections.map((s, i) => ({
+                id: randomUUID ? randomUUID() : Math.random().toString(36).substring(2, 11),
+                type: s.type,
+                enabled: true,
+                order: i,
+                config: s.config || {}
+            }));
+        }
+
         const newPage = await Page.create({
             ...body,
+            template: templateKey,
+            sections: pageSections,
             createdBy: session.user.id,
             updatedBy: session.user.id,
             tenantId: 'DEFAULT_STORE'

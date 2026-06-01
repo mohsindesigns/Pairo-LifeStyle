@@ -123,6 +123,7 @@ export async function GET(req) {
           }
         }
       ],
+      template: "home",
       seo: {
         title: "Pairo | Premium Shearling Jackets",
         description: "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets."

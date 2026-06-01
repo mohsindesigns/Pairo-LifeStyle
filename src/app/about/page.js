@@ -1,20 +1,17 @@
-import dbConnect from "@/lib/db";
-import Page from "@/models/Page";
-import SectionRenderer from "@/components/common/SectionRenderer";
+import { resolvePageSections } from "@/lib/page-data-resolver";
 import { notFound } from "next/navigation";
 import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
-import { resolvePageSections } from "@/lib/page-data-resolver";
+import { resolvePageAndTemplate } from "@/lib/page-cache";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  await dbConnect();
-  const page = await Page.findOne({ slug: "about" }).lean();
-  if (!page) return { title: "About Us" };
-
+  const { page } = await resolvePageAndTemplate("about", "about");
+  
   const { metadata } = resolveSEOMetadata({
     entity: page,
     type: "page",
+    fallbackTitle: "About Us | Pairo - Premium Shearling Jackets",
     path: "/about"
   });
 
@@ -22,10 +19,10 @@ export async function generateMetadata() {
 }
 
 export default async function AboutPage() {
-  await dbConnect();
-  const page = await Page.findOne({ slug: "about", status: "Published" }).lean();
+  const { page, templateInfo } = await resolvePageAndTemplate("about", "about");
 
-  if (!page) {
+  // Throw 404 if the page is draft and not viewable
+  if (page.status !== "Published") {
     notFound();
   }
 
@@ -35,7 +32,9 @@ export default async function AboutPage() {
   }
 
   // Ensure sections are sorted correctly
-  const sortedSections = JSON.parse(JSON.stringify(resolvedSections.sort((a, b) => a.order - b.order)));
+  const sortedSections = JSON.parse(
+    JSON.stringify(resolvedSections.sort((a, b) => (a.order || 0) - (b.order || 0)))
+  );
 
   const { structuredData } = resolveSEOMetadata({
     entity: page,
@@ -43,15 +42,17 @@ export default async function AboutPage() {
     path: "/about"
   });
 
+  const TemplateComponent = templateInfo.component;
+
   return (
-    <main className="bg-white">
+    <>
       {structuredData && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
-      <SectionRenderer sections={sortedSections} />
-    </main>
+      <TemplateComponent page={page} sections={sortedSections} />
+    </>
   );
 }

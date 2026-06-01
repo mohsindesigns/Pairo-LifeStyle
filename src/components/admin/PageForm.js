@@ -54,6 +54,7 @@ import { toast } from "react-hot-toast";
 import Link from "next/link";
 
 import { SECTION_SCHEMAS } from "@/lib/section-schemas";
+import { TEMPLATE_REGISTRY } from "@/lib/templates";
 import MediaPickerModal from "./MediaPickerModal";
 import AdminPageLayout from "./AdminPageLayout";
 import SEOConfigPanel from "./SEOConfigPanel";
@@ -416,6 +417,9 @@ export default function PageForm({ pageId }) {
                         onChange={(e) => setPage({ ...page, title: e.target.value })}
                      />
                      {page.isSystem && <span className="bg-amber-100 text-amber-700 text-[9px] font-black uppercase px-2 py-1 rounded">System Page</span>}
+                     <span className="bg-blue-50 text-blue-700 text-[9px] font-black uppercase px-2 py-1 rounded select-none border border-blue-200">
+                        Template: {TEMPLATE_REGISTRY[page.template || "default"]?.name || page.template || "Default"}
+                     </span>
                   </div>
                   <div className="text-[12px] text-gray-500 px-1 mt-1 flex items-center gap-1">
                      Permalink: <span className="text-gray-400">pairo.store/</span>
@@ -459,21 +463,26 @@ export default function PageForm({ pageId }) {
                               <Plus className="w-3.5 h-3.5" /> Add Section
                            </button>
                            <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-[#c3c4c7] shadow-xl z-50 hidden group-hover:block py-1">
-                              {Object.entries(SECTION_SCHEMAS).map(([type, s]) => (
-                                 <button 
-                                    key={type} 
-                                    type="button"
-                                    onClick={() => {
-                                       const id = generateId();
-                                       const newSec = { id, type, enabled: true, order: page.sections.length, config: {} };
-                                       setPage({ ...page, sections: [...page.sections, newSec] });
-                                       setExpandedSectionId(id);
-                                    }}
-                                    className="w-full text-left px-4 py-1.5 text-[12px] hover:bg-[#2271b1] hover:text-white"
-                                 >
-                                    {s.name}
-                                 </button>
-                              ))}
+                              {Object.entries(SECTION_SCHEMAS)
+                                 .filter(([type]) => {
+                                    const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
+                                    return !templateConfig || !templateConfig.allowedSections || templateConfig.allowedSections.includes(type);
+                                 })
+                                 .map(([type, s]) => (
+                                    <button 
+                                       key={type} 
+                                       type="button"
+                                       onClick={() => {
+                                          const id = generateId();
+                                          const newSec = { id, type, enabled: true, order: page.sections.length, config: {} };
+                                          setPage({ ...page, sections: [...page.sections, newSec] });
+                                          setExpandedSectionId(id);
+                                       }}
+                                       className="w-full text-left px-4 py-1.5 text-[12px] hover:bg-[#2271b1] hover:text-white"
+                                    >
+                                       {s.name}
+                                    </button>
+                                 ))}
                            </div>
                         </div>
                      </div>

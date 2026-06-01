@@ -89,6 +89,7 @@ export async function GET() {
           }
         }
       ],
+      template: "about",
       seo: {
         title: "About Us | Pairo - Premium Shearling Jackets",
         description: about.hero.subtitle,

@@ -12,7 +12,8 @@ export default function NewPage() {
     title: "",
     slug: "",
     description: "",
-    status: "Draft"
+    status: "Draft",
+    template: "default"
   });
 
   const handleTitleChange = (e) => {
@@ -47,7 +48,7 @@ export default function NewPage() {
     } catch (err) {
       toast.error("An error occurred");
     } finally {
-      setLoading(setLoading(false));
+      setLoading(false);
     }
   };
 
@@ -85,6 +86,22 @@ export default function NewPage() {
               />
             </div>
             <p className="text-[11px] text-[#646970] italic">The public URL of the page. Only alphanumeric characters and dashes allowed.</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[13px] font-bold text-[#1d2327]">Page Template</label>
+            <select
+              value={formData.template}
+              onChange={(e) => setFormData({ ...formData, template: e.target.value })}
+              required
+              className="w-full border border-[#8c8f94] outline-none px-3 py-2 text-[13px] bg-white focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] rounded-[3px]"
+            >
+              <option value="default">Default Template (General Landing Page)</option>
+              <option value="home">Homepage Template</option>
+              <option value="about">About Page Template</option>
+              <option value="contact">Contact Page Template</option>
+            </select>
+            <p className="text-[11px] text-[#646970] italic">Select the dynamic structural template for this page. Locked after creation.</p>
           </div>
 
           <div className="space-y-1.5">

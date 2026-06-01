@@ -55,11 +55,16 @@ export async function aggregateProductRatings(productId) {
     let session = null;
     try {
       if (mongoose.connection.readyState === 1 && typeof mongoose.connection.client?.startSession === 'function') {
-        session = await mongoose.startSession();
-        session.startTransaction();
+        const tempSession = await mongoose.startSession();
+        try {
+          tempSession.startTransaction();
+          session = tempSession;
+        } catch (txError) {
+          await tempSession.endSession();
+          session = null;
+        }
       }
     } catch (e) {
-      // Gracefully fall back if transactions are not supported (e.g. standalone Mongo)
       session = null;
     }
 

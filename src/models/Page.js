@@ -49,6 +49,12 @@ const PageSchema = new mongoose.Schema({
     enum: ["Draft", "Published"], 
     default: "Draft" 
   },
+  template: {
+    type: String,
+    enum: ["home", "about", "contact", "default"],
+    default: "default",
+    required: true
+  },
   isSystem: { 
     type: Boolean, 
     default: false 

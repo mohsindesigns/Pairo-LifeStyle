@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import { can } from "@/lib/rbac";
 import { logAction } from "@/lib/audit";
+import { validateTemplateSections } from "@/lib/templates";
 
 export async function GET(req, { params }) {
     const { id } = await params;
@@ -48,6 +49,18 @@ export async function PUT(req, { params }) {
         const existing = await Page.findById(id);
         if (!existing) return NextResponse.json({ error: "Page not found" }, { status: 404 });
 
+        // Enforce Template Immutability (locked template check)
+        const existingTemplate = existing.template || (existing.slug === "home" ? "home" : existing.slug === "about" ? "about" : existing.slug === "contact" ? "contact" : "default");
+        if (body.template && body.template !== existingTemplate) {
+            return NextResponse.json({ error: "Page template is locked and cannot be modified after creation." }, { status: 400 });
+        }
+
+        // Validate sections against template constraints
+        const { isValid, error } = validateTemplateSections(existingTemplate, body.sections);
+        if (!isValid) {
+            return NextResponse.json({ error }, { status: 400 });
+        }
+
         // Prevent collisions with reserved system routes
         const { isReservedPath, registerRedirect } = await import("@/lib/redirect-resolver");
         if (body.slug) {
@@ -63,6 +76,7 @@ export async function PUT(req, { params }) {
 
         const updated = await Page.findByIdAndUpdate(id, {
             ...body,
+            template: existingTemplate, // Force template to be immutable
             updatedBy: session.user.id
         }, { returnDocument: 'after' });
 

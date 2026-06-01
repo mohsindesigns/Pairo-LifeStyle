@@ -1,11 +1,9 @@
 import { notFound } from "next/navigation";
-import dbConnect from "@/lib/db";
-import Page from "@/models/Page";
-import SectionRenderer from "@/components/common/SectionRenderer";
 import { resolvePageSections } from "@/lib/page-data-resolver";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 import { RESERVED_SLUGS } from "@/lib/redirect-resolver";
+import { resolvePageAndTemplate } from "@/lib/page-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +17,12 @@ export async function generateMetadata({ params }) {
   const currentPath = `/${slug}`;
   await checkAndApplyRedirect(currentPath);
 
-  await dbConnect();
-  const page = await Page.findOne({ slug: slug.toLowerCase(), status: "Published" }).lean();
-  if (!page) return { title: "Page Not Found" };
+  const { page } = await resolvePageAndTemplate(slug, "default");
+  
+  // If it's a dynamic custom page, we require it to exist and be published
+  if (!page || page.status !== "Published") {
+    return { title: "Page Not Found" };
+  }
 
   const { metadata } = resolveSEOMetadata({
     entity: page,
@@ -42,10 +43,9 @@ export default async function CatchAllCMSPage({ params }) {
   const currentPath = `/${slug}`;
   await checkAndApplyRedirect(currentPath);
 
-  await dbConnect();
-  const page = await Page.findOne({ slug: slug.toLowerCase(), status: "Published" }).lean();
+  const { page, templateInfo } = await resolvePageAndTemplate(slug, "default");
 
-  if (!page) {
+  if (!page || page.status !== "Published") {
     notFound();
   }
 
@@ -55,7 +55,9 @@ export default async function CatchAllCMSPage({ params }) {
   }
 
   // Ensure sections are sorted correctly
-  const sortedSections = JSON.parse(JSON.stringify(resolvedSections.sort((a, b) => a.order - b.order)));
+  const sortedSections = JSON.parse(
+    JSON.stringify(resolvedSections.sort((a, b) => (a.order || 0) - (b.order || 0)))
+  );
 
   const { structuredData } = resolveSEOMetadata({
     entity: page,
@@ -63,15 +65,17 @@ export default async function CatchAllCMSPage({ params }) {
     path: currentPath
   });
 
+  const TemplateComponent = templateInfo.component;
+
   return (
-    <div className="flex flex-col min-h-screen">
+    <>
       {structuredData && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
-      <SectionRenderer sections={sortedSections} />
-    </div>
+      <TemplateComponent page={page} sections={sortedSections} />
+    </>
   );
 }
