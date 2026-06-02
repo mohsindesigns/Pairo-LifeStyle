@@ -1,9 +1,8 @@
-import { withAuth } from "next-auth/middleware";
+import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token;
+export async function middleware(req) {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     const path = req.nextUrl.pathname;
 
     // 1. API Admin Protection
@@ -59,14 +58,7 @@ export default withAuth(
     }
 
     return NextResponse.next();
-  },
-  {
-    secret: process.env.NEXTAUTH_SECRET,
-    callbacks: {
-      authorized: () => true, // Let the middleware handle redirects manually based on route type (UI vs API)
-    },
-  }
-);
+}
 
 export const config = {
   matcher: [
