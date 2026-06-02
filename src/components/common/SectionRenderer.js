@@ -15,7 +15,7 @@ import { getSectionComponent } from "@/lib/section-registry";
 import SectionErrorBoundary from "@/components/common/SectionErrorBoundary";
 import Reveal from "@/components/common/Reveal";
 
-const SectionWrapper = ({ section, children }) => {
+const SectionWrapper = ({ section, isFirst, children }) => {
   const { overrides = {} } = section;
   // Force removal of the old default culprit if it exists in the DB
   let padding = overrides.padding || "py-0";
@@ -24,6 +24,12 @@ const SectionWrapper = ({ section, children }) => {
   const background = overrides.background || "transparent";
   const customClasses = overrides.customClasses || "";
 
+  const content = (
+    <SectionErrorBoundary>
+      {children}
+    </SectionErrorBoundary>
+  );
+
   return (
     <div 
       className={`${padding} ${customClasses}`} 
@@ -31,11 +37,7 @@ const SectionWrapper = ({ section, children }) => {
       data-section-id={section.id}
       data-section-type={section.type}
     >
-      <Reveal>
-        <SectionErrorBoundary>
-          {children}
-        </SectionErrorBoundary>
-      </Reveal>
+      {isFirst ? content : <Reveal>{content}</Reveal>}
     </div>
   );
 };
@@ -48,7 +50,7 @@ export default function SectionRenderer({ sections = [] }) {
       {sections
         .filter((s) => s && s.enabled)
         .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map((section) => {
+        .map((section, index) => {
           if (!section.type) return null;
           
           const Component = getSectionComponent(section.type);
@@ -62,7 +64,7 @@ export default function SectionRenderer({ sections = [] }) {
           }
 
           return (
-            <SectionWrapper key={section.id} section={section}>
+            <SectionWrapper key={section.id} section={section} isFirst={index === 0}>
               <Component {...(section.config || {})} sectionId={section.id} />
             </SectionWrapper>
           );

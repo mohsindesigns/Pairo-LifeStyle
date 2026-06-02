@@ -39,6 +39,7 @@ export default function ProductCard({ product }) {
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 className="object-cover"
                 quality={75}
+                unoptimized={process.env.NODE_ENV === 'development'}
               />
             )}
           </motion.div>
@@ -58,6 +59,7 @@ export default function ProductCard({ product }) {
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 className="object-cover"
                 quality={75}
+                unoptimized={process.env.NODE_ENV === 'development'}
               />
             </motion.div>
           )}

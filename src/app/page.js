@@ -19,11 +19,15 @@ export async function generateMetadata() {
 }
 
 export default async function Home() {
+  console.time('resolvePageAndTemplate');
   const { page, templateInfo } = await resolvePageAndTemplate("home", "home");
+  console.timeEnd('resolvePageAndTemplate');
   
   let resolvedSections = [];
   if (page.sections?.length > 0) {
+    console.time('resolvePageSections');
     resolvedSections = await resolvePageSections(page.sections);
+    console.timeEnd('resolvePageSections');
   }
 
   // Ensure sections are sorted correctly

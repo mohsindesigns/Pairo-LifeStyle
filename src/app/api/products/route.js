@@ -25,7 +25,10 @@ export async function GET(req) {
     if (category && category !== 'all') query.category = { $regex: new RegExp(category, 'i') };
     if (type) query.type = type;
 
-    const products = await Product.find(query).sort({ createdAt: -1 });
+    const products = await Product.find(query)
+      .select('name slug price compareAtPrice images categories rating reviewsCount isFeatured type status')
+      .sort({ createdAt: -1 })
+      .lean();
     
     // Group them like data.json for compatibility but include ALL for the shop
     if (!category && !type && !id) {

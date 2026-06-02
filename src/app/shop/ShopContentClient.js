@@ -7,6 +7,7 @@ import { SlidersHorizontal, ChevronRight, X, Check, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import siteData from "@/lib/data.json";
 import ProductCard from "@/components/home/ProductCard";
+import { useSiteData } from "@/context/SiteContext";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -30,7 +31,17 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const { filters } = siteData;
+  const siteContextData = useSiteData();
+  const dbCategories = siteContextData?._dbCategories || [];
   
+  // Extract dynamic categories from dbCategories
+  const dynamicCategories = dbCategories
+    .filter(cat => cat.type === 'product' && cat.name)
+    .map(cat => cat.name);
+    
+  // Merge hardcoded and dynamic categories, removing duplicates
+  const allCategories = Array.from(new Set([...dynamicCategories, ...(filters.categories || [])]));
+
   useEffect(() => {
     fetch("/api/products")
       .then(res => res.json())
@@ -74,7 +85,14 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
     // Category filter
     if (categoryParam) {
-      result = result.filter(p => p.category?.toLowerCase() === categoryParam.toLowerCase());
+      const targetDbCat = dbCategories.find(c => c.name.toLowerCase() === categoryParam.toLowerCase());
+      result = result.filter(p => {
+         const pCat = p.category || '';
+         const pCats = p.categories || [];
+         const matchesString = pCat.toLowerCase() === categoryParam.toLowerCase();
+         const matchesId = targetDbCat && pCats.includes(targetDbCat._id);
+         return matchesString || matchesId;
+      });
     }
 
     // Type filter
@@ -230,7 +248,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
             <span>All Products</span>
             <span className="text-black/30 text-[10px]">{products.length}</span>
           </Link>
-          {filters.categories.map((cat) => (
+          {allCategories.map((cat) => (
             <Link 
               key={cat} 
               href={`/shop?category=${cat.toLowerCase()}`}
@@ -239,7 +257,14 @@ export default function ShopContentClient({ initialCategory = null, initialType 
             >
               <span>{cat}</span>
               <span className="text-black/30 text-[10px]">
-                {products.filter(p => p.category?.toLowerCase() === cat.toLowerCase()).length}
+                {products.filter(p => {
+                  const pCat = p.category || '';
+                  const pCats = p.categories || [];
+                  const dbCat = dbCategories.find(c => c.name.toLowerCase() === cat.toLowerCase());
+                  const matchesString = pCat.toLowerCase() === cat.toLowerCase();
+                  const matchesId = dbCat && pCats.includes(dbCat._id);
+                  return matchesString || matchesId;
+                }).length}
               </span>
             </Link>
           ))}

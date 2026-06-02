@@ -21,6 +21,7 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata() {
   try {
+    console.log("=== generateMetadata MONGODB_URI ===", process.env.MONGODB_URI?.substring(0, 30) + '...');
     await dbConnect();
     const config = await SiteConfig.findOne({ key: 'main' }).maxTimeMS(4000).lean();
     if (config?.brand) {
@@ -74,10 +75,20 @@ export default async function RootLayout({ children }) {
   try {
     await dbConnect();
 
-    // Run all DB reads in parallel with a shared timeout so any single
-    // slow query never blocks the entire page render.
-    const [configResult, catsResult, pagesResult, blogsResult, prodsResult] = await Promise.allSettled([
-      SiteConfig.findOne({ key: 'main' }).maxTimeMS(QUERY_TIMEOUT_MS).lean(),
+    // 1. Fetch SiteConfig first to determine exactly which products are needed for the nav menu
+    const config = await SiteConfig.findOne({ key: 'main' }).maxTimeMS(QUERY_TIMEOUT_MS).lean() || null;
+
+    let productIdsToFetch = [];
+    if (config?.headerConfig?.navItems) {
+      config.headerConfig.navItems.forEach(item => {
+        if (item.type === 'dropdown_product' && item.dropdownProductIds) {
+          productIdsToFetch.push(...item.dropdownProductIds);
+        }
+      });
+    }
+
+    // Run remaining DB reads in parallel
+    const [catsResult, pagesResult, blogsResult, prodsResult] = await Promise.allSettled([
       Category.find({ status: { $ne: 'Draft' }, isDeleted: { $ne: true } })
         .select('name slug image type')
         .sort({ name: 1 })
@@ -94,14 +105,16 @@ export default async function RootLayout({ children }) {
         .limit(50)
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),
-      import('@/models/Product').then(m => m.default.find({ status: 'Active', isDeleted: { $ne: true } })
-        .select('title slug images')
-        .sort({ title: 1 })
+      productIdsToFetch.length > 0 ? import('@/models/Product').then(m => m.default.find({ 
+        _id: { $in: productIdsToFetch }, 
+        status: { $ne: 'Draft' }, 
+        isDeleted: { $ne: true } 
+      })
+        .select('name slug price images')
         .maxTimeMS(QUERY_TIMEOUT_MS)
-        .lean()),
+        .lean()) : Promise.resolve([])
     ]);
 
-    const config = configResult.status === 'fulfilled' ? configResult.value : null;
     const dbCategories = catsResult.status === 'fulfilled' ? (catsResult.value || []) : [];
     const dbPages = pagesResult.status === 'fulfilled' ? (pagesResult.value || []) : [];
     const dbBlogs = blogsResult.status === 'fulfilled' ? (blogsResult.value || []) : [];

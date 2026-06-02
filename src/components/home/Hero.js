@@ -58,7 +58,7 @@ export default function Hero({
 
   return (
     <section className="relative h-[550px] md:h-[650px] lg:h-[750px] overflow-hidden mx-4 md:mx-8 my-6 rounded-[32px] md:rounded-[40px] shadow-2xl bg-black">
-      <AnimatePresence initial={true} custom={direction} mode="popLayout">
+      <AnimatePresence initial={false} custom={direction} mode="popLayout">
         <motion.div key={currentSlide} custom={direction} variants={slideVariants} initial="initial" animate="animate" exit="exit" className="absolute inset-0">
           <div className="absolute inset-0">
             <Image src={hero.slides[currentSlide].image} alt={hero.slides[currentSlide].title} fill className="object-cover object-right md:object-center brightness-[0.9]" priority />

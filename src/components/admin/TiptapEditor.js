@@ -146,8 +146,11 @@ export default function TiptapEditor({ content, onChange }) {
 
   // Keep editor content in sync with external prop changes (e.g. initial load)
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content || '');
+    if (editor && content !== undefined) {
+      const currentHtml = editor.getHTML();
+      if (content !== currentHtml && content !== '<p></p>') {
+        editor.commands.setContent(content || '');
+      }
     }
   }, [content, editor]);
 

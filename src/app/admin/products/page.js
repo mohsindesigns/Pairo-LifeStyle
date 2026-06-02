@@ -254,8 +254,8 @@ export default function AdminProducts() {
                       </div>
                     </td>
                     <td className="px-3 py-4 align-top">
-                       <Link href={`/admin/products/${p._id}`} className="text-[#2271b1] font-bold hover:underline">{p.name}</Link>
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
+                       <Link href={`/admin/products/${p._id}`} className="text-[#2271b1] font-bold hover:underline block mb-1">{p.name}</Link>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
                            <Link href={`/admin/products/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
                            <span className="text-[#c3c4c7]">|</span>
                            <button onClick={() => openQuickEdit(p)} className="hover:text-[#135e96]">Quick Edit</button>

@@ -273,7 +273,7 @@ export default function Navbar() {
                                   href={`/product/${prod.slug}`}
                                   className="block px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.15em] text-black/60 hover:text-black hover:bg-black/[0.02] transition-colors truncate"
                                 >
-                                  {prod.title}
+                                  {prod.name || prod.title}
                                 </Link>
                               ))}
                             </div>
@@ -290,15 +290,15 @@ export default function Navbar() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 10 }}
-                            className="absolute top-full left-1/2 -translate-x-1/2 pt-0 w-[800px]"
+                            className="absolute top-full left-1/2 -translate-x-1/2 pt-0 w-max max-w-[95vw] xl:max-w-[1200px]"
                           >
-                            <div className="bg-white border border-black/5 shadow-2xl rounded-b-[40px] p-10 grid grid-cols-3 gap-10">
+                            <div className="bg-white border border-black/5 shadow-2xl rounded-b-[40px] p-10 flex flex-wrap justify-center gap-10 max-h-[80vh] overflow-y-auto">
                               {(item.itemMegaCategories || []).map((cat) => (
-                                <Link key={cat.slug || cat.name} href={`/shop?category=${cat.slug}`} className="group/item">
+                                <Link key={cat.slug || cat.name} href={`/shop?category=${cat.slug}`} className="group/item flex-1 min-w-[200px] max-w-[280px]">
                                   <div className="relative aspect-[4/5] rounded-[24px] overflow-hidden mb-5 bg-[#F9F9F9]">
                                     <Image src={cat.image || '/placeholder.jpg'} alt={cat.name} fill className="object-cover transition-transform duration-1000 group-hover/item:scale-110" />
                                   </div>
-                                  <h4 className="font-bold uppercase tracking-[0.2em] text-[10px]">{cat.name} Collection</h4>
+                                  <h4 className="font-bold uppercase tracking-[0.2em] text-[10px] text-center">{cat.name}</h4>
                                 </Link>
                               ))}
                             </div>

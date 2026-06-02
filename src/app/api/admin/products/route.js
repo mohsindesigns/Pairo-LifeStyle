@@ -26,12 +26,15 @@ export async function GET(req) {
     const tenantId = searchParams.get('tenantId');
     const isDeleted = searchParams.get('isDeleted') === 'true';
     
-    let query = { isDeleted, status: "Published" };
+    let query = { isDeleted };
     if (tenantId) query.tenantId = tenantId;
     
     if (status) query.status = status;
     
-    const products = await Product.find(query).sort({ createdAt: -1 });
+    const products = await Product.find(query)
+      .select('name slug price status sku stock images categories createdAt isDeleted')
+      .sort({ createdAt: -1 })
+      .lean();
     return NextResponse.json(products);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
