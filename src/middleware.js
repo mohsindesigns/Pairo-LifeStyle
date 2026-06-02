@@ -2,7 +2,19 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 
 export async function middleware(req) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    // 1. Try default getToken (infers from req.url / NEXTAUTH_URL)
+    let token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    
+    // 2. Fallback: Force secure cookie check (Vercel production)
+    if (!token) {
+        token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, secureCookie: true });
+    }
+    
+    // 3. Fallback: Force non-secure cookie check (misconfigured environments)
+    if (!token) {
+        token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, secureCookie: false });
+    }
+
     const path = req.nextUrl.pathname;
 
     // 1. API Admin Protection
@@ -16,6 +28,7 @@ export async function middleware(req) {
     // 2. UI Admin Protection
     if (path.startsWith("/admin")) {
         console.log(`[Middleware] Accessing ${path}`);
+        console.log(`[Middleware] All Cookies:`, req.cookies.getAll());
         console.log(`[Middleware] Token:`, token);
         
         // If not logged in at all, send to admin login page
