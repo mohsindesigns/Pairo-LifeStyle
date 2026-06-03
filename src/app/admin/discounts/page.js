@@ -57,6 +57,24 @@ export default function AdminDiscounts() {
     }
   };
 
+  const handleDuplicate = async (discount) => {
+    try {
+      const { _id, ...rest } = discount;
+      const copy = {
+        ...rest,
+        code: `${discount.code}_COPY_${Math.floor(Math.random() * 1000)}`
+      };
+      const res = await fetch("/api/admin/discounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(copy)
+      });
+      if (res.ok) fetchDiscounts();
+    } catch (err) {
+      console.error("Duplicate failed:", err);
+    }
+  };
+
   const handleDelete = async (id) => {
      if (!confirm("Are you sure?")) return;
      try {
@@ -69,15 +87,20 @@ export default function AdminDiscounts() {
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Delete ${selectedIds.length} coupons?`)) {
+     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} coupons?`)) {
         try {
            for (const id of selectedIds) {
-              await fetch(`/api/admin/discounts?id=${id}`, { method: "DELETE" });
+              if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
+                  await fetch(`/api/admin/discounts?id=${id}`, { method: "DELETE" });
+              } else if (bulkAction === "Duplicate") {
+                  const d = discounts.find(x => x._id === id);
+                  if (d) await handleDuplicate(d);
+              }
            }
            setSelectedIds([]);
            fetchDiscounts();
         } catch (err) {
-           console.error("Bulk delete failed:", err);
+           console.error("Bulk action failed:", err);
         }
      }
   };
@@ -171,7 +194,9 @@ export default function AdminDiscounts() {
                onChange={(e) => setBulkAction(e.target.value)}
              >
                 <option>Bulk actions</option>
-                <option>Delete</option>
+                <option>Duplicate</option>
+                <option>Move to Trash</option>
+                <option>Delete Permanently</option>
              </select>
              <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shadow-sm">Apply</button>
           </div>
@@ -201,8 +226,10 @@ export default function AdminDiscounts() {
                       <td className="px-3 py-4 align-top">
                         <div className="flex flex-col">
                            <span className="text-[14px] font-bold text-[#2271b1] hover:underline cursor-pointer">{d.code}</span>
-                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
+                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
                               <button className="hover:text-[#135e96]">Edit</button>
+                              <span className="text-[#c3c4c7]">|</span>
+                              <button onClick={() => handleDuplicate(d)} className="hover:text-[#135e96]">Duplicate</button>
                               <span className="text-[#c3c4c7]">|</span>
                               <button onClick={() => handleDelete(d._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
                            </div>

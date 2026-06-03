@@ -29,8 +29,9 @@ export default function AdminLoginPage() {
       if (res.error) {
         setError("Invalid credentials. Please check your admin access.");
       } else {
-        // Use hard navigation to completely wipe stale SessionProvider cache and force a fresh session load
-        window.location.href = "/admin";
+        // Standard Next.js client-side navigation + refresh for session propagation
+        router.refresh();
+        router.push("/admin");
       }
     } catch (err) {
       setError("An unexpected error occurred.");

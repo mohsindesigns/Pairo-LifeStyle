@@ -5,26 +5,28 @@ import {
   Plus, 
   FileText, 
   Search, 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
-  Eye,
-  Globe,
   Settings,
-  Layout
+  Layout,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRBAC } from "@/hooks/useRBAC";
 import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 export default function PagesManagementPage() {
   const { can } = useRBAC();
+  const router = useRouter();
   const [pages, setPages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkAction, setBulkAction] = useState("Bulk actions");
 
   const fetchPages = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetch("/api/admin/pages");
       const data = await res.json();
@@ -44,7 +46,7 @@ export default function PagesManagementPage() {
 
   const deletePage = async (id, isSystem) => {
     if (isSystem) return toast.error("System pages cannot be deleted");
-    if (!confirm("Are you sure you want to delete this page?")) return;
+    if (!confirm("Are you sure you want to move this page to trash?")) return;
     
     try {
       const res = await fetch(`/api/admin/pages/${id}`, { method: 'DELETE' });
@@ -60,6 +62,65 @@ export default function PagesManagementPage() {
     }
   };
 
+  const handleDuplicate = async (page) => {
+    if (page.isSystem) return toast.error("System pages cannot be duplicated");
+    try {
+      const { _id, createdAt, updatedAt, ...rest } = page;
+      const copy = {
+        ...rest,
+        title: `${page.title} (Copy)`,
+        slug: `${page.slug}-copy-${Math.floor(Math.random() * 1000)}`,
+        status: "Draft",
+        isSystem: false
+      };
+      const res = await fetch("/api/admin/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(copy)
+      });
+      if (res.ok) {
+         toast.success("Page duplicated");
+         fetchPages();
+      }
+    } catch (err) {
+      console.error("Duplicate failed:", err);
+      toast.error("Failed to duplicate page");
+    }
+  };
+
+  const handleBulkAction = async () => {
+     if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
+     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} pages?`)) {
+        try {
+           for (const id of selectedIds) {
+              const page = pages.find(p => p._id === id);
+              if (page?.isSystem) continue; // Skip system pages for bulk actions
+              
+              if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
+                  await fetch(`/api/admin/pages/${id}`, { method: "DELETE" });
+              } else if (bulkAction === "Duplicate") {
+                  await handleDuplicate(page);
+              }
+           }
+           setSelectedIds([]);
+           fetchPages();
+        } catch (err) {
+           console.error("Bulk action failed:", err);
+        }
+     }
+  };
+
+  const toggleSelect = (id, isSystem) => {
+     if (isSystem) return; // Prevent selecting system pages for bulk deletion
+     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+     const selectable = filteredPages.filter(p => !p.isSystem);
+     if (selectedIds.length === selectable.length) setSelectedIds([]);
+     else setSelectedIds(selectable.map(p => p._id));
+  };
+
   const filteredPages = pages.filter(p => 
     p.title.toLowerCase().includes(search.toLowerCase()) ||
     p.slug.toLowerCase().includes(search.toLowerCase())
@@ -67,116 +128,99 @@ export default function PagesManagementPage() {
 
   return (
     <AdminPageLayout 
-      title="Page Management" 
-      subtitle="Create and manage dynamic pages and landing layouts across your store."
+      title="Pages" 
       addNewLink="/admin/pages/new"
-      addNewLabel="Create Page"
+      addNewLabel="Add New"
     >
-      <div className="space-y-6">
-        {/* Action Bar */}
+      <div className="space-y-4">
+        {/* View Tabs */}
+        <ul className="flex items-center gap-2 text-[13px] text-[#2271b1]">
+           <li className="text-[#1d2327] font-semibold cursor-pointer">
+              All <span className="text-[#646970] font-normal">({pages.length})</span>
+           </li>
+           <span className="text-[#c3c4c7]">|</span>
+           <li className="cursor-pointer hover:text-[#135e96]">
+              Published <span className="text-[#646970] font-normal">({pages.filter(p => p.status === 'Published').length})</span>
+           </li>
+        </ul>
+
+        {/* Filter Bar */}
         <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
            <div className="flex items-center gap-2">
-              <div className="relative w-full md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#646970]" />
-                <input 
-                  type="text" 
-                  placeholder="Search pages..." 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full border border-[#8c8f94] outline-none pl-9 pr-3 py-1.5 text-[13px] bg-white focus:border-[#2271b1] rounded-[3px]"
-                />
-              </div>
+              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+                 <option>Bulk actions</option>
+                 <option>Duplicate</option>
+                 <option>Move to Trash</option>
+                 <option>Delete Permanently</option>
+              </select>
+              <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
+           </div>
+           <div className="flex items-center gap-2 w-full md:w-auto">
+              <input 
+                type="text" 
+                placeholder="Search pages..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
+              />
+              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Search Pages</button>
            </div>
         </div>
 
-        {/* Pages Table */}
-        <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden">
-           <table className="w-full text-left border-collapse text-[13px]">
+        {/* WP Data Table */}
+        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
+           <table className="w-full text-left border-collapse text-[13px] min-w-[800px]">
               <thead>
                  <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327]">Page Title</th>
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327]">Slug</th>
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327]">Status</th>
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327]">Sections</th>
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327]">Last Updated</th>
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327] text-right">Actions</th>
+                    <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredPages.filter(p => !p.isSystem).length} onChange={toggleSelectAll} /></th>
+                    <th className="px-3 py-2 font-bold text-[#1d2327]">Title</th>
+                    <th className="px-3 py-2 font-bold text-[#1d2327]">Author</th>
+                    <th className="px-3 py-2 font-bold text-[#1d2327]">Date</th>
                  </tr>
               </thead>
               <tbody className="divide-y divide-[#f0f0f1]">
                  {loading ? (
-                    <tr><td colSpan={6} className="p-10 text-center italic text-gray-400">Loading pages...</td></tr>
+                    <tr><td colSpan={4} className="p-8 text-center italic text-gray-400">Loading pages...</td></tr>
                  ) : filteredPages.length === 0 ? (
-                    <tr><td colSpan={6} className="p-10 text-center italic text-gray-400">No pages found.</td></tr>
+                    <tr><td colSpan={4} className="p-8 text-center italic text-gray-400">No pages found.</td></tr>
                  ) : (
                     filteredPages.map((p) => (
-                       <tr key={p._id} className="hover:bg-[#f6f7f7] group transition-colors">
-                          <td className="px-4 py-4">
-                             <div className="flex items-center gap-3">
-                                <div className={`w-9 h-9 rounded flex items-center justify-center ${p.isSystem ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
-                                   {p.isSystem ? <Settings className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
-                                </div>
-                                <div className="flex flex-col">
-                                   <Link href={`/admin/pages/${p._id}`} className="font-bold text-[#2271b1] hover:underline">
-                                      {p.title}
-                                   </Link>
-                                   <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Link href={`/admin/pages/${p._id}`} className="text-[11px] text-[#2271b1] hover:text-black">Edit</Link>
-                                      <span className="text-gray-300">|</span>
-                                      <Link href={`/${p.slug}`} target="_blank" className="text-[11px] text-[#2271b1] hover:text-black">View</Link>
-                                      {!p.isSystem && (
-                                         <>
-                                            <span className="text-gray-300">|</span>
-                                            <button onClick={() => deletePage(p._id, p.isSystem)} className="text-[11px] text-[#d63638] hover:text-red-700">Trash</button>
-                                         </>
-                                      )}
-                                   </div>
-                                   {p.isSystem && <span className="text-[10px] font-bold text-amber-600 uppercase tracking-tighter mt-1">System Page</span>}
-                                </div>
-                             </div>
+                       <tr key={p._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(p._id) ? "bg-[#f0f6fa]" : ""}`}>
+                          <td className="px-3 py-4 text-center align-top">
+                             <input type="checkbox" checked={selectedIds.includes(p._id)} onChange={() => toggleSelect(p._id, p.isSystem)} disabled={p.isSystem} className={p.isSystem ? 'opacity-30 cursor-not-allowed' : ''} />
                           </td>
-                          <td className="px-4 py-4 font-mono text-[#646970]">{p.slug === 'home' ? '/' : `/${p.slug}`}</td>
-                          <td className="px-4 py-4">
-                             <select
-                                value={p.status}
-                                onChange={async (e) => {
-                                   const newStatus = e.target.value;
-                                   try {
-                                      const res = await fetch(`/api/admin/pages/${p._id}`, {
-                                         method: 'PUT',
-                                         headers: { 'Content-Type': 'application/json' },
-                                         body: JSON.stringify({ ...p, status: newStatus })
-                                      });
-                                      if (res.ok) {
-                                         toast.success(`Page set to ${newStatus}`);
-                                         fetchPages();
-                                      }
-                                   } catch (err) { toast.error("Update failed"); }
-                                }}
-                                className={`px-2 py-0.5 rounded-full text-[11px] font-bold border outline-none cursor-pointer ${
-                                   p.status === 'Published' 
-                                     ? 'bg-green-50 text-green-700 border-green-200' 
-                                     : 'bg-amber-50 text-amber-700 border-amber-200'
-                                }`}
-                             >
-                                <option value="Draft">Draft</option>
-                                <option value="Published">Published</option>
-                             </select>
-                          </td>
-                          <td className="px-4 py-4 text-[#646970] font-medium">{p.sections?.length || 0} Modules</td>
-                          <td className="px-4 py-4 text-[#646970]">{new Date(p.updatedAt).toLocaleDateString()}</td>
-                          <td className="px-4 py-4 text-right">
-                             <div className="flex items-center justify-end gap-2">
-                                <Link href={`/admin/pages/${p._id}`} className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-blue-50 rounded transition-colors" title="Edit Page">
-                                   <FileText className="w-4 h-4" />
+                          <td className="px-3 py-4 align-top">
+                             <div className="flex items-center gap-2 mb-1">
+                                <Link href={`/admin/pages/${p._id}`} className="font-bold text-[#2271b1] hover:underline text-[14px]">
+                                   {p.title}
                                 </Link>
-                                <button onClick={() => deletePage(p._id, p.isSystem)} className={`p-1.5 rounded transition-colors ${p.isSystem ? 'text-gray-200 cursor-not-allowed' : 'text-[#646970] hover:text-red-600 hover:bg-red-50'}`} title="Delete" disabled={p.isSystem}>
-                                   <Trash2 className="w-4 h-4" />
-                                </button>
+                                {p.status === 'Draft' && <span className="text-[#1d2327] font-bold">— Draft</span>}
+                                {p.isSystem && <span className="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-tight">System Page</span>}
                              </div>
+                             
+                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
+                                <Link href={`/admin/pages/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
+                                {!p.isSystem && (
+                                   <>
+                                      <span className="text-[#c3c4c7]">|</span>
+                                      <button onClick={() => handleDuplicate(p)} className="hover:text-[#135e96]">Duplicate</button>
+                                      <span className="text-[#c3c4c7]">|</span>
+                                      <button onClick={() => deletePage(p._id, p.isSystem)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
+                                   </>
+                                )}
+                                <span className="text-[#c3c4c7]">|</span>
+                                <Link href={p.slug === 'home' ? '/' : `/${p.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
+                             </div>
+                          </td>
+                          <td className="px-3 py-4 align-top text-[#2271b1] hover:underline cursor-pointer">
+                             Admin
+                          </td>
+                          <td className="px-3 py-4 align-top text-[#646970]">
+                             {p.status === 'Published' ? 'Published' : 'Last Modified'}<br />
+                             {new Date(p.updatedAt).toLocaleDateString()}
                           </td>
                        </tr>
-                    )
-)
+                    ))
                  )}
               </tbody>
            </table>

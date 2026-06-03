@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -25,26 +25,24 @@ import {
   UserPlus,
   History,
   Code2,
-  Palette
+  Palette,
+  MessageSquare,
+  Wrench
 } from "lucide-react";
-
 import { signOut } from "next-auth/react";
-import { useRBAC } from "@/hooks/useRBAC";
 
-const NavLink = ({ href, icon: Icon, children, exact = false, permission, isSubmenu = false }) => {
+const NavLink = ({ href, icon: Icon, children, exact = false, isSubmenu = false }) => {
   const pathname = usePathname();
-  const { can } = useRBAC();
-  if (permission && !can(permission)) return null;
   
   const isActive = exact ? pathname === href : pathname.startsWith(href);
   return (
      <Link 
        href={href}
-       className={`flex items-center gap-2 px-3 py-1.5 text-[14px] leading-[1.3] transition-all group ${
+       className={`flex items-center gap-2 px-3 py-1.5 text-[13px] leading-[1.3] transition-all group ${
          isActive 
            ? "text-white font-medium bg-[#2271b1]" 
            : isSubmenu ? "text-[#c3c4c7] hover:text-[#72aee6]" : "text-[#a7aaad] hover:text-[#72aee6]"
-       } ${isSubmenu ? "py-2 px-4 hover:bg-[#353c42]" : ""}`}
+       } ${isSubmenu ? "py-1.5 px-8 hover:bg-[#353c42]" : ""}`}
      >
        {Icon && <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />}
        <span>{children}</span>
@@ -52,18 +50,16 @@ const NavLink = ({ href, icon: Icon, children, exact = false, permission, isSubm
   );
 };
 
-const AccordionMenu = ({ title, icon: Icon, children, permission, activePath, isOpen, onToggle }) => {
+const AccordionMenu = ({ title, icon: Icon, children, activePath, isOpen, onToggle }) => {
   const pathname = usePathname();
-  const { can } = useRBAC();
+  // Check if any child route is active
   const isActive = pathname.includes(activePath);
 
-  if (permission && !can(permission)) return null;
-
   return (
-      <div className="mb-1">
+      <div className="mb-0">
           <button 
               onClick={onToggle}
-              className={`w-full flex items-center justify-between px-3 py-2 text-[14px] transition-all ${isActive ? "bg-[#2271b1] text-white font-medium" : "hover:bg-[#2c3338] hover:text-[#72aee6] text-[#a7aaad]"}`}
+              className={`w-full flex items-center justify-between px-3 py-2 text-[13px] transition-all ${isActive && !isOpen ? "bg-[#2271b1] text-white font-medium" : isActive && isOpen ? "bg-[#2271b1] text-white font-medium" : "hover:bg-[#2c3338] hover:text-[#72aee6] text-[#a7aaad]"}`}
           >
               <div className="flex items-center gap-2">
                   <Icon className={`w-4 h-4 ${isActive ? "text-white" : ""}`} />
@@ -73,101 +69,62 @@ const AccordionMenu = ({ title, icon: Icon, children, permission, activePath, is
           </button>
           
           {/* Accordion Submenu */}
-          {isOpen && (
-              <div className="bg-[#2c3338] py-1">
-                  {children}
-              </div>
-          )}
+          <div className={`bg-[#32373c] py-1 overflow-hidden transition-all duration-200 ${isOpen ? "block" : "hidden"}`}>
+              {children}
+          </div>
       </div>
   );
 };
 
-const SectionHeader = ({ title }) => (
-  <div className="px-3 pt-4 pb-1">
-    <span className="text-[11px] font-semibold text-[#a7aaad]/70 uppercase tracking-widest">{title}</span>
-  </div>
-);
-
 export default function AdminSidebar() {
   const pathname = usePathname();
-  const { can } = useRBAC();
+  const [openAccordion, setOpenAccordion] = useState("");
 
-  // Find the initially active accordion based on the pathname
-  const initialOpen = ['/admin/products', '/admin/orders', '/admin/pages', '/admin/blogs', '/admin/settings/team'].find(path => pathname.includes(path));
-  const [openAccordion, setOpenAccordion] = useState(initialOpen || "");
+  // Determine initial open accordion based on path
+  useEffect(() => {
+    if (pathname.includes("/admin/products")) setOpenAccordion("products");
+    else if (pathname.includes("/admin/orders") || pathname.includes("/admin/customers") || pathname.includes("/admin/promotions") || pathname.includes("/admin/discounts") || pathname.includes("/admin/reviews")) setOpenAccordion("commerce");
+    else if (pathname.includes("/admin/blogs")) setOpenAccordion("posts");
+    else if (pathname.includes("/admin/pages")) setOpenAccordion("pages");
+    else if (pathname.includes("/admin/settings/team") || pathname.includes("/admin/settings/roles")) setOpenAccordion("users");
+    else if (pathname.includes("/admin/appearance")) setOpenAccordion("appearance");
+    else if (pathname.includes("/admin/contact") || pathname.includes("/admin/settings/logs") || pathname.includes("/admin/settings/scripts")) setOpenAccordion("tools");
+    else if (pathname.includes("/admin/settings/site")) setOpenAccordion("settings");
+    else setOpenAccordion("");
+  }, [pathname]);
 
-  const handleToggle = (path) => {
-    setOpenAccordion(prev => prev === path ? "" : path);
+  const handleToggle = (id) => {
+    setOpenAccordion(prev => prev === id ? "" : id);
   };
 
   return (
-    <aside className="w-[200px] bg-[#1d2327] text-[#f0f0f1] h-screen flex flex-col fixed left-0 top-0 z-50 font-sans border-r border-white/5 select-none">
-      {/* Sidebar Header */}
-      <div className="border-b border-white/5 shrink-0 bg-[#1d2327]">
-        <Link href="/admin" className="flex items-center gap-2 px-3 py-4 hover:text-[#72aee6] transition-colors">
-           <div className="w-6 h-6 bg-[#2271b1] rounded-sm flex items-center justify-center">
-              <span className="text-[12px] font-black italic text-white">P</span>
-           </div>
-           <span className="text-[14px] font-bold tracking-wide">Pairo Store</span>
-        </Link>
-      </div>
-
+    <aside className="w-[160px] bg-[#1d2327] text-[#f0f0f1] h-screen flex flex-col fixed left-0 top-0 z-50 font-sans border-r border-white/5 select-none shrink-0">
       {/* Scrollable Nav */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
         <nav className="py-2">
            
-           {/* Dashboard */}
-           <div className="mb-1">
-             <Link href="/admin" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname === "/admin" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
-                <LayoutDashboard className="w-4 h-4" />
-                <span>Dashboard</span>
+           {/* Dashboard Accordion (simulated as standalone link but matches style) */}
+           <div className="mb-0">
+             <Link href="/admin" className={`flex items-center justify-between px-3 py-2 text-[13px] transition-all ${pathname === "/admin" || pathname === "/admin/analytics" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
+                <div className="flex items-center gap-2">
+                   <LayoutDashboard className="w-4 h-4" />
+                   <span>Dashboard</span>
+                </div>
              </Link>
+             {(pathname === "/admin" || pathname === "/admin/analytics") && (
+                <div className="bg-[#32373c] py-1">
+                   <NavLink href="/admin" exact isSubmenu>Home</NavLink>
+                   <NavLink href="/admin/analytics" isSubmenu>Analytics</NavLink>
+                </div>
+             )}
            </div>
-           <div className="mb-1">
-             <Link href="/admin/analytics" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname === "/admin/analytics" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
-                <BarChart3 className="w-4 h-4" />
-                <span>Analytics</span>
-             </Link>
-           </div>
 
-           <SectionHeader title="E-Commerce" />
+           <div className="my-2 bg-[#ffffff1a] h-[1px] w-full" />
 
-           {/* Products Accordion */}
+           {/* Posts (Blogs) */}
            <AccordionMenu 
-              title="Products" icon={Box} permission="products.view" activePath="/admin/products"
-              isOpen={openAccordion === "/admin/products"} onToggle={() => handleToggle("/admin/products")}
-           >
-                <NavLink href="/admin/products" exact isSubmenu>All Products</NavLink>
-                <NavLink href="/admin/products/new" isSubmenu>Add New</NavLink>
-                <NavLink href="/admin/categories" isSubmenu>Categories</NavLink>
-           </AccordionMenu>
-
-           {/* Store Accordion */}
-           <AccordionMenu 
-              title="Store" icon={ShoppingCart} permission="orders.view" activePath="/admin/orders"
-              isOpen={openAccordion === "/admin/orders"} onToggle={() => handleToggle("/admin/orders")}
-           >
-                <NavLink href="/admin/orders" isSubmenu>Orders</NavLink>
-                <NavLink href="/admin/customers" isSubmenu>Customers</NavLink>
-                <NavLink href="/admin/reviews" isSubmenu permission="reviews.view">Reviews</NavLink>
-                <NavLink href="/admin/promotions" isSubmenu>Promotions</NavLink>
-           </AccordionMenu>
-
-           <SectionHeader title="Content" />
-
-           {/* Page Builder Accordion */}
-           <AccordionMenu 
-              title="Pages" icon={Layers} permission="pages.view" activePath="/admin/pages"
-              isOpen={openAccordion === "/admin/pages"} onToggle={() => handleToggle("/admin/pages")}
-           >
-                <NavLink href="/admin/pages" exact isSubmenu>All Pages</NavLink>
-                <NavLink href="/admin/pages/new" isSubmenu>Add New</NavLink>
-           </AccordionMenu>
-
-           {/* Blog Accordion */}
-           <AccordionMenu 
-              title="Posts" icon={FileText} permission="blogs.view" activePath="/admin/blogs"
-              isOpen={openAccordion === "/admin/blogs"} onToggle={() => handleToggle("/admin/blogs")}
+              title="Posts" icon={FileText} activePath="/admin/blogs"
+              isOpen={openAccordion === "posts"} onToggle={() => handleToggle("posts")}
            >
                 <NavLink href="/admin/blogs" exact isSubmenu>All Posts</NavLink>
                 <NavLink href="/admin/blogs/new" isSubmenu>Add New</NavLink>
@@ -175,79 +132,96 @@ export default function AdminSidebar() {
            </AccordionMenu>
 
            {/* Media Standalone */}
-           {can("media.manage") && (
-            <div className="mb-1">
-              <Link href="/admin/media" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname === "/admin/media" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
+            <div className="mb-0">
+              <Link href="/admin/media" className={`flex items-center gap-2 px-3 py-2 text-[13px] transition-all ${pathname === "/admin/media" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
                   <ImageIcon className="w-4 h-4" />
                   <span>Media</span>
               </Link>
             </div>
-           )}
 
-           {/* Submissions Standalone */}
-           <div className="mb-1">
-             <Link href="/admin/contact" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname === "/admin/contact" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
-                <Mail className="w-4 h-4" />
-                <span>Contact Forms</span>
+           {/* Pages Accordion */}
+           <AccordionMenu 
+              title="Pages" icon={Layers} activePath="/admin/pages"
+              isOpen={openAccordion === "pages"} onToggle={() => handleToggle("pages")}
+           >
+                <NavLink href="/admin/pages" exact isSubmenu>All Pages</NavLink>
+                <NavLink href="/admin/pages/new" isSubmenu>Add New</NavLink>
+           </AccordionMenu>
+
+           {/* Comments / Reviews Standalone */}
+           <div className="mb-0">
+             <Link href="/admin/reviews" className={`flex items-center gap-2 px-3 py-2 text-[13px] transition-all ${pathname === "/admin/reviews" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
+                <MessageSquare className="w-4 h-4" />
+                <span>Reviews</span>
              </Link>
            </div>
 
-           <SectionHeader title="Settings" />
+           <div className="my-2 bg-[#ffffff1a] h-[1px] w-full" />
 
-           {/* Appearance Standalone */}
-           {can("settings.view") && (
-              <div className="mb-1">
-                <Link href="/admin/appearance" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname === "/admin/appearance" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
-                   <Palette className="w-4 h-4" />
-                   <span>Appearance</span>
-                </Link>
-              </div>
-           )}
+           {/* Commerce (WooCommerce eq) */}
+           <AccordionMenu 
+              title="Commerce" icon={ShoppingCart} activePath="/admin/orders"
+              isOpen={openAccordion === "commerce"} onToggle={() => handleToggle("commerce")}
+           >
+                <NavLink href="/admin/orders" isSubmenu>Orders</NavLink>
+                <NavLink href="/admin/customers" isSubmenu>Customers</NavLink>
+                <NavLink href="/admin/promotions" isSubmenu>Promotions</NavLink>
+                <NavLink href="/admin/discounts" isSubmenu>Coupons</NavLink>
+           </AccordionMenu>
 
-           {/* Site Settings Standalone */}
-           {can("settings.view") && (
-              <div className="mb-1">
-                <Link href="/admin/settings/site" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname.startsWith("/admin/settings/site") ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
-                   <Settings className="w-4 h-4" />
-                   <span>Site Settings</span>
-                </Link>
-              </div>
-           )}
+           {/* Products Accordion */}
+           <AccordionMenu 
+              title="Products" icon={Box} activePath="/admin/products"
+              isOpen={openAccordion === "products"} onToggle={() => handleToggle("products")}
+           >
+                <NavLink href="/admin/products" exact isSubmenu>All Products</NavLink>
+                <NavLink href="/admin/products/new" isSubmenu>Add New</NavLink>
+                <NavLink href="/admin/categories" isSubmenu>Categories</NavLink>
+           </AccordionMenu>
 
-           {/* Script Management Standalone */}
-           {can("scripts.view") && (
-              <div className="mb-1">
-                <Link href="/admin/settings/scripts" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname.startsWith("/admin/settings/scripts") ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
-                   <Code2 className="w-4 h-4" />
-                   <span>Custom Scripts</span>
-                </Link>
-              </div>
-           )}
+           <div className="my-2 bg-[#ffffff1a] h-[1px] w-full" />
+
+           {/* Appearance Accordion */}
+           <AccordionMenu 
+              title="Appearance" icon={Palette} activePath="/admin/appearance"
+              isOpen={openAccordion === "appearance"} onToggle={() => handleToggle("appearance")}
+           >
+                <NavLink href="/admin/appearance" exact isSubmenu>Themes</NavLink>
+                <NavLink href="/admin/appearance/menus" isSubmenu>Menus</NavLink>
+           </AccordionMenu>
 
            {/* Users Accordion */}
            <AccordionMenu 
-              title="Users & Roles" icon={Users} permission="staff.view" activePath="/admin/settings/team"
-              isOpen={openAccordion === "/admin/settings/team"} onToggle={() => handleToggle("/admin/settings/team")}
+              title="Users" icon={Users} activePath="/admin/settings/team"
+              isOpen={openAccordion === "users"} onToggle={() => handleToggle("users")}
            >
-                <NavLink href="/admin/settings/team" exact isSubmenu>All Staff</NavLink>
-                <NavLink href="/admin/settings/team/new" isSubmenu>Invite User</NavLink>
-                <NavLink href="/admin/settings/roles" isSubmenu>Roles & Access</NavLink>
+                <NavLink href="/admin/settings/team" exact isSubmenu>All Users</NavLink>
+                <NavLink href="/admin/settings/team/new" isSubmenu>Add New</NavLink>
+                <NavLink href="/admin/settings/roles" isSubmenu>Roles</NavLink>
            </AccordionMenu>
 
-           {/* Audit Logs Standalone */}
-           {can("settings.view") && (
-              <div className="mb-1">
-                <Link href="/admin/settings/logs" className={`flex items-center gap-2 px-3 py-2 text-[14px] transition-all ${pathname === "/admin/settings/logs" ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
-                   <History className="w-4 h-4" />
-                   <span>Audit Logs</span>
-                </Link>
-              </div>
-           )}
+           {/* Tools Accordion */}
+           <AccordionMenu 
+              title="Tools" icon={Wrench} activePath="/admin/contact"
+              isOpen={openAccordion === "tools"} onToggle={() => handleToggle("tools")}
+           >
+                <NavLink href="/admin/contact" isSubmenu>Contact Forms</NavLink>
+                <NavLink href="/admin/settings/logs" isSubmenu>Audit Logs</NavLink>
+                <NavLink href="/admin/settings/scripts" isSubmenu>Custom Scripts</NavLink>
+           </AccordionMenu>
+
+           {/* Settings Accordion */}
+           <AccordionMenu 
+              title="Settings" icon={Settings} activePath="/admin/settings/site"
+              isOpen={openAccordion === "settings"} onToggle={() => handleToggle("settings")}
+           >
+                <NavLink href="/admin/settings/site" isSubmenu>General</NavLink>
+           </AccordionMenu>
 
         </nav>
       </div>
 
-      {/* Logout */}
+      {/* Logout Footer (Like WP Collapse Menu but we do logout here) */}
       <div className="p-3 border-t border-white/5 shrink-0 bg-[#1d2327]">
         <button 
           onClick={() => signOut({ callbackUrl: "/" })}

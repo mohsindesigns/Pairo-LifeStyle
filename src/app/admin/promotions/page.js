@@ -83,6 +83,35 @@ export default function PromotionsDashboard() {
     }
   };
 
+  const handleBulkAction = async () => {
+     if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
+     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} promotions?`)) {
+        try {
+           for (const id of selectedIds) {
+              if (bulkAction === "Delete Permanently" || bulkAction === "Move to Trash") {
+                  await fetch(`/api/admin/promotions/${id}`, { method: "DELETE" });
+              } else if (bulkAction === "Duplicate") {
+                  const promo = promotions.find(p => p._id === id);
+                  if (promo) await handleDuplicate(promo);
+              }
+           }
+           setSelectedIds([]);
+           fetchPromotions();
+        } catch (err) {
+           console.error("Bulk action failed:", err);
+        }
+     }
+  };
+
+  const toggleSelect = (id) => {
+     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+     if (selectedIds.length === filteredPromotions.length) setSelectedIds([]);
+     else setSelectedIds(filteredPromotions.map(p => p._id));
+  };
+
   const filteredPromotions = promotions.filter(p => {
     const matchesSearch = p.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           p.code?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -160,13 +189,13 @@ export default function PromotionsDashboard() {
         {/* Filter Bar */}
         <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
            <div className="flex items-center gap-2">
-              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none">
+              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
                  <option>Bulk actions</option>
-                 <option>Pause Selected</option>
-                 <option>Resume Selected</option>
+                 <option>Duplicate</option>
+                 <option>Move to Trash</option>
                  <option>Delete Permanently</option>
               </select>
-              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
+              <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
            </div>
 
            <div className="flex items-center gap-2 w-full md:w-auto">
@@ -186,7 +215,7 @@ export default function PromotionsDashboard() {
           <table className="w-full text-left border-collapse table-fixed min-w-[1000px] text-[13px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-3 py-2 w-8 text-center"><input type="checkbox" /></th>
+                <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredPromotions.length} onChange={toggleSelectAll} /></th>
                 <th className="px-3 py-2 font-bold text-[#1d2327]">Discount Name & Coupon Code</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Targeting</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Status</th>
@@ -198,13 +227,13 @@ export default function PromotionsDashboard() {
             </thead>
             <tbody className="divide-y divide-[#f0f0f1]">
               {loading ? (
-                <tr><td colSpan={7} className="p-8 text-center text-gray-400 italic">Loading campaigns...</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-gray-400 italic">Loading campaigns...</td></tr>
               ) : filteredPromotions.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-gray-500 italic">No promotions found matching filters.</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-gray-500 italic">No promotions found matching filters.</td></tr>
               ) : (
                 filteredPromotions.map((p) => (
-                  <tr key={p._id} className="hover:bg-[#f6f7f7] group transition-colors">
-                    <td className="px-3 py-4 text-center align-top"><input type="checkbox" /></td>
+                  <tr key={p._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(p._id) ? "bg-[#f0f6fa]" : ""}`}>
+                    <td className="px-3 py-4 text-center align-top"><input type="checkbox" checked={selectedIds.includes(p._id)} onChange={() => toggleSelect(p._id)} /></td>
                     <td className="px-3 py-4 align-top">
                        <Link href={`/admin/promotions/${p._id}`} className="text-[#2271b1] font-bold hover:underline text-sm">{p.title}</Link>
                        <div className="mt-0.5 font-mono text-[11px] text-[#646970]">{p.code || "Automatic (No Code)"}</div>

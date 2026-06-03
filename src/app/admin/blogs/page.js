@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { 
   Plus, 
   Image as ImageIcon,
@@ -15,8 +15,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { useRouter } from "next/navigation";
 
 export default function AdminBlogs() {
+  const router = useRouter();
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -25,7 +27,7 @@ export default function AdminBlogs() {
   const [bulkAction, setBulkAction] = useState("Bulk actions");
   const [counts, setCounts] = useState({ all: 0, published: 0, trash: 0 });
 
-  const fetchBlogs = async () => {
+  const fetchBlogs = useCallback(async () => {
     setLoading(true);
     try {
       let url = "/api/admin/blogs";
@@ -48,13 +50,13 @@ export default function AdminBlogs() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [view]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
       fetchBlogs();
     });
-  }, [view]);
+  }, [fetchBlogs]);
 
   const handleTrash = async (id) => {
     if (!confirm("Move to trash?")) return;
@@ -66,19 +68,42 @@ export default function AdminBlogs() {
     }
   };
 
+  const handleDuplicate = async (blog) => {
+    try {
+      const { _id, createdAt, updatedAt, ...rest } = blog;
+      const copy = {
+        ...rest,
+        title: `${blog.title} (Copy)`,
+        slug: `${blog.slug}-copy-${Math.floor(Math.random() * 1000)}`,
+        status: "Draft"
+      };
+      const res = await fetch("/api/admin/blogs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(copy)
+      });
+      if (res.ok) fetchBlogs();
+    } catch (err) {
+      console.error("Duplicate failed:", err);
+    }
+  };
+
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Apply to ${selectedIds.length} items?`)) {
+     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`)) {
         try {
            for (const id of selectedIds) {
-              if (bulkAction === "Move to Trash") {
+              if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
                  await fetch(`/api/admin/blogs?id=${id}`, { method: "DELETE" });
+              } else if (bulkAction === "Duplicate") {
+                 const blog = blogs.find(b => b._id === id);
+                 if (blog) await handleDuplicate(blog);
               }
            }
            setSelectedIds([]);
            fetchBlogs();
         } catch (err) {
-           console.error(err);
+           console.error("Bulk action failed:", err);
         }
      }
   };
@@ -87,16 +112,20 @@ export default function AdminBlogs() {
      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
+  const toggleSelectAll = () => {
+     if (selectedIds.length === filteredBlogs.length) setSelectedIds([]);
+     else setSelectedIds(filteredBlogs.map(b => b._id));
+  };
+
   const filteredBlogs = blogs.filter(b => 
      b.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <AdminPageLayout 
-      title="Blog" 
+      title="Blog Posts" 
       addNewLink="/admin/blogs/new"
       addNewLabel="Add New"
-      breadcrumbs={[{ label: "Blog", href: "/admin/blogs" }, { label: "All Posts" }]}
     >
       <div className="space-y-4">
         {/* View Tabs */}
@@ -119,7 +148,9 @@ export default function AdminBlogs() {
            <div className="flex items-center gap-2">
               <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
                  <option>Bulk actions</option>
+                 <option>Duplicate</option>
                  <option>Move to Trash</option>
+                 <option>Delete Permanently</option>
               </select>
               <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
            </div>
@@ -130,9 +161,9 @@ export default function AdminBlogs() {
                 placeholder="Search blog..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 md:w-48 bg-white focus:border-[#2271b1] rounded-[3px]"
+                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
               />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Search Blog</button>
+              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Search Posts</button>
            </div>
         </div>
 
@@ -141,11 +172,11 @@ export default function AdminBlogs() {
           <table className="w-full text-left border-collapse table-fixed min-w-[900px] text-[13px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-3 py-2 w-8 text-center"><input type="checkbox" /></th>
+                <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredBlogs.length} onChange={toggleSelectAll} /></th>
                 <th className="px-3 py-2 font-bold text-[#1d2327]">Title</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Author</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-40">Categories</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-24 text-center">Status</th>
+                <th className="px-3 py-2 font-bold text-[#1d2327] w-24">Status</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Date</th>
               </tr>
             </thead>
@@ -160,13 +191,18 @@ export default function AdminBlogs() {
                     <td className="px-3 py-4 text-center align-top"><input type="checkbox" checked={selectedIds.includes(b._id)} onChange={() => toggleSelect(b._id)} /></td>
                     <td className="px-3 py-4 align-top">
                       <div className="flex items-start gap-3">
-                         <div className="w-10 h-10 bg-gray-100 border border-gray-200 shrink-0 flex items-center justify-center text-gray-300 rounded-[2px]">
-                            {b.image ? <img src={b.image} className="w-full h-full object-cover" /> : <FileText className="w-5 h-5" />}
+                         <div className="w-10 h-10 bg-white border border-[#dcdcde] rounded-[2px] mx-auto overflow-hidden">
+                            {b.image ? <img src={b.image} className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5 text-[#dcdcde] mt-2.5 mx-auto" />}
                          </div>
                          <div className="flex flex-col">
-                            <Link href={`/admin/blogs/${b._id}`} className="text-[#2271b1] font-bold hover:underline">{b.title}</Link>
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
+                            <Link href={`/admin/blogs/${b._id}`} className="text-[#2271b1] font-bold hover:underline block mb-1 text-[14px]">
+                               {b.title}
+                            </Link>
+                            {b.status === "Draft" && <span className="font-bold text-[#1d2327] text-[12px] -mt-1 mb-1">— Draft</span>}
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
                                <Link href={`/admin/blogs/${b._id}`} className="hover:text-[#135e96]">Edit</Link>
+                               <span className="text-[#c3c4c7]">|</span>
+                               <button onClick={() => handleDuplicate(b)} className="hover:text-[#135e96]">Duplicate</button>
                                <span className="text-[#c3c4c7]">|</span>
                                <button onClick={() => handleTrash(b._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
                                <span className="text-[#c3c4c7]">|</span>
@@ -175,25 +211,15 @@ export default function AdminBlogs() {
                          </div>
                       </div>
                     </td>
-                    <td className="px-3 py-4 align-top text-[#2271b1]">Admin</td>
-                    <td className="px-3 py-4 align-top text-[#2271b1] font-medium">{b.category || "Uncategorized"}</td>
-                    <td className="px-3 py-4 align-top text-center">
-                       <button 
-                          onClick={async () => {
-                             const newStatus = b.status === 'Published' ? 'Draft' : 'Published';
-                             await fetch(`/api/admin/blogs`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ id: b._id, status: newStatus })
-                             });
-                             fetchBlogs();
-                          }}
-                          className={`px-2 py-0.5 rounded border text-[10px] font-bold uppercase transition-colors ${b.status === 'Published' ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`}
-                       >
-                          {b.status}
-                       </button>
+                    <td className="px-3 py-4 align-top text-[#2271b1] hover:underline cursor-pointer">Admin</td>
+                    <td className="px-3 py-4 align-top text-[#2271b1] font-medium hover:underline cursor-pointer">{b.category || "Uncategorized"}</td>
+                    <td className="px-3 py-4 align-top">
+                       <span className={`px-2 py-0.5 rounded-[2px] text-[10px] font-bold uppercase ${b.status === 'Published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {b.status || "Published"}
+                       </span>
                     </td>
                     <td className="px-3 py-4 align-top text-[#646970]">
+                       {b.status === 'Published' ? 'Published' : 'Last Modified'}<br />
                        {new Date(b.createdAt).toLocaleDateString()}
                     </td>
                   </tr>
