@@ -54,12 +54,23 @@ function InlinePick({ value, onChange }) {
    );
 }
 
+// Utility: convert a title to a URL-safe slug
+function toSlug(str) {
+   return str
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/[\s_-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+}
+
 export default function ProductForm({ productId = null }) {
    const router = useRouter();
    const [loading, setLoading] = useState(productId ? true : false);
    const [saving, setSaving] = useState(false);
    const [activeTab, setActiveTab] = useState("general");
    const [activeFormTab, setActiveFormTab] = useState("content");
+   const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!productId);
    const [categories, setCategories] = useState([]);
 
    const [formData, setFormData] = useState({
@@ -159,8 +170,11 @@ export default function ProductForm({ productId = null }) {
    const handleSubmit = async (e) => {
       if (e) e.preventDefault();
       setSaving(true);
+      // Auto-generate slug from name if still empty
+      const finalSlug = formData.slug ? formData.slug : toSlug(formData.name);
+      const normalizedData = { ...formData, slug: finalSlug };
       try {
-         const payload = productId ? { ...formData, id: productId } : formData;
+         const payload = productId ? { ...normalizedData, id: productId } : normalizedData;
          const res = await fetch("/api/admin/products", {
             method: productId ? "PUT" : "POST",
             headers: { "Content-Type": "application/json" },
@@ -222,6 +236,7 @@ export default function ProductForm({ productId = null }) {
       const newCombos = combos.map(c => ({
          title: c.map(v => v.label).join(" / "),
          price: formData.price,
+         compareAtPrice: formData.compareAtPrice,
          stock: formData.stock,
          sku: `${formData.sku}-${c.map(v => v.label).join("-")}`.toUpperCase(),
          image: c.find(v => v.variantImage)?.variantImage || ""
@@ -316,11 +331,46 @@ export default function ProductForm({ productId = null }) {
                      placeholder="Enter title here"
                      className="w-full border border-[#c3c4c7] outline-none px-3 py-2 text-[20px] bg-white shadow-inner font-semibold post-title-input"
                      value={formData.name}
-                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) => {
+                         const newName = e.target.value;
+                         setFormData(prev => ({
+                            ...prev,
+                            name: newName,
+                            slug: slugManuallyEdited ? prev.slug : toSlug(newName)
+                         }));
+                      }}
                   />
                   <div className="text-[12px] text-gray-500 px-1 mt-1 flex items-center gap-1">
-                     Permalink: <span className="text-gray-400">pairo.store/product/</span>
-                     <input className="border-none bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px]" value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} />
+                     Permalink: <span className="text-gray-400">pairolifestyle.com/product/</span>
+                      <input
+                         className="border-none bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px]"
+                         value={formData.slug}
+                         onChange={(e) => {
+                            setSlugManuallyEdited(true);
+                            setFormData({ ...formData, slug: toSlug(e.target.value) });
+                         }}
+                         title="URL slug — auto-generated from title unless manually set"
+                      />
+                      {!slugManuallyEdited && formData.slug && (
+                         <span className="text-[10px] text-gray-300 ml-1">(auto)</span>
+                      )}
+                  </div>
+               </div>
+
+               {/* Short Description */}
+               <div className="bg-white border border-[#c3c4c7] shadow-sm">
+                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">
+                     Product Short Description
+                  </div>
+                  <div className="p-3">
+                     <textarea
+                        rows={3}
+                        placeholder="Brief product excerpt shown on product page (1-2 sentences)…"
+                        className="w-full border border-[#c3c4c7] outline-none px-3 py-2 text-[13px] bg-white resize-none focus:border-[#2271b1] transition-colors rounded-[2px]"
+                        value={formData.shortDescription}
+                        onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
+                     />
+                     <p className="text-[11px] text-gray-400 mt-1">This appears as an italic excerpt on the product detail page.</p>
                   </div>
                </div>
 
@@ -522,7 +572,8 @@ export default function ProductForm({ productId = null }) {
                                                    <tr>
                                                       <th className="px-4 py-3">IMG</th>
                                                       <th className="px-4 py-3">Variant</th>
-                                                      <th className="px-4 py-3">Price</th>
+                                                      <th className="px-4 py-3">Reg. Price</th>
+                                                      <th className="px-4 py-3">Sale Price</th>
                                                       <th className="px-4 py-3">Stock</th>
                                                       <th className="px-4 py-3"></th>
                                                    </tr>
@@ -532,7 +583,8 @@ export default function ProductForm({ productId = null }) {
                                                       <tr key={cIdx} className="border-b border-gray-100">
                                                          <td className="px-4 py-2"><InlinePick value={comb.image} onChange={url=>{ const n=[...formData.variantCombinations]; n[cIdx].image=url; setFormData({...formData,variantCombinations:n}); }} /></td>
                                                          <td className="px-4 py-2 font-bold">{comb.title}</td>
-                                                         <td className="px-4 py-2"><input className="w-20 border border-gray-200 p-1" type="number" value={comb.price} onChange={e=>{ const n=[...formData.variantCombinations]; n[cIdx].price=e.target.value; setFormData({...formData,variantCombinations:n}); }} /></td>
+                                                         <td className="px-4 py-2"><input className="w-20 border border-gray-200 p-1" type="number" placeholder="0.00" value={comb.compareAtPrice || ''} onChange={e=>{ const n=[...formData.variantCombinations]; n[cIdx].compareAtPrice=e.target.value; setFormData({...formData,variantCombinations:n}); }} /></td>
+                                                         <td className="px-4 py-2"><input className="w-20 border border-gray-200 p-1 font-bold" type="number" placeholder="0.00" value={comb.price} onChange={e=>{ const n=[...formData.variantCombinations]; n[cIdx].price=e.target.value; setFormData({...formData,variantCombinations:n}); }} /></td>
                                                          <td className="px-4 py-2"><input className="w-16 border border-gray-200 p-1" type="number" value={comb.stock} onChange={e=>{ const n=[...formData.variantCombinations]; n[cIdx].stock=e.target.value; setFormData({...formData,variantCombinations:n}); }} /></td>
                                                          <td className="px-4 py-2"><button type="button" onClick={()=>setFormData({...formData,variantCombinations:formData.variantCombinations.filter((_,i)=>i!==cIdx)})}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button></td>
                                                       </tr>

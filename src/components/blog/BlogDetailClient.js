@@ -113,12 +113,44 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
     restDelta: 0.001
   });
 
-  const sections = [
-    { id: "heritage", title: "Heritage", num: "01" },
-    { id: "process", title: "Process", num: "02" },
-    { id: "style", title: "Style", num: "03" },
-    { id: "archive", title: "Archive", num: "04" }
-  ];
+  // Dynamically extract H2 headings from all post content for the sidebar TOC
+  const [tocSections, setTocSections] = useState([]);
+
+  useEffect(() => {
+    const allContent = [post.content, post.heritage, post.process, post.style]
+      .filter(Boolean)
+      .join(" ");
+
+    if (!allContent) {
+      setTocSections([]);
+      return;
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(allContent, "text/html");
+      const h2s = Array.from(doc.querySelectorAll("h2"));
+      const extracted = h2s.map((el, i) => {
+        const text = el.textContent.trim();
+        const id = `toc-${text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${i}`;
+        return { id, title: text };
+      });
+      setTocSections(extracted);
+    } catch (e) {
+      setTocSections([]);
+    }
+  }, [post]);
+
+  // Add IDs to H2 elements in the rendered blog content after mount
+  useEffect(() => {
+    if (tocSections.length === 0) return;
+    const contentEl = document.getElementById("blog-main-content");
+    if (!contentEl) return;
+    const h2s = contentEl.querySelectorAll("h2");
+    h2s.forEach((el, i) => {
+      if (tocSections[i]) el.id = tocSections[i].id;
+    });
+  }, [tocSections]);
 
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -161,7 +193,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
 
       <div className="container mx-auto px-4 md:px-12 py-8 md:py-12">
          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-14">
-            <div className="lg:col-span-8">
+            <div id="blog-main-content" className="lg:col-span-8">
                <div className="aspect-[16/9] rounded-[12px] md:rounded-[16px] overflow-hidden border border-black/5 shadow-sm mb-10">
                   <img src={post.image} className="w-full h-full object-cover" />
                </div>
@@ -221,60 +253,83 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
 
             <div className="lg:col-span-4 relative">
                <aside className="sticky top-24 space-y-8 pl-6 border-l border-black/5">
-                  <div className="space-y-5">
-                     <span className="text-[8px] font-bold tracking-[0.2em] text-black/30 uppercase">INDEX</span>
-                     <div className="flex flex-col gap-3">
-                        {sections.map((section) => (
-                           <button 
-                             key={section.id}
-                             onClick={() => scrollToSection(section.id)}
-                             className="group flex items-center justify-between text-left"
-                           >
-                              <span className="text-sm md:text-base font-bold heading-font text-black/30 group-hover:text-black transition-all uppercase tracking-tighter">
-                                 {section.title}
-                              </span>
-                              <ArrowRight className="w-3 h-3 text-black/5 group-hover:text-black transition-all" />
-                           </button>
-                        ))}
-                     </div>
-                  </div>
+                  {post.showSidebarIndex !== false && (
+                    <div className="space-y-5">
+                       <span className="text-[8px] font-bold tracking-[0.2em] text-black/30 uppercase">INDEX</span>
+                       <div className="flex flex-col gap-3">
+                          {tocSections.length > 0 ? (
+                             tocSections.map((section) => (
+                                <button 
+                                  key={section.id}
+                                  onClick={() => scrollToSection(section.id)}
+                                  className="group flex items-center justify-between text-left"
+                                >
+                                   <span className="text-sm md:text-base font-bold heading-font text-black/30 group-hover:text-black transition-all uppercase tracking-tighter line-clamp-1">
+                                      {section.title}
+                                   </span>
+                                   <ArrowRight className="w-3 h-3 text-black/5 group-hover:text-black transition-all shrink-0" />
+                                </button>
+                             ))
+                          ) : (
+                             <p className="text-[10px] text-black/20 italic">No sections found</p>
+                          )}
+                       </div>
+                    </div>
+                  )}
 
-                  <div id="archive" className="space-y-4 pt-6 border-t border-black/5">
-                     <span className="text-[8px] font-bold tracking-[0.2em] text-black/30 uppercase">SHOP PIECE</span>
-                     <Link href={`/product/${featuredProduct._id || featuredProduct.id}`} className="block aspect-square rounded-[8px] overflow-hidden border border-black/5 group cursor-pointer relative">
-                        <img src={featuredProduct.images?.[0] || featuredProduct.image} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                     </Link>
-                     <div className="space-y-1">
-                        <h4 className="text-xs font-bold heading-font text-black uppercase">{featuredProduct.name}</h4>
-                        {featuredProduct.price && (
-                           <p className="text-[10px] font-bold text-black/40">${featuredProduct.price}</p>
-                        )}
-                     </div>
-                     
-                     <div className="space-y-2.5">
-                        <Link 
-                           href={`/product/${featuredProduct._id || featuredProduct.id}`}
-                           className="flex items-center justify-center gap-2 w-full bg-black text-white py-3.5 rounded-xl font-bold text-[9px] uppercase tracking-[0.2em] hover:bg-black/80 transition-all shadow-lg active:scale-[0.98]"
-                        >
-                           Go to product
-                           <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
-                        <div className="grid grid-cols-2 gap-2">
-                           <button 
-                              onClick={handleAddToCart}
-                              className="flex items-center justify-center gap-2 w-full border border-black text-black py-3.5 rounded-xl font-bold text-[9px] uppercase tracking-[0.1em] hover:bg-black hover:text-white transition-all active:scale-[0.98]"
-                           >
-                              Add to cart
-                           </button>
-                           <button 
-                              onClick={handleBuyNow}
-                              className="flex items-center justify-center gap-2 w-full bg-[#111] text-white py-3.5 rounded-xl font-bold text-[9px] uppercase tracking-[0.1em] hover:bg-black transition-all shadow-md active:scale-[0.98]"
-                           >
-                              Buy now
-                           </button>
-                        </div>
-                     </div>
-                  </div>
+                  {post.showFeaturedProduct !== false && featuredProduct && featuredProduct.id !== "default" && (
+                    <div id="archive" className="space-y-4 pt-6 border-t border-black/5">
+                       <span className="text-[8px] font-bold tracking-[0.2em] text-black/30 uppercase">SHOP PIECE</span>
+                       <Link href={`/product/${featuredProduct._id || featuredProduct.id}`} className="block aspect-square rounded-[8px] overflow-hidden border border-black/5 group cursor-pointer relative">
+                          <img src={featuredProduct.images?.[0] || featuredProduct.image} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                       </Link>
+                       <div className="space-y-1">
+                          <h4 className="text-xs font-bold heading-font text-black uppercase">{featuredProduct.name}</h4>
+                          {featuredProduct.price && (
+                             <p className="text-[10px] font-bold text-black/40">${featuredProduct.price}</p>
+                          )}
+                       </div>
+                       
+                       <div className="space-y-2.5">
+                          <Link 
+                             href={`/product/${featuredProduct._id || featuredProduct.id}`}
+                             className="flex items-center justify-center gap-2 w-full bg-black text-white py-3.5 rounded-xl font-bold text-[9px] uppercase tracking-[0.2em] hover:bg-black/80 transition-all shadow-lg active:scale-[0.98]"
+                          >
+                             Go to product
+                             <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                          <div className="grid grid-cols-2 gap-2">
+                             <button 
+                                onClick={handleAddToCart}
+                                className="flex items-center justify-center gap-2 w-full border border-black text-black py-3.5 rounded-xl font-bold text-[9px] uppercase tracking-[0.1em] hover:bg-black hover:text-white transition-all active:scale-[0.98]"
+                             >
+                                Add to cart
+                             </button>
+                             <button 
+                                onClick={handleBuyNow}
+                                className="flex items-center justify-center gap-2 w-full bg-[#111] text-white py-3.5 rounded-xl font-bold text-[9px] uppercase tracking-[0.1em] hover:bg-black transition-all shadow-md active:scale-[0.98]"
+                             >
+                                Buy now
+                             </button>
+                          </div>
+                       </div>
+                    </div>
+                  )}
+
+                  {post.showSidebarIndex === false && post.showFeaturedProduct === false && (
+                    <div className="space-y-5">
+                       <span className="text-[8px] font-bold tracking-[0.2em] text-black/30 uppercase">BLOG OVERVIEW</span>
+                       <div className="p-5 bg-gray-50 rounded-2xl border border-black/[0.03] space-y-4">
+                          <h4 className="text-[10px] font-bold uppercase tracking-wider text-black">About this Article</h4>
+                          <p className="text-xs md:text-sm text-black/60 leading-relaxed font-medium">
+                             {post.excerpt || "This article showcases Pairo's premium leather artisanal design, deep-rooted heritage, and unique craftsmanship."}
+                          </p>
+                          <div className="pt-2.5 border-t border-black/5 text-[9px] font-bold uppercase text-black/40">
+                             Written by: {post.author || "Pairo Studio"}
+                          </div>
+                       </div>
+                    </div>
+                  )}
                </aside>
             </div>
          </div>

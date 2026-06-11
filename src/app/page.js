@@ -48,8 +48,8 @@ export default async function Home() {
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "Pairo",
-      "url": "https://pairo.store",
-      "logo": "https://pairo.store/logo.png"
+      "url": "https://pairolifestyle.com",
+      "logo": "https://pairolifestyle.com/logo.png"
     };
   }
 

@@ -38,30 +38,32 @@ export function CartProvider({ children }) {
   }, [cartItems, storageKey]);
 
   const addToCart = (product) => {
-    // Optional: Only allow adding to cart if logged in
-    // if (!session) {
-    //   window.location.href = "/login";
-    //   return;
-    // }
+    const normalizedProduct = {
+      ...product,
+      id: product.id || product._id,
+      selectedSize: product.selectedSize || product.selectedOptions?.Size || product.selectedOptions?.size || "Standard",
+      selectedColor: product.selectedColor || product.selectedOptions?.Color || product.selectedOptions?.color || "Standard",
+      image: product.image || (product.images && product.images[0]) || "/placeholder.jpg",
+    };
 
     setCartItems((prevItems) => {
       const existingItem = prevItems.find(
         (item) => 
-          item.id === product.id && 
-          item.selectedSize === product.selectedSize && 
-          item.selectedColor === product.selectedColor
+          item.id === normalizedProduct.id && 
+          item.selectedSize === normalizedProduct.selectedSize && 
+          item.selectedColor === normalizedProduct.selectedColor
       );
 
       if (existingItem) {
         return prevItems.map((item) =>
-          (item.id === product.id && 
-           item.selectedSize === product.selectedSize && 
-           item.selectedColor === product.selectedColor)
+          (item.id === normalizedProduct.id && 
+           item.selectedSize === normalizedProduct.selectedSize && 
+           item.selectedColor === normalizedProduct.selectedColor)
             ? { ...item, quantity: item.quantity + 1 } 
             : item
         );
       }
-      return [...prevItems, { ...product, quantity: 1 }];
+      return [...prevItems, { ...normalizedProduct, quantity: 1 }];
     });
     setIsCartOpen(true);
   };

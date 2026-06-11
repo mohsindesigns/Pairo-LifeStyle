@@ -21,6 +21,8 @@ const BlogSchema = new mongoose.Schema({
     image: String,
     price: String
   },
+  showFeaturedProduct: { type: Boolean, default: true },
+  showSidebarIndex: { type: Boolean, default: true },
   isDeleted: { type: Boolean, default: false },
   seo: {
     title: String,

@@ -21,8 +21,31 @@ export async function GET(req) {
     } else {
        query.type = type;
     }
-    const categories = await Category.find(query).sort({ name: 1 });
-    return NextResponse.json(categories);
+    const categories = await Category.find(query).sort({ name: 1 }).lean();
+    
+    // Compute product counts in a single aggregation pipeline to avoid N+1 queries
+    const Product = (await import("@/models/Product")).default;
+    const categoryCounts = await Product.aggregate([
+      { $match: { isDeleted: false, status: 'Published' } },
+      { $unwind: '$categories' },
+      { $group: { _id: '$categories', count: { $sum: 1 } } }
+    ]);
+
+    const countMap = {};
+    categoryCounts.forEach(c => {
+      if (c._id) {
+        countMap[c._id.toString()] = c.count;
+      }
+    });
+
+    const mappedCategories = categories.map((cat) => {
+      if (cat.type === 'product' || !cat.type) {
+        return { ...cat, productCount: countMap[cat._id.toString()] || 0 };
+      }
+      return cat;
+    });
+
+    return NextResponse.json(mappedCategories);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

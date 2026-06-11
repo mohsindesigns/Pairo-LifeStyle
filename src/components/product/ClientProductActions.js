@@ -54,14 +54,55 @@ export default function ClientProductActions({ product, onVariantChange }) {
   };
 
   const handleAddToCart = () => {
+    if (product.productType === "variable") {
+      const missingAttrs = attributes.filter(attr => !selectedOptions[attr.name]);
+      if (missingAttrs.length > 0) {
+        alert(`Please select: ${missingAttrs.map(a => a.name).join(", ")}`);
+        return;
+      }
+    }
+
+    let price = product.price;
+    let compareAtPrice = product.compareAtPrice;
+    let image = product.images?.[0] || product.image;
+    let sku = product.sku;
+
+    if (product.variantCombinations?.length && Object.keys(selectedOptions).length > 0) {
+      const attrOrder = product.attributes?.map(a => selectedOptions[a.name]).filter(Boolean) || [];
+      const selectedStr = attrOrder.join(" / ");
+      const match = product.variantCombinations.find(
+        (v) => v.title === selectedStr || Object.values(selectedOptions).join(" / ") === v.title
+      );
+      if (match) {
+        if (match.price !== undefined && match.price !== null) price = match.price;
+        if (match.compareAtPrice !== undefined && match.compareAtPrice !== null) compareAtPrice = match.compareAtPrice;
+        if (match.image) image = match.image;
+        if (match.sku) sku = match.sku;
+      }
+    }
+
     for (let i = 0; i < quantity; i++) {
-      addToCart({ ...product, selectedOptions });
+      addToCart({
+        ...product,
+        price,
+        compareAtPrice,
+        image,
+        sku,
+        selectedOptions
+      });
     }
     setAddedFeedback(true);
     setTimeout(() => setAddedFeedback(false), 1800);
   };
 
   const handleSecureCheckout = () => {
+    if (product.productType === "variable") {
+      const missingAttrs = attributes.filter(attr => !selectedOptions[attr.name]);
+      if (missingAttrs.length > 0) {
+        alert(`Please select: ${missingAttrs.map(a => a.name).join(", ")}`);
+        return;
+      }
+    }
     handleAddToCart();
     router.push("/checkout");
   };

@@ -28,6 +28,9 @@ function resolveNavHref(item, dbPages, dbCategories, dbProducts) {
     case 'product_category': {
       return `/shop?category=${item.value}`;
     }
+    case 'blog_list': {
+      return '/blog';
+    }
     case 'external_url':
     case 'custom_url':
     case 'mega_menu':

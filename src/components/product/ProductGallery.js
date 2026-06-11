@@ -5,7 +5,7 @@ import Image from "next/image";
 import { getOptimizedImage, getCloudinarySrcSet } from "@/lib/cloudinary";
 import { ZoomIn } from "lucide-react";
 
-export default function ProductGallery({ images = [], variantImage, productName = "" }) {
+export default function ProductGallery({ images = [], variantImage, productName = "", imageAlts = {} }) {
   const allImages = images.length > 0 ? images : ["/placeholder.jpg"];
   const [mainImage, setMainImage] = useState(allImages[0]);
 
@@ -41,7 +41,7 @@ export default function ProductGallery({ images = [], variantImage, productName 
             >
               <Image
                 src={getOptimizedImage(img, "thumbnail")}
-                alt=""
+                alt={imageAlts[img] || `${productName} thumbnail ${i + 1}`}
                 fill
                 className="object-cover"
                 sizes="72px"
@@ -57,7 +57,7 @@ export default function ProductGallery({ images = [], variantImage, productName 
           key={displayImage}
           src={getOptimizedImage(displayImage, "gallery")}
           srcSet={getCloudinarySrcSet(displayImage)}
-          alt={productName}
+          alt={imageAlts[displayImage] || productName}
           fill
           className="object-cover transition-opacity duration-300 animate-fadeIn"
           priority

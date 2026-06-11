@@ -21,7 +21,7 @@ describe("SEO - Path Normalization", () => {
   });
 
   it("should keep absolute URLs intact", () => {
-    expect(normalizePath("https://pairo.store/product/jacket")).toBe("https://pairo.store/product/jacket");
+    expect(normalizePath("https://pairolifestyle.com/product/jacket")).toBe("https://pairolifestyle.com/product/jacket");
   });
 });
 
@@ -92,7 +92,7 @@ describe("SEO - Centralized Metadata Resolver", () => {
 
     expect(metadata.title).toBe("Buy Handcrafted Shearling Coat Online | Pairo");
     expect(metadata.description).toBe("Custom SEO description override.");
-    expect(metadata.alternates.canonical).toBe("https://pairo.store/product/handcrafted-shearling-coat");
+    expect(metadata.alternates.canonical).toBe("https://pairolifestyle.com/product/handcrafted-shearling-coat");
     expect(metadata.robots.index).toBe(true);
     expect(metadata.robots.follow).toBe(false);
     expect(metadata.twitter.site).toBe("@pairostore");
@@ -118,7 +118,7 @@ describe("SEO - Centralized Metadata Resolver", () => {
 
     expect(metadata.title).toBe("The Shearling Heritage");
     expect(metadata.description).toBe("Deep dive into the craftsmanship.");
-    expect(metadata.alternates.canonical).toBe("https://pairo.store/blog/shearling-heritage");
+    expect(metadata.alternates.canonical).toBe("https://pairolifestyle.com/blog/shearling-heritage");
 
     expect(structuredData).toBeDefined();
     expect(structuredData["@type"]).toBe("BlogPosting");
@@ -142,8 +142,8 @@ describe("SEO - Centralized Metadata Resolver", () => {
       type: "page",
       fallbackImage: "/global.jpg"
     });
-    expect(res1.metadata.openGraph.images[0].url).toBe("https://pairo.store/seo-og.jpg");
-    expect(res1.metadata.twitter.images[0]).toBe("https://pairo.store/seo-tw.jpg");
+    expect(res1.metadata.openGraph.images[0].url).toBe("https://pairolifestyle.com/seo-og.jpg");
+    expect(res1.metadata.twitter.images[0]).toBe("https://pairolifestyle.com/seo-tw.jpg");
 
     // Case 2: Custom SEO images missing, should fall back to entity featured image
     const mockEntityNoSeoImage = {
@@ -156,8 +156,8 @@ describe("SEO - Centralized Metadata Resolver", () => {
       type: "page",
       fallbackImage: "/global.jpg"
     });
-    expect(res2.metadata.openGraph.images[0].url).toBe("https://pairo.store/featured.jpg");
-    expect(res2.metadata.twitter.images[0]).toBe("https://pairo.store/featured.jpg");
+    expect(res2.metadata.openGraph.images[0].url).toBe("https://pairolifestyle.com/featured.jpg");
+    expect(res2.metadata.twitter.images[0]).toBe("https://pairolifestyle.com/featured.jpg");
 
     // Case 3: All missing, should fall back to global image
     const mockEntityEmpty = {
@@ -168,13 +168,13 @@ describe("SEO - Centralized Metadata Resolver", () => {
       type: "page",
       fallbackImage: "/global.jpg"
     });
-    expect(res3.metadata.openGraph.images[0].url).toBe("https://pairo.store/global.jpg");
-    expect(res3.metadata.twitter.images[0]).toBe("https://pairo.store/global.jpg");
+    expect(res3.metadata.openGraph.images[0].url).toBe("https://pairolifestyle.com/global.jpg");
+    expect(res3.metadata.twitter.images[0]).toBe("https://pairolifestyle.com/global.jpg");
   });
 
   it("should normalize and deduplicate canonical query parameters", () => {
-    expect(normalizeCanonicalUrl("https://pairo.store/shop?category=Men&color=black&size=XL&type=Jackets"))
-      .toBe("https://pairo.store/shop?category=men&type=jackets");
+    expect(normalizeCanonicalUrl("https://pairolifestyle.com/shop?category=Men&color=black&size=XL&type=Jackets"))
+      .toBe("https://pairolifestyle.com/shop?category=men&type=jackets");
   });
 
   it("should force noindex/nofollow on draft pages", () => {

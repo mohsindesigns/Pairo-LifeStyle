@@ -49,6 +49,7 @@ export default function ProductMainSection({ product }) {
   };
 
   const displayPrice = selectedVariant?.price || product.price;
+  const displayCompareAtPrice = selectedVariant ? (selectedVariant.compareAtPrice !== undefined && selectedVariant.compareAtPrice !== null ? selectedVariant.compareAtPrice : null) : product.compareAtPrice;
   const displaySku = selectedVariant?.sku || product.sku;
   const displayStock = selectedVariant?.stock !== undefined ? selectedVariant.stock : product.stock;
 
@@ -62,6 +63,7 @@ export default function ProductMainSection({ product }) {
           images={product.images}
           variantImage={selectedVariantImage}
           productName={product.name}
+          imageAlts={product.imageAlts}
         />
       </div>
 
@@ -90,11 +92,11 @@ export default function ProductMainSection({ product }) {
 
           <div className="flex items-baseline gap-4">
             <span className="text-3xl md:text-4xl font-bold heading-font tracking-tighter text-black">${displayPrice}</span>
-            {product.compareAtPrice > displayPrice && (
+            {displayCompareAtPrice > displayPrice && (
               <div className="flex items-center gap-3">
-                <span className="text-xl font-bold text-black/10 line-through">${product.compareAtPrice}</span>
+                <span className="text-xl font-bold text-black/10 line-through">${displayCompareAtPrice}</span>
                 <span className="text-[9px] font-bold text-red-500 uppercase tracking-widest bg-red-50 px-2.5 py-1 rounded-full">
-                  -{Math.round(((product.compareAtPrice - displayPrice) / product.compareAtPrice) * 100)}% OFF
+                  -{Math.round(((displayCompareAtPrice - displayPrice) / displayCompareAtPrice) * 100)}% OFF
                 </span>
               </div>
             )}

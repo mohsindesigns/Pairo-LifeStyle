@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pairo.store";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com";
 
   const robots = `User-agent: *
 Disallow: /admin/

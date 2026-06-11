@@ -2,7 +2,7 @@ import { normalizePath } from "./redirect-resolver";
 
 const DEFAULT_SITE_TITLE = "Pairo | Premium Handcrafted Shearling Jackets";
 const DEFAULT_SITE_DESC = "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://pairo.store";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com";
 
 /**
  * Sanitizes input strings to prevent HTML tag or script injection in metadata.

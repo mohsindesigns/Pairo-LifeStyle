@@ -229,10 +229,13 @@ export default function CheckoutPage() {
               <h2 className="text-xs font-bold uppercase tracking-[0.2em] mb-10 text-black/40">Selections</h2>
               
               <div className="space-y-8 mb-10 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
-                {(cartItems || []).map((item) => (
-                  <div key={item.id} className="flex gap-6 items-center">
+                {(cartItems || []).map((item, index) => {
+                  const itemImage = item.image || (Array.isArray(item.images) && item.images[0]) || "/placeholder.jpg";
+                  const itemKey = `${item.id || item._id}-${item.selectedSize || "Standard"}-${item.selectedColor || "Standard"}-${index}`;
+                  return (
+                  <div key={itemKey} className="flex gap-6 items-center">
                     <div className="w-16 h-20 bg-white rounded-2xl overflow-hidden border border-black/5 shrink-0">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <img src={itemImage} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 space-y-1">
                        <h3 className="text-[10px] font-bold uppercase tracking-widest">{item.name}</h3>
@@ -240,7 +243,8 @@ export default function CheckoutPage() {
                        <p className="text-xs font-bold tracking-tight mt-2">${(item.price * item.quantity).toLocaleString()}</p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="space-y-4 pt-10 border-t border-black/5">

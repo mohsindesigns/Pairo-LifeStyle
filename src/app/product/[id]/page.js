@@ -102,10 +102,19 @@ export default async function ProductDetailPage({ params }) {
   // Standard Pricing Logic:
   // product.price = Sale/Current Price (What they pay)
   // product.compareAtPrice = Regular/Original Price (What it was)
-  const currentPrice = parseFloat(product.price) || 0;
-  const originalPrice = parseFloat(product.compareAtPrice) || 0;
-  const hasSale = originalPrice > currentPrice;
-  const discountPercent = hasSale ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
+  const { getAltTextMap } = await import("@/lib/mediaUsage");
+  const allUrls = [];
+  if (product) {
+    allUrls.push(...(product.images || []), product.image);
+  }
+  relatedProducts.forEach(rp => {
+    allUrls.push(...(rp.images || []), rp.image);
+  });
+  const altMap = await getAltTextMap(allUrls);
+  if (product) product.imageAlts = altMap;
+  relatedProducts.forEach(rp => {
+    rp.imageAlts = altMap;
+  });
 
   const sanitizedProduct = JSON.parse(JSON.stringify(product));
   const sanitizedRelated = JSON.parse(JSON.stringify(relatedProducts));

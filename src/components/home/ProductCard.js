@@ -34,7 +34,7 @@ export default function ProductCard({ product }) {
             {mainImage && (
               <Image
                 src={mainImage}
-                alt={product.name || "Product"}
+                alt={product.imageAlts?.[mainImage] || product.name || "Product"}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 className="object-cover"
@@ -54,7 +54,7 @@ export default function ProductCard({ product }) {
             >
               <Image
                 src={hoverImage}
-                alt={product.name || "Product"}
+                alt={product.imageAlts?.[hoverImage] || product.name || "Product"}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 className="object-cover"
@@ -106,9 +106,9 @@ export default function ProductCard({ product }) {
         <div className="flex items-center justify-between border-t border-black/[0.03] pt-2 md:pt-3">
            <div className="flex items-center gap-2 md:gap-3">
               <span className="text-sm md:text-xl font-bold text-black">${product.price}</span>
-              {product.oldPrice && (
+              {(product.compareAtPrice || product.oldPrice) && (
                 <span className="text-[10px] md:text-sm font-medium text-black/20 line-through">
-                  ${product.oldPrice}
+                  ${product.compareAtPrice || product.oldPrice}
                 </span>
               )}
            </div>

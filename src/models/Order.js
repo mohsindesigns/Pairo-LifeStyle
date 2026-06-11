@@ -36,7 +36,7 @@ const OrderSchema = new mongoose.Schema({
       promotionId: mongoose.Schema.Types.Mixed, // Use Mixed to avoid casting issues between different model versions
       code: String,
       title: String,
-      type: String,
+      type: { type: String },
       value: mongoose.Schema.Types.Mixed,
       discountAmount: Number,
       explanation: String,

@@ -42,6 +42,7 @@ const ProductSchema = new mongoose.Schema({
     title: String, // e.g. "Black / M"
     sku: String,
     price: Number,
+    compareAtPrice: Number,
     stock: Number,
     image: String
   }],

@@ -38,6 +38,8 @@ export default function BlogForm({ blogId }) {
          name: "",
          image: ""
       },
+      showFeaturedProduct: true,
+      showSidebarIndex: true,
       seo: {
          title: "",
          description: "",
@@ -85,6 +87,8 @@ export default function BlogForm({ blogId }) {
                const data = await blogRes.json();
                setFormData(prev => ({
                    ...prev,
+                   showFeaturedProduct: data.showFeaturedProduct !== false,
+                   showSidebarIndex: data.showSidebarIndex !== false,
                    ...data,
                    category: data.category || "Uncategorized",
                    seo: {
@@ -392,6 +396,31 @@ export default function BlogForm({ blogId }) {
                          </select>
                          <p className="text-[10px] text-gray-400">Choose a product to feature in the sidebar.</p>
                       </div>
+                   </div>
+                </div>
+
+                {/* Sidebar Settings Box */}
+                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
+                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Sidebar Controls</div>
+                   <div className="p-4 space-y-3">
+                      <label className="flex items-center gap-2 text-[12px] font-medium text-gray-700 cursor-pointer">
+                         <input 
+                            type="checkbox"
+                            checked={formData.showFeaturedProduct}
+                            onChange={(e) => setFormData({...formData, showFeaturedProduct: e.target.checked})}
+                            className="rounded border-[#c3c4c7] text-[#2271b1] focus:ring-[#2271b1] w-4 h-4"
+                         />
+                         Enable Featured Product
+                      </label>
+                      <label className="flex items-center gap-2 text-[12px] font-medium text-gray-700 cursor-pointer">
+                         <input 
+                            type="checkbox"
+                            checked={formData.showSidebarIndex}
+                            onChange={(e) => setFormData({...formData, showSidebarIndex: e.target.checked})}
+                            className="rounded border-[#c3c4c7] text-[#2271b1] focus:ring-[#2271b1] w-4 h-4"
+                         />
+                         Enable Sidebar Index (TOC)
+                      </label>
                    </div>
                 </div>
              </div>

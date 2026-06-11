@@ -7,6 +7,7 @@ import SiteConfig from "@/models/SiteConfig";
 import Category from "@/models/Category";
 import Blog from "@/models/Blog";
 import Page from "@/models/Page";
+import Product from "@/models/Product";
 import { SiteProvider } from "@/context/SiteContext";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import ScriptLoader from "@/components/common/ScriptLoader";
@@ -31,7 +32,7 @@ export async function generateMetadata() {
       return {
         title,
         description: config.brand.description || "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.",
-        metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pairo.store"),
+        metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com"),
         robots: {
           index: true,
           follow: true,
@@ -46,7 +47,7 @@ export async function generateMetadata() {
   return {
     title: "Pairo | Premium Shearling Jackets",
     description: "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.",
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pairo.store"),
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com"),
     robots: {
       index: true,
       follow: true,
@@ -105,20 +106,42 @@ export default async function RootLayout({ children }) {
         .limit(50)
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),
-      productIdsToFetch.length > 0 ? import('@/models/Product').then(m => m.default.find({ 
+      productIdsToFetch.length > 0 ? Product.find({ 
         _id: { $in: productIdsToFetch }, 
         status: { $ne: 'Draft' }, 
         isDeleted: { $ne: true } 
       })
         .select('name slug price images')
         .maxTimeMS(QUERY_TIMEOUT_MS)
-        .lean()) : Promise.resolve([])
+        .lean() : Promise.resolve([])
     ]);
 
-    const dbCategories = catsResult.status === 'fulfilled' ? (catsResult.value || []) : [];
+    const dbCategoriesRaw = catsResult.status === 'fulfilled' ? (catsResult.value || []) : [];
     const dbPages = pagesResult.status === 'fulfilled' ? (pagesResult.value || []) : [];
     const dbBlogs = blogsResult.status === 'fulfilled' ? (blogsResult.value || []) : [];
     const dbProducts = prodsResult.status === 'fulfilled' ? (prodsResult.value || []) : [];
+
+
+    // Compute product counts in a single aggregation pipeline to avoid N+1 queries
+    const categoryCounts = await Product.aggregate([
+      { $match: { isDeleted: false, status: 'Published' } },
+      { $unwind: '$categories' },
+      { $group: { _id: '$categories', count: { $sum: 1 } } }
+    ]);
+
+    const countMap = {};
+    categoryCounts.forEach(c => {
+      if (c._id) {
+        countMap[c._id.toString()] = c.count;
+      }
+    });
+
+    const dbCategories = dbCategoriesRaw.map((cat) => {
+      if (cat.type === 'product' || !cat.type) {
+        return { ...cat, productCount: countMap[cat._id.toString()] || 0 };
+      }
+      return cat;
+    });
 
     if (config) {
       sanitizedConfig = JSON.parse(JSON.stringify(config));

@@ -107,6 +107,7 @@ export default function CartDrawer() {
               ) : (
                 cartItems.map((item, idx) => {
                   const uniqueKey = `${item.id}-${item.selectedSize}-${item.selectedColor}`;
+                  const itemImage = item.image || (Array.isArray(item.images) && item.images[0]) || "/placeholder.jpg";
                   return (
                     <motion.div
                       layout
@@ -116,7 +117,7 @@ export default function CartDrawer() {
                     >
                       <div className="relative w-16 h-22 rounded-lg overflow-hidden bg-black/[0.02] shrink-0 border border-black/5">
                         <Image
-                          src={item.image}
+                          src={itemImage}
                           alt={item.name}
                           fill
                           className="object-cover"

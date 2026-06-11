@@ -26,7 +26,7 @@ export default function CategoryBanner({
   
   const displayCategories = (propCategories && propCategories.length > 0) 
     ? propCategories.slice(0, 3) 
-    : (siteData?.categories?.items?.slice(0, 3) || []);
+    : [];
 
   // Bento Spans [1 : 2 : 1]
   const layoutSpans = [

@@ -11,7 +11,7 @@ export async function resolvePageSections(sections) {
       if (section.type === 'product_grid') {
         const query = { status: 'Published', tenantId: 'DEFAULT_STORE' };
         if (config.collectionId) {
-          query.category = config.collectionId;
+          query.categories = config.collectionId;
         }
         
         const products = await Product.find(query)
@@ -19,7 +19,16 @@ export async function resolvePageSections(sections) {
           .limit(config.limit || 8)
           .lean();
           
-        config.products = JSON.parse(JSON.stringify(products));
+        const { getAltTextMap } = await import("@/lib/mediaUsage");
+        const allUrls = [];
+        products.forEach(p => {
+          if (p.images) allUrls.push(...p.images);
+          if (p.image) allUrls.push(p.image);
+        });
+        const altMap = await getAltTextMap(allUrls);
+        const enriched = products.map(p => ({ ...p, imageAlts: altMap }));
+          
+        config.products = JSON.parse(JSON.stringify(enriched));
       }
 
       // Resolve Banner Feature Data
@@ -32,7 +41,12 @@ export async function resolvePageSections(sections) {
             query.slug = config.productId;
          }
          const product = await Product.findOne(query).lean();
-         if (product) config.product = JSON.parse(JSON.stringify(product));
+         if (product) {
+            const { getAltTextMap } = await import("@/lib/mediaUsage");
+            const altMap = await getAltTextMap([...(product.images || []), product.image]);
+            product.imageAlts = altMap;
+            config.product = JSON.parse(JSON.stringify(product));
+         }
       }
 
       // Resolve Category Showcase Data

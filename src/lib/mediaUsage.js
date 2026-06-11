@@ -60,3 +60,25 @@ export async function findMediaByUrl(url) {
     return null;
   }
 }
+
+/**
+ * Get a map of image URLs to their saved altText.
+ */
+export async function getAltTextMap(urls) {
+  const uniqueUrls = [...new Set(urls.filter(Boolean))];
+  if (uniqueUrls.length === 0) return {};
+  await dbConnect();
+  try {
+    const mediaItems = await Media.find({ url: { $in: uniqueUrls }, isDeleted: false }, 'url altText').lean();
+    const map = {};
+    mediaItems.forEach(item => {
+      if (item.url) {
+        map[item.url] = item.altText || "";
+      }
+    });
+    return map;
+  } catch (err) {
+    console.error('[MediaUsage] getAltTextMap error:', err.message);
+    return {};
+  }
+}

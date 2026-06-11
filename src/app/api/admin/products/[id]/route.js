@@ -66,12 +66,39 @@ export async function DELETE(req, { params }) {
 
   await dbConnect();
   try {
-    const product = await Product.findByIdAndUpdate(params.id, { 
-      isDeleted: true,
-      status: 'Draft' 
-    }, { new: true });
-    
-    return NextResponse.json({ message: "Product moved to trash", product });
+    const product = await Product.findById(params.id);
+    if (!product) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
+
+    if (product.isDeleted) {
+      // Clean up media usage references
+      try {
+        const { removeMediaUsage, findMediaByUrl } = await import("@/lib/mediaUsage");
+        const productImages = [
+          ...(product.images || []),
+          product.seo?.ogImage,
+          ...(product.variantCombinations || []).map(v => v.image)
+        ].filter(Boolean);
+
+        for (const url of productImages) {
+          const media = await findMediaByUrl(url);
+          if (media) {
+            await removeMediaUsage(media._id, 'Product', params.id);
+          }
+        }
+      } catch (mediaErr) {
+        console.error("Failed to clean up media usage references:", mediaErr);
+      }
+
+      await Product.findByIdAndDelete(params.id);
+      return NextResponse.json({ message: "Product permanently deleted" });
+    } else {
+      product.isDeleted = true;
+      product.status = 'Draft';
+      await product.save();
+      return NextResponse.json({ message: "Product moved to trash", product });
+    }
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

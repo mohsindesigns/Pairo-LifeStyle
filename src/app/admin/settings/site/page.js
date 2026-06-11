@@ -192,6 +192,7 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                   <select className={inputClass} value={item.type} onChange={e => updateNav(idx, { type: e.target.value, value: '' })}>
                     <option value="custom_url">Custom Link</option>
                     <option value="page">Page</option>
+                    <option value="blog_list">Blog List Page</option>
                     <option value="product">Only 1 Product</option>
                     <option value="product_category">Any 1 Product Category</option>
                     <option value="mega_menu">Mega Menu</option>
@@ -207,6 +208,7 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                   {item.type === 'page' ? (
                     <select className={inputClass} value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
                       <option value="">— Select Page —</option>
+                      <option value="/blog">Blog List (System Page)</option>
                       {dbPages.map(p => <option key={p._id} value={p._id}>{p.title}</option>)}
                     </select>
                   ) : item.type === 'product' ? (

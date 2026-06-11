@@ -10,7 +10,7 @@ export const revalidate = 3600; // Cache on Next.js side for 1 hour
 
 export async function GET() {
   await dbConnect();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pairo.store";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com";
 
   try {
     // 1. Fetch products (Published, not deleted, not noIndexed)
