@@ -19,7 +19,7 @@ const MarqueeItem = ({ item }) => (
          <ArrowUpRight className="w-3 h-3 md:w-5 md:h-5 text-black/10 group-hover:text-black group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-500" />
        </div>
        <span className="text-[7px] md:text-[9px] font-bold uppercase tracking-[0.3em] text-black/30 group-hover:text-black/60 transition-colors duration-500">
-         PAIRO — 26
+         {item.subText || "PAIRO — 26"}
        </span>
     </div>
 

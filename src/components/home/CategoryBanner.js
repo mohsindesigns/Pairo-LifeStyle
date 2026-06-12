@@ -95,24 +95,26 @@ export default function CategoryBanner({
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
 
                 {/* Content Area */}
-                <div className={`absolute inset-0 p-8 md:p-12 flex flex-col ${isSmall ? 'items-center text-center' : 'items-start text-left'}`}>
-                  <div className="space-y-2">
-                     <span className="text-[9px] font-bold text-white/60 uppercase tracking-[0.3em]">
-                       DEPARTMENT 0{index + 1}
-                     </span>
-                     <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white uppercase tracking-tighter leading-[0.9]">
-                       {category.name}
-                     </h3>
-                  </div>
+                <div className={`absolute inset-0 p-8 md:p-12 flex flex-col justify-end ${isSmall ? 'items-center text-center' : 'items-start text-left'}`}>
+                  <div className={`space-y-5 w-full flex flex-col ${isSmall ? 'items-center' : 'items-start'}`}>
+                    <div className="space-y-2">
+                       <span className="text-[9px] font-bold text-white/60 uppercase tracking-[0.3em]">
+                         DEPARTMENT 0{index + 1}
+                       </span>
+                       <h3 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white uppercase tracking-tighter leading-[0.9]">
+                         {category.name}
+                       </h3>
+                    </div>
 
-                  <div className={`mt-auto w-full flex ${isSmall ? 'justify-center' : 'justify-start'}`}>
-                     <button className="group/btn relative overflow-hidden bg-white text-black px-10 py-3.5 rounded-full font-bold text-[10px] uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl active:scale-95">
-                        <span className="relative z-10 flex items-center gap-3 group-hover/btn:text-white transition-colors duration-300">
-                          {exploreText}
-                          <ArrowRight className="w-4 h-4" />
-                        </span>
-                        <div className="absolute inset-0 bg-black translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500" />
-                     </button>
+                    <div className={`w-full flex ${isSmall ? 'justify-center' : 'justify-start'}`}>
+                       <button className="group/btn relative overflow-hidden bg-white text-black px-10 py-3.5 rounded-full font-bold text-[10px] uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl active:scale-95">
+                          <span className="relative z-10 flex items-center gap-3 group-hover/btn:text-white transition-colors duration-300">
+                            {exploreText}
+                            <ArrowRight className="w-4 h-4" />
+                          </span>
+                          <div className="absolute inset-0 bg-black translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500" />
+                       </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>

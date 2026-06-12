@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, ShieldCheck, Globe } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import siteData from "@/lib/data.json";
 
 export default function FeaturedBanner({ 
@@ -16,7 +17,8 @@ export default function FeaturedBanner({
   linkType,
   productId,
   collectionId,
-  image: propImage
+  image: propImage,
+  features: propFeatures
 }) {
   const product = propProduct || { name: "Product Name", price: "000", image: "/placeholder.jpg" };
 
@@ -68,16 +70,28 @@ export default function FeaturedBanner({
             </div>
 
             {/* Condensed Features */}
-            <div className="flex items-center gap-6 pt-4 border-t border-white/5">
-               <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-3.5 h-3.5 text-white/30" />
-                  <span className="text-[8px] md:text-[10px] font-bold text-white/60 uppercase tracking-widest">Lifetime Guarantee</span>
-               </div>
-               <div className="flex items-center gap-2">
-                  <Globe className="w-3.5 h-3.5 text-white/30" />
-                  <span className="text-[8px] md:text-[10px] font-bold text-white/60 uppercase tracking-widest">Global Shipping</span>
-               </div>
-            </div>
+            {(() => {
+              const defaultFeatures = [
+                { text: "Lifetime Guarantee", icon: "ShieldCheck" },
+                { text: "Global Shipping", icon: "Globe" }
+              ];
+              const features = propFeatures && propFeatures.length > 0 ? propFeatures : defaultFeatures;
+              return (
+                <div className="flex items-center gap-6 pt-4 border-t border-white/5">
+                  {features.map((feat, index) => {
+                    const IconComponent = LucideIcons[feat.icon] || LucideIcons.ShieldCheck;
+                    return (
+                      <div key={index} className="flex items-center gap-2">
+                        <IconComponent className="w-3.5 h-3.5 text-white/30" />
+                        <span className="text-[8px] md:text-[10px] font-bold text-white/60 uppercase tracking-widest">
+                          {feat.text}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Action Area */}
             <div className="pt-2">

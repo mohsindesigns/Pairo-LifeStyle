@@ -15,6 +15,10 @@ export const SECTION_SCHEMAS = {
       ]},
       { name: "labels", label: "Labels", type: "group", fields: [
         { name: "viewCollection", label: "View Collection Label", type: "text" }
+      ]},
+      { name: "marqueeItems", label: "Marquee Items", type: "repeater", fields: [
+        { name: "text", label: "Display Text", type: "text" },
+        { name: "icon", label: "Icon Name", type: "icon" }
       ]}
     ]
   },
@@ -35,6 +39,7 @@ export const SECTION_SCHEMAS = {
     fields: [
       { name: "items", label: "Marquee Items", type: "repeater", fields: [
         { name: "text", label: "Display Text", type: "text" },
+        { name: "subText", label: "Sub Text (e.g. PAIRO — 26)", type: "text" },
         { name: "icon", label: "Icon", type: "icon" }
       ]},
       { name: "speed", label: "Scroll Speed (seconds)", type: "number", default: 40 }
@@ -90,7 +95,11 @@ export const SECTION_SCHEMAS = {
         { label: "Collection", value: "collection" }
       ]},
       { name: "productId", label: "Select Product", type: "select", options: "products", dependsOn: "linkType", visibleIf: "product" },
-      { name: "collectionId", label: "Select Collection", type: "select", options: "categories", dependsOn: "linkType", visibleIf: "collection" }
+      { name: "collectionId", label: "Select Collection", type: "select", options: "categories", dependsOn: "linkType", visibleIf: "collection" },
+      { name: "features", label: "Banner Features (Max 2)", type: "repeater", fields: [
+        { name: "text", label: "Feature Text", type: "text" },
+        { name: "icon", label: "Icon Name", type: "icon" }
+      ]}
     ]
   },
   about_hero: {

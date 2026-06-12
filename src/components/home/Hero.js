@@ -10,7 +10,8 @@ import { useSiteData } from "@/context/SiteContext";
 export default function Hero({ 
   slides: propSlides, 
   brand: propBrand, 
-  labels: propLabels 
+  labels: propLabels,
+  marqueeItems: propMarqueeItems
 }) {
   const siteData = useSiteData();
   
@@ -18,7 +19,8 @@ export default function Hero({
   const heroData = {
     hero: {
       slides: propSlides || siteData?.hero?.slides || [],
-      labels: propLabels || siteData?.hero?.labels || { viewCollection: "View Collection" }
+      labels: propLabels || siteData?.hero?.labels || { viewCollection: "View Collection" },
+      marqueeItems: propMarqueeItems || siteData?.hero?.marqueeItems || []
     },
     brand: propBrand || siteData?.brand || { tagline: "Premium Shearling" }
   };
@@ -96,7 +98,7 @@ export default function Hero({
       <div className="absolute bottom-0 left-0 h-[3px] bg-black/10 w-full z-40 overflow-hidden">
         <motion.div className="h-full bg-black" initial={{ width: 0 }} animate={{ width: "100%" }} key={currentSlide} transition={{ duration: 7, ease: "linear" }} />
       </div>
-      <MarqueeSection />
+      <MarqueeSection items={hero.marqueeItems} />
     </section>
   );
 }

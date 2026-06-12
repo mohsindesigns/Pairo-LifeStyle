@@ -290,20 +290,72 @@ export default function Navbar() {
                       <AnimatePresence>
                         {isDropdownActive && (
                           <motion.div
-                            initial={{ opacity: 0, y: 10 }}
+                            initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
-                            className="absolute top-full left-1/2 -translate-x-1/2 pt-0 w-max max-w-[95vw] xl:max-w-[1200px]"
+                            exit={{ opacity: 0, y: 15 }}
+                            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                            className="absolute top-full left-1/2 -translate-x-1/2 pt-2 z-50 pointer-events-auto"
                           >
-                            <div className="bg-white border border-black/5 shadow-2xl rounded-b-[40px] p-10 flex flex-wrap justify-center gap-10 max-h-[80vh] overflow-y-auto">
-                              {(item.itemMegaCategories || []).map((cat) => (
-                                <Link key={cat.slug || cat.name} href={`/shop?category=${cat.slug}`} className="group/item flex-1 min-w-[200px] max-w-[280px]">
-                                  <div className="relative aspect-[4/5] rounded-[24px] overflow-hidden mb-5 bg-[#F9F9F9]">
-                                    <Image src={cat.image || '/placeholder.jpg'} alt={cat.name} fill className="object-cover transition-transform duration-1000 group-hover/item:scale-110" />
+                            <div className="bg-white/98 backdrop-blur-xl border border-black/[0.06] rounded-[32px] p-8 shadow-[0_30px_70px_rgba(0,0,0,0.12)] w-[960px] max-w-[95vw] overflow-hidden">
+                              <div className="grid grid-cols-12 gap-8">
+                                {/* Left Navigation Pane */}
+                                <div className="col-span-4 flex flex-col justify-between border-r border-black/[0.05] pr-8 py-2">
+                                  <div>
+                                    <span className="block text-[8px] font-black text-black/35 tracking-[0.3em] uppercase mb-6">Collections</span>
+                                    <div className="flex flex-col gap-4">
+                                      {(item.itemMegaCategories || []).map((cat, catIdx) => (
+                                        <Link 
+                                          key={cat.slug || cat.name} 
+                                          href={`/shop?category=${cat.slug}`} 
+                                          className="group/lnk flex items-center gap-4 text-left"
+                                        >
+                                          <span className="text-[10px] font-mono text-black/30 group-hover/lnk:text-black transition-colors duration-300">0{catIdx + 1}</span>
+                                          <div className="relative py-0.5">
+                                            <span className="text-[12px] font-bold uppercase tracking-[0.2em] text-black/60 group-hover/lnk:text-black transition-colors duration-300">
+                                              {cat.name}
+                                            </span>
+                                            {/* Micro-underline animation */}
+                                            <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-black transition-all duration-300 group-hover/lnk:w-full" />
+                                          </div>
+                                        </Link>
+                                      ))}
+                                    </div>
                                   </div>
-                                  <h4 className="font-bold uppercase tracking-[0.2em] text-[10px] text-center">{cat.name}</h4>
-                                </Link>
-                              ))}
+                                  
+                                  <div className="mt-8 pt-4 border-t border-black/[0.03]">
+                                    <Link href="/shop" className="text-[9px] font-black uppercase tracking-[0.25em] text-black/40 hover:text-black transition-colors flex items-center gap-1.5">
+                                      View All Products <span className="translate-y-[-0.5px]">→</span>
+                                    </Link>
+                                  </div>
+                                </div>
+
+                                {/* Right Visual Pane */}
+                                <div className="col-span-8 flex items-center justify-start gap-6 pl-2">
+                                  {(item.itemMegaCategories || []).slice(0, 3).map((cat) => (
+                                    <Link 
+                                      key={`promo-${cat.slug || cat.name}`} 
+                                      href={`/shop?category=${cat.slug}`} 
+                                      className="group/promo relative flex-1 min-w-[160px] max-w-[210px] aspect-[4/5] rounded-[20px] overflow-hidden bg-black/5 border border-black/5 shadow-sm hover:shadow-md transition-all duration-500"
+                                    >
+                                      <Image 
+                                        src={cat.image || '/placeholder.jpg'} 
+                                        alt={cat.name} 
+                                        fill 
+                                        sizes="210px"
+                                        className="object-cover transition-transform duration-1000 ease-out group-hover/promo:scale-105" 
+                                      />
+                                      {/* Gradient Overlay */}
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500" />
+                                      
+                                      {/* Editorial Content */}
+                                      <div className="absolute inset-x-0 bottom-0 p-5 flex flex-col items-start gap-1">
+                                        <span className="text-[7px] font-bold tracking-[0.25em] text-white/50 uppercase">Discover</span>
+                                        <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white w-full leading-snug">{cat.name}</h4>
+                                      </div>
+                                    </Link>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           </motion.div>
                         )}
@@ -412,14 +464,14 @@ export default function Navbar() {
                                   </div>
                                 )}
                                 
-                                {item.dropdownType === 'mega' && (
+                                {(item.dropdownType === 'mega' || item.type === 'mega_menu') && (
                                   <div className="grid grid-cols-2 gap-4 mt-4">
                                     {item.itemMegaCategories.map((cat) => (
                                       <Link key={cat.slug || cat.name} href={`/shop?category=${cat.slug}`} onClick={() => setIsOpen(false)}>
-                                        <div className="relative aspect-square rounded-[20px] overflow-hidden bg-black/5">
+                                        <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/5">
                                           <Image src={cat.image || '/placeholder.jpg'} alt={cat.name} fill className="object-cover" />
-                                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-2">
-                                            <p className="text-white font-bold text-[8px] uppercase tracking-widest text-center">{cat.name}</p>
+                                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/10 flex items-end p-3">
+                                            <p className="text-white font-bold text-[9px] uppercase tracking-widest w-full text-left">{cat.name}</p>
                                           </div>
                                         </div>
                                       </Link>

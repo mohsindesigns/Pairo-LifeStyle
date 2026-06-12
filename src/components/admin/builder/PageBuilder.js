@@ -71,7 +71,21 @@ const COMMON_ICONS = [
 const IconPicker = ({ value, onChange }) => {
   const [search, setSearch] = useState("");
   const Icon = LucideIcons[value] || LucideIcons.HelpCircle;
-  const filteredIcons = COMMON_ICONS.filter(name => name.toLowerCase().includes(search.toLowerCase()));
+
+  const allIconNames = React.useMemo(() => {
+    return Object.keys(LucideIcons).filter(key => 
+      key !== 'createReactComponent' && 
+      key !== 'default' && 
+      /^[A-Z]/.test(key)
+    );
+  }, []);
+
+  const filteredIcons = React.useMemo(() => {
+    if (!search) return COMMON_ICONS;
+    return allIconNames
+      .filter(name => name.toLowerCase().includes(search.toLowerCase()))
+      .slice(0, 49);
+  }, [search, allIconNames]);
 
   return (
     <div className="flex flex-col gap-2 border border-[#ccd0d4] bg-[#f6f7f7] p-2 rounded-sm">
@@ -92,6 +106,7 @@ const IconPicker = ({ value, onChange }) => {
       <div className="grid grid-cols-7 gap-1 p-1 max-h-[140px] overflow-y-auto bg-white border border-[#ccd0d4]">
         {filteredIcons.map(iconName => {
           const ItemIcon = LucideIcons[iconName];
+          if (!ItemIcon) return null;
           return (
             <button
               key={iconName}
@@ -106,7 +121,7 @@ const IconPicker = ({ value, onChange }) => {
       </div>
     </div>
   );
-};
+}
 
 // --- Sortable Section Item ---
 const SortableSection = ({
