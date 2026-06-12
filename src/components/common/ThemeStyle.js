@@ -65,7 +65,7 @@ export default async function ThemeStyle() {
 
   // Dynamic Font Loading (Simplified)
   const fontFamilies = [...new Set([typography.headingFont, typography.bodyFont])];
-  const googleFontsUrl = `https://fonts.googleapis.com/css2?family=${fontFamilies.map(f => f.replace(/\s+/g, '+')).join('&family=')}:wght@300;400;500;600;700;800;900&display=swap`;
+  const googleFontsUrl = `https://fonts.googleapis.com/css2?${fontFamilies.map(f => `family=${f.replace(/\s+/g, '+')}:wght@300;400;500;600;700;800;900`).join('&')}&display=swap`;
 
   return (
     <>

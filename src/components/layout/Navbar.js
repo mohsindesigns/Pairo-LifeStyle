@@ -127,7 +127,7 @@ export default function Navbar() {
       itemMegaCategories: siteData?.categories?.items || dbCategories.slice(0, 3),
       openInNewTab: false,
     }));
-  }, [siteData, dbPages, dbCategories]);
+  }, [siteData, dbPages, dbCategories, dbProducts]);
 
   // Header logo
   const headerLogoUrl = siteData?.headerConfig?.logoUrl;
@@ -177,9 +177,9 @@ export default function Navbar() {
             <div className="flex-shrink-0">
               <Link href="/" className="flex items-center">
                 {headerLogoUrl ? (
-                  <img src={headerLogoUrl} alt="Logo" width={110} height={40} className="object-contain h-10 w-auto" />
+                  <Image src={headerLogoUrl} alt="Logo" width={110} height={40} className="object-contain h-10 w-auto" priority />
                 ) : (
-                  <Image src={logo} alt="Pairo Logo" width={110} height={40} className="object-contain" priority />
+                  <Image src={logo} alt="Pairo Logo" width={110} height={40} className="object-contain h-10 w-auto" priority />
                 )}
               </Link>
             </div>
@@ -415,9 +415,9 @@ export default function Navbar() {
             <div className="flex items-center justify-between p-6 border-b border-black/5">
               <Link href="/" onClick={() => setIsOpen(false)}>
                 {headerLogoUrl ? (
-                  <img src={headerLogoUrl} alt="Logo" width={100} height={35} className="object-contain h-9 w-auto" />
+                  <Image src={headerLogoUrl} alt="Logo" width={100} height={35} className="object-contain h-9 w-auto" />
                 ) : (
-                  <Image src={logo} alt="Logo" width={100} height={35} />
+                  <Image src={logo} alt="Logo" width={100} height={35} className="object-contain" />
                 )}
               </Link>
               <button onClick={() => setIsOpen(false)} className="p-3 bg-black/5 rounded-full"><X className="w-6 h-6" /></button>

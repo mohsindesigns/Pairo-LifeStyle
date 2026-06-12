@@ -179,14 +179,8 @@ export default function AdminSidebar() {
 
            <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
 
-           {/* Appearance Accordion */}
-           <AccordionMenu 
-              title="Appearance" icon={Palette}
-              isOpen={openAccordion === "appearance"} onToggle={() => handleToggle("appearance")}
-           >
-                <NavLink href="/admin/appearance" exact isSubmenu>Themes</NavLink>
-                <NavLink href="/admin/appearance/menus" exact isSubmenu>Menus</NavLink>
-           </AccordionMenu>
+           {/* Appearance Standalone */}
+           <NavLink href="/admin/appearance" exact icon={Palette}>Appearance</NavLink>
 
            {/* Users Accordion */}
            <AccordionMenu 

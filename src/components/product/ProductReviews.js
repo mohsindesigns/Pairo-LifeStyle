@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { 
   Star, 
@@ -98,7 +99,9 @@ export default function ProductReviews({ productId, productName }) {
   // Sync logged in user name
   useEffect(() => {
     if (session?.user) {
-      setFormData(prev => ({ ...prev, customerName: session.user.name || "" }));
+      Promise.resolve().then(() => {
+        setFormData(prev => ({ ...prev, customerName: session.user.name || "" }));
+      });
     }
   }, [session]);
 
@@ -123,7 +126,7 @@ export default function ProductReviews({ productId, productName }) {
   }, [productId, sort]);
 
   useEffect(() => {
-    fetchReviews(1);
+    Promise.resolve().then(() => fetchReviews(1));
   }, [fetchReviews]);
 
   // Form submit handler (POST)
@@ -600,7 +603,7 @@ export default function ProductReviews({ productId, productName }) {
                     <div className="grid grid-cols-3 gap-3 pt-2">
                       {mockFiles.map((file, idx) => (
                         <div key={idx} className="relative aspect-square rounded-lg border border-neutral-100 overflow-hidden bg-neutral-50 group">
-                          <img src={file.preview} alt="upload preview" className="w-full h-full object-cover" />
+                          <Image src={file.preview} alt="upload preview" fill className="object-cover" unoptimized />
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); removeMockFile(idx); }}

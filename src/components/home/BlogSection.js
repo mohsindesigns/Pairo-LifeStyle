@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, ArrowUpRight, ArrowRight } from "lucide-react";
 import { useSiteData } from "@/context/SiteContext";
@@ -9,7 +10,7 @@ const BlogCard = ({ post, readMoreLabel }) => (
   <Link href={`/blog/${post.slug}`} className="group cursor-pointer w-full block">
     <div className="relative aspect-square bg-[#F7F7F7] rounded-[16px] md:rounded-[24px] overflow-hidden border border-black/5">
        <div className="absolute inset-0">
-          <img src={post.image} alt={post.title} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+          <Image src={post.image || "/placeholder.jpg"} alt={post.title} fill className="object-cover transition-transform duration-1000 group-hover:scale-105" />
        </div>
        <div className="absolute top-2 md:top-4 left-2 md:left-4 z-10">
           <span className="bg-black/80 backdrop-blur-md text-white text-[6px] md:text-[8px] font-bold px-2 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg tracking-[0.1em] md:tracking-[0.2em] uppercase shadow-lg">{post.category || "JOURNAL"}</span>
@@ -134,7 +135,7 @@ export default function BlogSection({
                   <Link href={`/product/${blogsConfig.featuredProduct.id}`} className="relative z-10 flex items-center justify-center gap-3 w-full bg-white text-black py-3.5 md:py-4 rounded-lg md:rounded-xl font-bold text-[8px] md:text-[10px] uppercase tracking-[0.2em] hover:bg-gray-100 transition-all shadow-xl active:scale-95">
                     {blogsConfig.featuredProduct.buttonText}<ArrowRight className="w-4 h-4" />
                   </Link>
-                  <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-48 md:h-48 opacity-20 group-hover:scale-110 transition-transform duration-1000"><img src={blogsConfig.featuredProduct.image} alt="Featured" className="w-full h-full object-cover rounded-[16px]" /></div>
+                  <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-48 md:h-48 opacity-20 group-hover:scale-110 transition-transform duration-1000"><Image src={blogsConfig.featuredProduct.image || "/placeholder.jpg"} alt="Featured" fill className="object-cover rounded-[16px]" /></div>
                </div>
             </div>
           </div>

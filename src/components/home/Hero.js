@@ -45,10 +45,11 @@ export default function Hero({
   useEffect(() => {
     if (!hero.slides.length) return;
     const timer = setInterval(() => {
-      nextSlide();
+      setDirection(1);
+      setCurrentSlide((prev) => (prev + 1) % hero.slides.length);
     }, 7000);
     return () => clearInterval(timer);
-  }, [currentSlide, hero.slides.length]);
+  }, [hero.slides.length]);
 
   if (!siteData && !propSlides) return <div className="h-[650px] bg-black/5 rounded-[40px] m-8 animate-pulse" />;
 

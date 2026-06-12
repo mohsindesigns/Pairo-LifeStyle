@@ -45,7 +45,15 @@ export default function AppearanceManagement() {
     "Outfit",
     "Playfair Display",
     "Roboto",
-    "Lora"
+    "Lora",
+    "Poppins",
+    "Montserrat",
+    "Open Sans",
+    "Lato",
+    "Oswald",
+    "Raleway",
+    "Nunito",
+    "Ubuntu"
   ];
 
   const fetchThemes = useCallback(async () => {
@@ -270,10 +278,22 @@ export default function AppearanceManagement() {
                           {Object.entries(editingTheme.config.colors).map(([key, value]) => (
                              <div key={key} className="flex items-center justify-between gap-4">
                                 <label className="text-[12px] text-[#646970] capitalize">{key}</label>
-                                <div className="flex items-center gap-2">
-                                   <input type="text" value={value} readOnly className="w-20 text-[11px] border border-[#ccd0d4] px-1 py-1 font-mono text-center bg-[#f6f7f7] rounded-sm" />
-                                   <div className="w-6 h-6 rounded-sm border border-[#ccd0d4]" style={{ backgroundColor: value }} />
-                                </div>
+                                 <div className="flex items-center gap-2">
+                                    <input 
+                                       type="text" 
+                                       value={value} 
+                                       onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, colors: {...editingTheme.config.colors, [key]: e.target.value}}})}
+                                       className="w-20 text-[11px] border border-[#ccd0d4] px-1 py-1 font-mono text-center bg-white rounded-sm focus:outline-none focus:border-[#2271b1] uppercase" 
+                                    />
+                                    <div className="relative w-6 h-6 rounded-sm border border-[#ccd0d4] shadow-sm cursor-pointer overflow-hidden" style={{ backgroundColor: value }}>
+                                       <input 
+                                          type="color" 
+                                          value={value} 
+                                          onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, colors: {...editingTheme.config.colors, [key]: e.target.value}}})}
+                                          className="opacity-0 absolute inset-[-10px] w-10 h-10 cursor-pointer" 
+                                       />
+                                    </div>
+                                 </div>
                              </div>
                           ))}
                        </div>
@@ -349,16 +369,65 @@ export default function AppearanceManagement() {
                           <div className="text-[11px] text-gray-400 font-mono tracking-tighter">PREVIEW_MODE_ACTIVE</div>
                        </div>
                        
-                       <div className="flex-1 overflow-y-auto p-12" style={{ backgroundColor: editingTheme.config.colors.background }}>
-                          <div className="max-w-md space-y-6">
-                             <span style={{ color: editingTheme.config.colors.primary, fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase' }}>Storefront Preview</span>
-                             <h1 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '40px', lineHeight: '1', fontWeight: 'bold' }}>
-                               Experience Pure Luxury
-                             </h1>
-                             <p style={{ color: editingTheme.config.colors.foreground, opacity: 0.6, fontSize: '14px', lineHeight: '1.6' }}>
-                               This is a live simulation of your public storefront using the selected theme parameters.
-                             </p>
-                             <div className="h-12 w-40 rounded-sm" style={{ backgroundColor: editingTheme.config.colors.primary }}></div>
+                       <div className="flex-1 overflow-y-auto relative" style={{ backgroundColor: editingTheme.config.colors.background }}>
+                          {/* Inject Dynamic Google Fonts Link for Preview */}
+                          <link 
+                            rel="stylesheet" 
+                            href={`https://fonts.googleapis.com/css2?family=${editingTheme.config.typography.headingFont.replace(/\s+/g, '+')}:wght@300;400;500;600;700;800;900&family=${editingTheme.config.typography.bodyFont.replace(/\s+/g, '+')}:wght@300;400;500;600;700;800;900&display=swap`} 
+                          />
+                          
+                          {/* Mini Header */}
+                          <div className="sticky top-0 z-10 border-b shadow-sm flex items-center justify-between px-8 py-4" style={{ backgroundColor: editingTheme.config.colors.card || editingTheme.config.colors.background, borderColor: editingTheme.config.colors.border }}>
+                             <div style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '18px', fontWeight: '900', letterSpacing: '-0.5px' }}>STOREFRONT</div>
+                             <div className="flex gap-6">
+                                <span style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.bodyFont, fontSize: '13px', opacity: 0.8, cursor: 'pointer' }}>Home</span>
+                                <span style={{ color: editingTheme.config.colors.primary, fontFamily: editingTheme.config.typography.bodyFont, fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>Shop</span>
+                                <span style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.bodyFont, fontSize: '13px', opacity: 0.8, cursor: 'pointer' }}>About</span>
+                             </div>
+                          </div>
+
+                          <div className="p-12 max-w-2xl mx-auto space-y-16">
+                             {/* Hero Section */}
+                             <div className="space-y-6 text-center">
+                                <span style={{ color: editingTheme.config.colors.primary, fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', tracking: 'widest', fontFamily: editingTheme.config.typography.bodyFont }}>New Collection</span>
+                                <h1 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '48px', lineHeight: '1.1', fontWeight: '800', letterSpacing: '-1px' }}>
+                                  Experience Pure Luxury
+                                </h1>
+                                <p style={{ color: editingTheme.config.colors.foreground, opacity: 0.7, fontSize: '16px', lineHeight: '1.6', fontFamily: editingTheme.config.typography.bodyFont, maxWidth: '400px', margin: '0 auto' }}>
+                                  This is a live simulation of your public storefront using the selected typography, colors, and borders.
+                                </p>
+                                <div className="pt-4 flex items-center justify-center gap-4">
+                                   <div className="h-11 px-8 rounded flex items-center justify-center font-bold text-[14px] cursor-pointer shadow-lg hover:opacity-90 transition-opacity" 
+                                        style={{ backgroundColor: editingTheme.config.colors.primary, color: editingTheme.config.colors.background, fontFamily: editingTheme.config.typography.bodyFont }}>
+                                      Shop Now
+                                   </div>
+                                   <div className="h-11 px-8 rounded flex items-center justify-center font-bold text-[14px] cursor-pointer border" 
+                                        style={{ borderColor: editingTheme.config.colors.border, color: editingTheme.config.colors.foreground, backgroundColor: 'transparent', fontFamily: editingTheme.config.typography.bodyFont }}>
+                                      Learn More
+                                   </div>
+                                </div>
+                             </div>
+
+                             {/* Product Grid Simulation */}
+                             <div className="space-y-6">
+                                <h2 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '24px', fontWeight: 'bold' }}>Featured Products</h2>
+                                <div className="grid grid-cols-2 gap-6">
+                                   {[1, 2].map((i) => (
+                                     <div key={i} className="rounded-lg overflow-hidden border transition-transform hover:-translate-y-1" style={{ backgroundColor: editingTheme.config.colors.card || editingTheme.config.colors.background, borderColor: editingTheme.config.colors.border }}>
+                                        <div className="aspect-[4/3] w-full" style={{ backgroundColor: editingTheme.config.colors.muted }}></div>
+                                        <div className="p-5 space-y-3">
+                                           <h3 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '16px', fontWeight: 'bold' }}>Sample Product {i}</h3>
+                                           <div className="flex items-center justify-between">
+                                              <span style={{ color: editingTheme.config.colors.foreground, opacity: 0.7, fontFamily: editingTheme.config.typography.bodyFont, fontSize: '15px' }}>$199.00</span>
+                                              <div className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer" style={{ backgroundColor: editingTheme.config.colors.secondary, color: editingTheme.config.colors.primary }}>
+                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14"/></svg>
+                                              </div>
+                                           </div>
+                                        </div>
+                                     </div>
+                                   ))}
+                                </div>
+                             </div>
                           </div>
                        </div>
                     </div>

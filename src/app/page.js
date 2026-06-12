@@ -2,7 +2,7 @@ import { resolvePageSections } from "@/lib/page-data-resolver";
 import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 import { resolvePageAndTemplate } from "@/lib/page-cache";
 
-export const dynamic = "force-dynamic";
+// Dynamic mode removed to inherit layout caching
 
 export async function generateMetadata() {
   const { page } = await resolvePageAndTemplate("home", "home");

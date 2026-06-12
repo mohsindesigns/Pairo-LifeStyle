@@ -13,23 +13,27 @@ import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import ScriptLoader from "@/components/common/ScriptLoader";
 import ThemeStyle from "@/components/common/ThemeStyle";
 import { Toaster } from "react-hot-toast";
+import { cache } from "react";
 
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60; // Enable ISR, cache public pages for 60 seconds
+
+const getSiteConfig = cache(async () => {
+  await dbConnect();
+  return await SiteConfig.findOne({ key: 'main' }).maxTimeMS(4000).lean() || null;
+});
 
 export async function generateMetadata() {
   try {
-    console.log("=== generateMetadata MONGODB_URI ===", process.env.MONGODB_URI?.substring(0, 30) + '...');
-    await dbConnect();
-    const config = await SiteConfig.findOne({ key: 'main' }).maxTimeMS(4000).lean();
+    const config = await getSiteConfig();
     if (config?.brand) {
       const name = config.brand.name || "Pairo";
       const tagline = config.brand.tagline || "Premium Shearling Jackets";
       const title = tagline ? `${name} | ${tagline}` : name;
-      return {
+      const metadata = {
         title,
         description: config.brand.description || "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.",
         metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com"),
@@ -39,6 +43,21 @@ export async function generateMetadata() {
           googleBot: { index: true, follow: true },
         },
       };
+
+      if (config.brand.faviconUrl) {
+        const bustUrl = `${config.brand.faviconUrl}?v=${Date.now()}`;
+        metadata.icons = {
+          icon: [
+            { url: bustUrl, type: 'image/png' },
+            { url: bustUrl, sizes: '192x192', type: 'image/png' },
+            { url: bustUrl, sizes: '512x512', type: 'image/png' },
+          ],
+          shortcut: bustUrl,
+          apple: bustUrl,
+        };
+      }
+
+      return metadata;
     }
   } catch (error) {
     console.error("Failed to generate metadata", error);
@@ -77,7 +96,7 @@ export default async function RootLayout({ children }) {
     await dbConnect();
 
     // 1. Fetch SiteConfig first to determine exactly which products are needed for the nav menu
-    const config = await SiteConfig.findOne({ key: 'main' }).maxTimeMS(QUERY_TIMEOUT_MS).lean() || null;
+    const config = await getSiteConfig();
 
     let productIdsToFetch = [];
     if (config?.headerConfig?.navItems) {

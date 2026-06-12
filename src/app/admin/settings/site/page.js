@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
   Save, Globe, Layout, AlignLeft, Share2,
@@ -67,6 +68,7 @@ function GeneralTab({ config, onChange }) {
   return (
     <table className="form-table w-full"><tbody>
       <TextRow label="Site Title" value={b.name} onChange={v => set('name', v)} placeholder="Pairo" />
+      <ImagePicker label="Favicon" description="Upload a square icon (e.g. 512x512) for the browser tab." value={b.faviconUrl} onChange={v => set('faviconUrl', v)} />
       <TextRow label="Tagline" value={b.tagline} onChange={v => set('tagline', v)} placeholder="Premium Shearling" description="In a few words, explain what this site is about." />
       <TextRow label="Footer Brand Name" value={b.footerBrandName} onChange={v => set('footerBrandName', v)} placeholder="PAIRO" description="Large animated text shown at the bottom of the footer." />
       <TextRow label="Copyright Text" value={b.copyrightText} onChange={v => set('copyrightText', v)} placeholder="PAIRO — ALL RIGHTS RESERVED © 2026" />
@@ -483,6 +485,7 @@ const TABS = [
 ];
 
 export default function SiteSettingsPage() {
+  const router = useRouter();
   const [tab, setTab] = useState('general');
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -521,6 +524,7 @@ export default function SiteSettingsPage() {
       if (res.ok) {
         setConfig(await res.json());
         toast.success("Settings saved successfully.");
+        router.refresh();
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(`Save failed: ${err.error || 'Unknown error'}`);

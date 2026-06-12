@@ -29,8 +29,8 @@
   color-scheme: light;
   
   /* --- BRAND PALETTE DEFAULT FALLBACK (Admin & Initial Load) --- */
-  --brand-font: var(--font-space);
-  --font-sans: var(--font-inter);
+  --brand-font: var(--font-space), sans-serif;
+  --body-font: var(--font-inter), sans-serif;
   
   --background: #FFFFFF; 
   --foreground: #1A1A1A;

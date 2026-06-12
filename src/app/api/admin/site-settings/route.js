@@ -54,6 +54,9 @@ export async function PUT(req) {
       { upsert: true, new: true, runValidators: false }
     );
 
+    const { revalidatePath } = require('next/cache');
+    revalidatePath('/', 'layout');
+
     return NextResponse.json(JSON.parse(JSON.stringify(updated.toObject())));
   } catch (error) {
     console.error("[SiteSettings PUT]", error);

@@ -121,9 +121,9 @@ export default function Footer() {
           <motion.div variants={itemVariants}>
             <Link href="/" className="flex-shrink-0">
               {footerLogoUrl ? (
-                <img src={footerLogoUrl} alt="Logo" width={110} height={40} className="object-contain h-10 w-auto" />
+                <Image src={footerLogoUrl} alt="Logo" width={110} height={40} className="object-contain h-10 w-auto" />
               ) : (
-                <Image src={logo} alt="Pairo Logo" width={110} height={40} className="object-contain" />
+                <Image src={logo} alt="Pairo Logo" width={110} height={40} className="object-contain h-10 w-auto" />
               )}
             </Link>
           </motion.div>
