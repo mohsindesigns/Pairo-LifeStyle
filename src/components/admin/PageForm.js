@@ -267,7 +267,7 @@ export default function PageForm({ pageId }) {
 
             setPage(pageData);
             setDynamicOptions({
-               categories: Array.isArray(cats) ? cats.filter(c => c.status === 'Published').map(c => ({ label: c.name, value: c.slug })) : [],
+               categories: Array.isArray(cats) ? cats.filter(c => c.status === 'Published').map(c => ({ label: c.name, value: c._id })) : [],
                products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p.slug || p._id })) : [],
                blogs: Array.isArray(blogs) ? blogs.filter(b => b.status === 'Published').map(b => ({ label: b.title, value: b._id })) : []
             });
@@ -389,6 +389,21 @@ export default function PageForm({ pageId }) {
                   ))}
                </select>
             );
+         case "multiselect": {
+            const selected = Array.isArray(value) ? value : [];
+            const msOpts = field.options === 'categories' ? dynamicOptions.categories : field.options === 'products' ? dynamicOptions.products : field.options === 'blogs' ? dynamicOptions.blogs : field.options || [];
+            return (
+               <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto p-3 border border-[#c3c4c7] bg-white shadow-inner">
+                  {msOpts.length === 0 && <span className="text-[11px] text-gray-400 italic p-2">No options available</span>}
+                  {msOpts.map(opt => (
+                     <label key={opt.value} className="flex items-center gap-2.5 text-[13px] hover:bg-[#f0f6fa] px-2 py-1.5 cursor-pointer transition-colors rounded">
+                        <input type="checkbox" className="rounded-sm border-gray-300 text-[#2271b1] focus:ring-[#2271b1]" checked={selected.includes(opt.value)} onChange={(e) => onChange(e.target.checked ? [...selected, opt.value] : selected.filter(v => v !== opt.value))} />
+                        <span>{opt.label}</span>
+                     </label>
+                  ))}
+               </div>
+            );
+         }
          case "repeater":
             const items = value || [];
             return (

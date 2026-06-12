@@ -69,6 +69,17 @@ export default async function ProductDetailPage({ params }) {
       .populate('categories')
       .lean();
   }
+
+  if (product) {
+    const { getAltTextMap } = await import("@/lib/mediaUsage");
+    const allUrls = [
+      ...(product.images || []),
+      product.image,
+      ...(product.variantCombinations || []).map(v => v.image)
+    ].filter(Boolean);
+    const altMap = await getAltTextMap(allUrls);
+    product.imageAlts = altMap;
+  }
   
   // Removed hard Published check to allow previews
   

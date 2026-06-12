@@ -189,16 +189,40 @@ export default function ClientProductActions({ product, onVariantChange }) {
 
       {/* Stock */}
       <div className="flex items-center gap-2">
-        <span
-          className={`w-1.5 h-1.5 rounded-full ${
-            (!product.manageStock || product.stock > 0) ? "bg-emerald-500" : "bg-red-500"
-          }`}
-        />
-        <span className="text-[9px] font-bold uppercase tracking-widest text-black/30">
-          {!product.manageStock 
-            ? "Available" 
-            : (product.stock > 0 ? `In Stock — ${product.stock} units` : "Out of Stock")}
-        </span>
+        {(() => {
+          if (!product.manageStock) {
+            return (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600">In Stock</span>
+              </>
+            );
+          }
+          const stockNum = Number(product.stock) || 0;
+          const lowThreshold = Number(product.lowStockThreshold) || 5;
+          if (stockNum <= 0) {
+            return (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                <span className="text-[9px] font-bold uppercase tracking-widest text-red-500">Out of Stock</span>
+              </>
+            );
+          } else if (stockNum <= lowThreshold) {
+            return (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600">Low Stock — {stockNum} units remaining</span>
+              </>
+            );
+          } else {
+            return (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600">In Stock — {stockNum} units</span>
+              </>
+            );
+          }
+        })()}
       </div>
 
       {/* Quantity + ATC */}

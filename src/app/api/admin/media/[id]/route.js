@@ -4,13 +4,14 @@ import { authOptions } from "../../../auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Media from "@/models/Media";
 import { deleteFromStorage } from "@/lib/storage";
+import { can } from "@/lib/rbac";
 
 // GET /api/admin/media/[id] — Get single media item with usage refs
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!can(session.user, "media.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   await dbConnect();
   const { id } = await params;
   const media = await Media.findById(id).lean();
@@ -21,9 +22,9 @@ export async function GET(req, { params }) {
 // PATCH /api/admin/media/[id] — Update metadata (alt, title, tags, caption)
 export async function PATCH(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!can(session.user, "media.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   await dbConnect();
   const { id } = await params;
   const body = await req.json();
@@ -48,9 +49,9 @@ export async function PATCH(req, { params }) {
 // DELETE /api/admin/media/[id] — Soft delete, or permanent if ?permanent=true
 export async function DELETE(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!can(session.user, "media.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   await dbConnect();
   const { id } = await params;
   const { searchParams } = new URL(req.url);

@@ -128,9 +128,30 @@ export async function DELETE(req) {
    const { searchParams } = new URL(req.url);
    const id = searchParams.get("id");
    try {
-      // Soft delete like WordPress
-      await Blog.findByIdAndUpdate(id, { isDeleted: true });
-      return NextResponse.json({ success: true });
+      const blog = await Blog.findById(id);
+      if (!blog) return NextResponse.json({ error: "Blog not found" }, { status: 404 });
+
+      if (blog.isDeleted) {
+         // Clean up media usage references
+         try {
+            if (blog.image) {
+               const { removeMediaUsage, findMediaByUrl } = await import("@/lib/mediaUsage");
+               const media = await findMediaByUrl(blog.image);
+               if (media) {
+                  await removeMediaUsage(media._id, 'Blog', id);
+               }
+            }
+         } catch (mediaErr) {
+            console.error("Failed to clean up blog media references:", mediaErr);
+         }
+
+         await Blog.findByIdAndDelete(id);
+         return NextResponse.json({ message: "Blog permanently deleted", success: true });
+      } else {
+         blog.isDeleted = true;
+         await blog.save();
+         return NextResponse.json({ message: "Blog moved to trash", success: true, blog });
+      }
    } catch (err) {
       return NextResponse.json({ error: err.message }, { status: 500 });
    }

@@ -195,7 +195,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-14">
             <div id="blog-main-content" className="lg:col-span-8">
                <div className="aspect-[16/9] rounded-[12px] md:rounded-[16px] overflow-hidden border border-black/5 shadow-sm mb-10">
-                  <img src={post.image} className="w-full h-full object-cover" />
+                  <img src={post.image} alt={post.imageAlts?.[post.image] || post.title || "Blog Image"} className="w-full h-full object-cover" />
                </div>
 
                <div className="max-w-2xl space-y-12 md:space-y-16">

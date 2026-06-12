@@ -195,18 +195,21 @@ export default function PageBuilder({ initialPage }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log("[PageBuilder] Fetching dynamic options...");
         const [catsRes, prodsRes, blogsRes] = await Promise.all([
           fetch("/api/admin/categories"),
           fetch("/api/admin/products"),
           fetch("/api/admin/blogs")
         ]);
+        console.log("[PageBuilder] Responses received status:", catsRes.status, prodsRes.status, blogsRes.status);
         const [cats, prods, blogs] = await Promise.all([catsRes.json(), prodsRes.json(), blogsRes.json()]);
+        console.log("[PageBuilder] Data parsed:", Array.isArray(cats) ? cats.length : typeof cats, Array.isArray(prods) ? prods.length : typeof prods, Array.isArray(blogs) ? blogs.length : typeof blogs);
         setDynamicOptions({
-          categories: Array.isArray(cats) ? cats.filter(c => c.status === 'Published').map(c => ({ label: c.name, value: c.slug })) : [],
+          categories: Array.isArray(cats) ? cats.map(c => ({ label: c.name, value: c._id })) : [],
           products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p.slug || p._id })) : [],
-          blogs: Array.isArray(blogs) ? blogs.filter(b => b.status === 'Published').map(b => ({ label: b.title, value: b._id })) : []
+          blogs: Array.isArray(blogs) ? blogs.map(b => ({ label: b.title, value: b._id })) : []
         });
-      } catch (err) { console.error("Dynamic options fetch failed", err); }
+      } catch (err) { console.error("[PageBuilder] Dynamic options fetch failed", err); }
     };
     fetchData();
   }, []);
@@ -296,6 +299,7 @@ export default function PageBuilder({ initialPage }) {
       case "multiselect":
         const selected = Array.isArray(value) ? value : [];
         const opts = field.options === 'categories' ? dynamicOptions.categories : field.options === 'products' ? dynamicOptions.products : field.options === 'blogs' ? dynamicOptions.blogs : field.options || [];
+        console.log("[PageBuilder] RENDER MULTISELECT:", field.name, "selected:", selected, "options count:", opts.length, "options:", opts);
         return (
           <div className="flex flex-col gap-1 max-h-[160px] overflow-y-auto p-2 border border-[#8c8f94] bg-white rounded-sm">
             {opts.length === 0 && <span className="text-[11px] text-gray-400 italic p-2">No options available</span>}

@@ -12,9 +12,10 @@ export async function GET(req, { params }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   await dbConnect();
   try {
-    const promotion = await Promotion.findById(params.id);
+    const promotion = await Promotion.findById(id);
     if (!promotion) {
       return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
     }
@@ -30,19 +31,20 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   await dbConnect();
   try {
     const data = await req.json();
-    const oldPromo = await Promotion.findById(params.id);
+    const oldPromo = await Promotion.findById(id);
     if (!oldPromo) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const promotion = await Promotion.findByIdAndUpdate(params.id, data, { new: true, runValidators: true });
+    const promotion = await Promotion.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     
     // Track History
     const diff = HistoryService.generateDiff(oldPromo.toObject(), promotion.toObject());
     if (diff.length > 0) {
         await HistoryService.recordRevision(promotion, { adminName: session.user.name || session.user.email });
-        await HistoryService.logAction('UPDATE', params.id, { adminName: session.user.name || session.user.email }, diff);
+        await HistoryService.logAction('UPDATE', id, { adminName: session.user.name || session.user.email }, diff);
     }
 
     // Invalidate Cache
@@ -60,10 +62,11 @@ export async function PATCH(req, { params }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   await dbConnect();
   try {
     const data = await req.json();
-    const promotion = await Promotion.findByIdAndUpdate(params.id, { $set: data }, { new: true });
+    const promotion = await Promotion.findByIdAndUpdate(id, { $set: data }, { new: true });
     
     if (!promotion) {
       return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
@@ -83,10 +86,11 @@ export async function DELETE(req, { params }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { id } = await params;
   await dbConnect();
   try {
     // Instead of hard delete, we archive
-    const promotion = await Promotion.findByIdAndUpdate(params.id, { adminStatus: 'Archived' }, { new: true });
+    const promotion = await Promotion.findByIdAndUpdate(id, { adminStatus: 'Archived' }, { new: true });
     
     if (!promotion) {
       return NextResponse.json({ error: "Promotion not found" }, { status: 404 });

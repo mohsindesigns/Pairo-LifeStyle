@@ -123,175 +123,205 @@ export default function CheckoutPage() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
   };
 
+  const inputClass = "w-full bg-white border border-[#d9d9d9] rounded-xl px-5 py-3.5 text-[13px] font-medium placeholder:text-neutral-400 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all";
+
   return (
-    <div className="bg-white min-h-screen text-black font-sans selection:bg-black selection:text-white pb-32">
-      <div className="container mx-auto px-6 md:px-12 py-12 md:py-24 max-w-7xl">
+    <div className="bg-[#fcfcfc] min-h-screen text-black font-sans selection:bg-black selection:text-white pb-32">
+      <div className="container mx-auto px-4 sm:px-6 md:px-12 py-8 md:py-16 max-w-7xl">
         
-        <div className="flex flex-col gap-8 mb-16">
-          <Link href="/cart" className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-black/40 hover:text-black transition-all">
-            <ChevronLeft className="w-4 h-4" />
-            Back to Bag
+        {/* Top Header */}
+        <div className="flex flex-col gap-4 mb-12">
+          <Link href="/cart" className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-450 hover:text-black transition-colors">
+            <ChevronLeft className="w-3.5 h-3.5" /> Back to Bag
           </Link>
-          <div className="space-y-2">
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Checkout</h1>
-            <p className="text-sm text-black/40">Complete your acquisition.</p>
+          <div className="flex items-center justify-between border-b border-black/5 pb-6">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight uppercase heading-font">Secure Checkout</h1>
+            <div className="flex items-center gap-1.5 text-[9px] font-black text-neutral-400 uppercase tracking-widest">
+              <Lock className="w-3.5 h-3.5" /> SSL encrypted
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 xl:gap-24 items-start">
+        {/* Responsive Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-16 items-start">
           
-          <motion.div variants={containerVariants} initial="hidden" animate="visible" className="lg:col-span-7 space-y-16">
-            
+          {/* Left Side: Contact, Shipping, Payment Forms */}
+          <motion.div 
+            variants={containerVariants} 
+            initial="hidden" 
+            animate="visible" 
+            className="lg:col-span-7 bg-white rounded-[24px] border border-black/5 p-6 md:p-10 space-y-12"
+          >
             {/* Contact */}
-            <section className="space-y-8">
-              <div className="flex items-center gap-4">
-                 <h2 className="text-sm font-bold uppercase tracking-widest">01. Contact</h2>
-                 <div className="h-[1px] bg-black/5 flex-1" />
+            <section className="space-y-6">
+              <div className="flex items-center gap-3">
+                 <h2 className="text-[11px] font-bold uppercase tracking-[0.25em] text-black">01. Contact Details</h2>
+                 <div className="h-px bg-black/5 flex-1" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/30 ml-1">First Name</label>
-                  <input name="firstName" onChange={handleInputChange} value={formData.firstName} type="text" placeholder="John" className="w-full bg-gray-50 border border-transparent rounded-2xl px-6 py-4 text-sm focus:bg-white focus:border-black/10 transition-all outline-none" />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-neutral-450 ml-1">First Name</label>
+                  <input name="firstName" onChange={handleInputChange} value={formData.firstName} type="text" placeholder="e.g. John" className={inputClass} />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/30 ml-1">Last Name</label>
-                  <input name="lastName" onChange={handleInputChange} value={formData.lastName} type="text" placeholder="Doe" className="w-full bg-gray-50 border border-transparent rounded-2xl px-6 py-4 text-sm focus:bg-white focus:border-black/10 transition-all outline-none" />
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-neutral-450 ml-1">Last Name</label>
+                  <input name="lastName" onChange={handleInputChange} value={formData.lastName} type="text" placeholder="e.g. Doe" className={inputClass} />
                 </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/30 ml-1">Email</label>
-                  <input name="email" onChange={handleInputChange} value={formData.email} type="email" placeholder="john@example.com" className="w-full bg-gray-50 border border-transparent rounded-2xl px-6 py-4 text-sm focus:bg-white focus:border-black/10 transition-all outline-none" />
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-neutral-450 ml-1">Email Address <span className="text-red-500">*</span></label>
+                  <input name="email" onChange={handleInputChange} value={formData.email} type="email" placeholder="john@example.com" className={inputClass} required />
                 </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/30 ml-1">Phone Number</label>
-                  <input name="phone" onChange={handleInputChange} value={formData.phone} type="tel" placeholder="+1 (555) 000-0000" className="w-full bg-gray-50 border border-transparent rounded-2xl px-6 py-4 text-sm focus:bg-white focus:border-black/10 transition-all outline-none" />
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-neutral-450 ml-1">Phone Number</label>
+                  <input name="phone" onChange={handleInputChange} value={formData.phone} type="tel" placeholder="+1 (555) 000-0000" className={inputClass} />
                 </div>
               </div>
             </section>
 
             {/* Shipping */}
-            <section className="space-y-8">
-              <div className="flex items-center gap-4">
-                 <h2 className="text-sm font-bold uppercase tracking-widest">02. Shipping</h2>
-                 <div className="h-[1px] bg-black/5 flex-1" />
+            <section className="space-y-6">
+              <div className="flex items-center gap-3">
+                 <h2 className="text-[11px] font-bold uppercase tracking-[0.25em] text-black">02. Shipping Address</h2>
+                 <div className="h-px bg-black/5 flex-1" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/30 ml-1">Address</label>
-                  <input name="street" onChange={handleInputChange} value={formData.street} type="text" placeholder="123 Luxury Avenue" className="w-full bg-gray-50 border border-transparent rounded-2xl px-6 py-4 text-sm focus:bg-white focus:border-black/10 transition-all outline-none" />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-neutral-450 ml-1">Street Address <span className="text-red-500">*</span></label>
+                  <input name="street" onChange={handleInputChange} value={formData.street} type="text" placeholder="123 Luxury Avenue, Apt 4" className={inputClass} required />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/30 ml-1">City</label>
-                  <input name="city" onChange={handleInputChange} value={formData.city} type="text" placeholder="New York" className="w-full bg-gray-50 border border-transparent rounded-2xl px-6 py-4 text-sm focus:bg-white focus:border-black/10 transition-all outline-none" />
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-neutral-450 ml-1">City</label>
+                  <input name="city" onChange={handleInputChange} value={formData.city} type="text" placeholder="New York" className={inputClass} />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/30 ml-1">ZIP Code</label>
-                  <input name="zip" onChange={handleInputChange} value={formData.zip} type="text" placeholder="10001" className="w-full bg-gray-50 border border-transparent rounded-2xl px-6 py-4 text-sm focus:bg-white focus:border-black/10 transition-all outline-none" />
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-neutral-450 ml-1">ZIP Code</label>
+                  <input name="zip" onChange={handleInputChange} value={formData.zip} type="text" placeholder="10001" className={inputClass} />
                 </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-black/30 ml-1">Note (Optional)</label>
-                  <textarea name="customerNote" onChange={handleInputChange} value={formData.customerNote} placeholder="Any specific instructions..." className="w-full bg-gray-50 border border-transparent rounded-2xl px-6 py-4 text-sm focus:bg-white focus:border-black/10 transition-all outline-none min-h-[100px]" />
+                <div className="md:col-span-2 space-y-1">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-neutral-450 ml-1">Order Note (Optional)</label>
+                  <textarea name="customerNote" onChange={handleInputChange} value={formData.customerNote} placeholder="Specific instructions for delivery..." className={`${inputClass} min-h-[90px] resize-y`} />
                 </div>
               </div>
             </section>
 
             {/* Payment */}
-            <section className="space-y-8">
-              <div className="flex items-center gap-4">
-                 <h2 className="text-sm font-bold uppercase tracking-widest">03. Payment</h2>
-                 <div className="h-[1px] bg-black/5 flex-1" />
+            <section className="space-y-6">
+              <div className="flex items-center gap-3">
+                 <h2 className="text-[11px] font-bold uppercase tracking-[0.25em] text-black">03. Payment Method</h2>
+                 <div className="h-px bg-black/5 flex-1" />
               </div>
-              <div className="p-8 border border-black/5 rounded-[2rem] bg-gray-50 flex items-center justify-between">
-                 <div className="flex items-center gap-4">
-                    <CreditCard className="w-5 h-5 text-black/40" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-black/40">Manual Payment / Cash on Delivery</span>
+              
+              <div className="p-5 border border-black/10 rounded-xl bg-neutral-50 flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                    <CreditCard className="w-4.5 h-4.5 text-neutral-500" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-600">Manual Payment / Cash on Delivery</span>
                  </div>
-                 <div className="w-5 h-5 rounded-full border-4 border-black" />
+                 <div className="w-4 h-4 rounded-full border-[3px] border-black bg-white" />
               </div>
             </section>
 
-            <div className="pt-8">
+            {/* Action */}
+            <div className="pt-4">
                <button 
                 onClick={handlePayment}
                 disabled={isProcessing || !cartItems || cartItems.length === 0}
-                className="w-full bg-black text-white py-7 rounded-[2rem] font-bold text-xs uppercase tracking-[0.3em] shadow-xl hover:shadow-2xl transition-all active:scale-[0.99] disabled:opacity-50"
+                className="w-full bg-black text-white hover:bg-neutral-900 py-5 rounded-xl font-bold text-[11px] uppercase tracking-[0.25em] transition-all active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
                >
                 {isProcessing ? (
-                  <span className="flex items-center justify-center gap-3">Processing Order <Loader2 className="w-4 h-4 animate-spin" /></span>
+                  <>Processing <Loader2 className="w-3.5 h-3.5 animate-spin" /></>
                 ) : (
-                  <span className="flex items-center justify-center gap-3">Complete Acquisition <ArrowRight className="w-4 h-4" /></span>
+                  <>Complete Acquisition <ArrowRight className="w-3.5 h-3.5" /></>
                 )}
                </button>
             </div>
           </motion.div>
 
-          <motion.aside variants={containerVariants} initial="hidden" animate="visible" transition={{ delay: 0.1 }} className="lg:col-span-5">
-            <div className="bg-[#fcfcfc] rounded-[2.5rem] p-8 md:p-12 border border-black/[0.03] sticky top-32">
-              <h2 className="text-xs font-bold uppercase tracking-[0.2em] mb-10 text-black/40">Selections</h2>
+          {/* Right Side: Order Summary */}
+          <motion.aside 
+            variants={containerVariants} 
+            initial="hidden" 
+            animate="visible" 
+            transition={{ delay: 0.1 }} 
+            className="lg:col-span-5"
+          >
+            <div className="bg-white rounded-[24px] border border-black/5 p-6 md:p-8 space-y-8 sticky top-10">
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.25em] text-black">Your Selections</h2>
               
-              <div className="space-y-8 mb-10 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
+              {/* Selections List */}
+              <div className="divide-y divide-black/5 overflow-y-auto max-h-[360px] pr-1">
                 {(cartItems || []).map((item, index) => {
                   const itemImage = item.image || (Array.isArray(item.images) && item.images[0]) || "/placeholder.jpg";
                   const itemKey = `${item.id || item._id}-${item.selectedSize || "Standard"}-${item.selectedColor || "Standard"}-${index}`;
                   return (
-                  <div key={itemKey} className="flex gap-6 items-center">
-                    <div className="w-16 h-20 bg-white rounded-2xl overflow-hidden border border-black/5 shrink-0">
-                      <img src={itemImage} alt={item.name} className="w-full h-full object-cover" />
+                    <div key={itemKey} className="flex gap-4 items-center py-4 first:pt-0 last:pb-0">
+                      <div className="w-14 h-18 bg-[#f9f9f9] rounded-lg overflow-hidden border border-black/5 shrink-0">
+                        <img src={itemImage} alt={item.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 space-y-1 min-w-0">
+                         {/* Reduced Product Title Size - Premium Shopify Plus style */}
+                         <h3 className="text-[11px] font-bold text-neutral-800 uppercase tracking-wider truncate">{item.name}</h3>
+                         <p className="text-[9px] text-neutral-400 font-bold uppercase">
+                           Qty {item.quantity} / {item.selectedOptions ? Object.values(item.selectedOptions).join(" / ") : "Standard"}
+                         </p>
+                         <p className="text-[11px] font-bold tracking-tight text-neutral-900 mt-1">
+                           ${(item.price * item.quantity).toLocaleString()}
+                         </p>
+                      </div>
                     </div>
-                    <div className="flex-1 space-y-1">
-                       <h3 className="text-[10px] font-bold uppercase tracking-widest">{item.name}</h3>
-                       <p className="text-[9px] text-black/40 uppercase font-bold">Qty {item.quantity} / {item.selectedOptions ? Object.values(item.selectedOptions).join(" / ") : "Standard"}</p>
-                       <p className="text-xs font-bold tracking-tight mt-2">${(item.price * item.quantity).toLocaleString()}</p>
-                    </div>
-                  </div>
                   );
                 })}
               </div>
 
-              <div className="space-y-4 pt-10 border-t border-black/5">
-                {/* Promo Code Section */}
-                <div className="pb-6">
-                   <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        placeholder="Promo Code" 
-                        className="flex-1 bg-white border border-black/10 rounded-xl px-4 py-2 text-[10px] font-bold uppercase tracking-widest outline-none focus:border-black transition-all"
-                        value={promoCode}
-                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                      />
-                      <button 
-                        onClick={applyPromoCode}
-                        disabled={!promoCode || applyingPromo}
-                        className="px-4 py-2 bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-black/80 disabled:opacity-50 transition-all"
-                      >
-                         {applyingPromo ? "..." : "Apply"}
-                      </button>
+              {/* Promo Form */}
+              <div className="pt-6 border-t border-black/5 space-y-3">
+                 <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      placeholder="PROMO CODE" 
+                      className="flex-1 bg-white border border-neutral-200 rounded-xl px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest outline-none focus:border-black transition-all"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    />
+                    <button 
+                      onClick={applyPromoCode}
+                      disabled={!promoCode || applyingPromo}
+                      className="px-5 py-2.5 bg-black hover:bg-neutral-850 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 shrink-0"
+                    >
+                       {applyingPromo ? "..." : "Apply"}
+                    </button>
+                 </div>
+                 {promoError && <p className="text-[9px] text-red-500 font-bold ml-1 uppercase tracking-widest">{promoError}</p>}
+                 {discountData && (
+                   <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
+                      <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Code {discountData.code} Applied</span>
+                      <button onClick={() => setDiscountData(null)} className="text-[9px] font-bold text-emerald-600 hover:text-emerald-800 uppercase tracking-widest">Remove</button>
                    </div>
-                   {promoError && <p className="text-[9px] text-red-500 font-bold mt-2 ml-1 uppercase tracking-widest">{promoError}</p>}
-                   {discountData && (
-                     <div className="mt-3 flex items-center justify-between p-2 bg-green-50 rounded-lg">
-                        <span className="text-[9px] font-bold text-green-700 uppercase tracking-widest">Code Applied: {discountData.code}</span>
-                        <button onClick={() => setDiscountData(null)} className="text-[9px] font-bold text-green-700 uppercase">Remove</button>
-                     </div>
-                   )}
-                </div>
+                 )}
+              </div>
 
-                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-black/40">
+              {/* Totals Breakdown */}
+              <div className="space-y-3 pt-6 border-t border-black/5">
+                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-neutral-450">
                   <span>Subtotal</span>
-                  <span className="text-black">${(cartSubtotal || 0).toLocaleString()}</span>
+                  <span className="text-black font-semibold">${(cartSubtotal || 0).toLocaleString()}</span>
                 </div>
                 {discountData && (
-                   <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-green-600">
+                   <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-emerald-600">
                     <span>Discount ({discountData.type === 'percentage' ? `${discountData.value}%` : 'Fixed'})</span>
                     <span>-${discountData.discountAmount.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-black/40">
+                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-neutral-450">
                   <span>Shipping</span>
-                  <span className="text-green-600">Complimentary</span>
+                  <span className="text-emerald-600">Complimentary</span>
                 </div>
-                <div className="pt-6 flex justify-between items-end border-t border-black/[0.03]">
-                   <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Total</span>
-                   <span className="text-4xl font-bold tracking-tighter">${(total - (discountData?.discountAmount || 0)).toLocaleString()}</span>
+                
+                {/* Total */}
+                <div className="pt-6 flex justify-between items-end border-t border-black/5">
+                   <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Total Amount</span>
+                   <span className="text-3xl font-bold tracking-tight">${(total - (discountData?.discountAmount || 0)).toLocaleString()}</span>
                 </div>
               </div>
             </div>

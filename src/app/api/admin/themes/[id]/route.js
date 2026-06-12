@@ -10,9 +10,10 @@ export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   
+  const { id } = await params;
   await dbConnect();
   try {
-    const theme = await Theme.findById(params.id).lean();
+    const theme = await Theme.findById(id).lean();
     if (!theme) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(theme);
   } catch (error) {
@@ -25,16 +26,17 @@ export async function PATCH(req, { params }) {
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!can(session.user, "settings.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   await dbConnect();
   try {
     const data = await req.json();
-    const before = await Theme.findById(params.id).lean();
+    const before = await Theme.findById(id).lean();
     
     if (before.isSystem) {
         return NextResponse.json({ error: "System themes cannot be modified. Duplicate to customize." }, { status: 403 });
     }
 
-    const theme = await Theme.findByIdAndUpdate(params.id, data, { new: true });
+    const theme = await Theme.findByIdAndUpdate(id, data, { new: true });
     await logAction(req, session, 'UPDATE_THEME', 'theme', { before, after: theme });
     return NextResponse.json(theme);
   } catch (error) {
@@ -47,9 +49,10 @@ export async function DELETE(req, { params }) {
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!can(session.user, "settings.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   await dbConnect();
   try {
-    const theme = await Theme.findById(params.id);
+    const theme = await Theme.findById(id);
     if (theme.isSystem) return NextResponse.json({ error: "Cannot delete system themes" }, { status: 403 });
     if (theme.isActive) return NextResponse.json({ error: "Cannot delete active theme" }, { status: 403 });
 

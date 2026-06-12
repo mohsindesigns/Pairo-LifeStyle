@@ -75,7 +75,12 @@ export default async function BlogDetail({ params }) {
   }).limit(6).sort({ createdAt: -1 }).lean();
 
   // Sanitize for client to ensure only plain objects are passed
-  const serializedPost = JSON.parse(JSON.stringify(post));
+  const { getAltTextMap } = await import("@/lib/mediaUsage");
+  const postAltMap = post?.image ? await getAltTextMap([post.image]) : {};
+  const serializedPost = {
+    ...JSON.parse(JSON.stringify(post)),
+    imageAlts: postAltMap
+  };
   const serializedPosts = JSON.parse(JSON.stringify(latestPosts)).map(p => ({
     ...p,
     id: p._id,

@@ -48,6 +48,22 @@ export default function ProductSection({
 
   if (!siteData) return null;
 
+  if (!products || products.length === 0) {
+    return (
+      <section className="py-2 md:py-4">
+        <div className="mx-4 md:mx-8 bg-white border border-black/5 rounded-[32px] md:rounded-[40px] shadow-sm overflow-hidden py-16 md:py-20 px-6 md:px-16 text-center">
+          <div className="max-w-md mx-auto space-y-4">
+            <h2 className="text-xl md:text-2xl font-bold heading-font text-black uppercase tracking-tight">{title}</h2>
+            <div className="w-12 h-[1px] bg-black/10 mx-auto" />
+            <p className="text-[10px] text-black/45 font-bold uppercase tracking-widest leading-relaxed">
+              No products are currently available in this collection.
+            </p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-2 md:py-4">
       <div className="mx-4 md:mx-8 bg-white border border-black/5 rounded-[32px] md:rounded-[40px] shadow-sm overflow-hidden py-16 md:py-20 px-6 md:px-16">

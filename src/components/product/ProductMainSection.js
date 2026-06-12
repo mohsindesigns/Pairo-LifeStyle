@@ -51,7 +51,12 @@ export default function ProductMainSection({ product }) {
   const displayPrice = selectedVariant?.price || product.price;
   const displayCompareAtPrice = selectedVariant ? (selectedVariant.compareAtPrice !== undefined && selectedVariant.compareAtPrice !== null ? selectedVariant.compareAtPrice : null) : product.compareAtPrice;
   const displaySku = selectedVariant?.sku || product.sku;
-  const displayStock = selectedVariant?.stock !== undefined ? selectedVariant.stock : product.stock;
+  let displayStock = product.stock;
+  if (selectedVariant?.stock !== undefined) {
+    displayStock = selectedVariant.stock;
+  } else if (product.productType === 'variable' && product.variantCombinations?.length) {
+    displayStock = product.variantCombinations.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
+  }
 
   const categoryName = product.categories?.[0]?.name || product.category || "Collection";
 

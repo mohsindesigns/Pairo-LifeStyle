@@ -82,6 +82,29 @@ export default function AdminProducts() {
     }
   };
 
+  const handleRestoreProduct = async (id) => {
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, isDeleted: false, status: 'Draft', tenantId: "DEFAULT_STORE" })
+      });
+      if (res.ok) fetchProducts();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePermanentDeleteProduct = async (id, name) => {
+    if (!confirm(`Are you sure you want to permanently delete "${name}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+      if (res.ok) fetchProducts();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleDuplicate = async (product) => {
      try {
         const { _id, createdAt, updatedAt, ...rest } = product;
@@ -113,7 +136,7 @@ export default function AdminProducts() {
                  const p = products.find(prod => prod._id === id);
                  if (p) await handleDuplicate(p);
               } else if (bulkAction === "Delete Permanently") {
-                 await fetch(`/api/admin/products?id=${id}&permanent=true`, { method: "DELETE" });
+                 await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
               }
            }
            setSelectedIds([]);
@@ -256,15 +279,25 @@ export default function AdminProducts() {
                     <td className="px-3 py-4 align-top">
                        <Link href={`/admin/products/${p._id}`} className="text-[#2271b1] font-bold hover:underline block mb-1">{p.name}</Link>
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
-                           <Link href={`/admin/products/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
-                           <span className="text-[#c3c4c7]">|</span>
-                           <button onClick={() => openQuickEdit(p)} className="hover:text-[#135e96]">Quick Edit</button>
-                           <span className="text-[#c3c4c7]">|</span>
-                           <button onClick={() => handleDuplicate(p)} className="hover:text-[#135e96]">Duplicate</button>
-                           <span className="text-[#c3c4c7]">|</span>
-                           <button onClick={() => handleTrash(p._id)} className="hover:text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
-                           <span className="text-[#c3c4c7]">|</span>
-                           <Link href={`/product/${p.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
+                           {view === "trash" ? (
+                              <>
+                                 <button onClick={() => handleRestoreProduct(p._id)} className="hover:text-[#135e96]">Restore</button>
+                                 <span className="text-[#c3c4c7]">|</span>
+                                 <button onClick={() => handlePermanentDeleteProduct(p._id, p.name)} className="hover:text-[#d63638]">Delete Permanently</button>
+                              </>
+                           ) : (
+                              <>
+                                 <Link href={`/admin/products/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
+                                 <span className="text-[#c3c4c7]">|</span>
+                                 <button onClick={() => openQuickEdit(p)} className="hover:text-[#135e96]">Quick Edit</button>
+                                 <span className="text-[#c3c4c7]">|</span>
+                                 <button onClick={() => handleDuplicate(p)} className="hover:text-[#135e96]">Duplicate</button>
+                                 <span className="text-[#c3c4c7]">|</span>
+                                 <button onClick={() => handleTrash(p._id)} className="hover:text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
+                                 <span className="text-[#c3c4c7]">|</span>
+                                 <Link href={`/product/${p.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
+                              </>
+                           )}
                         </div>
                     </td>
                     <td className="px-3 py-4 align-top">
@@ -286,8 +319,22 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-3 py-4 align-top text-[#646970] font-mono">{p.sku || "—"}</td>
                     <td className="px-3 py-4 align-top text-center">
-                       <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${!p.manageStock || p.stock > 0 ? "text-green-700" : "text-red-700"}`}>
-                          {!p.manageStock ? "In stock (Untracked)" : p.stock > 0 ? `In stock (${p.stock})` : "Out of stock"}
+                       <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                         !p.manageStock 
+                           ? "bg-green-50 text-green-700" 
+                           : p.stock <= 0 
+                             ? "bg-red-50 text-red-700" 
+                             : p.stock <= (p.lowStockThreshold || 5)
+                               ? "bg-amber-50 text-amber-700"
+                               : "bg-green-50 text-green-700"
+                       }`}>
+                          {!p.manageStock 
+                            ? "In stock (Untracked)" 
+                            : p.stock <= 0 
+                              ? "Out of stock" 
+                              : p.stock <= (p.lowStockThreshold || 5)
+                                ? `Low stock (${p.stock})`
+                                : `In stock (${p.stock})`}
                        </span>
                     </td>
                     <td className="px-3 py-4 align-top font-bold">${p.price?.toFixed(2)}</td>

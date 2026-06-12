@@ -12,9 +12,10 @@ export async function GET(req, { params }) {
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!can(session.user, "products.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   await dbConnect();
   try {
-    const product = await Product.findById(params.id)
+    const product = await Product.findById(id)
       .populate('categories')
       .populate('collections')
       .populate('relatedProducts')
@@ -33,24 +34,37 @@ export async function PUT(req, { params }) {
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!can(session.user, "products.edit")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   await dbConnect();
   try {
     const data = await req.json();
     
-    const oldProduct = await Product.findById(params.id);
+    const oldProduct = await Product.findById(id);
     if (!oldProduct) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     // Auto-generate slug if it's being updated or missing
-    if (data.name && (!data.slug || data.slug === "")) {
-      data.slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    let slug = data.slug;
+    if (data.name && (!slug || slug === "")) {
+      slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     }
+    if (!slug) slug = oldProduct.slug || "product";
+
+    // Ensure uniqueness within the tenant without appending suffixes unless a duplicate exists
+    let finalSlug = slug;
+    let counter = 1;
+    const tenantId = oldProduct.tenantId || "DEFAULT_STORE";
+    while (await Product.findOne({ slug: finalSlug, tenantId, _id: { $ne: id } })) {
+      finalSlug = `${slug}-${counter}`;
+      counter++;
+    }
+    data.slug = finalSlug;
 
     // Register redirect if slug changed
     if (data.slug && oldProduct.slug && oldProduct.slug !== data.slug) {
       await registerRedirect(`/product/${oldProduct.slug}`, `/product/${data.slug}`);
     }
 
-    const product = await Product.findByIdAndUpdate(params.id, { $set: data }, { new: true, runValidators: true });
+    const product = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
     return NextResponse.json(product);
   } catch (error) {
     console.error("PUT Error:", error);
@@ -64,9 +78,10 @@ export async function DELETE(req, { params }) {
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!can(session.user, "products.delete")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const { id } = await params;
   await dbConnect();
   try {
-    const product = await Product.findById(params.id);
+    const product = await Product.findById(id);
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
@@ -84,14 +99,18 @@ export async function DELETE(req, { params }) {
         for (const url of productImages) {
           const media = await findMediaByUrl(url);
           if (media) {
-            await removeMediaUsage(media._id, 'Product', params.id);
+            await removeMediaUsage(media._id, 'Product', id);
           }
         }
       } catch (mediaErr) {
         console.error("Failed to clean up media usage references:", mediaErr);
       }
 
-      await Product.findByIdAndDelete(params.id);
+      // Clean related and upsell product references
+      await Product.updateMany({ relatedProducts: id }, { $pull: { relatedProducts: id } });
+      await Product.updateMany({ upsellProducts: id }, { $pull: { upsellProducts: id } });
+
+      await Product.findByIdAndDelete(id);
       return NextResponse.json({ message: "Product permanently deleted" });
     } else {
       product.isDeleted = true;

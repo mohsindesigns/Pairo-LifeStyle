@@ -68,6 +68,29 @@ export default function AdminBlogs() {
     }
   };
 
+  const handleRestoreBlog = async (id) => {
+    try {
+      const res = await fetch("/api/admin/blogs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, isDeleted: false })
+      });
+      if (res.ok) fetchBlogs();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePermanentDeleteBlog = async (id, title) => {
+    if (!confirm(`Are you sure you want to permanently delete "${title}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/admin/blogs?id=${id}`, { method: "DELETE" });
+      if (res.ok) fetchBlogs();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleDuplicate = async (blog) => {
     try {
       const { _id, createdAt, updatedAt, ...rest } = blog;
@@ -200,13 +223,23 @@ export default function AdminBlogs() {
                             </Link>
                             {b.status === "Draft" && <span className="font-bold text-[#1d2327] text-[12px] -mt-1 mb-1">— Draft</span>}
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
-                               <Link href={`/admin/blogs/${b._id}`} className="hover:text-[#135e96]">Edit</Link>
-                               <span className="text-[#c3c4c7]">|</span>
-                               <button onClick={() => handleDuplicate(b)} className="hover:text-[#135e96]">Duplicate</button>
-                               <span className="text-[#c3c4c7]">|</span>
-                               <button onClick={() => handleTrash(b._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
-                               <span className="text-[#c3c4c7]">|</span>
-                               <Link href={`/blog/${b.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
+                               {view === "trash" ? (
+                                  <>
+                                     <button onClick={() => handleRestoreBlog(b._id)} className="hover:text-[#135e96]">Restore</button>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <button onClick={() => handlePermanentDeleteBlog(b._id, b.title)} className="hover:text-[#d63638]">Delete Permanently</button>
+                                  </>
+                               ) : (
+                                  <>
+                                     <Link href={`/admin/blogs/${b._id}`} className="hover:text-[#135e96]">Edit</Link>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <button onClick={() => handleDuplicate(b)} className="hover:text-[#135e96]">Duplicate</button>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <button onClick={() => handleTrash(b._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
+                                     <span className="text-[#c3c4c7]">|</span>
+                                     <Link href={`/blog/${b.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
+                                  </>
+                               )}
                             </div>
                          </div>
                       </div>

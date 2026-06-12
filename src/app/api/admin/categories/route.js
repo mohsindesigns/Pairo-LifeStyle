@@ -12,10 +12,11 @@ export async function GET(req) {
 
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type") || "product";
+  const trash = searchParams.get("trash") === "true";
 
   await dbConnect();
   try {
-    const query = { isDeleted: false };
+    const query = { isDeleted: trash };
     if (type === "product") {
        query.$or = [{ type: "product" }, { type: { $exists: false } }];
     } else {
@@ -217,12 +218,40 @@ export async function DELETE(req) {
 
   await dbConnect();
   try {
-    const category = await Category.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
-    
-    // Usage tracking is usually kept for soft deletes, but we could remove it if desired.
-    // Keeping it for now so "Trash" items still show as "In Use".
+    const category = await Category.findById(id);
+    if (!category) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
 
-    return NextResponse.json(category);
+    if (category.isDeleted) {
+      // Clean up media usage references
+      try {
+        if (category.image) {
+          const { removeMediaUsage, findMediaByUrl } = await import("@/lib/mediaUsage");
+          const media = await findMediaByUrl(category.image);
+          if (media) {
+            await removeMediaUsage(media._id, 'Category', id);
+          }
+        }
+      } catch (mediaErr) {
+        console.error("Failed to clean up category media references:", mediaErr);
+      }
+
+      // Pull Category ID from all products' categories array
+      const Product = (await import("@/models/Product")).default;
+      await Product.updateMany(
+        { categories: id },
+        { $pull: { categories: id } }
+      );
+
+      // Permanently delete Category document
+      await Category.findByIdAndDelete(id);
+      return NextResponse.json({ message: "Category permanently deleted" });
+    } else {
+      category.isDeleted = true;
+      await category.save();
+      return NextResponse.json({ message: "Category moved to trash", category });
+    }
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

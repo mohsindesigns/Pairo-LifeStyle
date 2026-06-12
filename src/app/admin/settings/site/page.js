@@ -189,7 +189,7 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                 {/* Type */}
                 <div className="md:col-span-3">
                   <label className="text-[11px] font-semibold text-[#646970] uppercase tracking-wider block mb-1">Type</label>
-                  <select className={inputClass} value={item.type} onChange={e => updateNav(idx, { type: e.target.value, value: '' })}>
+                  <select className={inputClass} value={item.type} onChange={e => updateNav(idx, { type: e.target.value, value: e.target.value === 'blog_list' ? '/blog' : '' })}>
                     <option value="custom_url">Custom Link</option>
                     <option value="page">Page</option>
                     <option value="blog_list">Blog List Page</option>
@@ -203,9 +203,13 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                 {/* Value */}
                 <div className="md:col-span-4">
                   <label className="text-[11px] font-semibold text-[#646970] uppercase tracking-wider block mb-1">
-                    {item.type === 'page' ? 'Page' : item.type === 'product' ? 'Product' : item.type === 'product_category' ? 'Category' : ['mega_menu', 'dropdown_product', 'dropdown_category'].includes(item.type) ? 'Configuration' : 'URL'}
+                    {item.type === 'page' ? 'Page' : item.type === 'product' ? 'Product' : item.type === 'product_category' ? 'Category' : ['mega_menu', 'dropdown_product', 'dropdown_category', 'blog_list'].includes(item.type) ? 'Configuration' : 'URL'}
                   </label>
-                  {item.type === 'page' ? (
+                  {item.type === 'blog_list' ? (
+                    <div className="text-[12px] text-[#2271b1] font-mono py-[6px] font-bold">
+                      Auto-routes to /blog
+                    </div>
+                  ) : item.type === 'page' ? (
                     <select className={inputClass} value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
                       <option value="">— Select Page —</option>
                       <option value="/blog">Blog List (System Page)</option>

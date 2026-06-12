@@ -84,7 +84,11 @@ export default function CategoryBanner({
 
                 {/* Images */}
                 <div className="absolute inset-0 transition-transform duration-1000 group-hover:scale-105">
-                   <Image src={category.image} alt={category.name} fill className="object-cover" priority={index === 1} />
+                   {category.image ? (
+                      <Image src={category.image} alt={category.imageAlts?.[category.image] || category.name || "Category"} fill className="object-cover" priority={index === 1} />
+                   ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-neutral-800 to-neutral-900 flex items-center justify-center text-white/20 font-bold uppercase tracking-widest text-[11px]">No Image</div>
+                   )}
                 </div>
                 
                 {/* Overlay for Text Visibility */}

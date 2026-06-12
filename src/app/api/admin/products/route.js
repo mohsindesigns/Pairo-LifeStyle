@@ -24,7 +24,6 @@ export async function GET(req) {
     }
 
     const tenantId = searchParams.get('tenantId');
-    const isDeleted = searchParams.get('isDeleted') === 'true';
     
     let query = { isDeleted };
     if (tenantId) query.tenantId = tenantId;
@@ -56,10 +55,22 @@ export async function POST(req) {
         tenantId: data.tenantId || "DEFAULT_STORE"
     };
 
-    // Generate unique slug if not provided
-    if (!productData.slug && productData.name) {
-      productData.slug = productData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+    // Generate slug cleanly
+    let slug = productData.slug;
+    if (!slug && productData.name) {
+      slug = productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     }
+    if (!slug) slug = "product";
+    
+    // Ensure uniqueness within the tenant without appending suffixes unless a duplicate exists
+    let finalSlug = slug;
+    let counter = 1;
+    const tenantId = productData.tenantId || "DEFAULT_STORE";
+    while (await Product.findOne({ slug: finalSlug, tenantId })) {
+      finalSlug = `${slug}-${counter}`;
+      counter++;
+    }
+    productData.slug = finalSlug;
 
     const product = await Product.create(productData);
 
