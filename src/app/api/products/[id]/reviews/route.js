@@ -66,7 +66,7 @@ export async function GET(req, { params }) {
     const product = await Product.findOne({
       $or: [
         { _id: mongoose.isValidObjectId(paramId) ? paramId : null },
-        { id: parseInt(paramId) || -1 },
+        { id: /^\d+$/.test(paramId) ? parseInt(paramId) : -1 },
         { slug: paramId }
       ]
     }).select("_id rating reviewCount ratingBreakdown name").lean();
@@ -189,7 +189,7 @@ export async function POST(req, { params }) {
     const product = await Product.findOne({
       $or: [
         { _id: mongoose.isValidObjectId(paramId) ? paramId : null },
-        { id: parseInt(paramId) || -1 },
+        { id: /^\d+$/.test(paramId) ? parseInt(paramId) : -1 },
         { slug: paramId }
       ]
     }).select("_id name").lean();

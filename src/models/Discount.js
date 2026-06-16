@@ -11,7 +11,14 @@ const DiscountSchema = new mongoose.Schema({
   usageCount: { type: Number, default: 0 },
   usagePerUserLimit: { type: Number, default: 1 }, // Max times one user can use this
   isActive: { type: Boolean, default: true, index: true },
-  isDeleted: { type: Boolean, default: false, index: true }
+  isDeleted: { type: Boolean, default: false, index: true },
+  
+  // Advanced coupon conditions
+  firstOrderOnly: { type: Boolean, default: false },
+  userRegistrationRequired: { type: Boolean, default: false },
+  newsletterSubscribedOnly: { type: Boolean, default: false },
+  specificProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+  specificCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }]
 }, { timestamps: true });
 
 export default mongoose.models.Discount || mongoose.model('Discount', DiscountSchema);

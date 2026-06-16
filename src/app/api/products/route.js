@@ -1,5 +1,6 @@
 import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
+import mongoose from "mongoose";
 
 export async function GET(req) {
   try {
@@ -19,7 +20,17 @@ export async function GET(req) {
     const { getAltTextMap } = await import("@/lib/mediaUsage");
 
     if (id) {
-      const product = await Product.findOne({ ...baseQuery, id: parseInt(id) }).lean();
+      const isMongoId = mongoose.isValidObjectId(id);
+      const query = {
+        ...baseQuery,
+        $or: [
+          { id: /^\d+$/.test(id) ? parseInt(id) : -1 }
+        ]
+      };
+      if (isMongoId) {
+        query.$or.push({ _id: id });
+      }
+      const product = await Product.findOne(query).lean();
       if (product) {
         const altMap = await getAltTextMap([...(product.images || []), product.image]);
         product.imageAlts = altMap;

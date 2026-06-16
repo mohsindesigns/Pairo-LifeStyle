@@ -127,8 +127,10 @@ export async function PUT(req, { params }) {
     await review.save();
 
     // Trigger re-aggregation for product ratings
-    const { aggregateProductRatings } = await import("@/lib/review-aggregator");
-    await aggregateProductRatings(review.productId);
+    if (review.productId) {
+      const { aggregateProductRatings } = await import("@/lib/review-aggregator");
+      await aggregateProductRatings(review.productId);
+    }
 
     // Audit log (with resourceId parameter)
     await logAction(req, session, "MODERATE_REVIEW", "reviews", {
@@ -171,8 +173,10 @@ export async function DELETE(req, { params }) {
       await Review.findByIdAndDelete(id);
 
       // Trigger re-aggregation for product ratings
-      const { aggregateProductRatings } = await import("@/lib/review-aggregator");
-      await aggregateProductRatings(review.productId);
+      if (review.productId) {
+        const { aggregateProductRatings } = await import("@/lib/review-aggregator");
+        await aggregateProductRatings(review.productId);
+      }
 
       // Audit log (with resourceId parameter)
       await logAction(req, session, "PERMANENT_DELETE_REVIEW", "reviews", {
@@ -187,8 +191,10 @@ export async function DELETE(req, { params }) {
       await review.save();
 
       // Trigger re-aggregation for product ratings
-      const { aggregateProductRatings } = await import("@/lib/review-aggregator");
-      await aggregateProductRatings(review.productId);
+      if (review.productId) {
+        const { aggregateProductRatings } = await import("@/lib/review-aggregator");
+        await aggregateProductRatings(review.productId);
+      }
 
       // Audit log (with resourceId parameter)
       await logAction(req, session, "DELETE_REVIEW", "reviews", {

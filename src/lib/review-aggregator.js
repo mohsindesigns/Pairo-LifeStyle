@@ -48,6 +48,7 @@ async function serializeAggregation(productId, fn) {
  * @param {string|mongoose.Types.ObjectId} productId 
  */
 export async function aggregateProductRatings(productId) {
+  if (!productId) return;
   return serializeAggregation(productId, async () => {
     await dbConnect();
 

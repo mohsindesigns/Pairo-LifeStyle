@@ -8,12 +8,19 @@ import { useCart } from "@/context/CartContext";
 import { useRouter } from "next/navigation";
 
 export default function CheckoutPage() {
-  const { cartItems, cartSubtotal, clearCart } = useCart();
+  const { 
+    cartItems, 
+    cartSubtotal, 
+    clearCart,
+    appliedPromo,
+    discountTotal,
+    applyPromoCode,
+    removePromoCode
+  } = useCart();
   const [isProcessing, setIsProcessing] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const [applyingPromo, setApplyingPromo] = useState(false);
   const [promoError, setPromoError] = useState("");
-  const [discountData, setDiscountData] = useState(null);
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const router = useRouter();
 
@@ -24,27 +31,16 @@ export default function CheckoutPage() {
     });
   }, []);
 
-  const applyPromoCode = async () => {
+  const handleApplyPromo = async () => {
     if (!promoCode) return;
     setApplyingPromo(true);
     setPromoError("");
-    try {
-      const res = await fetch("/api/coupons/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: promoCode, cartSubtotal })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDiscountData(data);
-        setPromoCode("");
-      } else {
-        setPromoError(data.error);
-      }
-    } catch (err) {
-      setPromoError("Connection error");
-    } finally {
-      setApplyingPromo(false);
+    const res = await applyPromoCode(promoCode, formData.email);
+    setApplyingPromo(false);
+    if (res.success) {
+      setPromoCode("");
+    } else {
+      setPromoError(res.error);
     }
   };
   
@@ -60,8 +56,26 @@ export default function CheckoutPage() {
     customerNote: ""
   });
 
-  const shipping = 0; 
+  const FREE_SHIPPING_THRESHOLD = 500;
+  const shipping = cartSubtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 45; 
   const total = cartSubtotal + shipping;
+
+  // Debounced email-change promo code validation
+  useEffect(() => {
+    if (appliedPromo && formData.email) {
+      const delayDebounceFn = setTimeout(() => {
+        const revalidate = async () => {
+          setPromoError("");
+          const res = await applyPromoCode(appliedPromo.code, formData.email);
+          if (!res.success) {
+            setPromoError(`Coupon removed: ${res.error}`);
+          }
+        };
+        revalidate();
+      }, 500);
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [formData.email, appliedPromo?.code]);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -95,9 +109,9 @@ export default function CheckoutPage() {
           financials: {
             subtotal: cartSubtotal,
             shippingCost: shipping,
-            discountTotal: discountData?.discountAmount || 0,
-            total: total - (discountData?.discountAmount || 0),
-            promoCode: discountData?.code || null
+            discountTotal: discountTotal || 0,
+            total: total - (discountTotal || 0),
+            promoCode: appliedPromo?.code || null
           }
         })
       });
@@ -276,7 +290,7 @@ export default function CheckoutPage() {
 
               {/* Promo Form */}
               <div className="pt-6 border-t border-black/5 space-y-3">
-                 <div className="flex gap-2">
+                  <div className="flex gap-2">
                     <input 
                       type="text" 
                       placeholder="PROMO CODE" 
@@ -285,7 +299,7 @@ export default function CheckoutPage() {
                       onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                     />
                     <button 
-                      onClick={applyPromoCode}
+                      onClick={handleApplyPromo}
                       disabled={!promoCode || applyingPromo}
                       className="px-5 py-2.5 bg-black hover:bg-neutral-850 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 shrink-0"
                     >
@@ -293,10 +307,10 @@ export default function CheckoutPage() {
                     </button>
                  </div>
                  {promoError && <p className="text-[9px] text-red-500 font-bold ml-1 uppercase tracking-widest">{promoError}</p>}
-                 {discountData && (
+                 {appliedPromo && (
                    <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
-                      <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Code {discountData.code} Applied</span>
-                      <button onClick={() => setDiscountData(null)} className="text-[9px] font-bold text-emerald-600 hover:text-emerald-800 uppercase tracking-widest">Remove</button>
+                      <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">Code {appliedPromo.code} Applied</span>
+                      <button onClick={removePromoCode} className="text-[9px] font-bold text-emerald-600 hover:text-emerald-800 uppercase tracking-widest">Remove</button>
                    </div>
                  )}
               </div>
@@ -307,21 +321,23 @@ export default function CheckoutPage() {
                   <span>Subtotal</span>
                   <span className="text-black font-semibold">${(cartSubtotal || 0).toLocaleString()}</span>
                 </div>
-                {discountData && (
+                {discountTotal > 0 && (
                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-                    <span>Discount ({discountData.type === 'percentage' ? `${discountData.value}%` : 'Fixed'})</span>
-                    <span>-${discountData.discountAmount.toLocaleString()}</span>
+                    <span>Discount ({(appliedPromo?.type === 'percentage' || appliedPromo?.type === 'percentage_discount') ? `${appliedPromo?.value}%` : 'Fixed'})</span>
+                    <span>-${discountTotal.toLocaleString()}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-neutral-450">
                   <span>Shipping</span>
-                  <span className="text-emerald-600">Complimentary</span>
+                  <span className={shipping === 0 ? "text-emerald-600" : "text-black font-semibold"}>
+                    {shipping === 0 ? "Complimentary" : `$${shipping.toFixed(2)}`}
+                  </span>
                 </div>
                 
                 {/* Total */}
                 <div className="pt-6 flex justify-between items-end border-t border-black/5">
                    <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Total Amount</span>
-                   <span className="text-3xl font-bold tracking-tight">${(total - (discountData?.discountAmount || 0)).toLocaleString()}</span>
+                   <span className="text-3xl font-bold tracking-tight">${Math.max(0, total - discountTotal).toLocaleString()}</span>
                 </div>
               </div>
             </div>

@@ -10,6 +10,7 @@ import pairoEvents from "@/lib/events";
 import mongoose from "mongoose";
 import logger, { getContextLogger, LogCategory } from "@/lib/logger";
 import { NextResponse } from "next/server";
+import { validateLegacyDiscount, calculateEligibleSubtotal } from "@/lib/couponValidator";
 
 export async function POST(req) {
   let session = null;
@@ -53,11 +54,75 @@ export async function POST(req) {
                 }
             );
 
-            let finalAppliedPromotions = engineResults.appliedPromotions;
-            let finalDiscountTotal = engineResults.discountTotal;
+            let finalAppliedPromotions = engineResults.appliedPromotions || [];
+            let finalDiscountTotal = engineResults.discountTotal || 0;
+
+            // Fallback: Check for legacy discount if engine didn't find any match and a promo code was entered
+            if (finalAppliedPromotions.length === 0 && financials.promoCode) {
+                const legacyDiscount = await Discount.findOne({
+                    code: financials.promoCode.toUpperCase().trim(),
+                    isActive: true,
+                    isDeleted: false
+                }).session(session);
+
+                if (legacyDiscount) {
+                    const validation = await validateLegacyDiscount(legacyDiscount, {
+                        cartSubtotal: financials.subtotal,
+                        items,
+                        userId: authSession?.user?.id || null,
+                        email: customerEmail || authSession?.user?.email || null
+                    });
+
+                    if (!validation.valid) {
+                        throw new Error(validation.error);
+                    }
+
+                    const eligibleSubtotal = await calculateEligibleSubtotal(legacyDiscount, items);
+                    const amount = legacyDiscount.type === 'percentage'
+                        ? (eligibleSubtotal * legacyDiscount.value) / 100
+                        : legacyDiscount.value;
+
+                    finalDiscountTotal = Math.min(amount, eligibleSubtotal);
+                    
+                    // Increment legacy usageCount atomically
+                    if (legacyDiscount.usageLimit) {
+                        const updatedDiscount = await Discount.findOneAndUpdate(
+                            {
+                                _id: legacyDiscount._id,
+                                usageCount: { $lt: legacyDiscount.usageLimit }
+                            },
+                            { $inc: { usageCount: 1 } },
+                            { session, new: true }
+                        );
+                        if (!updatedDiscount) {
+                            throw new Error("Promo code usage limit has been reached.");
+                        }
+                    } else {
+                        await Discount.updateOne(
+                            { _id: legacyDiscount._id },
+                            { $inc: { usageCount: 1 } },
+                            { session }
+                        );
+                    }
+
+                    finalAppliedPromotions = [{
+                        promotionId: legacyDiscount._id,
+                        code: legacyDiscount.code,
+                        title: `Discount Code: ${legacyDiscount.code}`,
+                        type: legacyDiscount.type,
+                        value: legacyDiscount.value,
+                        discountAmount: finalDiscountTotal,
+                        explanation: `Legacy discount code ${legacyDiscount.code} applied`,
+                        isLegacy: true
+                    }];
+                } else {
+                    throw new Error("Promo code is invalid or no longer available.");
+                }
+            }
 
             // 3. Reserve Promotions
             for (const applied of finalAppliedPromotions) {
+                if (applied.isLegacy) continue;
                 const promoRes = await Promotion.findOneAndUpdate(
                     { 
                         _id: applied.promotionId,
@@ -124,6 +189,7 @@ export async function POST(req) {
                 customer: {
                     userId: authSession?.user?.id || null,
                     email: customerEmail || authSession?.user?.email,
+                    isGuest: !authSession?.user?.id,
                     ipAddress: req.headers.get("x-forwarded-for") || "unknown"
                 },
                 shippingAddress,

@@ -12,6 +12,7 @@ import { getOptimizedImage, getCloudinarySrcSet } from "@/lib/cloudinary";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 import Review from "@/models/Review";
+import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,13 @@ export async function generateMetadata({ params }) {
   const currentPath = `/product/${resolvedParams.id}`;
   await checkAndApplyRedirect(currentPath);
 
+  const idOrSlug = resolvedParams.id;
+  const isMongoId = mongoose.isValidObjectId(idOrSlug);
   const product = await Product.findOne({ 
     $or: [
-      { id: parseInt(resolvedParams.id) || -1 },
-      { slug: resolvedParams.id }
+      { _id: isMongoId ? idOrSlug : new mongoose.Types.ObjectId() },
+      { id: /^\d+$/.test(idOrSlug) ? parseInt(idOrSlug) : -1 },
+      { slug: idOrSlug }
     ]
   }).lean();
 
@@ -57,18 +61,23 @@ export default async function ProductDetailPage({ params }) {
   await dbConnect();
   let product;
   
-  const numericId = parseInt(paramId);
-  if (!isNaN(numericId)) {
-    product = await Product.findOne({ id: numericId, isDeleted: { $ne: true } })
-      .populate('categories')
-      .lean();
+  const isMongoId = mongoose.isValidObjectId(paramId);
+  const queryOr = [
+    { slug: paramId }
+  ];
+  if (/^\d+$/.test(paramId)) {
+    queryOr.push({ id: parseInt(paramId) });
   }
-  
-  if (!product) {
-    product = await Product.findOne({ slug: paramId, isDeleted: { $ne: true } })
-      .populate('categories')
-      .lean();
+  if (isMongoId) {
+    queryOr.push({ _id: paramId });
   }
+
+  product = await Product.findOne({ 
+    $or: queryOr,
+    isDeleted: { $ne: true } 
+  })
+    .populate('categories')
+    .lean();
 
   if (product) {
     const { getAltTextMap } = await import("@/lib/mediaUsage");

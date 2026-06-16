@@ -145,7 +145,7 @@ export async function POST(req) {
 
     // Fetch reviews to get productIds before updating/deleting (needed for aggregations)
     const reviewsToUpdate = await Review.find({ _id: { $in: ids } }).select("productId").lean();
-    const productIdsToReaggregate = [...new Set(reviewsToUpdate.map(r => r.productId.toString()))];
+    const productIdsToReaggregate = [...new Set(reviewsToUpdate.map(r => r.productId?.toString()).filter(Boolean))];
 
     let result;
     if (action === "delete_permanently") {

@@ -37,6 +37,40 @@ export function CartProvider({ children }) {
     }
   }, [cartItems, storageKey]);
 
+  const [appliedPromo, setAppliedPromo] = useState(null);
+
+  // Load promo code from localStorage when storageKey changes
+  useEffect(() => {
+    const savedPromo = localStorage.getItem(`pairo-promo-${storageKey}`);
+    Promise.resolve().then(() => {
+      if (savedPromo) {
+        try {
+          setAppliedPromo(JSON.parse(savedPromo));
+        } catch (e) {
+          setAppliedPromo(null);
+        }
+      } else {
+        setAppliedPromo(null);
+      }
+    });
+  }, [storageKey]);
+
+  // Save promo code to localStorage when it changes
+  useEffect(() => {
+    if (appliedPromo) {
+      localStorage.setItem(`pairo-promo-${storageKey}`, JSON.stringify(appliedPromo));
+    } else {
+      localStorage.removeItem(`pairo-promo-${storageKey}`);
+    }
+  }, [appliedPromo, storageKey]);
+
+  // Clear promo if cart is empty
+  useEffect(() => {
+    if (cartItems.length === 0) {
+      setAppliedPromo(null);
+    }
+  }, [cartItems]);
+
   const addToCart = (product, openDrawer = true) => {
     const normalizedProduct = {
       ...product,
@@ -96,8 +130,74 @@ export function CartProvider({ children }) {
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartSubtotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
 
+  // Re-validate coupon code automatically when cart items or subtotal changes
+  useEffect(() => {
+    if (appliedPromo && cartItems.length > 0) {
+      const revalidatePromo = async () => {
+        try {
+          const res = await fetch("/api/coupons/validate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code: appliedPromo.code, cartSubtotal, items: cartItems })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setAppliedPromo(data);
+          } else {
+            // If it becomes invalid (e.g. minSpend not met), clear the promo
+            setAppliedPromo(null);
+          }
+        } catch (err) {
+          console.error("Failed to re-validate promo on cart change", err);
+        }
+      };
+      revalidatePromo();
+    }
+  }, [cartItems, cartSubtotal]);
+
+  // Dynamic discount calculation
+  const discountTotal = (() => {
+    if (!appliedPromo) return 0;
+    
+    // Use server-calculated amount directly when available
+    if (appliedPromo.discountAmount !== undefined && appliedPromo.discountAmount !== null) {
+      return Math.min(appliedPromo.discountAmount, cartSubtotal);
+    }
+    
+    if (appliedPromo.type === "percentage" || appliedPromo.type === "percentage_discount") {
+      return (cartSubtotal * appliedPromo.value) / 100;
+    } else {
+      return Math.min(appliedPromo.value, cartSubtotal);
+    }
+  })();
+
+  const applyPromoCode = async (code, email = null) => {
+    if (!code) return { success: false, error: "No code provided" };
+    try {
+      const res = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, cartSubtotal, items: cartItems, email })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppliedPromo(data);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (err) {
+      return { success: false, error: "Connection error" };
+    }
+  };
+
+  const removePromoCode = () => {
+    setAppliedPromo(null);
+  };
+
   const clearCart = () => {
     setCartItems([]);
+    setAppliedPromo(null);
   };
 
   return (
@@ -112,6 +212,10 @@ export function CartProvider({ children }) {
         cartCount,
         cartSubtotal,
         clearCart,
+        appliedPromo,
+        discountTotal,
+        applyPromoCode,
+        removePromoCode
       }}
     >
       {children}
