@@ -15,7 +15,7 @@ export default function AboutHero({
   marqueeEnabled = "true",
   marqueeItems 
 }) {
-  const items = marqueeItems?.length > 0 ? marqueeItems.map(i => i.text) : undefined;
+  const items = marqueeItems?.length > 0 ? marqueeItems : undefined;
 
   return (
     <section className="relative h-[550px] md:h-[650px] lg:h-[750px] overflow-hidden mx-4 md:mx-8 my-6 rounded-[32px] md:rounded-[40px] shadow-2xl bg-black">

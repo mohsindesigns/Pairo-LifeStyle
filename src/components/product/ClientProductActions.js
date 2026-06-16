@@ -53,7 +53,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
     }
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (openDrawer = true) => {
     if (product.productType === "variable") {
       const missingAttrs = attributes.filter(attr => !selectedOptions[attr.name]);
       if (missingAttrs.length > 0) {
@@ -89,7 +89,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
         image,
         sku,
         selectedOptions
-      });
+      }, openDrawer);
     }
     setAddedFeedback(true);
     setTimeout(() => setAddedFeedback(false), 1800);
@@ -103,7 +103,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
         return;
       }
     }
-    handleAddToCart();
+    handleAddToCart(false);
     router.push("/checkout");
   };
 

@@ -125,19 +125,6 @@ export default function BlogSection({
                 <BlogCard post={post} readMoreLabel={blogsConfig.readMore} />
               </div>
             ))}
-            <div className="w-[75vw] sm:w-[45vw] md:w-[35vw] lg:w-[22.5vw] shrink-0 snap-start">
-               <div className="h-full bg-black text-white p-8 md:p-10 rounded-[16px] md:rounded-[24px] flex flex-col justify-between relative overflow-hidden group min-h-[300px] md:min-h-[400px]">
-                  <div className="relative z-10 space-y-4">
-                     <span className="text-white/40 text-[9px] font-bold uppercase tracking-[0.4em]">{blogsConfig.featuredProduct.label}</span>
-                     <h3 className="text-xl md:text-2xl font-bold heading-font uppercase leading-tight">{blogsConfig.featuredProduct.name}</h3>
-                     <p className="text-white/50 text-[10px] md:text-sm line-clamp-3">{blogsConfig.featuredProduct.description}</p>
-                  </div>
-                  <Link href={`/product/${blogsConfig.featuredProduct.id}`} className="relative z-10 flex items-center justify-center gap-3 w-full bg-white text-black py-3.5 md:py-4 rounded-lg md:rounded-xl font-bold text-[8px] md:text-[10px] uppercase tracking-[0.2em] hover:bg-gray-100 transition-all shadow-xl active:scale-95">
-                    {blogsConfig.featuredProduct.buttonText}<ArrowRight className="w-4 h-4" />
-                  </Link>
-                  <div className="absolute -bottom-6 -right-6 w-32 h-32 md:w-48 md:h-48 opacity-20 group-hover:scale-110 transition-transform duration-1000"><Image src={blogsConfig.featuredProduct.image || "/placeholder.jpg"} alt="Featured" fill className="object-cover rounded-[16px]" /></div>
-               </div>
-            </div>
           </div>
         </div>
       </div>

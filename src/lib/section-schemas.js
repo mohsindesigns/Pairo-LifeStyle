@@ -117,7 +117,8 @@ export const SECTION_SCHEMAS = {
         { label: "No", value: "false" }
       ]},
       { name: "marqueeItems", label: "Marquee Items", type: "repeater", fields: [
-        { name: "text", label: "Item Text", type: "text" }
+        { name: "text", label: "Item Text", type: "text" },
+        { name: "icon", label: "Icon Name", type: "icon" }
       ]}
     ]
   },
@@ -183,7 +184,16 @@ export const SECTION_SCHEMAS = {
       { name: "subtitle", label: "Hero Subtitle", type: "textarea" },
       { name: "label", label: "Hero Label (Badge)", type: "text" },
       { name: "image", label: "Background Image", type: "image" },
-      { name: "buttonText", label: "CTA Button Text", type: "text" }
+      { name: "buttonText", label: "CTA Button Text", type: "text" },
+      { name: "link", label: "Button Link (URL or ID)", type: "text" },
+      { name: "marqueeEnabled", label: "Enable Marquee", type: "select", options: [
+        { label: "Yes", value: "true" },
+        { label: "No", value: "false" }
+      ]},
+      { name: "marqueeItems", label: "Marquee Items", type: "repeater", fields: [
+        { name: "text", label: "Item Text", type: "text" },
+        { name: "icon", label: "Icon Name", type: "icon" }
+      ]}
     ]
   },
   contact_section: {

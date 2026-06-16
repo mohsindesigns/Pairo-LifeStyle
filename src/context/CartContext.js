@@ -37,7 +37,7 @@ export function CartProvider({ children }) {
     }
   }, [cartItems, storageKey]);
 
-  const addToCart = (product) => {
+  const addToCart = (product, openDrawer = true) => {
     const normalizedProduct = {
       ...product,
       id: product.id || product._id,
@@ -65,7 +65,9 @@ export function CartProvider({ children }) {
       }
       return [...prevItems, { ...normalizedProduct, quantity: 1 }];
     });
-    setIsCartOpen(true);
+    if (openDrawer) {
+      setIsCartOpen(true);
+    }
   };
 
   const removeFromCart = (uniqueKey) => {

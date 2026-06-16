@@ -113,17 +113,10 @@ export default function ProductCard({ product }) {
               )}
            </div>
 
-           <div className="flex items-center gap-1 md:gap-1.5">
-              <div className="flex items-center gap-0.5">
-                {[...Array(5)].map((_, i) => (
-                   <Star 
-                     key={i} 
-                     className={`w-2 md:w-2.5 h-2 md:h-2.5 ${i < Math.floor(product.rating || 5) ? 'fill-[#FFC633] text-[#FFC633]' : 'fill-black/10 text-black/10'}`} 
-                   />
-                ))}
-              </div>
-              <span className="text-[8px] md:text-[9px] font-bold text-black/50 uppercase tracking-tighter">
-                ({product.reviewsCount || 45} Reviews)
+           <div className="flex items-center gap-1">
+              <Star className="w-2.5 h-2.5 fill-[#FFC633] text-[#FFC633]" />
+              <span className="text-[9px] font-normal text-black/50">
+                {(product.rating || 5).toFixed(1)} ({product.reviewsCount || 45})
               </span>
            </div>
         </div>

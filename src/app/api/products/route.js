@@ -32,7 +32,7 @@ export async function GET(req) {
     if (type) query.type = type;
 
     const products = await Product.find(query)
-      .select('name slug price compareAtPrice images categories rating reviewsCount isFeatured type status')
+      .select('name slug price compareAtPrice images categories rating reviewsCount isFeatured type status attributes variantCombinations')
       .sort({ createdAt: -1 })
       .lean();
     

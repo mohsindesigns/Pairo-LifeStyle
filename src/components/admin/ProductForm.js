@@ -172,7 +172,23 @@ export default function ProductForm({ productId = null }) {
       setSaving(true);
       // Auto-generate slug from name if still empty
       const finalSlug = formData.slug ? formData.slug : toSlug(formData.name);
-      const normalizedData = { ...formData, slug: finalSlug };
+      
+      // Synchronize parent prices and stock to combinations for variable products
+      let updatedCombinations = formData.variantCombinations || [];
+      if (formData.productType === "variable") {
+         updatedCombinations = updatedCombinations.map(comb => ({
+            ...comb,
+            price: formData.price !== "" && formData.price !== undefined && formData.price !== null ? Number(formData.price) : undefined,
+            compareAtPrice: formData.compareAtPrice !== "" && formData.compareAtPrice !== undefined && formData.compareAtPrice !== null ? Number(formData.compareAtPrice) : undefined,
+            stock: formData.stock !== "" && formData.stock !== undefined && formData.stock !== null ? Number(formData.stock) : 0
+         }));
+      }
+
+      const normalizedData = { 
+         ...formData, 
+         slug: finalSlug,
+         variantCombinations: updatedCombinations
+      };
       try {
          const payload = productId ? { ...normalizedData, id: productId } : normalizedData;
          const res = await fetch("/api/admin/products", {
@@ -467,24 +483,20 @@ export default function ProductForm({ productId = null }) {
                            <div className="flex-1 p-8 bg-white overflow-y-auto">
                               {activeTab === "general" && (
                                  <div className="space-y-4 max-w-xl">
-                                    {formData.productType === "simple" && (
-                                       <>
-                                          <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                             <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Regular price</label>
-                                             <div className="flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
-                                                <span className="text-gray-400 text-[13px]">$</span>
-                                                <input className="w-full bg-transparent text-[14px] outline-none" placeholder="0.00" value={formData.compareAtPrice} onChange={(e) => setFormData({ ...formData, compareAtPrice: e.target.value })} />
-                                             </div>
-                                          </div>
-                                          <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                             <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Sale price</label>
-                                             <div className="flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
-                                                <span className="text-gray-400 text-[13px] font-bold">$</span>
-                                                <input className="w-full bg-transparent text-[14px] outline-none font-bold" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} />
-                                             </div>
-                                          </div>
-                                       </>
-                                    )}
+                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Regular price</label>
+                                       <div className="flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
+                                          <span className="text-gray-400 text-[13px]">$</span>
+                                          <input className="w-full bg-transparent text-[14px] outline-none" placeholder="0.00" value={formData.compareAtPrice} onChange={(e) => setFormData({ ...formData, compareAtPrice: e.target.value })} />
+                                       </div>
+                                    </div>
+                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Sale price</label>
+                                       <div className="flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
+                                          <span className="text-gray-400 text-[13px] font-bold">$</span>
+                                          <input className="w-full bg-transparent text-[14px] outline-none font-bold" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} />
+                                       </div>
+                                    </div>
                                     <div className="flex items-center gap-6 py-2 border-b border-gray-50">
                                        <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Shipping Type</label>
                                        <select className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" value={formData.shippingType} onChange={(e) => setFormData({ ...formData, shippingType: e.target.value })}>
@@ -572,9 +584,6 @@ export default function ProductForm({ productId = null }) {
                                                    <tr>
                                                       <th className="px-4 py-3">IMG</th>
                                                       <th className="px-4 py-3">Variant</th>
-                                                      <th className="px-4 py-3">Reg. Price</th>
-                                                      <th className="px-4 py-3">Sale Price</th>
-                                                      <th className="px-4 py-3">Stock</th>
                                                       <th className="px-4 py-3"></th>
                                                    </tr>
                                                 </thead>
@@ -583,9 +592,6 @@ export default function ProductForm({ productId = null }) {
                                                       <tr key={cIdx} className="border-b border-gray-100">
                                                          <td className="px-4 py-2"><InlinePick value={comb.image} onChange={url=>{ const n=[...formData.variantCombinations]; n[cIdx].image=url; setFormData({...formData,variantCombinations:n}); }} /></td>
                                                          <td className="px-4 py-2 font-bold">{comb.title}</td>
-                                                         <td className="px-4 py-2"><input className="w-20 border border-gray-200 p-1" type="number" placeholder="0.00" value={comb.compareAtPrice || ''} onChange={e=>{ const n=[...formData.variantCombinations]; n[cIdx].compareAtPrice=e.target.value; setFormData({...formData,variantCombinations:n}); }} /></td>
-                                                         <td className="px-4 py-2"><input className="w-20 border border-gray-200 p-1 font-bold" type="number" placeholder="0.00" value={comb.price} onChange={e=>{ const n=[...formData.variantCombinations]; n[cIdx].price=e.target.value; setFormData({...formData,variantCombinations:n}); }} /></td>
-                                                         <td className="px-4 py-2"><input className="w-16 border border-gray-200 p-1" type="number" value={comb.stock} onChange={e=>{ const n=[...formData.variantCombinations]; n[cIdx].stock=e.target.value; setFormData({...formData,variantCombinations:n}); }} /></td>
                                                          <td className="px-4 py-2"><button type="button" onClick={()=>setFormData({...formData,variantCombinations:formData.variantCombinations.filter((_,i)=>i!==cIdx)})}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button></td>
                                                       </tr>
                                                    ))}

@@ -18,7 +18,14 @@ export async function generateMetadata({ searchParams }) {
     const currentPath = `/shop?category=${categorySlug}`;
     await checkAndApplyRedirect(currentPath);
 
-    const category = await Category.findOne({ slug: categorySlug, type: "product" }).lean();
+    const mongoose = require('mongoose');
+    let category;
+    if (mongoose.Types.ObjectId.isValid(categorySlug)) {
+      category = await Category.findOne({ _id: categorySlug, type: "product" }).lean();
+    } else {
+      category = await Category.findOne({ slug: categorySlug, type: "product" }).lean();
+    }
+
     if (category) {
       const { metadata } = resolveSEOMetadata({
         entity: category,

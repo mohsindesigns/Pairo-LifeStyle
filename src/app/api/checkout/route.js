@@ -100,6 +100,7 @@ export async function POST(req) {
                     productId: product._id,
                     name: product.name,
                     sku: product.sku,
+                    image: item.image || product.images?.[0] || product.image,
                     priceAtPurchase: item.price,
                     quantity: item.quantity
                 });

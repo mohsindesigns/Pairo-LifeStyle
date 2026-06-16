@@ -48,20 +48,35 @@ export async function resolvePageSections(sections) {
       }
 
       // Resolve Banner Feature Data
-      if (section.type === 'banner_feature' && config.productId) {
-         const mongoose = require('mongoose');
-         const query = { isDeleted: false };
-         if (mongoose.Types.ObjectId.isValid(config.productId)) {
-            query._id = config.productId;
-         } else {
-            query.slug = config.productId;
+      if (section.type === 'banner_feature') {
+         if (config.productId) {
+            const mongoose = require('mongoose');
+            const query = { isDeleted: false };
+            if (mongoose.Types.ObjectId.isValid(config.productId)) {
+               query._id = config.productId;
+            } else {
+               query.slug = config.productId;
+            }
+            const product = await Product.findOne(query).lean();
+            if (product) {
+               const { getAltTextMap } = await import("@/lib/mediaUsage");
+               const altMap = await getAltTextMap([...(product.images || []), product.image]);
+               product.imageAlts = altMap;
+               config.product = JSON.parse(JSON.stringify(product));
+            }
          }
-         const product = await Product.findOne(query).lean();
-         if (product) {
-            const { getAltTextMap } = await import("@/lib/mediaUsage");
-            const altMap = await getAltTextMap([...(product.images || []), product.image]);
-            product.imageAlts = altMap;
-            config.product = JSON.parse(JSON.stringify(product));
+         if (config.collectionId) {
+            const mongoose = require('mongoose');
+            const query = { isDeleted: false };
+            if (mongoose.Types.ObjectId.isValid(config.collectionId)) {
+               query._id = config.collectionId;
+            } else {
+               query.slug = config.collectionId;
+            }
+            const category = await Category.findOne(query).lean();
+            if (category) {
+               config.collectionId = category.slug;
+            }
          }
       }
 

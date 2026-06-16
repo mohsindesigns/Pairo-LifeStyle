@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
+import Product from "@/models/Product";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
@@ -17,13 +18,21 @@ export async function GET(req, { params }) {
     const order = await Order.findOne({ 
       _id: id, 
       "customer.userId": session.user.id 
-    });
+    }).populate('items.productId', 'images image').lean();
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, order });
+    const enrichedOrder = {
+      ...order,
+      items: (order.items || []).map(item => ({
+        ...item,
+        image: item.image || item.productId?.images?.[0] || item.productId?.image || "/images/placeholder.jpg"
+      }))
+    };
+
+    return NextResponse.json({ success: true, order: enrichedOrder });
 
   } catch (error) {
     console.error("Profile Order Fetch Error:", error);
