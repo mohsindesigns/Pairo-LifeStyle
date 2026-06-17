@@ -40,13 +40,13 @@ export default function ClientTabSystem({ product }) {
                <motion.div key="details" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="max-w-4xl space-y-12">
                   <div>
                      <div 
-                        className="text-primary/70 text-sm md:text-base leading-relaxed font-normal prose-custom max-w-none"
-                        dangerouslySetInnerHTML={{ __html: product.description || "Detailed overview coming soon..." }}
-                      />
+                         className="text-primary/85 text-base md:text-lg leading-loose font-normal prose-custom max-w-none"
+                         dangerouslySetInnerHTML={{ __html: product.description || "Detailed overview coming soon..." }}
+                       />
                   </div>
 
                   {/* Technical Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pt-12 border-t border-black/5">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pt-8 border-t border-black/5">
                      {[
                         { l: "SKU Identifier", v: product.sku || "N/A" },
                         { l: "Department", v: product.categories?.[0]?.name || product.category || "General" },
@@ -54,8 +54,8 @@ export default function ClientTabSystem({ product }) {
                         { l: "Logistics", v: product.shippingType || "Express" }
                      ].map((s, i) => (
                         <div key={i} className="space-y-1.5">
-                           <p className="text-[8px] font-medium text-primary/60 uppercase tracking-widest">{s.l}</p>
-                           <p className="text-[11px] font-medium uppercase text-primary tracking-wider">{s.v}</p>
+                           <p className="text-[9px] font-semibold text-primary/60 uppercase tracking-widest">{s.l}</p>
+                           <p className="text-xs font-semibold uppercase text-primary tracking-wider">{s.v}</p>
                         </div>
                      ))}
                   </div>
@@ -102,7 +102,7 @@ export default function ClientTabSystem({ product }) {
                                   transition={{ duration: 0.25, ease: "easeInOut" }}
                                 >
                                   <div className="px-5 pb-6 pl-17 md:px-6 md:pb-8 md:pl-18 border-t border-border/30 pt-4">
-                                     <p className="text-primary/70 font-normal text-xs md:text-sm leading-relaxed tracking-normal max-w-2xl">
+                                     <p className="text-primary/85 font-normal text-sm md:text-base leading-loose tracking-normal max-w-2xl">
                                        {faq.answer}
                                      </p>
                                   </div>
@@ -125,17 +125,19 @@ export default function ClientTabSystem({ product }) {
       </div>
 
       <style jsx global>{`
-        .prose-custom > * { margin-top: 0; margin-bottom: 1.25rem; }
+        .prose-custom > * { margin-top: 0; margin-bottom: 1.5rem; }
         .prose-custom > *:last-child { margin-bottom: 0; }
-        .prose-custom h1 { font-size: 1.5rem; font-weight: 600; line-height: 1.2; margin-top: 2rem; color: var(--primary); }
-        .prose-custom h2 { font-size: 1.25rem; font-weight: 600; line-height: 1.3; margin-top: 1.5rem; color: var(--primary); }
-        .prose-custom p { margin-bottom: 1rem; line-height: 1.7; color: var(--primary); opacity: 0.7; }
-        .prose-custom ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 1rem; }
-        .prose-custom ol { list-style-type: decimal; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 1rem; }
-        .prose-custom li { margin-bottom: 0.25rem; color: var(--primary); opacity: 0.7; }
+        .prose-custom h1 { font-size: 1.6rem; font-weight: 700; line-height: 1.25; margin-top: 2.5rem; color: var(--primary); opacity: 1; }
+        .prose-custom h2 { font-size: 1.3rem; font-weight: 700; line-height: 1.3; margin-top: 2rem; color: var(--primary); opacity: 1; }
+        .prose-custom h3 { font-size: 1.1rem; font-weight: 600; line-height: 1.4; margin-top: 1.5rem; color: var(--primary); opacity: 0.9; }
+        .prose-custom p { font-size: 1rem; margin-bottom: 1.25rem; line-height: 1.9; color: var(--primary); opacity: 0.85; }
+        .prose-custom ul { list-style-type: disc; padding-left: 1.75rem; margin-top: 0.75rem; margin-bottom: 1.25rem; }
+        .prose-custom ol { list-style-type: decimal; padding-left: 1.75rem; margin-top: 0.75rem; margin-bottom: 1.25rem; }
+        .prose-custom li { margin-bottom: 0.5rem; font-size: 1rem; line-height: 1.8; color: var(--primary); opacity: 0.85; }
         .prose-custom li p { margin-bottom: 0 !important; margin-top: 0 !important; }
-        .prose-custom blockquote { border-left: 2px solid var(--border); padding-left: 1.5rem; font-style: italic; color: var(--primary); opacity: 0.7; margin: 2rem 0; }
-        .prose-custom strong { font-weight: 600; color: var(--primary); }
+        .prose-custom blockquote { border-left: 3px solid var(--primary); padding: 0.75rem 1.5rem; font-style: italic; color: var(--primary); opacity: 0.8; margin: 2rem 0; background: rgba(0,0,0,0.02); border-radius: 0 4px 4px 0; }
+        .prose-custom strong { font-weight: 700; color: var(--primary); opacity: 1; }
+        .prose-custom em { font-style: italic; color: var(--primary); opacity: 0.85; }
         .prose-custom *:first-child { margin-top: 0 !important; }
       `}</style>
     </div>

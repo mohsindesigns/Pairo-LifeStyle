@@ -274,11 +274,11 @@ export default function CheckoutPage() {
                       </div>
                       <div className="flex-1 space-y-1 min-w-0">
                          {/* Reduced Product Title Size - Premium Shopify Plus style */}
-                         <p className="text-[11px] font-bold text-foreground uppercase tracking-wider truncate">{item.name}</p>
-                         <p className="text-[9px] text-foreground/50 font-bold uppercase">
+                         <p className="text-xs font-bold text-foreground uppercase tracking-wider truncate">{item.name}</p>
+                         <p className="text-[10px] text-foreground/65 font-bold uppercase">
                            Qty {item.quantity} / {item.selectedOptions ? Object.values(item.selectedOptions).join(" / ") : "Standard"}
                          </p>
-                         <p className="text-[11px] font-bold tracking-tight text-foreground mt-1">
+                         <p className="text-xs font-bold tracking-tight text-foreground mt-1">
                            ${(item.price * item.quantity).toLocaleString()}
                          </p>
                       </div>
@@ -316,7 +316,7 @@ export default function CheckoutPage() {
 
               {/* Totals Breakdown */}
               <div className="space-y-3 pt-6 border-t border-border/80">
-                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-foreground/50">
+                <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-widest text-foreground/70">
                   <span>Subtotal</span>
                   <span className="text-foreground font-semibold">${(cartSubtotal || 0).toLocaleString()}</span>
                 </div>
@@ -326,7 +326,7 @@ export default function CheckoutPage() {
                     <span>-${discountTotal.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-foreground/50">
+                <div className="flex justify-between items-center text-[11px] font-bold uppercase tracking-widest text-foreground/70">
                   <span>Shipping</span>
                   <span className="text-emerald-600 font-semibold">
                     Free
