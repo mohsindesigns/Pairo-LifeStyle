@@ -40,26 +40,26 @@ export default function CartPage() {
     return (
       <div className="min-h-[75vh] flex flex-col items-center justify-center space-y-10 px-6 relative overflow-hidden bg-white">
         {/* Soft background glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/[0.02] rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/[0.04] rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative group">
           {/* Decorative blur glow */}
-          <div className="absolute inset-0 bg-primary/5 rounded-full blur-xl scale-110 group-hover:scale-125 transition-transform duration-500 ease-out" />
+          <div className="absolute inset-0 bg-primary/10 rounded-full blur-xl scale-110 group-hover:scale-125 transition-transform duration-500 ease-out" />
           <div className="relative w-24 h-24 bg-white border border-border rounded-full flex items-center justify-center shadow-lg transition-transform duration-500 hover:rotate-6">
-            <ShoppingBag className="w-9 h-9 text-primary/40 group-hover:text-primary transition-colors duration-500" />
+            <ShoppingBag className="w-9 h-9 text-primary/60 group-hover:text-primary transition-colors duration-500" />
           </div>
         </div>
 
         <div className="text-center space-y-4 max-w-sm relative z-10">
-          <p className="text-xl md:text-2xl font-bold heading-font uppercase tracking-tight text-primary">Your Bag is Empty</p>
-          <p className="text-primary/50 text-xs md:text-sm leading-relaxed max-w-xs mx-auto">
+          <p className="text-xl md:text-2xl font-bold heading-font uppercase tracking-tight text-foreground">Your Bag is Empty</p>
+          <p className="text-foreground/60 text-xs md:text-sm leading-relaxed max-w-xs mx-auto">
             Looks like you haven&apos;t added any handcrafted shearling jacket to your collection yet.
           </p>
         </div>
 
         <Link 
           href="/" 
-          className="group relative overflow-hidden bg-primary text-white px-10 py-4 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all duration-300 shadow-xl hover:scale-[1.03] active:scale-95 flex items-center gap-2.5 z-10"
+          className="group relative overflow-hidden bg-primary text-background px-10 py-4 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all duration-300 shadow-xl hover:scale-[1.03] active:scale-95 flex items-center gap-2.5 z-10"
         >
           <span className="relative z-10">Explore Collection</span>
           <ArrowRight className="w-3.5 h-3.5 relative z-10 transition-transform duration-300 group-hover:translate-x-1" />

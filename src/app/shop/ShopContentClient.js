@@ -475,8 +475,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   const renderFilterSections = (isMobile = false) => (
     <div className="space-y-10">
       {/* Search Bar */}
-      <div className="pb-8 border-b border-black/5">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-black/30 mb-4">Search</h4>
+      <div className="pb-8 border-b border-border">
+        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-4">Search</h4>
         <div className="relative">
           <input
             type="text"
@@ -486,30 +486,30 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               setCurrentPage(1);
             }}
             placeholder="Search products..."
-            className="w-full px-4 py-3 text-sm border border-black/10 rounded-lg focus:outline-none focus:border-black/30 transition-all"
+            className="w-full px-4 py-3 text-sm border border-foreground/15 rounded-lg focus:outline-none focus:border-foreground/40 text-foreground placeholder-foreground/40 transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-black/5 rounded-full"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-foreground/5 rounded-full"
             >
-              <X className="w-4 h-4 text-black/40" />
+              <X className="w-4 h-4 text-foreground/50" />
             </button>
           )}
         </div>
       </div>
 
       {/* Categories */}
-      <div className="pb-8 border-b border-black/5">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-black/30 mb-6">Categories</h4>
+      <div className="pb-8 border-b border-border">
+        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">Categories</h4>
         <div className="flex flex-col gap-3 text-xs">
           <button 
             type="button"
             onClick={() => handleCategorySelect("")}
-            className={`flex items-center justify-between py-1 w-full text-left transition-all ${!selectedCategory ? "font-bold text-black" : "text-black/50 hover:text-black"}`}
+            className={`flex items-center justify-between py-1 w-full text-left transition-all ${!selectedCategory ? "font-bold text-foreground" : "text-foreground/65 hover:text-foreground"}`}
           >
             <span>All Products</span>
-            <span className="text-black/30 text-[10px]">{products.length}</span>
+            <span className="text-foreground/50 text-[10px]">{products.length}</span>
           </button>
           {allCategories.map((cat) => {
             const dbCat = dbCategories.find(c => c.name.toLowerCase() === cat.toLowerCase());
@@ -526,10 +526,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   handleCategorySelect(dbCat ? dbCat.slug : cat.toLowerCase());
                   if (isMobile) setShowFilters(false);
                 }}
-                className={`flex items-center justify-between py-1 w-full text-left transition-all ${isSelected ? "font-bold text-black" : "text-black/50 hover:text-black"}`}
+                className={`flex items-center justify-between py-1 w-full text-left transition-all ${isSelected ? "font-bold text-foreground" : "text-foreground/65 hover:text-foreground"}`}
               >
                 <span>{cat}</span>
-                <span className="text-black/30 text-[10px]">
+                <span className="text-foreground/50 text-[10px]">
                   {products.filter(p => {
                     const pCat = p.category || '';
                     const pCats = p.categories || [];
@@ -545,8 +545,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       </div>
 
       {/* Product Types */}
-      <div className="pb-8 border-b border-black/5">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-black/30 mb-6">Product Type</h4>
+      <div className="pb-8 border-b border-border">
+        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">Product Type</h4>
         <div className="flex flex-wrap gap-2">
           {dynamicProductTypes.map((type) => (
             <button
@@ -555,8 +555,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               onClick={() => toggleType(type)}
               className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${
                 selectedTypes.includes(type) 
-                  ? "bg-black text-white border-black" 
-                  : "bg-transparent text-black/40 border-black/10 hover:border-black hover:text-black"
+                  ? "bg-foreground text-background border-foreground" 
+                  : "bg-transparent text-foreground/65 border-border hover:border-foreground/30 hover:text-foreground"
               }`}
             >
               {type}
@@ -569,33 +569,33 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       </div>
 
       {/* Price Range */}
-      <div className="pb-8 border-b border-black/5">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-black/30 mb-6">
+      <div className="pb-8 border-b border-border">
+        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">
           Price Range
-          <span className="ml-2 text-black">${priceLimits.min} - ${sliderValue}</span>
+          <span className="ml-2 text-foreground">${priceLimits.min} - ${sliderValue}</span>
         </h4>
         <input 
           type="range" 
-          className="w-full accent-black cursor-pointer" 
+          className="w-full accent-primary cursor-pointer" 
           min={priceLimits.min} 
           max={priceLimits.max} 
           step={10} 
           value={sliderValue} 
           onChange={(e) => setSliderValue(parseInt(e.target.value))} 
         />
-        <div className="flex justify-between text-[10px] font-bold mt-3 text-black/40">
+        <div className="flex justify-between text-[10px] font-bold mt-3 text-foreground/50">
           <span>${priceLimits.min}</span>
-          <span className="text-black font-bold">${sliderValue}</span>
+          <span className="text-foreground font-bold">${sliderValue}</span>
           <span>${priceLimits.max}</span>
         </div>
       </div>
 
       {/* Colors */}
-      <div className="pb-8 border-b border-black/5">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-black/30 mb-6">
+      <div className="pb-8 border-b border-border">
+        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">
           Colors
           {selectedColors.length > 0 && (
-            <span className="ml-2 text-black">({selectedColors.length})</span>
+            <span className="ml-2 text-foreground">({selectedColors.length})</span>
           )}
         </h4>
         <div className="flex flex-wrap gap-3">
@@ -629,8 +629,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                 <div 
                   className={`w-8 h-8 rounded-full border transition-all ${
                     selectedColors.includes(color) 
-                      ? "ring-2 ring-black ring-offset-2 scale-110" 
-                      : "border-black/10 hover:scale-110"
+                      ? "ring-2 ring-primary ring-offset-2 scale-110" 
+                      : "border-border hover:scale-110"
                   }`} 
                   style={{ 
                     backgroundColor: image ? 'transparent' : backgroundColor,
@@ -639,10 +639,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   }} 
                 >
                   {selectedColors.includes(color) && (
-                    <Check className={`w-4 h-4 m-auto ${color === 'White' || color === 'Tan' ? 'text-black' : 'text-white'}`} />
+                    <Check className={`w-4 h-4 m-auto ${color === 'White' || color === 'Tan' ? 'text-foreground' : 'text-background'}`} />
                   )}
                 </div>
-                <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[8px] font-bold text-black/40 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[8px] font-bold text-foreground/75 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                   {color}
                 </span>
               </button>
@@ -652,11 +652,11 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       </div>
 
       {/* Sizes */}
-      <div className="pb-8 border-b border-black/5">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-black/30 mb-6">
+      <div className="pb-8 border-b border-border">
+        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">
           Sizes
           {selectedSizes.length > 0 && (
-            <span className="ml-2 text-black">({selectedSizes.length})</span>
+            <span className="ml-2 text-foreground">({selectedSizes.length})</span>
           )}
         </h4>
         <div className="flex flex-wrap gap-2">
@@ -667,8 +667,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               onClick={() => toggleSize(size)} 
               className={`px-5 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${
                 selectedSizes.includes(size) 
-                  ? "bg-black text-white border-black" 
-                  : "bg-transparent text-black/40 border-black/10 hover:border-black hover:text-black"
+                  ? "bg-foreground text-background border-foreground" 
+                  : "bg-transparent text-foreground/65 border-border hover:border-foreground/30 hover:text-foreground"
               }`}
             >
               {size}
@@ -679,11 +679,11 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
       {/* Custom Dynamic Attributes */}
       {customAttributesMap.map((attr) => (
-        <div key={attr.name} className="pb-8 border-b border-black/5">
-          <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-black/30 mb-6">
+        <div key={attr.name} className="pb-8 border-b border-border">
+          <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">
             {attr.name}
             {selectedCustomAttrs[attr.name]?.length > 0 && (
-              <span className="ml-2 text-black">({selectedCustomAttrs[attr.name].length})</span>
+              <span className="ml-2 text-foreground">({selectedCustomAttrs[attr.name].length})</span>
             )}
           </h4>
           <div className="flex flex-wrap gap-2">
@@ -696,8 +696,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   onClick={() => toggleCustomAttr(attr.name, val)}
                   className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${
                     isSelected
-                      ? "bg-black text-white border-black"
-                      : "bg-transparent text-black/40 border-black/10 hover:border-black hover:text-black"
+                      ? "bg-foreground text-background border-foreground"
+                      : "bg-transparent text-foreground/65 border-border hover:border-foreground hover:text-foreground"
                   }`}
                 >
                   {val}
@@ -712,11 +712,11 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       <button 
         type="button"
         onClick={resetFilters} 
-        className="w-full text-black/40 hover:text-black py-4 font-bold text-[9px] uppercase tracking-[0.2em] transition-all hover:bg-black/5 rounded-lg"
+        className="w-full text-foreground/60 hover:text-foreground py-4 font-bold text-[9px] uppercase tracking-[0.2em] transition-all hover:bg-foreground/[0.04] rounded-lg"
       >
         Clear All Filters
         {getActiveFilterCount() > 0 && (
-          <span className="ml-2 bg-black text-white px-2 py-1 rounded-full text-[8px]">
+          <span className="ml-2 bg-foreground text-background px-2 py-1 rounded-full text-[8px]">
             {getActiveFilterCount()}
           </span>
         )}
@@ -729,12 +729,12 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       <div className="container mx-auto px-6 md:px-16 py-8 md:py-16">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
           <div className="space-y-4">
-             <div className="flex items-center gap-2 text-black/30 text-[9px] font-bold uppercase tracking-widest">
-                <Link href="/" className="hover:text-black transition-colors">Home</Link>
-                <ChevronRight className="w-3 h-3" />
-                <span className="text-black">Shop</span>
+             <div className="flex items-center gap-2 text-foreground/50 text-[9px] font-bold uppercase tracking-widest">
+                <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
+                <ChevronRight className="w-3.5 h-3.5 text-foreground/45" />
+                <span className="text-foreground/90">Shop</span>
              </div>
-             <h1 className="text-4xl md:text-6xl font-bold heading-font tracking-tighter uppercase leading-none">
+             <h1 className="text-4xl md:text-6xl font-bold heading-font tracking-tighter uppercase leading-none text-foreground">
                  {(() => {
                    if (selectedCategory) {
                      const dbCat = dbCategories.find(c => 
@@ -747,18 +747,18 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                    return selectedTypes[0] || "Shop All";
                  })()}
               </h1>
-             <p className="text-sm text-black/40 font-medium">
+             <p className="text-sm text-foreground/60 font-medium">
                {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
                {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} active filter${getActiveFilterCount() > 1 ? 's' : ''}`}
              </p>
           </div>
-          <div className="flex items-center justify-between md:justify-end gap-8 border-t border-black/5 md:border-none pt-8 md:pt-0">
+          <div className="flex items-center justify-between md:justify-end gap-8 border-t border-border md:border-none pt-8 md:pt-0">
              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold text-black/20 uppercase tracking-widest hidden sm:inline">Sort by:</span>
+                <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
                 <select 
                   value={sortBy} 
                   onChange={(e) => setSortBy(e.target.value)} 
-                  className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8"
+                  className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8 text-foreground"
                 >
                   <option>Most Popular</option>
                   <option>Newest</option>
@@ -771,12 +771,12 @@ export default function ShopContentClient({ initialCategory = null, initialType 
              <button 
                type="button"
                onClick={() => setShowFilters(true)} 
-               className="lg:hidden flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative"
+               className="lg:hidden flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative hover:bg-foreground/90"
              >
                <SlidersHorizontal className="w-4 h-4" /> 
                Filter
                {getActiveFilterCount() > 0 && (
-                 <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center">
+                 <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center animate-pulse">
                    {getActiveFilterCount()}
                  </span>
                )}
@@ -793,7 +793,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
             {loading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-10">
                  {[1,2,3,4,5,6].map(i => (
-                   <div key={i} className="aspect-[3/4] bg-gray-100 animate-pulse rounded-2xl" />
+                    <div key={i} className="aspect-[3/4] bg-gray-100 animate-pulse rounded-2xl" />
                  ))}
               </div>
             ) : paginatedProducts.length > 0 ? (
@@ -805,13 +805,13 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center py-40 border border-dashed border-black/10 rounded-3xl">
-                <p className="text-2xl font-bold heading-font uppercase mb-4">No products found</p>
-                <p className="text-sm text-black/40 mb-8">Try adjusting your filters or search terms</p>
+              <div className="flex flex-col items-center justify-center py-40 border border-dashed border-border rounded-3xl">
+                <p className="text-2xl font-bold heading-font uppercase mb-4 text-foreground">No products found</p>
+                <p className="text-sm text-foreground/60 mb-8">Try adjusting your filters or search terms</p>
                 <button 
                   type="button"
                   onClick={resetFilters} 
-                  className="px-8 py-3 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-black/80 transition-colors"
+                  className="px-8 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-foreground/90 transition-colors"
                 >
                   Clear All Filters
                 </button>
@@ -819,13 +819,13 @@ export default function ShopContentClient({ initialCategory = null, initialType 
             )}
 
             {totalPages > 1 && (
-              <div className="mt-20 flex items-center justify-center gap-12 border-t border-black/5 pt-12">
+              <div className="mt-20 flex items-center justify-center gap-12 border-t border-border pt-12">
                 <button 
                   type="button"
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
                   disabled={currentPage === 1} 
                   className={`text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    currentPage === 1 ? "opacity-10 cursor-not-allowed" : "hover:text-black/60"
+                    currentPage === 1 ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
                   }`}
                 >
                   Prev
@@ -838,8 +838,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                       onClick={() => setCurrentPage(i + 1)} 
                       className={`w-8 h-8 text-sm font-bold transition-all rounded-full ${
                         currentPage === i + 1 
-                          ? "bg-black text-white" 
-                          : "text-black/40 hover:text-black hover:bg-black/5"
+                          ? "bg-foreground text-background" 
+                          : "text-foreground/50 hover:text-foreground hover:bg-foreground/10"
                       }`}
                     >
                       {i + 1}
@@ -851,7 +851,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
                   disabled={currentPage === totalPages} 
                   className={`text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    currentPage === totalPages ? "opacity-10 cursor-not-allowed" : "hover:text-black/60"
+                    currentPage === totalPages ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
                   }`}
                 >
                   Next
@@ -878,38 +878,38 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               animate={{ x: 0 }} 
               exit={{ x: "100%" }} 
               transition={{ type: "spring", damping: 30, stiffness: 300 }} 
-              className="fixed right-0 top-0 bottom-0 w-[85vw] max-w-sm bg-white z-[110] lg:hidden flex flex-col shadow-2xl"
+              className="fixed right-0 top-0 bottom-0 w-[85vw] max-w-sm bg-background z-[110] lg:hidden flex flex-col shadow-2xl"
             >
-              <div className="p-6 flex items-center justify-between border-b border-black/5">
+              <div className="p-6 flex items-center justify-between border-b border-border">
                 <div>
-                  <h3 className="text-xl font-bold heading-font uppercase">Filters</h3>
+                  <h3 className="text-xl font-bold heading-font uppercase text-foreground">Filters</h3>
                   {getActiveFilterCount() > 0 && (
-                    <p className="text-xs text-black/40 mt-1">{getActiveFilterCount()} active</p>
+                    <p className="text-xs text-foreground/60 mt-1">{getActiveFilterCount()} active</p>
                   )}
                 </div>
                 <button 
                   type="button"
                   onClick={() => setShowFilters(false)} 
-                  className="p-2 hover:bg-black/5 rounded-full transition-colors"
+                  className="p-2 hover:bg-foreground/10 rounded-full transition-colors"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-6 h-6 text-foreground" />
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
                 {renderFilterSections(true)}
               </div>
-              <div className="p-6 border-t border-black/5 flex gap-4">
+              <div className="p-6 border-t border-border flex gap-4 bg-background">
                 <button 
                   type="button"
                   onClick={resetFilters}
-                  className="flex-1 text-black/60 hover:text-black py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest border border-black/10 hover:border-black/30 transition-all"
+                  className="flex-1 text-foreground/70 hover:text-foreground py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest border border-border hover:border-foreground/30 transition-all bg-transparent"
                 >
                   Reset
                 </button>
                 <button 
                   type="button"
                   onClick={() => setShowFilters(false)} 
-                  className="flex-1 bg-black text-white py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-xl hover:bg-black/90 transition-colors"
+                  className="flex-1 bg-foreground text-background py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-xl hover:bg-foreground/90 transition-colors"
                 >
                   Apply Filters
                 </button>

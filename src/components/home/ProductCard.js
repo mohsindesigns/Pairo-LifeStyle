@@ -97,16 +97,16 @@ export default function ProductCard({ product }) {
       <div className="mt-3 md:mt-4 space-y-1 md:space-y-2 px-1">
         <p 
           style={{ fontFamily: "var(--brand-font)" }}
-          className="text-lg md:text-xl font-bold uppercase tracking-wider text-black/80 group-hover:text-black transition-colors truncate"
+          className="text-lg md:text-xl font-bold uppercase tracking-wider text-foreground/85 group-hover:text-foreground transition-colors truncate"
         >
           {product.name}
         </p>
 
-        <div className="flex items-center justify-between border-t border-black/[0.03] pt-2 md:pt-3">
+        <div className="flex items-center justify-between border-t border-border pt-2 md:pt-3">
           <div className="flex items-center gap-2 md:gap-3">
-            <span className="text-sm md:text-xl font-bold text-black">${product.price}</span>
+            <span className="text-sm md:text-xl font-bold text-foreground">${product.price}</span>
             {(product.compareAtPrice || product.oldPrice) && (
-              <span className="text-[10px] md:text-sm font-medium text-black/20 line-through">
+              <span className="text-[10px] md:text-sm font-medium text-foreground/45 line-through">
                 ${product.compareAtPrice || product.oldPrice}
               </span>
             )}
@@ -114,7 +114,7 @@ export default function ProductCard({ product }) {
 
           <div className="flex items-center gap-1">
             <Star className="w-2.5 h-2.5 fill-[#FFC633] text-[#FFC633]" />
-            <span className="text-[9px] font-normal text-black/50">
+            <span className="text-[9px] font-normal text-foreground/60">
               {(product.rating || 5).toFixed(1)} ({product.reviewsCount || 45})
             </span>
           </div>
