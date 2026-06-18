@@ -409,6 +409,7 @@ export default function Navbar() {
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
+            transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
             className="fixed inset-0 z-[100] bg-white flex flex-col h-full lg:hidden"
           >
             <div className="flex items-center justify-between p-6 border-b border-black/5">
@@ -445,6 +446,7 @@ export default function Navbar() {
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: "auto", opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.25, ease: "easeInOut" }}
                                 className="overflow-hidden mt-4 pl-4"
                               >
                                 {item.dropdownType === 'simple' && (

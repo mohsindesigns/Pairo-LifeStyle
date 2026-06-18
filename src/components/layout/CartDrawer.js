@@ -11,15 +11,15 @@ export default function CartDrawer() {
 
   const drawerVariants = {
     hidden: { x: "100%" },
-    visible: { 
-      x: 0, 
-      transition: { 
-        type: "spring", 
-        damping: 30, 
+    visible: {
+      x: 0,
+      transition: {
+        type: "spring",
+        damping: 30,
         stiffness: 300,
         staggerChildren: 0.05,
         delayChildren: 0.1
-      } 
+      }
     },
     exit: { x: "100%", transition: { type: "spring", damping: 30, stiffness: 300 } }
   };
@@ -105,11 +105,11 @@ export default function CartDrawer() {
                             <p className="text-xs sm:text-sm font-bold heading-font uppercase tracking-tight truncate">
                               {item.name}
                             </p>
-                            <button 
-                               onClick={() => removeFromCart(uniqueKey)}
-                               className="text-black/40 hover:text-red-500 transition-colors p-1"
+                            <button
+                              onClick={() => removeFromCart(uniqueKey)}
+                              className="text-black/40 hover:text-red-500 transition-colors p-1"
                             >
-                               <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                           <div className="flex items-center gap-2">
@@ -118,11 +118,11 @@ export default function CartDrawer() {
                             </span>
                             <div className="w-[1px] h-2 bg-black/10" />
                             <div className="flex items-center gap-1.5">
-                               <span className="text-[10px] text-black/60 uppercase tracking-widest font-bold">Color:</span>
-                               <div 
-                                 className="w-2.5 h-2.5 rounded-full border border-black/10" 
-                                 style={{ backgroundColor: item.selectedColor }} 
-                               />
+                              <span className="text-[10px] text-black/60 uppercase tracking-widest font-bold">Color:</span>
+                              <div
+                                className="w-2.5 h-2.5 rounded-full border border-black/10"
+                                style={{ backgroundColor: item.selectedColor }}
+                              />
                             </div>
                           </div>
                         </div>
@@ -163,13 +163,13 @@ export default function CartDrawer() {
                   <div className="flex justify-between items-center">
                     <span className="text-black/50 uppercase tracking-widest font-bold text-[10px]">Shipping</span>
                     <span className="text-[10px] font-bold text-black/75 uppercase tracking-widest">
-                       Calculated next
+                      Calculated next
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Link 
+                  <Link
                     href="/checkout"
                     onClick={() => setIsCartOpen(false)}
                     className="w-full bg-black text-white h-12 rounded-lg font-bold uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-2 hover:bg-black/90 active:scale-[0.98] transition-all"

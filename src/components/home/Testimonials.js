@@ -61,7 +61,7 @@ const TestimonialCard = ({ review, isActive, position, onSwipe, labels, multipli
             <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent" />
           </div>
           <div className="flex flex-col">
-            <h4 className="text-black font-bold text-[13px] sm:text-base md:text-xl heading-font tracking-tighter leading-none uppercase">{review.name}</h4>
+            <p className="text-black font-bold text-[12px] sm:text-[14px] md:text-[18px] heading-font tracking-tighter leading-none uppercase">{review.name}</p>
             <span className="text-black/30 text-[7px] md:text-[9px] font-bold uppercase tracking-[0.2em] mt-1.5">{labels.verifiedLabel}</span>
           </div>
         </div>

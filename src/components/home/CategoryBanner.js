@@ -94,8 +94,8 @@ export default function CategoryBanner({
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-500" />
 
                 {/* Content Area */}
-                <div className={`absolute inset-0 p-5 sm:p-8 md:p-12 flex flex-col justify-end ${isSmall ? 'items-center text-center' : 'items-start text-left'}`}>
-                  <div className={`space-y-3 sm:space-y-5 w-full flex flex-col ${isSmall ? 'items-center' : 'items-start'}`}>
+                <div className={`absolute inset-0 p-5 sm:p-8 md:p-12 flex flex-col justify-end items-center text-center ${isSmall ? '' : 'sm:items-start sm:text-left'}`}>
+                  <div className={`space-y-3 sm:space-y-5 w-full flex flex-col items-center ${isSmall ? '' : 'sm:items-start'}`}>
                     <div className="space-y-1 sm:space-y-2">
                        <span className="inline-flex bg-white/10 backdrop-blur-md text-white text-[8px] font-bold px-2.5 py-1 rounded-md tracking-[0.2em] uppercase border border-white/10">
                          DEPARTMENT 0{index + 1}
@@ -105,7 +105,7 @@ export default function CategoryBanner({
                        </p>
                     </div>
 
-                    <div className={`w-full flex ${isSmall ? 'justify-center' : 'justify-start'}`}>
+                    <div className={`w-full flex justify-center ${isSmall ? '' : 'sm:justify-start'}`}>
                        <button className="group/btn relative overflow-hidden bg-white text-black px-6 py-2.5 sm:px-10 sm:py-3.5 rounded-full font-bold text-[8px] sm:text-[10px] uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl active:scale-95">
                           <span className="relative z-10 flex items-center gap-2 sm:gap-3 group-hover/btn:text-white transition-colors duration-300">
                             {exploreText}

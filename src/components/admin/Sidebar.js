@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  Layers, 
-  Image as ImageIcon, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Layers,
+  Image as ImageIcon,
+  Settings,
   ChevronRight,
   LogOut,
   FileText,
@@ -22,19 +22,18 @@ import { signOut } from "next-auth/react";
 
 const NavLink = ({ href, icon: Icon, children, exact = false, isSubmenu = false }) => {
   const pathname = usePathname();
-  
+
   // Exact match for standalone items, prefix match for groups
   const isActive = exact ? pathname === href : pathname.startsWith(href);
-  
+
   if (isSubmenu) {
     return (
-      <Link 
+      <Link
         href={href}
-        className={`block py-[6px] pr-3 pl-10 text-[13px] leading-5 transition-colors ${
-          isActive 
-            ? "text-white font-semibold" 
+        className={`block py-[6px] pr-3 pl-10 text-[13px] leading-5 transition-colors ${isActive
+            ? "text-white font-semibold"
             : "text-[#c3c4c7] hover:text-[#72aee6]"
-        }`}
+          }`}
       >
         {children}
       </Link>
@@ -42,43 +41,41 @@ const NavLink = ({ href, icon: Icon, children, exact = false, isSubmenu = false 
   }
 
   return (
-     <Link 
-       href={href}
-       className={`flex items-center gap-2 px-3 py-2 text-[13px] transition-all group ${
-         isActive 
-           ? "bg-[#2271b1] text-white font-medium" 
-           : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"
-       }`}
-     >
-       {Icon && <Icon className={`w-[18px] h-[18px] ${isActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />}
-       <span>{children}</span>
-     </Link>
+    <Link
+      href={href}
+      className={`flex items-center gap-2 px-3 py-2 text-[13px] transition-all group ${isActive
+          ? "bg-[#2271b1] text-white font-medium"
+          : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"
+        }`}
+    >
+      {Icon && <Icon className={`w-[18px] h-[18px] ${isActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />}
+      <span>{children}</span>
+    </Link>
   );
 };
 
 const AccordionMenu = ({ title, icon: Icon, children, isOpen, onToggle }) => {
   return (
-      <div className="mb-0">
-          <button 
-              onClick={onToggle}
-              className={`w-full flex items-center justify-between px-3 py-2 text-[13px] transition-all group ${
-                  isOpen 
-                      ? "bg-[#2271b1] text-white font-medium" 
-                      : "hover:bg-[#2c3338] hover:text-[#72aee6] text-[#a7aaad]"
-              }`}
-          >
-              <div className="flex items-center gap-2">
-                  <Icon className={`w-[18px] h-[18px] ${isOpen ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />
-                  <span>{title}</span>
-              </div>
-              <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-90" : ""} ${isOpen ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />
-          </button>
-          
-          {/* Accordion Submenu */}
-          <div className={`bg-[#32373c] py-1.5 overflow-hidden transition-all duration-200 ${isOpen ? "block" : "hidden"}`}>
-              {children}
-          </div>
+    <div className="mb-0">
+      <button
+        onClick={onToggle}
+        className={`w-full flex items-center justify-between px-3 py-2 text-[13px] transition-all group ${isOpen
+            ? "bg-[#2271b1] text-white font-medium"
+            : "hover:bg-[#2c3338] hover:text-[#72aee6] text-[#a7aaad]"
+          }`}
+      >
+        <div className="flex items-center gap-2">
+          <Icon className={`w-[18px] h-[18px] ${isOpen ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />
+          <span>{title}</span>
+        </div>
+        <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? "rotate-90" : ""} ${isOpen ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />
+      </button>
+
+      {/* Accordion Submenu */}
+      <div className={`bg-[#32373c] py-1.5 overflow-hidden transition-all duration-200 ${isOpen ? "block" : "hidden"}`}>
+        {children}
       </div>
+    </div>
   );
 };
 
@@ -110,111 +107,111 @@ export default function AdminSidebar() {
       {/* Scrollable Nav */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-10 mt-2">
         <nav className="py-2 flex flex-col gap-0.5">
-           
-           {/* Dashboard Accordion */}
-           <div className="mb-0">
-             <Link href="/admin" className={`flex items-center justify-between px-3 py-2 text-[13px] transition-all group ${isDashboardActive ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
-                <div className="flex items-center gap-2">
-                   <LayoutDashboard className={`w-[18px] h-[18px] ${isDashboardActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />
-                   <span>Dashboard</span>
-                </div>
-             </Link>
-             {isDashboardActive && (
-                <div className="bg-[#32373c] py-1.5">
-                   <NavLink href="/admin" exact isSubmenu>Home</NavLink>
-                   <NavLink href="/admin/analytics" exact isSubmenu>Analytics</NavLink>
-                </div>
-             )}
-           </div>
 
-           <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
+          {/* Dashboard Accordion */}
+          <div className="mb-0">
+            <Link href="/admin" className={`flex items-center justify-between px-3 py-2 text-[13px] transition-all group ${isDashboardActive ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
+              <div className="flex items-center gap-2">
+                <LayoutDashboard className={`w-[18px] h-[18px] ${isDashboardActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />
+                <span>Dashboard</span>
+              </div>
+            </Link>
+            {isDashboardActive && (
+              <div className="bg-[#32373c] py-1.5">
+                <NavLink href="/admin" exact isSubmenu>Home</NavLink>
+                <NavLink href="/admin/analytics" exact isSubmenu>Analytics</NavLink>
+              </div>
+            )}
+          </div>
 
-           {/* Posts (Blogs) */}
-           <AccordionMenu 
-              title="Posts" icon={FileText}
-              isOpen={openAccordion === "posts"} onToggle={() => handleToggle("posts")}
-           >
-                <NavLink href="/admin/blogs" exact isSubmenu>All Posts</NavLink>
-                <NavLink href="/admin/blogs/new" exact isSubmenu>Add New</NavLink>
-                <NavLink href="/admin/blogs/categories" exact isSubmenu>Categories</NavLink>
-           </AccordionMenu>
+          <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
 
-           {/* Media Standalone */}
-           <NavLink href="/admin/media" exact icon={ImageIcon}>Media</NavLink>
+          {/* Posts (Blogs) */}
+          <AccordionMenu
+            title="Posts" icon={FileText}
+            isOpen={openAccordion === "posts"} onToggle={() => handleToggle("posts")}
+          >
+            <NavLink href="/admin/blogs" exact isSubmenu>All Posts</NavLink>
+            <NavLink href="/admin/blogs/new" exact isSubmenu>Add New</NavLink>
+            <NavLink href="/admin/blogs/categories" exact isSubmenu>Categories</NavLink>
+          </AccordionMenu>
 
-           {/* Pages Accordion */}
-           <AccordionMenu 
-              title="Pages" icon={Layers}
-              isOpen={openAccordion === "pages"} onToggle={() => handleToggle("pages")}
-           >
-                <NavLink href="/admin/pages" exact isSubmenu>All Pages</NavLink>
-                <NavLink href="/admin/pages/new" exact isSubmenu>Add New</NavLink>
-           </AccordionMenu>
+          {/* Media Standalone */}
+          <NavLink href="/admin/media" exact icon={ImageIcon}>Media</NavLink>
 
-           {/* Comments / Reviews Standalone */}
-           <NavLink href="/admin/reviews" exact icon={MessageSquare}>Reviews</NavLink>
+          {/* Pages Accordion */}
+          <AccordionMenu
+            title="Pages" icon={Layers}
+            isOpen={openAccordion === "pages"} onToggle={() => handleToggle("pages")}
+          >
+            <NavLink href="/admin/pages" exact isSubmenu>All Pages</NavLink>
+            <NavLink href="/admin/pages/new" exact isSubmenu>Add New</NavLink>
+          </AccordionMenu>
 
-           <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
+          {/* Comments / Reviews Standalone */}
+          <NavLink href="/admin/reviews" exact icon={MessageSquare}>Reviews</NavLink>
 
-           {/* Commerce */}
-           <AccordionMenu 
-              title="Commerce" icon={ShoppingCart}
-              isOpen={openAccordion === "commerce"} onToggle={() => handleToggle("commerce")}
-           >
-                <NavLink href="/admin/orders" exact isSubmenu>Orders</NavLink>
-                <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>
-                <NavLink href="/admin/discounts" exact isSubmenu>Coupons</NavLink>
-           </AccordionMenu>
+          <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
 
-           {/* Products Accordion */}
-           <AccordionMenu 
-              title="Products" icon={Box}
-              isOpen={openAccordion === "products"} onToggle={() => handleToggle("products")}
-           >
-                <NavLink href="/admin/products" exact isSubmenu>All Products</NavLink>
-                <NavLink href="/admin/products/new" exact isSubmenu>Add New</NavLink>
-                <NavLink href="/admin/categories" exact isSubmenu>Categories</NavLink>
-           </AccordionMenu>
+          {/* Commerce */}
+          <AccordionMenu
+            title="Commerce" icon={ShoppingCart}
+            isOpen={openAccordion === "commerce"} onToggle={() => handleToggle("commerce")}
+          >
+            <NavLink href="/admin/orders" exact isSubmenu>Orders</NavLink>
+            <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>
+            <NavLink href="/admin/discounts" exact isSubmenu>Coupons</NavLink>
+          </AccordionMenu>
 
-           <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
+          {/* Products Accordion */}
+          <AccordionMenu
+            title="Products" icon={Box}
+            isOpen={openAccordion === "products"} onToggle={() => handleToggle("products")}
+          >
+            <NavLink href="/admin/products" exact isSubmenu>All Products</NavLink>
+            <NavLink href="/admin/products/new" exact isSubmenu>Add New</NavLink>
+            <NavLink href="/admin/categories" exact isSubmenu>Categories</NavLink>
+          </AccordionMenu>
 
-           {/* Appearance Standalone */}
-           <NavLink href="/admin/appearance" exact icon={Palette}>Appearance</NavLink>
+          <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
 
-           {/* Users Accordion */}
-           <AccordionMenu 
-              title="Users" icon={Users}
-              isOpen={openAccordion === "users"} onToggle={() => handleToggle("users")}
-           >
-                <NavLink href="/admin/settings/team" exact isSubmenu>All Users</NavLink>
-                <NavLink href="/admin/settings/team/new" exact isSubmenu>Add New</NavLink>
-                <NavLink href="/admin/settings/roles" exact isSubmenu>Roles</NavLink>
-           </AccordionMenu>
+          {/* Appearance Standalone */}
+          <NavLink href="/admin/appearance" exact icon={Palette}>Appearance</NavLink>
 
-           {/* Tools Accordion */}
-           <AccordionMenu 
-              title="Tools" icon={Wrench}
-              isOpen={openAccordion === "tools"} onToggle={() => handleToggle("tools")}
-           >
-                <NavLink href="/admin/contact" exact isSubmenu>Contact Forms</NavLink>
-                <NavLink href="/admin/settings/logs" exact isSubmenu>Audit Logs</NavLink>
-                <NavLink href="/admin/settings/scripts" exact isSubmenu>Custom Scripts</NavLink>
-           </AccordionMenu>
+          {/* Users Accordion */}
+          <AccordionMenu
+            title="Users" icon={Users}
+            isOpen={openAccordion === "users"} onToggle={() => handleToggle("users")}
+          >
+            <NavLink href="/admin/settings/team" exact isSubmenu>All Users</NavLink>
+            <NavLink href="/admin/settings/team/new" exact isSubmenu>Add New</NavLink>
+            <NavLink href="/admin/settings/roles" exact isSubmenu>Roles</NavLink>
+          </AccordionMenu>
 
-           {/* Settings Accordion */}
-           <AccordionMenu 
-              title="Settings" icon={Settings}
-              isOpen={openAccordion === "settings"} onToggle={() => handleToggle("settings")}
-           >
-                <NavLink href="/admin/settings/site" exact isSubmenu>General</NavLink>
-           </AccordionMenu>
+          {/* Tools Accordion */}
+          <AccordionMenu
+            title="Tools" icon={Wrench}
+            isOpen={openAccordion === "tools"} onToggle={() => handleToggle("tools")}
+          >
+            <NavLink href="/admin/contact" exact isSubmenu>Contact Forms</NavLink>
+            <NavLink href="/admin/settings/logs" exact isSubmenu>Audit Logs</NavLink>
+            <NavLink href="/admin/settings/scripts" exact isSubmenu>Custom Scripts</NavLink>
+          </AccordionMenu>
+
+          {/* Settings Accordion */}
+          <AccordionMenu
+            title="Settings" icon={Settings}
+            isOpen={openAccordion === "settings"} onToggle={() => handleToggle("settings")}
+          >
+            <NavLink href="/admin/settings/site" exact isSubmenu>General</NavLink>
+          </AccordionMenu>
 
         </nav>
       </div>
 
       {/* Logout Footer */}
       <div className="p-3 border-t border-white/5 shrink-0 bg-[#1d2327]">
-        <button 
+        <button
           onClick={() => signOut({ callbackUrl: "/" })}
           className="flex items-center gap-2 text-[#72aee6] hover:text-white transition-colors text-[13px] font-medium w-full px-2"
         >
@@ -222,7 +219,7 @@ export default function AdminSidebar() {
           Log Out
         </button>
       </div>
-      
+
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;

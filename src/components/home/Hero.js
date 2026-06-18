@@ -72,7 +72,7 @@ export default function Hero({
             <div className="max-w-2xl">
               <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.6, ease: "easeOut", delay: 0.3 }} className="space-y-4 md:space-y-6">
                 <div className="flex items-center gap-3"><div className="h-[1.5px] w-8 bg-white/30" /><span className="text-white/90 text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase">{brand.tagline}</span></div>
-                <h1 className="text-3xl md:text-5xl lg:text-7xl font-bold text-white heading-font leading-[1.05] tracking-tight max-w-[12ch] md:max-w-none">{hero.slides[currentSlide].title}</h1>
+                <p className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white heading-font leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none">{hero.slides[currentSlide].title}</p>
                 <p className="text-white/90 text-xs md:text-base lg:text-lg max-w-md leading-relaxed font-sans">{hero.slides[currentSlide].subtitle}</p>
                 <div className="flex flex-wrap items-center gap-4 pt-4 md:pt-6">
                   {hero.slides[currentSlide].link ? (
