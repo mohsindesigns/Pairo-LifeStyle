@@ -29,7 +29,7 @@ import GallerySorter from "./GallerySorter";
 import AdminPageLayout from "./AdminPageLayout";
 
 // Tiny inline image button — opens MediaPickerModal without the full MediaPicker drop-zone UI
-function InlinePick({ value, onChange }) {
+function InlinePick({ value, onChange, label = "+ Image", doneLabel = "✓ Change", title = "Pick image" }) {
    const [open, setOpen] = useState(false);
    return (
       <>
@@ -42,13 +42,13 @@ function InlinePick({ value, onChange }) {
                   : "border-gray-200 text-gray-400 bg-white hover:border-[#2271b1] hover:text-[#2271b1]"
             }`}
          >
-            {value ? "✓ Change" : "+ Image"}
+            {value ? doneLabel : label}
          </button>
          <MediaPickerModal
             open={open}
             onClose={() => setOpen(false)}
             onSelect={(sel) => { onChange(sel.url); setOpen(false); }}
-            title="Pick variant image"
+            title={title}
          />
       </>
    );
@@ -227,6 +227,7 @@ export default function ProductForm({ productId = null }) {
          value: label,
          hex: type === "color" ? "#000000" : "",
          image: "",
+         swatchType: "color", // "color" | "image"
          variantImage: ""
       });
       setFormData({ ...formData, attributes: newAttrs });
@@ -272,11 +273,11 @@ export default function ProductForm({ productId = null }) {
             name: "Color",
             type: "color",
             values: [
-               { label: "Black", value: "Black", hex: "#000000", image: "", variantImage: "" },
-               { label: "White", value: "White", hex: "#FFFFFF", image: "", variantImage: "" },
-               { label: "Navy", value: "Navy", hex: "#000080", image: "", variantImage: "" },
-               { label: "Gray", value: "Gray", hex: "#808080", image: "", variantImage: "" },
-               { label: "Red", value: "Red", hex: "#FF0000", image: "", variantImage: "" }
+               { label: "Black", value: "Black", hex: "#000000", image: "", swatchType: "color", variantImage: "" },
+               { label: "White", value: "White", hex: "#FFFFFF", image: "", swatchType: "color", variantImage: "" },
+               { label: "Navy", value: "Navy", hex: "#000080", image: "", swatchType: "color", variantImage: "" },
+               { label: "Gray", value: "Gray", hex: "#808080", image: "", swatchType: "color", variantImage: "" },
+               { label: "Red", value: "Red", hex: "#FF0000", image: "", swatchType: "color", variantImage: "" }
             ]
          },
          material: {
@@ -559,14 +560,87 @@ export default function ProductForm({ productId = null }) {
                                                 <button type="button" onClick={()=>setFormData({...formData,attributes:formData.attributes.filter((_,i)=>i!==aIdx)})} className="ml-auto text-gray-300 hover:text-red-500 p-0.5"><X className="w-3.5 h-3.5" /></button>
                                              </div>
                                              <div className="divide-y divide-gray-50">
-                                                {(attr.values||[]).map((val,vIdx)=>(
-                                                   <div key={vIdx} className="flex items-center gap-3 px-3 py-2">
-                                                      {attr.type==="color" && <input type="color" value={val.hex} onChange={e=>updateVal(vIdx,"hex",e.target.value)} className="w-6 h-6 p-0 border-none rounded-full" />}
-                                                      <input className="flex-1 border border-gray-200 rounded px-2 py-1 text-[12px]" value={val.label} onChange={e=>updateVal(vIdx,"label",e.target.value)} />
-                                                      <InlinePick value={val.variantImage} onChange={url=>updateVal(vIdx,"variantImage",url)} />
-                                                      <button type="button" onClick={()=>removeVal(vIdx)} className="text-gray-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
-                                                   </div>
-                                                ))}
+                                                {(attr.values||[]).map((val,vIdx)=>{
+                                                    const swatchType = val.swatchType || "color";
+                                                    return (
+                                                    <div key={vIdx} className="flex items-start gap-3 px-3 py-2.5 border-b border-gray-50 last:border-0">
+                                                       {/* Swatch Config — only for color attributes */}
+                                                       {attr.type==="color" && (
+                                                          <div className="flex flex-col gap-1.5 shrink-0">
+                                                             {/* Toggle between Color Picker and Image Swatch */}
+                                                             <div className="flex rounded overflow-hidden border border-gray-200 text-[10px] font-bold">
+                                                                <button
+                                                                   type="button"
+                                                                   onClick={()=>updateVal(vIdx,"swatchType","color")}
+                                                                   className={`px-2 py-1 transition-colors ${
+                                                                      swatchType==="color"
+                                                                         ? "bg-[#2271b1] text-white"
+                                                                         : "bg-white text-gray-400 hover:bg-gray-50"
+                                                                   }`}
+                                                                   title="Use a solid color swatch"
+                                                                >
+                                                                   Color
+                                                                </button>
+                                                                <button
+                                                                   type="button"
+                                                                   onClick={()=>updateVal(vIdx,"swatchType","image")}
+                                                                   className={`px-2 py-1 transition-colors ${
+                                                                      swatchType==="image"
+                                                                         ? "bg-[#2271b1] text-white"
+                                                                         : "bg-white text-gray-400 hover:bg-gray-50"
+                                                                   }`}
+                                                                   title="Use an image as the swatch (texture, pattern, etc.)"
+                                                                >
+                                                                   Image
+                                                                </button>
+                                                             </div>
+                                                             {/* Swatch preview + picker */}
+                                                             {swatchType==="color" ? (
+                                                                <div className="flex items-center gap-1.5">
+                                                                   <div
+                                                                      className="w-7 h-7 rounded-full border-2 border-white shadow ring-1 ring-gray-200 shrink-0"
+                                                                      style={{ background: val.hex || "#000000" }}
+                                                                   />
+                                                                   <input
+                                                                      type="color"
+                                                                      value={val.hex || "#000000"}
+                                                                      onChange={e=>updateVal(vIdx,"hex",e.target.value)}
+                                                                      className="w-7 h-7 p-0 border-none rounded cursor-pointer opacity-0 absolute"
+                                                                      style={{ marginLeft: "-28px" }}
+                                                                      title="Pick color"
+                                                                   />
+                                                                   <span className="text-[10px] font-mono text-gray-400">{val.hex || "#000000"}</span>
+                                                                </div>
+                                                             ) : (
+                                                                <div className="flex items-center gap-1.5">
+                                                                   {val.image ? (
+                                                                      <img src={val.image} alt="swatch" className="w-7 h-7 rounded-full object-cover border border-gray-200 shadow" />
+                                                                   ) : (
+                                                                      <div className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center">
+                                                                         <ImageIcon className="w-3 h-3 text-gray-300" />
+                                                                      </div>
+                                                                   )}
+                                                                   <InlinePick
+                                                                      value={val.image}
+                                                                      onChange={url=>updateVal(vIdx,"image",url)}
+                                                                      label="+ Swatch"
+                                                                      doneLabel="✓ Swatch"
+                                                                      title="Pick swatch image (texture / pattern)"
+                                                                   />
+                                                                </div>
+                                                             )}
+                                                          </div>
+                                                       )}
+                                                       {/* Value label */}
+                                                       <input className="flex-1 border border-gray-200 rounded px-2 py-1 text-[12px] mt-0.5" placeholder="Label" value={val.label} onChange={e=>updateVal(vIdx,"label",e.target.value)} />
+                                                       {/* Variant product image (separate from swatch) */}
+                                                       <div className="flex flex-col items-center gap-0.5 shrink-0">
+                                                          <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wide">Product img</span>
+                                                          <InlinePick value={val.variantImage} onChange={url=>updateVal(vIdx,"variantImage",url)} label="+" />
+                                                       </div>
+                                                       <button type="button" onClick={()=>removeVal(vIdx)} className="text-gray-300 hover:text-red-500 mt-0.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                                                    </div>
+                                                 );})}
                                              </div>
                                              <div className="p-2">
                                                 <input className="w-full border border-gray-200 rounded px-3 py-1 text-[12px]" placeholder="Add value..." onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); addAttributeValue(aIdx,e.target.value); e.target.value=""; } }} />

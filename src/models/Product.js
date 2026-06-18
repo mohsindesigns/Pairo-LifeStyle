@@ -32,10 +32,11 @@ const ProductSchema = new mongoose.Schema({
     type: { type: String, enum: ['color', 'size', 'custom'], default: 'custom' },
     values: [{
       label: String, // Display label
-      hex: String, // For color swatches
-      image: String, // Optional swatch image (pattern/texture)
+      hex: String, // For color swatches (used when swatchType === "color")
+      image: String, // Swatch image — pattern / texture (used when swatchType === "image")
+      swatchType: { type: String, enum: ['color', 'image'], default: 'color' }, // Admin-configured swatch mode
       value: String, // Actual value (e.g. "S", "M")
-      variantImage: String // Image override for this specific selection
+      variantImage: String // Image override for the product display when this option is selected
     }]
   }],
   variantCombinations: [{
