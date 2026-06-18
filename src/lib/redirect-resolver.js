@@ -75,7 +75,6 @@ export function isReservedPath(path) {
   const systemPrefixes = [
     "admin",
     "api",
-    "shop",
     "checkout",
     "cart",
     "login",

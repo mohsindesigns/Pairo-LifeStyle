@@ -180,7 +180,7 @@ export default function CategoryManager({ type = "product", title = "Categories"
                             <span className="text-[#c3c4c7]">|</span>
                             <button onClick={() => handleDelete(cat._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
                             <span className="text-[#c3c4c7]">|</span>
-                            <Link href={`/shop?category=${cat.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
+                            <Link href={`/shop/${cat.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
                          </div>
                       </div>
                     </td>

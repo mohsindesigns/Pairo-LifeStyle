@@ -98,7 +98,7 @@ export default function FeaturedBanner({
               <Link
                 href={
                   linkType === "product" && productId ? `/product/${productId}` :
-                    linkType === "collection" && collectionId ? `/shop?category=${collectionId}` :
+                    linkType === "collection" && collectionId ? `/shop/${collectionId}` :
                       "#"
                 }
                 className="inline-block"

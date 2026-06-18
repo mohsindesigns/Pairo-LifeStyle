@@ -26,7 +26,7 @@ function resolveNavHref(item, dbPages, dbCategories, dbProducts) {
       return page ? `/${page.slug}` : (item.href || item.value || '#');
     }
     case 'product_category': {
-      return `/shop?category=${item.value}`;
+      return `/shop/${item.value}`;
     }
     case 'blog_list': {
       return '/blog';
@@ -246,7 +246,7 @@ export default function Navbar() {
                               {item.itemDropdownCategories.map((cat) => (
                                 <Link
                                   key={cat.slug}
-                                  href={`/shop?category=${cat.slug}`}
+                                  href={`/shop/${cat.slug}`}
                                   className="block px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.15em] text-black/60 hover:text-black hover:bg-black/[0.02] transition-colors"
                                 >
                                   {cat.name}
@@ -305,7 +305,7 @@ export default function Navbar() {
                                       {(item.itemMegaCategories || []).map((cat, catIdx) => (
                                         <Link
                                           key={cat.slug || cat.name}
-                                          href={`/shop?category=${cat.slug}`}
+                                          href={`/shop/${cat.slug}`}
                                           className="group/lnk flex items-center gap-4 text-left"
                                         >
                                           <span className="text-[10px] font-mono text-black/50 group-hover/lnk:text-black transition-colors duration-300">0{catIdx + 1}</span>
@@ -333,7 +333,7 @@ export default function Navbar() {
                                   {(item.itemMegaCategories || []).slice(0, 3).map((cat) => (
                                     <Link
                                       key={`promo-${cat.slug || cat.name}`}
-                                      href={`/shop?category=${cat.slug}`}
+                                      href={`/shop/${cat.slug}`}
                                       className="group/promo relative flex-1 min-w-[160px] max-w-[210px] aspect-[4/5] rounded-[20px] overflow-hidden bg-black/5 border border-black/5 shadow-sm hover:shadow-md transition-all duration-500"
                                     >
                                       <Image
@@ -468,7 +468,7 @@ export default function Navbar() {
                                 {(item.dropdownType === 'mega' || item.type === 'mega_menu') && (
                                   <div className="grid grid-cols-2 gap-4 mt-4">
                                     {item.itemMegaCategories.map((cat) => (
-                                      <Link key={cat.slug || cat.name} href={`/shop?category=${cat.slug}`} onClick={() => setIsOpen(false)}>
+                                      <Link key={cat.slug || cat.name} href={`/shop/${cat.slug}`} onClick={() => setIsOpen(false)}>
                                         <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/5">
                                           <Image src={cat.image || '/placeholder.jpg'} alt={cat.name} fill className="object-cover" />
                                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/10 flex items-end p-3">

@@ -77,7 +77,7 @@ export default function CategoryBanner({
                 onMouseLeave={() => setHoveredIndex(null)}
                 className={`group relative h-[350px] md:h-[450px] rounded-[32px] overflow-hidden bg-gray-50 border border-black/5 ${layoutSpans[index]}`}
               >
-                <Link href={`/shop?category=${category.slug}`} className="absolute inset-0 z-20">
+                <Link href={`/shop/${category.slug}`} className="absolute inset-0 z-20">
                   <span className="sr-only">View {category.name}</span>
                 </Link>
 

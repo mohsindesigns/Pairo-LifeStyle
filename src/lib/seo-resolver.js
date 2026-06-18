@@ -124,7 +124,7 @@ export function resolveSEOMetadata(options = {}) {
     } else if (type === "blog" && entity.slug) {
       canonical = `/blog/${entity.slug}`;
     } else if (type === "category" && entity.slug) {
-      canonical = `/shop?category=${entity.slug}`;
+      canonical = `/shop/${entity.slug}`;
     } else if (type === "page" && entity.slug) {
       canonical = `/${entity.slug}`;
     } else {

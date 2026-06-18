@@ -1,42 +1,18 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import dbConnect from "@/lib/db";
-import Category from "@/models/Category";
 import Page from "@/models/Page";
 import ShopContentClient from "./ShopContentClient";
-import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata } from "@/lib/seo-resolver";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ searchParams }) {
   const resolvedSearchParams = await searchParams;
-  const categorySlug = resolvedSearchParams.category;
+  // If old ?category= format, metadata will be handled by the new /shop/[category] route after redirect
+  if (resolvedSearchParams.category) return {};
 
   await dbConnect();
-
-  if (categorySlug) {
-    const currentPath = `/shop?category=${categorySlug}`;
-    await checkAndApplyRedirect(currentPath);
-
-    const mongoose = require('mongoose');
-    let category;
-    if (mongoose.Types.ObjectId.isValid(categorySlug)) {
-      category = await Category.findOne({ _id: categorySlug, type: "product" }).lean();
-    } else {
-      category = await Category.findOne({ slug: categorySlug, type: "product" }).lean();
-    }
-
-    if (category) {
-      const { metadata } = resolveSEOMetadata({
-        entity: category,
-        type: "category",
-        path: currentPath
-      });
-      return metadata;
-    }
-  }
-
-  // Check for dynamic shop page override from database
   const shopPage = await Page.findOne({ slug: "shop" }).lean();
   const { metadata } = resolveSEOMetadata({
     entity: shopPage || {},
@@ -54,9 +30,12 @@ export default async function ShopPage({ searchParams }) {
   const categorySlug = resolvedSearchParams.category;
   const typeSlug = resolvedSearchParams.type;
 
+  // Redirect old query-param format to clean path-based URL
   if (categorySlug) {
-    const currentPath = `/shop?category=${categorySlug}`;
-    await checkAndApplyRedirect(currentPath);
+    const redirectUrl = typeSlug
+      ? `/shop/${categorySlug}?type=${typeSlug}`
+      : `/shop/${categorySlug}`;
+    redirect(redirectUrl);
   }
 
   return (
@@ -69,7 +48,7 @@ export default async function ShopPage({ searchParams }) {
         </div>
       </div>
     }>
-      <ShopContentClient initialCategory={categorySlug} initialType={typeSlug} />
+      <ShopContentClient initialCategory={null} initialType={typeSlug} />
     </Suspense>
   );
-}
+}

@@ -27,7 +27,7 @@
         "subtitle": "Discover the pinnacle of winter luxury with our handcrafted shearling jackets, meticulously designed for the modern individual.",
         "image": "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&q=80&w=2000",
         "buttonText": "Explore Men's",
-        "link": "/shop?category=men"
+        "link": "/shop/men"
       },
       {
         "id": 2,
@@ -35,7 +35,7 @@
         "subtitle": "Experience unparalleled warmth and sophisticated silhouettes with our exclusive women's shearling outerwear.",
         "image": "https://images.unsplash.com/photo-1544022613-e87ce71c8599?auto=format&fit=crop&q=80&w=2000",
         "buttonText": "Shop Women's",
-        "link": "/shop?category=women"
+        "link": "/shop/women"
       },
       {
         "id": 3,
@@ -43,7 +43,7 @@
         "subtitle": "Classic longline designs that stand the test of time, crafted from the finest double-faced sheepskin.",
         "image": "https://images.unsplash.com/photo-1539533377285-a42a8830ce11?auto=format&fit=crop&q=80&w=2000",
         "buttonText": "View Coats",
-        "link": "/shop?category=coats"
+        "link": "/shop/coats"
       }
     ],
     "labels": {

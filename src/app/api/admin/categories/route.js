@@ -136,7 +136,7 @@ export async function PUT(req) {
     // Register redirect if slug changed
     if (data.slug && oldCategory.slug && oldCategory.slug !== data.slug) {
       const { registerRedirect } = await import("@/lib/redirect-resolver");
-      await registerRedirect(`/shop?category=${oldCategory.slug}`, `/shop?category=${data.slug}`);
+      await registerRedirect(`/shop/${oldCategory.slug}`, `/shop/${data.slug}`);
     }
 
     const category = await Category.findByIdAndUpdate(id, data, { new: true });

@@ -69,7 +69,7 @@ export default function SEOConfigPanel({
     let pathPrefix = "/";
     if (parentType === "product") pathPrefix = "/product/";
     else if (parentType === "blog") pathPrefix = "/blog/";
-    else if (parentType === "category") pathPrefix = "/shop?category=";
+    else if (parentType === "category") pathPrefix = "/shop/";
 
     const generated = {
       ...seo,

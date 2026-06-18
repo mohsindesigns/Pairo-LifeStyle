@@ -75,7 +75,7 @@ export async function GET() {
       if (cat.slug) {
         xml += `
   <url>
-    <loc>${siteUrl}/shop?category=${cat.slug}</loc>
+    <loc>${siteUrl}/shop/${cat.slug}</loc>
     <lastmod>${cat.updatedAt ? new Date(cat.updatedAt).toISOString() : new Date().toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

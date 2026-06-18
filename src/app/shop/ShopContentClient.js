@@ -401,12 +401,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setSelectedCategory(catName);
     setCurrentPage(1);
     const params = new URLSearchParams(window.location.search);
-    if (catName) {
-      params.set("category", catName.toLowerCase());
-    } else {
-      params.delete("category");
-    }
-    const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+    params.delete("category");
+    const basePath = catName ? `/shop/${catName.toLowerCase()}` : '/shop';
+    const newUrl = `${basePath}${params.toString() ? `?${params.toString()}` : ''}`;
     silentReplaceState(newUrl);
   };
 
@@ -456,7 +453,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setSearchQuery("");
     setSortBy("Most Popular");
     setCurrentPage(1);
-    silentReplaceState(window.location.pathname);
+    silentReplaceState('/shop');
   };
 
   const getActiveFilterCount = () => {
