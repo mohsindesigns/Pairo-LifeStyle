@@ -116,9 +116,9 @@ export default function ContactSection({
                     {officeLabel}
                   </span>
                 </div>
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold heading-font tracking-tighter uppercase leading-[1.1] text-foreground">
+                <p className="text-2xl md:text-4xl lg:text-5xl font-bold heading-font tracking-tighter uppercase leading-[1.1] text-foreground">
                   {officeTitle}
-                </h2>
+                </p>
                 <div className="flex items-start gap-4 pt-6 border-t border-border/80">
                   <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-primary shrink-0 shadow-sm">
                     <MapPin className="w-4 h-4" />
@@ -203,7 +203,7 @@ export default function ContactSection({
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                     <span className="text-[9px] font-bold tracking-[0.25em] text-foreground/50 uppercase block">{formSubtitle}</span>
                   </div>
-                  <h3 className="text-3xl md:text-4xl font-bold heading-font uppercase tracking-tighter text-foreground leading-none">{formTitle}</h3>
+                  <p className="text-xl md:text-2xl font-bold heading-font uppercase tracking-tighter text-foreground leading-none">{formTitle}</p>
                 </div>
 
                 <form className="space-y-6" onSubmit={handleSubmit}>

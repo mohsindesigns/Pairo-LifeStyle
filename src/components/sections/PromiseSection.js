@@ -29,9 +29,9 @@ export default function PromiseSection({
              <div className="max-w-2xl space-y-12">
                 <div className="space-y-4">
                    <span className="text-[9px] md:text-[11px] font-bold tracking-[0.4em] text-white/80 uppercase">{label}</span>
-                   <h2 className="text-4xl md:text-6xl lg:text-7xl font-bold heading-font text-white uppercase leading-[0.9] tracking-tighter">
+                   <p className="text-2xl md:text-4xl lg:text-5xl font-bold heading-font text-white uppercase leading-[0.9] tracking-tighter">
                       {title}
-                   </h2>
+                   </p>
                 </div>
                 <p className="text-lg md:text-2xl text-white/85 leading-relaxed font-light">
                   {description}
@@ -39,7 +39,7 @@ export default function PromiseSection({
                 <div className="grid sm:grid-cols-2 gap-12 pt-12 border-t border-white/20">
                    {items.map((item, i) => (
                      <div key={i} className="space-y-4">
-                        <h4 className="text-xl font-bold uppercase tracking-tight text-white">{item.title}</h4>
+                        <p className="text-xl font-bold uppercase tracking-tight text-white">{item.title}</p>
                         <p className="text-sm text-white/80 leading-relaxed">{item.desc}</p>
                      </div>
                    ))}

@@ -30,36 +30,32 @@ export default function AboutHero({
       </div>
       <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/40 to-transparent" />
       <div className="container mx-auto px-6 md:px-16 h-full flex items-center relative z-10">
-        <div className="max-w-3xl">
+        <div className="max-w-2xl">
           <motion.div
-            initial={{ y: 30, opacity: 0 }}
+            initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-6 md:space-y-8"
+            transition={{ duration: 0.6, ease: "easeOut", delay: 0.3 }}
+            className="space-y-4 md:space-y-6"
           >
             <div className="flex items-center gap-3">
-              <div className="h-[1.5px] w-8 bg-white/40" />
-              <span className="text-white/85 text-[9px] md:text-[11px] font-bold tracking-[0.3em] uppercase heading-font">
+              <div className="h-[1.5px] w-8 bg-white/30" />
+              <span className="text-white/90 text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase">
                 {label}
               </span>
             </div>
-            <h1 className="text-4xl md:text-6xl lg:text-8xl font-bold text-white heading-font leading-[0.95] tracking-tighter uppercase">
+            <p className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white heading-font leading-[1.05] tracking-tight">
               {title}
-            </h1>
-            <p className="text-white/85 text-sm md:text-xl max-w-xl leading-relaxed font-sans">
+            </p>
+            <p className="text-white/90 text-xs md:text-base lg:text-lg max-w-md leading-relaxed font-sans">
               {subtitle}
             </p>
-            <div className="flex flex-wrap items-center gap-6 pt-4">
+            <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 sm:gap-4 pt-4 md:pt-6">
               <a
                 href={link}
-                className="group relative overflow-hidden bg-primary text-white px-10 md:px-12 py-4 md:py-5 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all duration-500 shadow-xl border border-primary/20 active:scale-95 inline-block"
+                className="group flex items-center justify-center gap-2 bg-white text-black px-6 sm:px-8 md:px-10 py-3 sm:py-3.5 md:py-4 rounded-full font-bold text-[10px] sm:text-xs md:text-sm tracking-widest uppercase transition-all duration-300 hover:bg-neutral-100 hover:scale-[1.03] active:scale-95 inline-flex shadow-xl"
               >
-                <span className="relative z-10 flex items-center gap-3 group-hover:text-primary transition-colors duration-500">
-                  {buttonText}
-                  <ArrowRight className="w-5 h-5 transition-transform duration-500 group-hover:translate-x-1" />
-                </span>
-
-                <div className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[0.22,1,0.36,1]" />
+                <span>{buttonText}</span>
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:translate-x-1" />
               </a>
             </div>
           </motion.div>

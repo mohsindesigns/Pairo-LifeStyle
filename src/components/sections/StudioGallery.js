@@ -20,9 +20,9 @@ export default function StudioGallery({
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8">
           <div className="space-y-4">
              <span className="text-[10px] font-bold tracking-[0.3em] text-white/70 uppercase">{label}</span>
-             <h2 className="text-4xl md:text-6xl font-bold heading-font tracking-tighter uppercase leading-none">
+             <p className="text-2xl md:text-4xl font-bold heading-font tracking-tighter uppercase leading-none">
                {title}
-             </h2>
+             </p>
           </div>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">

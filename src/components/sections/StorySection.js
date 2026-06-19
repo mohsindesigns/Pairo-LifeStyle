@@ -47,9 +47,9 @@ export default function StorySection({
                  <div className="w-1.5 h-1.5 rounded-full bg-foreground" />
                  <span className="text-[9px] md:text-[11px] font-bold tracking-[0.3em] text-foreground/80 uppercase">{label}</span>
               </div>
-              <h2 className="text-4xl md:text-5xl lg:text-7xl font-bold heading-font tracking-tighter text-foreground uppercase leading-[0.9]">
+              <p className="text-2xl md:text-4xl lg:text-5xl font-bold heading-font tracking-tighter text-foreground uppercase leading-[0.9]">
                 {title}
-              </h2>
+              </p>
             </motion.div>
             <motion.p variants={itemVariants} className="text-lg md:text-xl text-foreground/85 leading-relaxed max-w-xl">
               {description}
@@ -57,7 +57,7 @@ export default function StorySection({
             <motion.div variants={itemVariants} className="grid sm:grid-cols-2 gap-8 pt-6">
               {features.map((feature, i) => (
                 <div key={i} className="p-8 rounded-3xl bg-secondary border border-border space-y-4 hover:bg-primary transition-all duration-500 group">
-                  <h3 className="text-lg font-bold uppercase tracking-tight text-primary group-hover:text-white transition-colors duration-500">{feature.title}</h3>
+                  <p className="text-lg font-bold uppercase tracking-tight text-primary group-hover:text-white transition-colors duration-500">{feature.title}</p>
                   <p className="text-sm text-foreground group-hover:text-white/95 leading-relaxed transition-colors duration-500">{feature.desc}</p>
                 </div>
               ))}

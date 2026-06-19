@@ -13,9 +13,9 @@ export default function CTASection({
   return (
     <section className="py-12 md:py-24">
        <div className="mx-4 md:mx-8 bg-background border border-border text-foreground rounded-[32px] md:rounded-[40px] shadow-sm overflow-hidden py-24 px-6 md:px-16 text-center">
-          <h2 className="text-4xl md:text-7xl font-bold heading-font tracking-tighter uppercase mb-12">
+          <p className="text-2xl md:text-5xl font-bold heading-font tracking-tighter uppercase mb-12">
              {title}
-          </h2>
+          </p>
           <div className="flex flex-wrap justify-center gap-6">
              <Link href={primaryBtnLink} className="px-12 py-5 bg-primary text-background rounded-full font-bold text-xs uppercase tracking-widest hover:bg-primary/90 transition-all active:scale-95 inline-block">
                 {primaryBtnLabel}
