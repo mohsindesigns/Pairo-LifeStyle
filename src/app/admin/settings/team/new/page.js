@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Shield, Mail, Key, ArrowLeft, Save } from "lucide-react";
+import { UserPlus, Shield, Mail, Key, ArrowLeft, Save, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 
 export default function InviteStaff() {
   const router = useRouter();
   const [roles, setRoles] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -90,13 +91,22 @@ export default function InviteStaff() {
 
                <div className="space-y-1.5">
                   <label className="text-[13px] font-bold text-[#1d2327]">Initial Password</label>
-                  <input 
-                     type="password" 
-                     required
-                     className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                     value={formData.password}
-                     onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  />
+                  <div className="relative">
+                     <input 
+                        type={showPassword ? "text" : "password"} 
+                        required
+                        className="w-full border border-[#8c8f94] pl-3 pr-10 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
+                        value={formData.password}
+                        onChange={(e) => setFormData({...formData, password: e.target.value})}
+                     />
+                     <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                     >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                     </button>
+                  </div>
                   <p className="text-[11px] text-[#646970]">The user will be prompted to change this on their first login.</p>
                </div>
 

@@ -1,10 +1,32 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, Suspense } from "react";
 import AdminSidebar from "@/components/admin/Sidebar";
 import AuthProvider from "@/components/providers/AuthProvider";
+import { toast } from "react-hot-toast";
+
+function PermissionErrorToast() {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (error === "NoPermission") {
+      toast.error("You do not have permission to access that section.", {
+        id: "no-permission-error",
+      });
+      // Clean up the URL parameter cleanly
+      const params = new URLSearchParams(window.location.search);
+      params.delete("error");
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [searchParams]);
+
+  return null;
+}
 
 function AdminGuard({ children }) {
   const { data: session, status } = useSession();
@@ -41,7 +63,13 @@ function AdminGuard({ children }) {
 export default function AdminLayout({ children }) {
   return (
     <AuthProvider>
-      <AdminGuard>{children}</AdminGuard>
+      <AdminGuard>
+        <Suspense fallback={null}>
+          <PermissionErrorToast />
+        </Suspense>
+        {children}
+      </AdminGuard>
     </AuthProvider>
   );
 }
+

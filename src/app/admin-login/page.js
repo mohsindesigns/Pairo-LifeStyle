@@ -5,6 +5,8 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import logo from "@/assets/png-file.png";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -26,12 +28,26 @@ export default function AdminLoginPage() {
         redirect: false,
       });
 
-      if (res.error) {
+      if (res?.error) {
         setError("Invalid credentials. Please check your admin access.");
       } else {
-        // Standard Next.js client-side navigation + refresh for session propagation
-        router.refresh();
-        router.push("/admin");
+        // Wait for the session cookie to be fully established before navigating.
+        // router.push("/admin") without waiting causes the middleware to see no token
+        // and bounce back to /admin-login (race condition).
+        const { getSession } = await import("next-auth/react");
+        let attempts = 0;
+        let session = null;
+        while (attempts < 10) {
+          session = await getSession();
+          if (session?.user?.isStaff) break;
+          await new Promise((r) => setTimeout(r, 300));
+          attempts++;
+        }
+        if (session?.user?.isStaff) {
+          router.push("/admin");
+        } else {
+          setError("Session could not be established. Please try again.");
+        }
       }
     } catch (err) {
       setError("An unexpected error occurred.");
@@ -46,8 +62,8 @@ export default function AdminLoginPage() {
         {/* WP-style Logo Header */}
         <div className="text-center mb-4">
           <Link href="/" className="inline-block hover:opacity-80 transition-opacity">
-            <div className="w-20 h-20 bg-[#1d2327] rounded-full flex items-center justify-center mx-auto shadow-md border border-white/10">
-              <span className="text-white text-3xl font-black italic tracking-tighter">P</span>
+            <div className="w-28 h-16 bg-white rounded-xl flex items-center justify-center mx-auto shadow-md border border-[#c3c4c7] px-3 py-2">
+              <Image src={logo} alt="Pairo Logo" width={110} height={40} className="object-contain w-full h-full" priority />
             </div>
           </Link>
         </div>
