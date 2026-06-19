@@ -32,7 +32,7 @@ export default function FeaturedBanner({
   };
 
   return (
-    <section className="mx-4 md:mx-8 my-12 md:my-16">
+    <section className="mx-4 md:mx-8 my-8 md:my-12">
       <div className="bg-black rounded-[24px] md:rounded-[40px] overflow-hidden relative min-h-[380px] md:min-h-[450px] flex items-center">
         {/* Product Image - Optimized for all screens */}
         <div className="absolute inset-0 w-full h-full md:w-1/2 md:left-auto md:right-0">
@@ -47,7 +47,7 @@ export default function FeaturedBanner({
         </div>
 
         {/* Content Area - Responsive Fitting */}
-        <div className="w-full relative z-10 px-6 md:px-16 py-10 md:py-0">
+        <div className="w-full relative z-10 px-6 md:px-16 py-10 md:py-12 lg:py-16">
           <div className="max-w-full md:max-w-lg lg:max-w-xl space-y-6 md:space-y-8">
             {/* Minimalist Badges */}
             <div className="flex flex-wrap gap-2">
