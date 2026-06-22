@@ -29,11 +29,11 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  
+
   // Resolve from search parameters or fallback to server-passed props for SEO / SSR hydration alignment
   const categoryParam = searchParams.get("category") ?? initialCategory;
   const typeParam = searchParams.get("type") ?? initialType;
-  
+
   const [products, setProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || "");
   const [loading, setLoading] = useState(true);
@@ -51,7 +51,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       };
     }
   }, []);
-  
+
   useEffect(() => {
     fetch("/api/products")
       .then(res => res.json())
@@ -232,7 +232,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       max: Math.ceil(max / 10) * 10
     };
   }, [products]);
-  
+
   // States for filters
   const [maxPrice, setMaxPrice] = useState(2000);
   const [sliderValue, setSliderValue] = useState(2000);
@@ -274,19 +274,19 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
     // Category filter
     if (selectedCategory) {
-      const targetDbCat = dbCategories.find(c => 
+      const targetDbCat = dbCategories.find(c =>
         c.name.toLowerCase() === selectedCategory.toLowerCase() ||
         c.slug?.toLowerCase() === selectedCategory.toLowerCase() ||
         c._id === selectedCategory
       );
       result = result.filter(p => {
-         const pCat = p.category || '';
-         const pCats = p.categories || [];
-         const matchesString = pCat.toLowerCase() === selectedCategory.toLowerCase() ||
-                               (targetDbCat && pCat.toLowerCase() === targetDbCat.name.toLowerCase()) ||
-                               (targetDbCat && pCat.toLowerCase() === targetDbCat.slug?.toLowerCase());
-         const matchesId = targetDbCat && pCats.includes(targetDbCat._id);
-         return matchesString || matchesId;
+        const pCat = p.category || '';
+        const pCats = p.categories || [];
+        const matchesString = pCat.toLowerCase() === selectedCategory.toLowerCase() ||
+          (targetDbCat && pCat.toLowerCase() === targetDbCat.name.toLowerCase()) ||
+          (targetDbCat && pCat.toLowerCase() === targetDbCat.slug?.toLowerCase());
+        const matchesId = targetDbCat && pCats.includes(targetDbCat._id);
+        return matchesString || matchesId;
       });
     }
 
@@ -298,7 +298,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
           attr.name?.toLowerCase() === 'type' &&
           attr.values?.some(v => v.label && selectedTypes.some(type => v.label.toLowerCase() === type.toLowerCase()))
         );
-        return selectedTypes.some(type => 
+        return selectedTypes.some(type =>
           productType?.toLowerCase().includes(type.toLowerCase())
         ) || hasAttrType;
       });
@@ -311,7 +311,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     if (selectedColors.length > 0) {
       result = result.filter(p => {
         const hasLegacyColor = p.colors?.some(c => selectedColors.includes(c));
-        const hasAttrColor = p.attributes?.some(attr => 
+        const hasAttrColor = p.attributes?.some(attr =>
           (attr.name?.toLowerCase() === 'color' || attr.name?.toLowerCase() === 'colors') &&
           attr.values?.some(v => v.label && selectedColors.includes(v.label.trim()))
         );
@@ -323,7 +323,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     if (selectedSizes.length > 0) {
       result = result.filter(p => {
         const hasLegacySize = p.sizes?.some(s => selectedSizes.includes(s));
-        const hasAttrSize = p.attributes?.some(attr => 
+        const hasAttrSize = p.attributes?.some(attr =>
           (attr.name?.toLowerCase() === 'size' || attr.name?.toLowerCase() === 'sizes') &&
           attr.values?.some(v => v.label && selectedSizes.includes(v.label.trim()))
         );
@@ -335,8 +335,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     Object.keys(selectedCustomAttrs).forEach(attrName => {
       const selectedVals = selectedCustomAttrs[attrName];
       if (selectedVals && selectedVals.length > 0) {
-        result = result.filter(p => 
-          p.attributes?.some(attr => 
+        result = result.filter(p =>
+          p.attributes?.some(attr =>
             attr.name === attrName &&
             attr.values?.some(v => v.label && selectedVals.includes(v.label.trim()))
           )
@@ -347,7 +347,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(p => 
+      result = result.filter(p =>
         p.name?.toLowerCase().includes(query) ||
         p.description?.toLowerCase().includes(query) ||
         p.category?.toLowerCase().includes(query)
@@ -355,7 +355,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     }
 
     // Sorting
-    switch(sortBy) {
+    switch (sortBy) {
       case "Price: Low to High":
         result = [...result].sort((a, b) => a.price - b.price);
         break;
@@ -409,10 +409,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
   const toggleType = (type) => {
     setSelectedTypes(prev => {
-      const newTypes = prev.includes(type) 
-        ? prev.filter(t => t !== type) 
+      const newTypes = prev.includes(type)
+        ? prev.filter(t => t !== type)
         : [...prev, type];
-      
+
       const params = new URLSearchParams(window.location.search);
       if (newTypes.length === 1) {
         params.set("type", newTypes[0].toLowerCase());
@@ -421,7 +421,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       }
       const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
       silentReplaceState(newUrl);
-      
+
       return newTypes;
     });
     setCurrentPage(1);
@@ -473,7 +473,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     <div className="space-y-10">
       {/* Search Bar */}
       <div className="pb-8 border-b border-border">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-4">Search</h4>
+        <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-4">Search</p>
         <div className="relative">
           <input
             type="text"
@@ -498,9 +498,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
       {/* Categories */}
       <div className="pb-8 border-b border-border">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">Categories</h4>
+        <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">Categories</p>
         <div className="flex flex-col gap-3 text-xs">
-          <button 
+          <button
             type="button"
             onClick={() => handleCategorySelect("")}
             className={`flex items-center justify-between py-1 w-full text-left transition-all ${!selectedCategory ? "font-bold text-foreground" : "text-foreground/65 hover:text-foreground"}`}
@@ -516,8 +516,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               (dbCat && selectedCategory === dbCat._id)
             );
             return (
-              <button 
-                key={cat} 
+              <button
+                key={cat}
                 type="button"
                 onClick={() => {
                   handleCategorySelect(dbCat ? dbCat.slug : cat.toLowerCase());
@@ -543,18 +543,17 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
       {/* Product Types */}
       <div className="pb-8 border-b border-border">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">Product Type</h4>
+        <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">Product Type</p>
         <div className="flex flex-wrap gap-2">
           {dynamicProductTypes.map((type) => (
             <button
               key={type}
               type="button"
               onClick={() => toggleType(type)}
-              className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${
-                selectedTypes.includes(type) 
-                  ? "bg-foreground text-background border-foreground" 
-                  : "bg-transparent text-foreground/65 border-border hover:border-foreground/30 hover:text-foreground"
-              }`}
+              className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${selectedTypes.includes(type)
+                ? "bg-foreground text-background border-foreground"
+                : "bg-transparent text-foreground/65 border-border hover:border-foreground/30 hover:text-foreground"
+                }`}
             >
               {type}
               {selectedTypes.includes(type) && (
@@ -567,18 +566,18 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
       {/* Price Range */}
       <div className="pb-8 border-b border-border">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">
+        <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">
           Price Range
           <span className="ml-2 text-foreground">${priceLimits.min} - ${sliderValue}</span>
-        </h4>
-        <input 
-          type="range" 
-          className="w-full accent-primary cursor-pointer" 
-          min={priceLimits.min} 
-          max={priceLimits.max} 
-          step={10} 
-          value={sliderValue} 
-          onChange={(e) => setSliderValue(parseInt(e.target.value))} 
+        </p>
+        <input
+          type="range"
+          className="w-full accent-primary cursor-pointer"
+          min={priceLimits.min}
+          max={priceLimits.max}
+          step={10}
+          value={sliderValue}
+          onChange={(e) => setSliderValue(parseInt(e.target.value))}
         />
         <div className="flex justify-between text-[10px] font-bold mt-3 text-foreground/50">
           <span>${priceLimits.min}</span>
@@ -589,51 +588,50 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
       {/* Colors */}
       <div className="pb-8 border-b border-border">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">
+        <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">
           Colors
           {selectedColors.length > 0 && (
             <span className="ml-2 text-foreground">({selectedColors.length})</span>
           )}
-        </h4>
+        </p>
         <div className="flex flex-wrap gap-3">
           {dynamicColors.map((colorObj) => {
-             const color = colorObj.label;
-             const hex = colorObj.hex;
-             const image = colorObj.image;
-             
-             const colorMapFallback = { 
-               "Black": "#1A1A1A", 
-               "Brown": "#4A3B2F", 
-               "Tan": "#D2B48C", 
-               "Camel": "#C19A6B", 
-               "Navy": "#1B2E3C",
-               "White": "#FFFFFF",
-               "Gray": "#808080",
-               "Red": "#8B0000",
-               "Green": "#2F4F2F"
-             };
-             
-             const backgroundColor = hex || colorMapFallback[color] || color.toLowerCase();
-             
-             return (
-              <button 
-                key={color} 
+            const color = colorObj.label;
+            const hex = colorObj.hex;
+            const image = colorObj.image;
+
+            const colorMapFallback = {
+              "Black": "#1A1A1A",
+              "Brown": "#4A3B2F",
+              "Tan": "#D2B48C",
+              "Camel": "#C19A6B",
+              "Navy": "#1B2E3C",
+              "White": "#FFFFFF",
+              "Gray": "#808080",
+              "Red": "#8B0000",
+              "Green": "#2F4F2F"
+            };
+
+            const backgroundColor = hex || colorMapFallback[color] || color.toLowerCase();
+
+            return (
+              <button
+                key={color}
                 type="button"
-                onClick={() => toggleColor(color)} 
+                onClick={() => toggleColor(color)}
                 className="group relative"
                 title={color}
               >
-                <div 
-                  className={`w-8 h-8 rounded-full border transition-all ${
-                    selectedColors.includes(color) 
-                      ? "ring-2 ring-primary ring-offset-2 scale-110" 
-                      : "border-border hover:scale-110"
-                  }`} 
-                  style={{ 
+                <div
+                  className={`w-8 h-8 rounded-full border transition-all ${selectedColors.includes(color)
+                    ? "ring-2 ring-primary ring-offset-2 scale-110"
+                    : "border-border hover:scale-110"
+                    }`}
+                  style={{
                     backgroundColor: image ? 'transparent' : backgroundColor,
                     backgroundImage: image ? `url(${image})` : 'none',
                     backgroundSize: 'cover'
-                  }} 
+                  }}
                 >
                   {selectedColors.includes(color) && (
                     <Check className={`w-4 h-4 m-auto ${color === 'White' || color === 'Tan' ? 'text-foreground' : 'text-background'}`} />
@@ -643,30 +641,29 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   {color}
                 </span>
               </button>
-             );
+            );
           })}
         </div>
       </div>
 
       {/* Sizes */}
       <div className="pb-8 border-b border-border">
-        <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">
+        <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">
           Sizes
           {selectedSizes.length > 0 && (
             <span className="ml-2 text-foreground">({selectedSizes.length})</span>
           )}
-        </h4>
+        </p>
         <div className="flex flex-wrap gap-2">
           {dynamicSizes.map((size) => (
-            <button 
-              key={size} 
+            <button
+              key={size}
               type="button"
-              onClick={() => toggleSize(size)} 
-              className={`px-5 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${
-                selectedSizes.includes(size) 
-                  ? "bg-foreground text-background border-foreground" 
-                  : "bg-transparent text-foreground/65 border-border hover:border-foreground/30 hover:text-foreground"
-              }`}
+              onClick={() => toggleSize(size)}
+              className={`px-5 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${selectedSizes.includes(size)
+                ? "bg-foreground text-background border-foreground"
+                : "bg-transparent text-foreground/65 border-border hover:border-foreground/30 hover:text-foreground"
+                }`}
             >
               {size}
             </button>
@@ -677,12 +674,12 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       {/* Custom Dynamic Attributes */}
       {customAttributesMap.map((attr) => (
         <div key={attr.name} className="pb-8 border-b border-border">
-          <h4 className="font-bold text-[10px] uppercase tracking-[0.2em] text-foreground/60 mb-6">
+          <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">
             {attr.name}
             {selectedCustomAttrs[attr.name]?.length > 0 && (
               <span className="ml-2 text-foreground">({selectedCustomAttrs[attr.name].length})</span>
             )}
-          </h4>
+          </p>
           <div className="flex flex-wrap gap-2">
             {attr.values.map((val) => {
               const isSelected = selectedCustomAttrs[attr.name]?.includes(val);
@@ -691,11 +688,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   key={val}
                   type="button"
                   onClick={() => toggleCustomAttr(attr.name, val)}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${
-                    isSelected
-                      ? "bg-foreground text-background border-foreground"
-                      : "bg-transparent text-foreground/65 border-border hover:border-foreground hover:text-foreground"
-                  }`}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${isSelected
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-transparent text-foreground/65 border-border hover:border-foreground hover:text-foreground"
+                    }`}
                 >
                   {val}
                 </button>
@@ -706,9 +702,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       ))}
 
       {/* Reset Filters */}
-      <button 
+      <button
         type="button"
-        onClick={resetFilters} 
+        onClick={resetFilters}
         className="w-full text-foreground/60 hover:text-foreground py-4 font-bold text-[9px] uppercase tracking-[0.2em] transition-all hover:bg-foreground/[0.04] rounded-lg"
       >
         Clear All Filters
@@ -726,58 +722,58 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       <div className="container mx-auto px-6 md:px-16 py-8 md:py-16">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
           <div className="space-y-4">
-             <div className="flex items-center gap-2 text-foreground/50 text-[9px] font-bold uppercase tracking-widest">
-                <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
-                <ChevronRight className="w-3.5 h-3.5 text-foreground/45" />
-                <span className="text-foreground/90">Shop</span>
-             </div>
-             <h1 className="text-4xl md:text-6xl font-bold heading-font tracking-tighter uppercase leading-none text-foreground">
-                 {(() => {
-                   if (selectedCategory) {
-                     const dbCat = dbCategories.find(c => 
-                       c.name.toLowerCase() === selectedCategory.toLowerCase() ||
-                       c.slug?.toLowerCase() === selectedCategory.toLowerCase() ||
-                       c._id === selectedCategory
-                     );
-                     return dbCat ? dbCat.name : selectedCategory;
-                   }
-                   return selectedTypes[0] || "Shop All";
-                 })()}
-              </h1>
-             <p className="text-sm text-foreground/60 font-medium">
-               {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
-               {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} active filter${getActiveFilterCount() > 1 ? 's' : ''}`}
-             </p>
+            <div className="flex items-center gap-2 text-foreground/50 text-[9px] font-bold uppercase tracking-widest">
+              <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
+              <ChevronRight className="w-3.5 h-3.5 text-foreground/45" />
+              <span className="text-foreground/90">Shop</span>
+            </div>
+            <p className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold heading-font tracking-tighter uppercase leading-none text-foreground">
+              {(() => {
+                if (selectedCategory) {
+                  const dbCat = dbCategories.find(c =>
+                    c.name.toLowerCase() === selectedCategory.toLowerCase() ||
+                    c.slug?.toLowerCase() === selectedCategory.toLowerCase() ||
+                    c._id === selectedCategory
+                  );
+                  return dbCat ? dbCat.name : selectedCategory;
+                }
+                return selectedTypes[0] || "Shop All";
+              })()}
+            </p>
+            <p className="text-sm text-foreground/60 font-medium">
+              {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
+              {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} active filter${getActiveFilterCount() > 1 ? 's' : ''}`}
+            </p>
           </div>
           <div className="flex items-center justify-between md:justify-end gap-8 border-t border-border md:border-none pt-8 md:pt-0">
-             <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value)} 
-                  className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8 text-foreground"
-                >
-                  <option>Most Popular</option>
-                  <option>Newest</option>
-                  <option>Price: Low to High</option>
-                  <option>Price: High to Low</option>
-                  <option>Name: A to Z</option>
-                  <option>Name: Z to A</option>
-                </select>
-             </div>
-             <button 
-               type="button"
-               onClick={() => setShowFilters(true)} 
-               className="lg:hidden flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative hover:bg-foreground/90"
-             >
-               <SlidersHorizontal className="w-4 h-4" /> 
-               Filter
-               {getActiveFilterCount() > 0 && (
-                 <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center animate-pulse">
-                   {getActiveFilterCount()}
-                 </span>
-               )}
-             </button>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8 text-foreground"
+              >
+                <option>Most Popular</option>
+                <option>Newest</option>
+                <option>Price: Low to High</option>
+                <option>Price: High to Low</option>
+                <option>Name: A to Z</option>
+                <option>Name: Z to A</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFilters(true)}
+              className="lg:hidden flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative hover:bg-foreground/90"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Filter
+              {getActiveFilterCount() > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center animate-pulse">
+                  {getActiveFilterCount()}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -785,13 +781,13 @@ export default function ShopContentClient({ initialCategory = null, initialType 
           <aside className="hidden lg:block lg:col-span-3 h-fit sticky top-32">
             {renderFilterSections(false)}
           </aside>
-          
+
           <main className="lg:col-span-9 min-h-[800px]">
             {loading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-10">
-                 {[1,2,3,4,5,6].map(i => (
-                    <div key={i} className="aspect-[3/4] bg-gray-100 animate-pulse rounded-2xl" />
-                 ))}
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <div key={i} className="aspect-[3/4] bg-gray-100 animate-pulse rounded-2xl" />
+                ))}
               </div>
             ) : paginatedProducts.length > 0 ? (
               <>
@@ -805,9 +801,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               <div className="flex flex-col items-center justify-center py-40 border border-dashed border-border rounded-3xl">
                 <p className="text-2xl font-bold heading-font uppercase mb-4 text-foreground">No products found</p>
                 <p className="text-sm text-foreground/60 mb-8">Try adjusting your filters or search terms</p>
-                <button 
+                <button
                   type="button"
-                  onClick={resetFilters} 
+                  onClick={resetFilters}
                   className="px-8 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-foreground/90 transition-colors"
                 >
                   Clear All Filters
@@ -817,39 +813,36 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
             {totalPages > 1 && (
               <div className="mt-20 flex items-center justify-center gap-12 border-t border-border pt-12">
-                <button 
+                <button
                   type="button"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
-                  disabled={currentPage === 1} 
-                  className={`text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    currentPage === 1 ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
-                  }`}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`text-[10px] font-bold uppercase tracking-widest transition-all ${currentPage === 1 ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
+                    }`}
                 >
                   Prev
                 </button>
                 <div className="flex gap-4">
                   {[...Array(totalPages)].map((_, i) => (
-                    <button 
-                      key={i + 1} 
+                    <button
+                      key={i + 1}
                       type="button"
-                      onClick={() => setCurrentPage(i + 1)} 
-                      className={`w-8 h-8 text-sm font-bold transition-all rounded-full ${
-                        currentPage === i + 1 
-                          ? "bg-foreground text-background" 
-                          : "text-foreground/50 hover:text-foreground hover:bg-foreground/10"
-                      }`}
+                      onClick={() => setCurrentPage(i + 1)}
+                      className={`w-8 h-8 text-sm font-bold transition-all rounded-full ${currentPage === i + 1
+                        ? "bg-foreground text-background"
+                        : "text-foreground/50 hover:text-foreground hover:bg-foreground/10"
+                        }`}
                     >
                       {i + 1}
                     </button>
                   ))}
                 </div>
-                <button 
+                <button
                   type="button"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
-                  disabled={currentPage === totalPages} 
-                  className={`text-[10px] font-bold uppercase tracking-widest transition-all ${
-                    currentPage === totalPages ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
-                  }`}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`text-[10px] font-bold uppercase tracking-widest transition-all ${currentPage === totalPages ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
+                    }`}
                 >
                   Next
                 </button>
@@ -863,30 +856,30 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       <AnimatePresence>
         {showFilters && (
           <>
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              onClick={() => setShowFilters(false)} 
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] lg:hidden" 
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowFilters(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] lg:hidden"
             />
-            <motion.div 
-              initial={{ x: "100%" }} 
-              animate={{ x: 0 }} 
-              exit={{ x: "100%" }} 
-              transition={{ type: "spring", damping: 30, stiffness: 300 }} 
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
               className="fixed right-0 top-0 bottom-0 w-[85vw] max-w-sm bg-background z-[110] lg:hidden flex flex-col shadow-2xl"
             >
               <div className="p-6 flex items-center justify-between border-b border-border">
                 <div>
-                  <h3 className="text-xl font-bold heading-font uppercase text-foreground">Filters</h3>
+                  <p className="text-lg sm:text-xl font-bold heading-font uppercase text-foreground">Filters</p>
                   {getActiveFilterCount() > 0 && (
                     <p className="text-xs text-foreground/60 mt-1">{getActiveFilterCount()} active</p>
                   )}
                 </div>
-                <button 
+                <button
                   type="button"
-                  onClick={() => setShowFilters(false)} 
+                  onClick={() => setShowFilters(false)}
                   className="p-2 hover:bg-foreground/10 rounded-full transition-colors"
                 >
                   <X className="w-6 h-6 text-foreground" />
@@ -896,16 +889,16 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                 {renderFilterSections(true)}
               </div>
               <div className="p-6 border-t border-border flex gap-4 bg-background">
-                <button 
+                <button
                   type="button"
                   onClick={resetFilters}
                   className="flex-1 text-foreground/70 hover:text-foreground py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest border border-border hover:border-foreground/30 transition-all bg-transparent"
                 >
                   Reset
                 </button>
-                <button 
+                <button
                   type="button"
-                  onClick={() => setShowFilters(false)} 
+                  onClick={() => setShowFilters(false)}
                   className="flex-1 bg-foreground text-background py-4 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-xl hover:bg-foreground/90 transition-colors"
                 >
                   Apply Filters

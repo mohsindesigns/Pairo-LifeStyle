@@ -115,7 +115,7 @@ export default function ProductCard({ product }) {
           <div className="flex items-center gap-1">
             <Star className="w-2.5 h-2.5 fill-primary text-primary" />
             <span className="text-[9px] font-normal text-foreground/60">
-              {(product.rating || 5).toFixed(1)} ({product.reviewsCount || 45})
+              {(product.rating || 0).toFixed(1)} ({product.reviewCount || 0})
             </span>
           </div>
         </div>

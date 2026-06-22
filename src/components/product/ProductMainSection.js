@@ -79,17 +79,17 @@ export default function ProductMainSection({ product }) {
             <p className="text-[10px] md:text-[11px] font-bold text-primary/80 uppercase tracking-[0.25em]">
               Pairo Studio — {categoryName}
             </p>
-            <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl font-medium heading-font tracking-tight leading-[1.2] text-primary">
+            <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium heading-font tracking-tight leading-[1.2] text-primary">
               {product.name}
-            </h1>
+            </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-semibold text-primary/80">
+          <p className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-primary/80">
             <Star className="w-3.5 h-3.5 fill-primary text-primary" />
-            <span>{(product.rating || 5).toFixed(1)}/5.0</span>
+            <span>{(product.rating || 0).toFixed(1)}/5.0</span>
             <span className="text-black/10">•</span>
-            <span>({product.reviewsCount || 45} Reviews)</span>
-          </div>
+            <span>({product.reviewCount || 0} Reviews)</span>
+          </p>
 
           <div className="flex items-center flex-wrap gap-3.5">
             <span className="text-2xl md:text-2xl font-semibold tracking-tight text-primary">${displayPrice}</span>
@@ -109,10 +109,10 @@ export default function ProductMainSection({ product }) {
 
         {product.shortDescription && (
           <div className="relative">
-             <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary/20" />
-             <p className="text-primary/85 text-sm md:text-base leading-relaxed font-normal italic pl-6 py-0.5">
-                {product.shortDescription}
-             </p>
+            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-primary/20" />
+            <p className="text-primary/85 text-sm md:text-base leading-relaxed font-normal italic pl-6 py-0.5">
+              {product.shortDescription}
+            </p>
           </div>
         )}
 
@@ -126,18 +126,18 @@ export default function ProductMainSection({ product }) {
         {product.stats && product.stats.length > 0 && (
           <div className="grid grid-cols-2 gap-6 pt-8 border-t border-black/5">
             {product.stats.map((stat, i) => {
-               const Icon = ICON_MAP[stat.icon] || Info;
-               return (
-                 <div key={i} className="flex items-center gap-3 group">
-                   <div className="p-2.5 bg-white border border-border rounded-[var(--radius,0px)] transition-colors duration-300 group-hover:bg-primary group-hover:border-primary">
-                     <Icon className="w-3.5 h-3.5 text-primary/70 group-hover:text-white transition-colors" />
-                   </div>
-                   <div className="space-y-0.5">
-                     <p className="text-[8px] font-normal uppercase tracking-[0.15em] text-primary/60">{stat.label}</p>
-                     <p className="text-[11px] font-normal text-black uppercase tracking-wider">{stat.value}</p>
-                   </div>
-                 </div>
-               );
+              const Icon = ICON_MAP[stat.icon] || Info;
+              return (
+                <div key={i} className="flex items-center gap-3 group">
+                  <div className="p-2.5 bg-white border border-border rounded-[var(--radius,0px)] transition-colors duration-300 group-hover:bg-primary group-hover:border-primary">
+                    <Icon className="w-3.5 h-3.5 text-primary/70 group-hover:text-white transition-colors" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-[8px] font-normal uppercase tracking-[0.15em] text-primary/60">{stat.label}</p>
+                    <p className="text-[11px] font-normal text-black uppercase tracking-wider">{stat.value}</p>
+                  </div>
+                </div>
+              );
             })}
           </div>
         )}
@@ -146,16 +146,16 @@ export default function ProductMainSection({ product }) {
         {product.faqs && product.faqs.length > 0 && (
           <div className="pt-8 border-t border-black/5 space-y-4">
             <div className="flex items-center justify-between">
-               <h3 className="text-[10px] font-medium uppercase tracking-[0.2em] text-primary/60">Frequent Inquiries</h3>
-               <div className="flex items-center gap-2 text-[9px] font-medium text-black/40 uppercase tracking-widest">
-                  <MessageSquare className="w-3 h-3 text-primary/60" /> {product.faqs.length} Total
-               </div>
+              <h3 className="text-[10px] font-medium uppercase tracking-[0.2em] text-primary/60">Frequent Inquiries</h3>
+              <div className="flex items-center gap-2 text-[9px] font-medium text-black/40 uppercase tracking-widest">
+                <MessageSquare className="w-3 h-3 text-primary/60" /> {product.faqs.length} Total
+              </div>
             </div>
             <div className="space-y-2.5">
               {product.faqs.slice(0, 2).map((faq, i) => (
                 <div key={i} className="p-4 bg-white border border-border rounded-[var(--radius,0px)] flex gap-3.5 hover:border-primary/30 transition-all cursor-pointer group">
                   <div className="shrink-0 w-7 h-7 bg-white border border-border/60 rounded-[var(--radius,0px)] flex items-center justify-center group-hover:bg-primary transition-colors">
-                     <HelpCircle className="w-3.5 h-3.5 text-primary/70 group-hover:text-white transition-colors" />
+                    <HelpCircle className="w-3.5 h-3.5 text-primary/70 group-hover:text-white transition-colors" />
                   </div>
                   <div className="space-y-0.5">
                     <p className="text-xs font-normal text-black tracking-tight">{faq.question}</p>

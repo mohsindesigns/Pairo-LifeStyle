@@ -194,7 +194,7 @@ export function resolveSEOMetadata(options = {}) {
       if (entity.reviewCount > 0) {
         structuredDataJson.aggregateRating = {
           "@type": "AggregateRating",
-          "ratingValue": entity.rating || 5,
+          "ratingValue": entity.rating || 0,
           "bestRating": "5",
           "worstRating": "1",
           "reviewCount": entity.reviewCount

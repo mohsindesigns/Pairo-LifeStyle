@@ -44,21 +44,6 @@ export default function ClientTabSystem({ product }) {
                          dangerouslySetInnerHTML={{ __html: product.description || "Detailed overview coming soon..." }}
                        />
                   </div>
-
-                  {/* Technical Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 pt-8 border-t border-black/5">
-                     {[
-                        { l: "SKU Identifier", v: product.sku || "N/A" },
-                        { l: "Department", v: product.categories?.[0]?.name || product.category || "General" },
-                        { l: "Stock Status", v: product.status || "Published" },
-                        { l: "Logistics", v: product.shippingType || "Express" }
-                     ].map((s, i) => (
-                        <div key={i} className="space-y-1.5">
-                           <p className="text-[9px] font-semibold text-primary/60 uppercase tracking-widest">{s.l}</p>
-                           <p className="text-xs font-semibold uppercase text-primary tracking-wider">{s.v}</p>
-                        </div>
-                     ))}
-                  </div>
                </motion.div>
             )}
 

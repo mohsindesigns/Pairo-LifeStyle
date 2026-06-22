@@ -112,7 +112,7 @@ export default async function ProductDetailPage({ params }) {
       stars.push(
         <Star 
           key={i} 
-          className={`${size} ${i < Math.floor(rating || 5) ? 'fill-primary text-primary' : 'fill-black/5 text-black/5'}`} 
+          className={`${size} ${i < Math.floor(rating || 0) ? 'fill-primary text-primary' : 'fill-black/5 text-black/5'}`} 
         />
       );
     }

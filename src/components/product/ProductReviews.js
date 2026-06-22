@@ -366,9 +366,9 @@ export default function ProductReviews({ productId, productName }) {
     <div className="w-full bg-white border border-[#E3DACB] rounded-[var(--radius,0px)] p-6 md:p-10 font-sans">
       <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center justify-between border-b border-black/5 pb-8 mb-8">
         <div>
-          <h2 className="text-xl md:text-2xl font-medium tracking-tight uppercase heading-font text-[#1E1B19] mb-1">
+          <p className="text-lg sm:text-xl md:text-2xl font-medium tracking-tight uppercase heading-font text-[#1E1B19] mb-1">
             Ratings & Reviews
-          </h2>
+          </p>
           <p className="text-xs text-[#6F655B]/60 uppercase tracking-widest font-medium">
             Verified purchases from Pairo store
           </p>
@@ -840,7 +840,7 @@ export default function ProductReviews({ productId, productName }) {
         /* Empty state */
         <div className="py-16 text-center border border-dashed border-[#E3DACB] rounded-[var(--radius,0px)] bg-[#FAF7F0]/30">
           <MessageSquare className="w-10 h-10 text-[#6F655B]/40 mx-auto mb-4" />
-          <h4 className="text-sm font-medium uppercase tracking-wider text-[#1E1B19] mb-1">No reviews yet</h4>
+          <p className="text-xs sm:text-sm font-medium uppercase tracking-wider text-[#1E1B19] mb-1">No reviews yet</p>
           <p className="text-xs text-[#6F655B]/60 max-w-sm mx-auto leading-relaxed mb-6">
             Be the first to review this product! Share your feedback with other shoppers.
           </p>
@@ -884,9 +884,9 @@ export default function ProductReviews({ productId, productName }) {
                     </div>
                     {/* Review Title */}
                     {review.title && (
-                      <h4 className="text-sm font-medium uppercase tracking-wide text-[#1E1B19]">
+                      <p className="text-xs sm:text-sm font-medium uppercase tracking-wide text-[#1E1B19]">
                         {review.title}
-                      </h4>
+                      </p>
                     )}
                   </div>
 
