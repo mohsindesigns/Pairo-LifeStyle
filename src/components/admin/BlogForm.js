@@ -125,7 +125,11 @@ export default function BlogForm({ blogId }) {
             body: JSON.stringify(payload)
          });
          if (res.ok) {
-            router.push("/admin/blogs");
+            const savedBlog = await res.json();
+            alert(blogId ? "Blog post updated successfully!" : "Blog post created successfully!");
+            if (!blogId && savedBlog._id) {
+               router.push(`/admin/blogs/${savedBlog._id}`);
+            }
          } else {
             const errData = await res.json().catch(() => ({}));
             alert(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);

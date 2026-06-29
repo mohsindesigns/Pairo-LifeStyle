@@ -312,65 +312,78 @@ export default function Navbar() {
                             className="absolute top-full left-1/2 -translate-x-1/2 pt-2 z-50 pointer-events-auto"
                           >
                             <div className="bg-white/98 backdrop-blur-xl border border-black/[0.06] rounded-[32px] p-8 shadow-[0_30px_70px_rgba(0,0,0,0.12)] w-[960px] max-w-[95vw] overflow-hidden">
-                              <div className="grid grid-cols-12 gap-8">
-                                {/* Left Navigation Pane */}
-                                <div className="col-span-4 flex flex-col justify-between border-r border-black/[0.05] pr-8 py-2">
-                                  <div>
-                                    <span className="block text-[8px] font-black text-black/80 tracking-[0.3em] uppercase mb-6">Collections</span>
-                                    <div className="flex flex-col gap-4">
-                                      {(item.itemMegaCategories || []).map((cat, catIdx) => (
+                              {(() => {
+                                const megaCategories = item.itemMegaCategories || [];
+                                const catCount = megaCategories.length;
+                                const useTwoCols = catCount > 5;
+                                const leftSpan = useTwoCols ? "col-span-7" : "col-span-4";
+                                const rightSpan = useTwoCols ? "col-span-5" : "col-span-8";
+                                const promoCount = useTwoCols ? 2 : 3;
+
+                                return (
+                                  <div className="grid grid-cols-12 gap-8">
+                                    {/* Left Navigation Pane */}
+                                    <div className={`${leftSpan} flex flex-col justify-between border-r border-black/[0.05] pr-8 py-2`}>
+                                      <div>
+                                        <span className="block text-[8px] font-black text-black/80 tracking-[0.3em] uppercase mb-6">Collections</span>
+                                        <div className={useTwoCols ? "grid grid-cols-2 gap-x-8 gap-y-4" : "flex flex-col gap-4"}>
+                                          {megaCategories.map((cat, catIdx) => (
+                                            <Link
+                                              key={cat.slug || cat.name}
+                                              href={getCategoryUrl(cat)}
+                                              className="group/lnk flex items-center gap-4 text-left"
+                                            >
+                                              <span className="text-[10px] font-mono text-black/50 group-hover/lnk:text-black transition-colors duration-300">
+                                                {catIdx + 1 < 10 ? `0${catIdx + 1}` : catIdx + 1}
+                                              </span>
+                                              <div className="relative py-0.5">
+                                                <span className="text-[12px] font-bold uppercase tracking-[0.2em] text-black/85 group-hover/lnk:text-black transition-colors duration-300">
+                                                  {cat.name}
+                                                </span>
+                                                {/* Micro-underline animation */}
+                                                <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-black/85 transition-all duration-300 group-hover/lnk:w-full" />
+                                              </div>
+                                            </Link>
+                                          ))}
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-8 pt-4 border-t border-black/[0.03]">
+                                        <Link href="/shop" className="text-[11px]  uppercase tracking-[0.25em] text-black/80 hover:text-black transition-colors flex items-center gap-1.5">
+                                          View All Products <span className="translate-y-[-0.5px]">→</span>
+                                        </Link>
+                                      </div>
+                                    </div>
+
+                                    {/* Right Visual Pane */}
+                                    <div className={`${rightSpan} flex items-center justify-start gap-6 pl-2`}>
+                                      {megaCategories.slice(0, promoCount).map((cat) => (
                                         <Link
-                                          key={cat.slug || cat.name}
+                                          key={`promo-${cat.slug || cat.name}`}
                                           href={getCategoryUrl(cat)}
-                                          className="group/lnk flex items-center gap-4 text-left"
+                                          className="group/promo relative flex-1 min-w-[150px] max-w-[210px] aspect-[4/5] rounded-[20px] overflow-hidden bg-black/5 border border-black/5 shadow-sm hover:shadow-md transition-all duration-500"
                                         >
-                                          <span className="text-[10px] font-mono text-black/50 group-hover/lnk:text-black transition-colors duration-300">0{catIdx + 1}</span>
-                                          <div className="relative py-0.5">
-                                            <span className="text-[12px] font-bold uppercase tracking-[0.2em] text-black/85 group-hover/lnk:text-black transition-colors duration-300">
-                                              {cat.name}
-                                            </span>
-                                            {/* Micro-underline animation */}
-                                            <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-black/85 transition-all duration-300 group-hover/lnk:w-full" />
+                                          <Image
+                                            src={cat.image || '/placeholder.jpg'}
+                                            alt={cat.name}
+                                            fill
+                                            sizes="210px"
+                                            className="object-cover transition-transform duration-1000 ease-out group-hover/promo:scale-105"
+                                          />
+                                          {/* Gradient Overlay */}
+                                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500" />
+
+                                          {/* Editorial Content */}
+                                          <div className="absolute inset-x-0 bottom-0 p-5 flex flex-col items-start gap-1">
+                                            <span className="text-[7px] font-bold tracking-[0.25em] text-white/80 uppercase">Discover</span>
+                                            <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white w-full leading-snug">{cat.name}</h4>
                                           </div>
                                         </Link>
                                       ))}
                                     </div>
                                   </div>
-
-                                  <div className="mt-8 pt-4 border-t border-black/[0.03]">
-                                    <Link href="/shop" className="text-[11px]  uppercase tracking-[0.25em] text-black/80 hover:text-black transition-colors flex items-center gap-1.5">
-                                      View All Products <span className="translate-y-[-0.5px]">→</span>
-                                    </Link>
-                                  </div>
-                                </div>
-
-                                {/* Right Visual Pane */}
-                                <div className="col-span-8 flex items-center justify-start gap-6 pl-2">
-                                  {(item.itemMegaCategories || []).slice(0, 3).map((cat) => (
-                                    <Link
-                                      key={`promo-${cat.slug || cat.name}`}
-                                      href={getCategoryUrl(cat)}
-                                      className="group/promo relative flex-1 min-w-[160px] max-w-[210px] aspect-[4/5] rounded-[20px] overflow-hidden bg-black/5 border border-black/5 shadow-sm hover:shadow-md transition-all duration-500"
-                                    >
-                                      <Image
-                                        src={cat.image || '/placeholder.jpg'}
-                                        alt={cat.name}
-                                        fill
-                                        sizes="210px"
-                                        className="object-cover transition-transform duration-1000 ease-out group-hover/promo:scale-105"
-                                      />
-                                      {/* Gradient Overlay */}
-                                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500" />
-
-                                      {/* Editorial Content */}
-                                      <div className="absolute inset-x-0 bottom-0 p-5 flex flex-col items-start gap-1">
-                                        <span className="text-[7px] font-bold tracking-[0.25em] text-white/80 uppercase">Discover</span>
-                                        <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white w-full leading-snug">{cat.name}</h4>
-                                      </div>
-                                    </Link>
-                                  ))}
-                                </div>
-                              </div>
+                                );
+                              })()}
                             </div>
                           </motion.div>
                         )}

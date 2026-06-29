@@ -183,10 +183,10 @@ export default async function ProductDetailPage({ params, searchParams }) {
                    <div className="p-2.5 bg-primary text-white rounded-[var(--radius,0px)]"><ScrollText className="w-4 h-4" /></div>
                    <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-primary/60">{product.narrative.title || "The Story"}</span>
                 </div>
-                <h2 className="text-2xl md:text-3xl font-medium heading-font uppercase tracking-wider mb-6 leading-[1.2] text-primary">
+                <p className="text-[22px] md:text-[30px] font-medium heading-font uppercase tracking-wider mb-6 leading-[1.2] text-primary">
                    {product.name} <br/> 
                    <span className="text-primary/30 font-normal">Masterpiece Narrative</span>
-                </h2>
+                </p>
                 <div className="text-sm md:text-base text-primary/70 leading-relaxed font-normal" dangerouslySetInnerHTML={{ __html: product.narrative.content.replace(/\n/g, '<br/>') }} />
              </div>
           </div>

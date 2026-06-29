@@ -96,7 +96,11 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       });
       
       if (res.ok) {
-        router.push(type === 'product' ? '/admin/categories' : '/admin/blogs/categories');
+        const savedCat = await res.json();
+        alert(categoryId ? "Category updated successfully!" : "Category created successfully!");
+        if (!categoryId && savedCat._id) {
+          router.push(type === 'product' ? `/admin/products/categories/${savedCat._id}` : `/admin/blogs/categories/${savedCat._id}`);
+        }
       } else {
         const data = await res.json();
         alert("Error saving category: " + (data.error || "Unknown error"));

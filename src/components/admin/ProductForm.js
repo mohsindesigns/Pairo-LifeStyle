@@ -210,9 +210,13 @@ export default function ProductForm({ productId = null }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
          });
-         if (res.ok) {
-            router.push("/admin/products");
-         } else {
+          if (res.ok) {
+             const savedProduct = await res.json();
+             alert(productId ? "Product updated successfully!" : "Product created successfully!");
+             if (!productId && savedProduct._id) {
+                router.push(`/admin/products/${savedProduct._id}`);
+             }
+          } else {
             const errData = await res.json().catch(() => ({}));
             alert(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
             console.error("[ProductForm] Save failed:", errData);

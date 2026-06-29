@@ -316,7 +316,9 @@ export default function PageForm({ pageId }) {
          if (res.ok) {
             const savedData = await res.json();
             toast.success(isNew ? "Page created successfully" : "Page updated successfully");
-            router.push(isNew ? `/admin/pages/${savedData._id}` : "/admin/pages");
+            if (isNew && savedData._id) {
+               router.push(`/admin/pages/${savedData._id}`);
+            }
          } else {
             const errData = await res.json().catch(() => ({}));
             toast.error(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
