@@ -87,18 +87,13 @@ export default function Navbar() {
           let itemMegaCategories = [];
           if (isMega) {
             const itemMegaCategoryIds = item.megaCategoryIds || [];
-            // Only work with published, non-deleted product categories
             const productCats = dbCategories.filter(c => c.type === 'product' || !c.type);
             if (itemMegaCategoryIds.length > 0) {
-              // Try slug match first, then _id match as fallback
               itemMegaCategories = itemMegaCategoryIds
                 .map(val => productCats.find(c => c.slug === val || c._id?.toString() === val))
                 .filter(Boolean);
             }
-            // If no specific categories matched (or none selected), show all product categories
-            if (itemMegaCategories.length === 0) {
-              itemMegaCategories = productCats.slice(0, 6);
-            }
+            // No fallback — only show what was explicitly selected in admin
           }
 
           let itemDropdownCategories = [];
@@ -110,10 +105,7 @@ export default function Navbar() {
                 .map(val => productCats.find(c => c.slug === val || c._id?.toString() === val))
                 .filter(Boolean);
             }
-            // If none matched, fall back to all product categories
-            if (itemDropdownCategories.length === 0) {
-              itemDropdownCategories = productCats;
-            }
+            // No fallback — only show what was explicitly selected in admin
           }
 
           let itemDropdownProducts = [];
