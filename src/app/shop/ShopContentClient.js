@@ -775,7 +775,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
             {/* Sort bar — product count left, sort+filter right */}
             <div className="flex items-center justify-between gap-8 mb-8 border-b border-border pb-6">
-              <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest">
+              <span className="text-[13px] font-bold text-foreground/80 uppercase tracking-widest">
                 {filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'}
               </span>
               <div className="flex items-center gap-4">
