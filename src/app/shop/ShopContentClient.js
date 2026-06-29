@@ -50,16 +50,23 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     );
   }, [selectedCategory, dbCategories]);
 
-  // Enforce manual scroll restoration on mount to prevent Next.js layout jumps on route mutations
-  useEffect(() => {
-    if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
-      const originalScrollRestoration = window.history.scrollRestoration;
-      window.history.scrollRestoration = "manual";
-      return () => {
-        window.history.scrollRestoration = originalScrollRestoration;
-      };
-    }
   }, []);
+
+  // Restore scroll position after category transitions
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedScroll = sessionStorage.getItem("pairo_shop_scroll");
+      if (savedScroll) {
+        sessionStorage.removeItem("pairo_shop_scroll");
+        const targetScroll = parseInt(savedScroll);
+        setTimeout(() => {
+          window.scrollTo({ top: targetScroll, behavior: "instant" });
+          document.documentElement.scrollTo({ top: targetScroll, behavior: "instant" });
+          document.body.scrollTo({ top: targetScroll, behavior: "instant" });
+        }, 100);
+      }
+    }
+  }, [categoryParam]);
 
   useEffect(() => {
     fetch("/api/products")
@@ -414,13 +421,31 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   );
 
   const toggleColor = (color) => {
-    setSelectedColors(prev => prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]);
-    setCurrentPage(1);
+    if (typeof window !== "undefined") {
+      const scrollY = window.scrollY;
+      setSelectedColors(prev => prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]);
+      setCurrentPage(1);
+      setTimeout(() => {
+        window.scrollTo(0, scrollY);
+      }, 0);
+    } else {
+      setSelectedColors(prev => prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]);
+      setCurrentPage(1);
+    }
   };
 
   const toggleSize = (size) => {
-    setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
-    setCurrentPage(1);
+    if (typeof window !== "undefined") {
+      const scrollY = window.scrollY;
+      setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
+      setCurrentPage(1);
+      setTimeout(() => {
+        window.scrollTo(0, scrollY);
+      }, 0);
+    } else {
+      setSelectedSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
+      setCurrentPage(1);
+    }
   };
 
   const handleCategorySelect = (catName) => {
@@ -428,6 +453,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     const basePath = catName ? `/collections/${catName.toLowerCase()}` : '/shop';
     if (typeof window !== "undefined") {
       const scrollY = window.scrollY;
+      sessionStorage.setItem("pairo_shop_scroll", scrollY.toString());
       startTransition(() => {
         router.push(basePath, { scroll: false });
         let count = 0;
@@ -492,6 +518,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setCurrentPage(1);
     if (typeof window !== "undefined") {
       const scrollY = window.scrollY;
+      sessionStorage.setItem("pairo_shop_scroll", scrollY.toString());
       startTransition(() => {
         router.push('/shop', { scroll: false });
         let count = 0;
