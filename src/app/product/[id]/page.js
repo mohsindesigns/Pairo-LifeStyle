@@ -163,7 +163,7 @@ export default async function ProductDetailPage({ params, searchParams }) {
           <ChevronRight className="w-2.5 h-2.5 opacity-40 shrink-0" />
           {primaryCategory ? (
             <>
-              <Link href={`/product-category/${primaryCategory.slug}`} className="hover:text-primary transition-colors shrink-0">{primaryCategory.name}</Link>
+              <Link href={`/collections/${primaryCategory.slug}`} className="hover:text-primary transition-colors shrink-0">{primaryCategory.name}</Link>
               <ChevronRight className="w-2.5 h-2.5 opacity-40 shrink-0" />
             </>
           ) : (

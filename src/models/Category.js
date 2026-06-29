@@ -4,6 +4,7 @@ const CategorySchema = new mongoose.Schema({
   name: { type: String, required: true },
   slug: { type: String, required: true },
   image: { type: String },
+  banner: { type: String },
   description: { type: String }, // Short description
   content: { type: String }, // Full description
   status: { type: String, enum: ['Draft', 'Published'], default: 'Published' },

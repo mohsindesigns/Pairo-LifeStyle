@@ -10,7 +10,7 @@ export async function generateMetadata({ params, searchParams }) {
   const paramsQuery = new URLSearchParams(resolvedSearchParams);
   const queryString = paramsQuery.toString();
   
-  const destUrl = queryString ? `/product-category/${categorySlug}?${queryString}` : `/product-category/${categorySlug}`;
+  const destUrl = queryString ? `/collections/${categorySlug}?${queryString}` : `/collections/${categorySlug}`;
   permanentRedirect(destUrl);
 }
 
@@ -22,6 +22,6 @@ export default async function ShopCategoryRedirectPage({ params, searchParams })
   const paramsQuery = new URLSearchParams(resolvedSearchParams);
   const queryString = paramsQuery.toString();
   
-  const destUrl = queryString ? `/product-category/${categorySlug}?${queryString}` : `/product-category/${categorySlug}`;
+  const destUrl = queryString ? `/collections/${categorySlug}?${queryString}` : `/collections/${categorySlug}`;
   permanentRedirect(destUrl);
 }

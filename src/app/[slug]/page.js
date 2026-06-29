@@ -22,10 +22,10 @@ export async function generateMetadata({ params }) {
 
   await dbConnect();
   
-  // 1. Check if category slug and 301 redirect to product-category prefix path
+  // 1. Check if category slug and 301 redirect to collections prefix path
   const category = await Category.findOne({ slug: slug, type: "product", isDeleted: { $ne: true } }).lean();
   if (category) {
-    permanentRedirect(`/product-category/${slug}`);
+    permanentRedirect(`/collections/${slug}`);
   }
 
   // 2. Check if custom page
@@ -58,10 +58,10 @@ export default async function CatchAllCMSPage({ params, searchParams }) {
 
   await dbConnect();
 
-  // 1. Try to find as category page first and 301 redirect to product-category prefix path
+  // 1. Try to find as category page first and 301 redirect to collections prefix path
   const category = await Category.findOne({ slug: slug, type: "product", isDeleted: { $ne: true } }).lean();
   if (category) {
-    permanentRedirect(`/product-category/${slug}`);
+    permanentRedirect(`/collections/${slug}`);
   }
 
   // 2. Try to find as custom CMS page

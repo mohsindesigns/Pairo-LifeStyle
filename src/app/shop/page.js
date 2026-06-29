@@ -16,8 +16,8 @@ export async function generateMetadata({ searchParams }) {
     params.delete("category");
     const queryString = params.toString();
     const redirectUrl = queryString
-      ? `/product-category/${categorySlug}?${queryString}`
-      : `/product-category/${categorySlug}`;
+      ? `/collections/${categorySlug}?${queryString}`
+      : `/collections/${categorySlug}`;
     permanentRedirect(redirectUrl);
   }
 
@@ -45,8 +45,8 @@ export default async function ShopPage({ searchParams }) {
     params.delete("category");
     const queryString = params.toString();
     const redirectUrl = queryString
-      ? `/product-category/${categorySlug}?${queryString}`
-      : `/product-category/${categorySlug}`;
+      ? `/collections/${categorySlug}?${queryString}`
+      : `/collections/${categorySlug}`;
     permanentRedirect(redirectUrl);
   }
 

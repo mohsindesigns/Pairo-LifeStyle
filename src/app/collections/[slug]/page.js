@@ -16,7 +16,7 @@ export async function generateMetadata({ params }) {
     return {};
   }
 
-  const currentPath = `/product-category/${slug}`;
+  const currentPath = `/collections/${slug}`;
   await checkAndApplyRedirect(currentPath);
 
   await dbConnect();
@@ -43,7 +43,7 @@ export default async function DynamicCategoryCatcherPage({ params, searchParams 
     notFound();
   }
 
-  const currentPath = `/product-category/${slug}`;
+  const currentPath = `/collections/${slug}`;
   await checkAndApplyRedirect(currentPath);
 
   await dbConnect();

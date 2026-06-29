@@ -41,6 +41,15 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   const siteContextData = useSiteData();
   const dbCategories = siteContextData?._dbCategories || [];
 
+  const currentDbCategory = useMemo(() => {
+    if (!selectedCategory) return null;
+    return dbCategories.find(c =>
+      c.name.toLowerCase() === selectedCategory.toLowerCase() ||
+      c.slug?.toLowerCase() === selectedCategory.toLowerCase() ||
+      c._id === selectedCategory
+    );
+  }, [selectedCategory, dbCategories]);
+
   // Enforce manual scroll restoration on mount to prevent Next.js layout jumps on route mutations
   useEffect(() => {
     if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
@@ -415,7 +424,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
   const handleCategorySelect = (catName) => {
     setCurrentPage(1);
-    const basePath = catName ? `/product-category/${catName.toLowerCase()}` : '/shop';
+    const basePath = catName ? `/collections/${catName.toLowerCase()}` : '/shop';
     startTransition(() => {
       router.push(basePath);
     });
@@ -731,62 +740,126 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   return (
     <div className="bg-white min-h-screen">
       <div className="container mx-auto px-6 md:px-16 py-8 md:py-16">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-foreground/50 text-[9px] font-bold uppercase tracking-widest">
-              <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
-              <ChevronRight className="w-3.5 h-3.5 text-foreground/45" />
-              <span className="text-foreground/90">Shop</span>
+        {currentDbCategory && currentDbCategory.banner ? (
+          <>
+            <div className="relative w-full h-[250px] sm:h-[300px] md:h-[350px] mb-12 overflow-hidden rounded-[var(--radius,16px)] group">
+              <img 
+                src={currentDbCategory.banner} 
+                alt={currentDbCategory.name} 
+                className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/30" />
+              
+              <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 text-white z-10">
+                <div className="flex items-center gap-2 text-white/60 text-[9px] font-bold uppercase tracking-widest mb-3">
+                  <Link href="/" className="hover:text-white transition-colors">Home</Link>
+                  <ChevronRight className="w-3 h-3 text-white/45" />
+                  <Link href="/shop" className="hover:text-white transition-colors">Shop</Link>
+                  <ChevronRight className="w-3 h-3 text-white/45" />
+                  <span className="text-white/95">{currentDbCategory.name}</span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold heading-font tracking-tighter uppercase leading-none text-white mb-2">
+                  {currentDbCategory.name}
+                </h1>
+                <p className="text-xs sm:text-sm text-white/70 font-medium">
+                  {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
+                  {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} active filter${getActiveFilterCount() > 1 ? 's' : ''}`}
+                </p>
+              </div>
             </div>
-            <p className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold heading-font tracking-tighter uppercase leading-none text-foreground">
-              {(() => {
-                if (selectedCategory) {
-                  const dbCat = dbCategories.find(c =>
-                    c.name.toLowerCase() === selectedCategory.toLowerCase() ||
-                    c.slug?.toLowerCase() === selectedCategory.toLowerCase() ||
-                    c._id === selectedCategory
-                  );
-                  return dbCat ? dbCat.name : selectedCategory;
-                }
-                return selectedTypes[0] || "Shop All";
-              })()}
-            </p>
-            <p className="text-sm text-foreground/60 font-medium">
-              {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
-              {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} active filter${getActiveFilterCount() > 1 ? 's' : ''}`}
-            </p>
-          </div>
-          <div className="flex items-center justify-between md:justify-end gap-8 border-t border-border md:border-none pt-8 md:pt-0">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8 text-foreground"
+
+            <div className="flex items-center justify-end gap-8 mb-8 border-b border-border pb-6">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8 text-foreground"
+                >
+                  <option>Most Popular</option>
+                  <option>Newest</option>
+                  <option>Price: Low to High</option>
+                  <option>Price: High to Low</option>
+                  <option>Name: A to Z</option>
+                  <option>Name: Z to A</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFilters(true)}
+                className="lg:hidden flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative hover:bg-foreground/90"
               >
-                <option>Most Popular</option>
-                <option>Newest</option>
-                <option>Price: Low to High</option>
-                <option>Price: High to Low</option>
-                <option>Name: A to Z</option>
-                <option>Name: Z to A</option>
-              </select>
+                <SlidersHorizontal className="w-4 h-4" />
+                Filter
+                {getActiveFilterCount() > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center">
+                    {getActiveFilterCount()}
+                  </span>
+                )}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowFilters(true)}
-              className="lg:hidden flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative hover:bg-foreground/90"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              Filter
-              {getActiveFilterCount() > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center animate-pulse">
-                  {getActiveFilterCount()}
-                </span>
-              )}
-            </button>
+          </>
+        ) : (
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-foreground/50 text-[9px] font-bold uppercase tracking-widest">
+                <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
+                <ChevronRight className="w-3.5 h-3.5 text-foreground/45" />
+                {selectedCategory ? (
+                  <>
+                    <Link href="/shop" className="hover:text-foreground transition-colors">Shop</Link>
+                    <ChevronRight className="w-3.5 h-3.5 text-foreground/45" />
+                    <span className="text-foreground/90">
+                      {currentDbCategory ? currentDbCategory.name : selectedCategory}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-foreground/90">Shop</span>
+                )}
+              </div>
+              <p className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold heading-font tracking-tighter uppercase leading-none text-foreground">
+                {selectedCategory
+                  ? (currentDbCategory ? currentDbCategory.name : selectedCategory)
+                  : (selectedTypes[0] || "Shop All")
+                }
+              </p>
+              <p className="text-sm text-foreground/60 font-medium">
+                {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
+                {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} active filter${getActiveFilterCount() > 1 ? 's' : ''}`}
+              </p>
+            </div>
+            <div className="flex items-center justify-between md:justify-end gap-8 border-t border-border md:border-none pt-8 md:pt-0">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8 text-foreground"
+                >
+                  <option>Most Popular</option>
+                  <option>Newest</option>
+                  <option>Price: Low to High</option>
+                  <option>Price: High to Low</option>
+                  <option>Name: A to Z</option>
+                  <option>Name: Z to A</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFilters(true)}
+                className="lg:hidden flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative hover:bg-foreground/90"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                Filter
+                {getActiveFilterCount() > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center animate-pulse">
+                    {getActiveFilterCount()}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex flex-col lg:grid lg:grid-cols-12 gap-16">
           <aside className="hidden lg:block lg:col-span-3 h-fit sticky top-32">
@@ -857,6 +930,13 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                 >
                   Next
                 </button>
+              </div>
+            )}
+
+            {/* Category Full Description (content) */}
+            {currentDbCategory && currentDbCategory.content && (
+              <div className="mt-16 border-t border-border pt-12 prose max-w-none text-foreground/75 text-sm leading-relaxed">
+                <div dangerouslySetInnerHTML={{ __html: currentDbCategory.content }} />
               </div>
             )}
           </main>

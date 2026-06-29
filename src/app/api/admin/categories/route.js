@@ -85,6 +85,7 @@ export async function POST(req) {
           existing.name = data.name; 
           existing.type = type;
           existing.image = data.image || existing.image;
+          existing.banner = data.banner || existing.banner;
           existing.description = data.description || existing.description;
           existing.content = data.content || existing.content;
           existing.status = data.status || existing.status;
@@ -186,6 +187,27 @@ export async function PUT(req) {
             entityType: 'Category',
             entityId: id,
             fieldName: 'image',
+            label: category.name
+          });
+        }
+      }
+    }
+    
+    if (oldCategory.banner !== data.banner) {
+      const { trackMediaUsage, removeMediaUsage, findMediaByUrl } = await import("@/lib/mediaUsage");
+      
+      if (oldCategory.banner) {
+        const oldMedia = await findMediaByUrl(oldCategory.banner);
+        if (oldMedia) await removeMediaUsage(oldMedia._id, 'Category', id);
+      }
+
+      if (data.banner) {
+        const newMedia = await findMediaByUrl(data.banner);
+        if (newMedia) {
+          await trackMediaUsage(newMedia._id, {
+            entityType: 'Category',
+            entityId: id,
+            fieldName: 'banner',
             label: category.name
           });
         }

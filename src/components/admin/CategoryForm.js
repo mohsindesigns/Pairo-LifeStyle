@@ -21,6 +21,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     description: "",
     content: "",
     image: "",
+    banner: "",
     status: "Published",
     isFeatured: false,
     seo: { title: "", description: "", keywords: [], canonicalUrl: "", ogTitle: "", ogDescription: "", ogImage: "", noIndex: false, noFollow: false },
@@ -142,7 +143,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                   }}
                />
                <div className="text-[12px] text-gray-500 px-1 mt-1 flex items-center gap-1">
-                  Permalink: <span className="text-gray-400">pairo.store/{type}-category/</span>
+                  Permalink: <span className="text-gray-400">pairo.store/{type === 'product' ? 'collections' : 'blog-category'}/</span>
                   <input className="border-none bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px]" value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} />
                </div>
             </div>
@@ -157,18 +158,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                </div>
             </div>
 
-            {/* Short Description */}
-            <div className="bg-white border border-[#c3c4c7] shadow-sm">
-               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 font-bold text-[13px] text-gray-700">Short Description</div>
-               <div className="p-3">
-                  <textarea 
-                     rows={3}
-                     className="w-full border border-[#c3c4c7] outline-none p-2 text-[13px]"
-                     value={formData.description}
-                     onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  />
-               </div>
-            </div>
+
 
             {/* Link Items */}
             <div className="bg-white border border-[#c3c4c7] shadow-sm">
@@ -253,6 +243,17 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                      value={formData.image} 
                      onChange={(url) => setFormData({...formData, image: url})}
                      label="Set image"
+                  />
+               </div>
+            </div>
+
+            <div className="bg-white border border-[#c3c4c7] shadow-sm">
+               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Category Banner Image</div>
+               <div className="p-3">
+                  <MediaPicker 
+                     value={formData.banner || ""} 
+                     onChange={(url) => setFormData({...formData, banner: url})}
+                     label="Set banner image"
                   />
                </div>
             </div>
