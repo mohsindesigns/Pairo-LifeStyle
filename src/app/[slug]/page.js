@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { resolvePageSections } from "@/lib/page-data-resolver";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
@@ -7,7 +7,6 @@ import { resolvePageAndTemplate } from "@/lib/page-cache";
 import { Suspense } from "react";
 import dbConnect from "@/lib/db";
 import Category from "@/models/Category";
-import ShopContentClient from "../shop/ShopContentClient";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +22,10 @@ export async function generateMetadata({ params }) {
 
   await dbConnect();
   
-  // 1. Check if category slug
+  // 1. Check if category slug and 301 redirect to product-category prefix path
   const category = await Category.findOne({ slug: slug, type: "product", isDeleted: { $ne: true } }).lean();
   if (category) {
-    const { metadata } = resolveSEOMetadata({
-      entity: category,
-      type: "category",
-      path: currentPath
-    });
-    return metadata;
+    permanentRedirect(`/product-category/${slug}`);
   }
 
   // 2. Check if custom page
@@ -64,22 +58,10 @@ export default async function CatchAllCMSPage({ params, searchParams }) {
 
   await dbConnect();
 
-  // 1. Try to find as category page first
+  // 1. Try to find as category page first and 301 redirect to product-category prefix path
   const category = await Category.findOne({ slug: slug, type: "product", isDeleted: { $ne: true } }).lean();
   if (category) {
-    return (
-      <Suspense fallback={
-        <div className="container mx-auto px-4 py-40 text-center">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-            <p className="font-bold text-xl uppercase text-black/40 mt-4">Loading Catalog...</p>
-          </div>
-        </div>
-      }>
-        <ShopContentClient initialCategory={category.slug} initialType={typeSlug} />
-      </Suspense>
-    );
+    permanentRedirect(`/product-category/${slug}`);
   }
 
   // 2. Try to find as custom CMS page

@@ -1,4 +1,5 @@
 import { permanentRedirect } from "next/navigation";
+import { Suspense } from "react";
 import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import ShopContentClient from "./ShopContentClient";
@@ -15,8 +16,8 @@ export async function generateMetadata({ searchParams }) {
     params.delete("category");
     const queryString = params.toString();
     const redirectUrl = queryString
-      ? `/${categorySlug}?${queryString}`
-      : `/${categorySlug}`;
+      ? `/product-category/${categorySlug}?${queryString}`
+      : `/product-category/${categorySlug}`;
     permanentRedirect(redirectUrl);
   }
 
@@ -44,8 +45,8 @@ export default async function ShopPage({ searchParams }) {
     params.delete("category");
     const queryString = params.toString();
     const redirectUrl = queryString
-      ? `/${categorySlug}?${queryString}`
-      : `/${categorySlug}`;
+      ? `/product-category/${categorySlug}?${queryString}`
+      : `/product-category/${categorySlug}`;
     permanentRedirect(redirectUrl);
   }
 

@@ -77,7 +77,6 @@ export function getProductUrl(product) {
 
 export function getCategoryUrl(category) {
   if (!category) return '#';
-  const slug = typeof category === 'object' ? (category.slug || category._id?.toString()) : category;
-  if (!slug) return '#';
-  return `/${slug.toLowerCase().trim().replace(/[^a-z0-9-_]+/g, '-')}`;
+  const slug = category.slug || category._id?.toString() || category.id?.toString();
+  return slug ? `/product-category/${slug.toLowerCase().trim().replace(/[^a-z0-9-_]+/g, '-')}` : '#';
 }

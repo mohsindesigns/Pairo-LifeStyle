@@ -285,7 +285,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
         const matchesString = pCat.toLowerCase() === selectedCategory.toLowerCase() ||
           (targetDbCat && pCat.toLowerCase() === targetDbCat.name.toLowerCase()) ||
           (targetDbCat && pCat.toLowerCase() === targetDbCat.slug?.toLowerCase());
-        const matchesId = targetDbCat && pCats.includes(targetDbCat._id);
+        const matchesId = targetDbCat && pCats.some(c => 
+          (typeof c === 'object' && c !== null ? c._id === targetDbCat._id : c === targetDbCat._id)
+        );
         return matchesString || matchesId;
       });
     }
@@ -400,7 +402,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   const handleCategorySelect = (catName) => {
     setSelectedCategory(catName);
     setCurrentPage(1);
-    const basePath = catName ? `/${catName.toLowerCase()}` : '/shop';
+    const basePath = catName ? `/product-category/${catName.toLowerCase()}` : '/shop';
     router.push(basePath);
   };
 
@@ -521,7 +523,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                     const pCat = p.category || '';
                     const pCats = p.categories || [];
                     const matchesString = pCat.toLowerCase() === cat.toLowerCase();
-                    const matchesId = dbCat && pCats.includes(dbCat._id);
+                    const matchesId = dbCat && pCats.some(c => 
+                      (typeof c === 'object' && c !== null ? c._id === dbCat._id : c === dbCat._id)
+                    );
                     return matchesString || matchesId;
                   }).length}
                 </span>
