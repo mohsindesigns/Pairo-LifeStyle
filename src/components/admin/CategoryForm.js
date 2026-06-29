@@ -148,6 +148,23 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                </div>
             </div>
 
+            {/* Short Description — shown in banner overlay */}
+            <div className="bg-white border border-[#c3c4c7] shadow-sm">
+               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between font-bold text-[13px] text-gray-700">
+                  Short Description
+                  <span className="text-[11px] font-normal text-gray-400">Shown in banner overlay</span>
+               </div>
+               <div className="p-3">
+                  <textarea
+                     rows={3}
+                     placeholder="A brief tagline shown inside the category banner image..."
+                     className="w-full border border-[#c3c4c7] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] resize-none"
+                     value={formData.description || ""}
+                     onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  />
+               </div>
+            </div>
+
             {/* Content Editor */}
             <div className="bg-white border border-[#c3c4c7] shadow-sm">
                <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between font-bold text-[13px] text-gray-700">

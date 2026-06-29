@@ -742,27 +742,39 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       <div className="container mx-auto px-6 md:px-16 py-8 md:py-16">
         {currentDbCategory && currentDbCategory.banner ? (
           <>
-            <div className="relative w-full h-[250px] sm:h-[300px] md:h-[350px] mb-12 overflow-hidden rounded-[var(--radius,16px)] group">
-              <img 
-                src={currentDbCategory.banner} 
-                alt={currentDbCategory.name} 
+            <div className="relative w-full h-[280px] sm:h-[340px] md:h-[400px] mb-12 overflow-hidden rounded-[var(--radius,16px)] group">
+              <img
+                src={currentDbCategory.banner}
+                alt={currentDbCategory.name}
                 className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/30" />
-              
-              <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 text-white z-10">
-                <div className="flex items-center gap-2 text-white/60 text-[9px] font-bold uppercase tracking-widest mb-3">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/20" />
+
+              {/* Banner content — full height flex column keeps breadcrumbs top, rest bottom */}
+              <div className="absolute inset-0 flex flex-col justify-between p-8 md:p-12 text-white z-10">
+
+                {/* TOP — breadcrumbs */}
+                <div className="flex items-center gap-2 text-white/60 text-[9px] font-bold uppercase tracking-widest">
                   <Link href="/" className="hover:text-white transition-colors">Home</Link>
                   <ChevronRight className="w-3 h-3 text-white/45" />
                   <span className="text-white/95">{currentDbCategory.name}</span>
                 </div>
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold heading-font tracking-tighter uppercase leading-none text-white mb-2">
-                  {currentDbCategory.name}
-                </h1>
-                <p className="text-xs sm:text-sm text-white/70 font-medium">
-                  {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
-                  {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} active filter${getActiveFilterCount() > 1 ? 's' : ''}`}
-                </p>
+
+                {/* BOTTOM — title, short description, count */}
+                <div>
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold heading-font tracking-tighter uppercase leading-none text-white mb-3">
+                    {currentDbCategory.name}
+                  </h1>
+                  {currentDbCategory.description && (
+                    <p className="text-sm sm:text-base text-white/80 font-medium mb-3 max-w-2xl leading-relaxed">
+                      {currentDbCategory.description}
+                    </p>
+                  )}
+                  <p className="text-[10px] sm:text-xs text-white/55 font-bold uppercase tracking-widest">
+                    {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
+                    {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} filter${getActiveFilterCount() > 1 ? 's' : ''} active`}
+                  </p>
+                </div>
               </div>
             </div>
 
