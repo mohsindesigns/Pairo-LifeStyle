@@ -426,9 +426,22 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   const handleCategorySelect = (catName) => {
     setCurrentPage(1);
     const basePath = catName ? `/collections/${catName.toLowerCase()}` : '/shop';
-    startTransition(() => {
-      router.push(basePath, { scroll: false });
-    });
+    if (typeof window !== "undefined") {
+      const scrollY = window.scrollY;
+      startTransition(() => {
+        router.push(basePath, { scroll: false });
+        let count = 0;
+        const interval = setInterval(() => {
+          window.scrollTo(0, scrollY);
+          count++;
+          if (count > 8) clearInterval(interval);
+        }, 10);
+      });
+    } else {
+      startTransition(() => {
+        router.push(basePath, { scroll: false });
+      });
+    }
   };
 
   const toggleType = (type) => {
@@ -477,9 +490,22 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setSearchQuery("");
     setSortBy("Most Popular");
     setCurrentPage(1);
-    startTransition(() => {
-      router.push('/shop', { scroll: false });
-    });
+    if (typeof window !== "undefined") {
+      const scrollY = window.scrollY;
+      startTransition(() => {
+        router.push('/shop', { scroll: false });
+        let count = 0;
+        const interval = setInterval(() => {
+          window.scrollTo(0, scrollY);
+          count++;
+          if (count > 8) clearInterval(interval);
+        }, 10);
+      });
+    } else {
+      startTransition(() => {
+        router.push('/shop', { scroll: false });
+      });
+    }
   };
   const handlePageChange = (page) => {
     setCurrentPage(page);
