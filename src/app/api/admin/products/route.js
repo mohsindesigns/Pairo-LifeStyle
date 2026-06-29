@@ -66,7 +66,7 @@ export async function POST(req) {
     let finalSlug = slug;
     let counter = 1;
     const tenantId = productData.tenantId || "DEFAULT_STORE";
-    while (await Product.findOne({ slug: finalSlug, tenantId })) {
+    while (await Product.findOne({ slug: finalSlug, tenantId, isDeleted: { $ne: true } })) {
       finalSlug = `${slug}-${counter}`;
       counter++;
     }

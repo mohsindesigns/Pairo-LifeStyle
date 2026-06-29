@@ -54,7 +54,7 @@ export async function PUT(req, { params }) {
     let finalSlug = slug;
     let counter = 1;
     const tenantId = oldProduct.tenantId || "DEFAULT_STORE";
-    while (await Product.findOne({ slug: finalSlug, tenantId, _id: { $ne: id } })) {
+    while (await Product.findOne({ slug: finalSlug, tenantId, _id: { $ne: id }, isDeleted: { $ne: true } })) {
       finalSlug = `${slug}-${counter}`;
       counter++;
     }

@@ -48,7 +48,7 @@ export default async function CollectionsPage() {
                 Luxury Store
               </p>
               <p 
-                className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight uppercase leading-none text-black"
+                className="text-[22px] md:text-[30px] font-extrabold tracking-tight uppercase leading-none text-black"
                 style={{ fontFamily: 'var(--brand-font)' }}
               >
                 OUR COLLECTIONS

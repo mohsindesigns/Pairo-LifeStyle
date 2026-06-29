@@ -76,7 +76,7 @@ export default function ProductMainSection({ product }) {
       <div className="lg:col-span-6 space-y-8 md:space-y-12">
         <div className="space-y-4 md:space-y-6">
           <div className="space-y-2">
-            <p className="text-[10px] md:text-[11px] font-bold text-primary/80 uppercase tracking-[0.25em]">
+            <p className="text-[11px] md:text-[12px] font-bold text-primary/80 uppercase tracking-[0.25em]">
               Pairo Studio — {categoryName}
             </p>
             <p className="text-[18px] md:text-[30px] font-medium heading-font tracking-tight leading-[1.2] text-primary">
@@ -84,7 +84,7 @@ export default function ProductMainSection({ product }) {
             </p>
           </div>
 
-          <p className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-primary/80">
+          <p className="flex items-center gap-2 text-[13px] md:text-[14px] font-semibold text-primary/80">
             <Star className="w-3.5 h-3.5 fill-primary text-primary" />
             <span>{(product.rating || 0).toFixed(1)}/5.0</span>
             <span className="text-black/10">•</span>
@@ -92,17 +92,17 @@ export default function ProductMainSection({ product }) {
           </p>
 
           <div className="flex items-center flex-wrap gap-3.5">
-            <span className="text-2xl md:text-2xl font-semibold tracking-tight text-primary">${displayPrice}</span>
+            <span className="text-2xl font-semibold tracking-tight text-primary">${displayPrice}</span>
             {displayCompareAtPrice > displayPrice && (
               <>
-                <span className="text-sm md:text-base font-medium text-primary/40 line-through">${displayCompareAtPrice}</span>
+                <span className="text-sm font-medium text-primary/40 line-through">${displayCompareAtPrice}</span>
                 <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-[var(--radius,0px)] select-none">
                   Save {Math.round(((displayCompareAtPrice - displayPrice) / displayCompareAtPrice) * 100)}%
                 </span>
               </>
             )}
             {displaySku && (
-              <span className="text-[10px] md:text-[11px] font-semibold text-primary/60 uppercase tracking-[0.15em] ml-auto">SKU: {displaySku}</span>
+              <span className="text-[11px] md:text-[12px] font-semibold text-primary/60 uppercase tracking-[0.15em] ml-auto">SKU: {displaySku}</span>
             )}
           </div>
         </div>
@@ -133,8 +133,8 @@ export default function ProductMainSection({ product }) {
                     <Icon className="w-3.5 h-3.5 text-primary/70 group-hover:text-white transition-colors" />
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-[8px] font-normal uppercase tracking-[0.15em] text-primary/60">{stat.label}</p>
-                    <p className="text-[11px] font-normal text-black uppercase tracking-wider">{stat.value}</p>
+                    <p className="text-[9px] font-normal uppercase tracking-[0.15em] text-primary/60">{stat.label}</p>
+                    <p className="text-[12px] font-normal text-black uppercase tracking-wider">{stat.value}</p>
                   </div>
                 </div>
               );
@@ -146,8 +146,8 @@ export default function ProductMainSection({ product }) {
         {product.faqs && product.faqs.length > 0 && (
           <div className="pt-8 border-t border-black/5 space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-medium uppercase tracking-[0.2em] text-primary/60">Frequent Inquiries</h3>
-              <div className="flex items-center gap-2 text-[9px] font-medium text-black/40 uppercase tracking-widest">
+              <h3 className="text-[11px] md:text-[12px] font-medium uppercase tracking-[0.2em] text-primary/60">Frequent Inquiries</h3>
+              <div className="flex items-center gap-2 text-[10px] font-medium text-black/40 uppercase tracking-widest">
                 <MessageSquare className="w-3 h-3 text-primary/60" /> {product.faqs.length} Total
               </div>
             </div>
@@ -158,12 +158,12 @@ export default function ProductMainSection({ product }) {
                     <HelpCircle className="w-3.5 h-3.5 text-primary/70 group-hover:text-white transition-colors" />
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-xs font-normal text-black tracking-tight">{faq.question}</p>
-                    <p className="text-[11px] text-primary/70 leading-relaxed line-clamp-1 font-light">{faq.answer}</p>
+                    <p className="text-sm font-normal text-black tracking-tight">{faq.question}</p>
+                    <p className="text-[12px] text-primary/70 leading-relaxed line-clamp-1 font-light">{faq.answer}</p>
                   </div>
                 </div>
               ))}
-              <p className="text-center text-[9px] font-normal text-black/40 uppercase tracking-[0.15em] pt-1.5">
+              <p className="text-center text-[10px] font-normal text-black/40 uppercase tracking-[0.15em] pt-1.5">
                 View detailed FAQs below
               </p>
             </div>

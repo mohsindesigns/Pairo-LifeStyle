@@ -20,7 +20,7 @@ export async function validateSlug(slug, excludeId = null) {
   await dbConnect();
   
   // 2. Validate against CMS Page slugs
-  const pageQuery = { slug: cleanSlug };
+  const pageQuery = { slug: cleanSlug, isDeleted: { $ne: true } };
   if (excludeId) pageQuery._id = { $ne: excludeId };
   const pageExists = await Page.findOne(pageQuery).lean();
   if (pageExists) {
@@ -28,7 +28,7 @@ export async function validateSlug(slug, excludeId = null) {
   }
   
   // 3. Validate against Blog slugs/routes
-  const blogQuery = { slug: cleanSlug };
+  const blogQuery = { slug: cleanSlug, isDeleted: { $ne: true } };
   if (excludeId) blogQuery._id = { $ne: excludeId };
   const blogExists = await Blog.findOne(blogQuery).lean();
   if (blogExists) {
@@ -36,7 +36,7 @@ export async function validateSlug(slug, excludeId = null) {
   }
   
   // 4. Validate against Category slugs
-  const catQuery = { slug: cleanSlug };
+  const catQuery = { slug: cleanSlug, isDeleted: { $ne: true } };
   if (excludeId) catQuery._id = { $ne: excludeId };
   const catExists = await Category.findOne(catQuery).lean();
   if (catExists) {
@@ -44,7 +44,7 @@ export async function validateSlug(slug, excludeId = null) {
   }
 
   // 5. Validate against Product slugs
-  const prodQuery = { slug: cleanSlug };
+  const prodQuery = { slug: cleanSlug, isDeleted: { $ne: true } };
   if (excludeId) prodQuery._id = { $ne: excludeId };
   const productExists = await Product.findOne(prodQuery).lean();
   if (productExists) {

@@ -116,11 +116,11 @@ export default function ClientProductActions({ product, onVariantChange }) {
         return (
           <div key={attr.name} className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <p className="text-[10px] md:text-[11px] font-bold text-primary/80 uppercase tracking-[0.25em]">
+              <p className="text-[11px] md:text-[12px] font-bold text-primary/80 uppercase tracking-[0.25em]">
                 {attr.name}
               </p>
               {selectedOptions[attr.name] && (
-                <span className="text-[11px] md:text-xs font-bold text-primary uppercase tracking-wider">
+                <span className="text-[12px] md:text-[13px] font-bold text-primary uppercase tracking-wider">
                   {selectedOptions[attr.name]}
                 </span>
               )}
@@ -172,7 +172,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
                     key={option.label}
                     type="button"
                     onClick={() => handleOptionSelect(attr.name, option)}
-                    className={`h-10 px-5 rounded-[var(--radius,0px)] text-[11px] md:text-xs font-semibold uppercase tracking-[0.2em] transition-all duration-200 border ${
+                    className={`h-10 px-5 rounded-[var(--radius,0px)] text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.2em] transition-all duration-200 border ${
                       isSelected
                         ? "bg-primary text-white border-primary"
                         : "bg-transparent text-primary/70 border-border hover:border-primary hover:text-primary"
@@ -192,7 +192,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
         {(() => {
           if (!product.manageStock) {
             return (
-              <span className="inline-flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50/80 px-3 py-1 rounded border border-emerald-250">
+              <span className="inline-flex items-center gap-1.5 text-[11px] md:text-[12px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50/80 px-3 py-1 rounded border border-emerald-250">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                 In Stock
               </span>
@@ -202,21 +202,21 @@ export default function ClientProductActions({ product, onVariantChange }) {
           const lowThreshold = Number(product.lowStockThreshold) || 5;
           if (stockNum <= 0) {
             return (
-              <span className="inline-flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-wider text-red-800 bg-red-50/80 px-3 py-1 rounded border border-red-250">
+              <span className="inline-flex items-center gap-1.5 text-[11px] md:text-[12px] font-bold uppercase tracking-wider text-red-800 bg-red-50/80 px-3 py-1 rounded border border-red-250">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
                 Out of Stock
               </span>
             );
           } else if (stockNum <= lowThreshold) {
             return (
-              <span className="inline-flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50/80 px-3 py-1 rounded border border-amber-250">
+              <span className="inline-flex items-center gap-1.5 text-[11px] md:text-[12px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50/80 px-3 py-1 rounded border border-amber-250">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                 Low Stock — {stockNum} units remaining
               </span>
             );
           } else {
             return (
-              <span className="inline-flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50/80 px-3 py-1 rounded border border-emerald-250">
+              <span className="inline-flex items-center gap-1.5 text-[11px] md:text-[12px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50/80 px-3 py-1 rounded border border-emerald-250">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                 In Stock — {stockNum} units
               </span>
@@ -246,7 +246,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
 
           <button
             onClick={handleAddToCart}
-            className={`flex-1 h-12 rounded-[var(--radius,0px)] font-bold uppercase tracking-[0.2em] text-[11px] md:text-xs flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.98] ${
+            className={`flex-1 h-12 rounded-[var(--radius,0px)] font-bold uppercase tracking-[0.2em] text-[12px] md:text-[13px] flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.98] ${
               addedFeedback
                 ? "bg-emerald-600 text-white"
                 : "bg-primary text-white hover:bg-primary/90"
@@ -268,7 +268,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
 
         <button
           onClick={handleSecureCheckout}
-          className="w-full h-12 border border-primary rounded-[var(--radius,0px)] text-primary font-bold uppercase tracking-[0.25em] text-[11px] md:text-xs hover:bg-primary hover:text-white transition-all duration-200 active:scale-[0.98]"
+          className="w-full h-12 border border-primary rounded-[var(--radius,0px)] text-primary font-bold uppercase tracking-[0.25em] text-[12px] md:text-[13px] hover:bg-primary hover:text-white transition-all duration-200 active:scale-[0.98]"
         >
           Secure Checkout
         </button>

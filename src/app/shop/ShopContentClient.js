@@ -776,7 +776,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   <span className="text-foreground/90">Shop</span>
                 )}
               </div>
-              <p className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold heading-font tracking-tighter uppercase leading-none text-foreground">
+              <p className="text-[22px] md:text-[30px] font-bold heading-font tracking-tighter uppercase leading-none text-foreground">
                 {selectedCategory
                   ? (currentDbCategory ? currentDbCategory.name : selectedCategory)
                   : (selectedTypes[0] || "Shop All")
