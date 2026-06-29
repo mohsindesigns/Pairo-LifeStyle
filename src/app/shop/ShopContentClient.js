@@ -854,7 +854,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               <div className="mt-20 flex items-center justify-center gap-12 border-t border-border pt-12">
                 <button
                   type="button"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  onClick={() => {
+                    setCurrentPage(prev => Math.max(1, prev - 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                   disabled={currentPage === 1}
                   className={`text-[10px] font-bold uppercase tracking-widest transition-all ${currentPage === 1 ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
                     }`}
@@ -866,7 +869,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                     <button
                       key={i + 1}
                       type="button"
-                      onClick={() => setCurrentPage(i + 1)}
+                      onClick={() => {
+                        setCurrentPage(i + 1);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
                       className={`w-8 h-8 text-sm font-bold transition-all rounded-full ${currentPage === i + 1
                         ? "bg-foreground text-background"
                         : "text-foreground/50 hover:text-foreground hover:bg-foreground/10"
@@ -878,7 +884,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                 </div>
                 <button
                   type="button"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  onClick={() => {
+                    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                   disabled={currentPage === totalPages}
                   className={`text-[10px] font-bold uppercase tracking-widest transition-all ${currentPage === totalPages ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
                     }`}
