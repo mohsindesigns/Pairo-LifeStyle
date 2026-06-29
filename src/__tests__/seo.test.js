@@ -99,8 +99,11 @@ describe("SEO - Centralized Metadata Resolver", () => {
     expect(metadata.twitter.creator).toBe("@pairostore");
 
     expect(structuredData).toBeDefined();
-    expect(structuredData["@type"]).toBe("Product");
-    expect(structuredData.offers.price).toBe(1200);
+    const productSchema = structuredData["@graph"] 
+      ? structuredData["@graph"].find(x => x["@type"] === "Product")
+      : structuredData;
+    expect(productSchema["@type"]).toBe("Product");
+    expect(productSchema.offers.price).toBe(1200);
   });
 
   it("should fall back to global settings when entity SEO is empty", () => {

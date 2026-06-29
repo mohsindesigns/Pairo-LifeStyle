@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { Star, Search, MessageSquare, Edit2, CornerDownRight, X, Square, CheckSquare } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { getProductUrl } from "@/lib/routes";
 
 // Helper to format date like WordPress: YYYY/MM/DD at hh:mm am/pm
 const formatDate = (dateString) => {
@@ -755,7 +756,7 @@ export default function AdminReviewsPage() {
                           {review.productId ? (
                             <div className="space-y-1">
                               <a 
-                                href={`/product/${review.productId.slug}`} 
+                                href={getProductUrl(review.productId)} 
                                 target="_blank" 
                                 rel="noopener noreferrer" 
                                 className="text-[#2271b1] hover:underline font-semibold block truncate max-w-[150px]"
@@ -765,7 +766,7 @@ export default function AdminReviewsPage() {
                               </a>
                               <div className="flex items-center gap-1 select-none">
                                 <a 
-                                  href={`/product/${review.productId.slug}`}
+                                  href={getProductUrl(review.productId)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-gray-400 hover:text-[#2271b1] text-[11px]"

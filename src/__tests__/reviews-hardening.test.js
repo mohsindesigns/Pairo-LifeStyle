@@ -138,11 +138,14 @@ describe("Reviews Hardening Verification Suite", () => {
     });
 
     expect(structuredData).toBeDefined();
-    expect(structuredData.review).toBeDefined();
+    const productSchema = structuredData["@graph"] 
+      ? structuredData["@graph"].find(x => x["@type"] === "Product")
+      : structuredData;
+    expect(productSchema.review).toBeDefined();
     
     // Should only contain 1 review (the Approved User)
-    expect(structuredData.review.length).toBe(1);
-    expect(structuredData.review[0].author.name).toBe("Approved User");
-    expect(structuredData.review[0].reviewBody).toBe("Great!");
+    expect(productSchema.review.length).toBe(1);
+    expect(productSchema.review[0].author.name).toBe("Approved User");
+    expect(productSchema.review[0].reviewBody).toBe("Great!");
   });
 });

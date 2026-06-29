@@ -31,6 +31,8 @@ export async function resolvePageSections(sections) {
         }
         
         const products = await Product.find(query)
+          .populate('categories')
+          .populate('primaryCategory')
           .sort({ createdAt: -1 })
           .limit(config.limit || 8)
           .lean();
@@ -57,7 +59,7 @@ export async function resolvePageSections(sections) {
             } else {
                query.slug = config.productId;
             }
-            const product = await Product.findOne(query).lean();
+            const product = await Product.findOne(query).populate('categories').populate('primaryCategory').lean();
             if (product) {
                const { getAltTextMap } = await import("@/lib/mediaUsage");
                const altMap = await getAltTextMap([...(product.images || []), product.image]);

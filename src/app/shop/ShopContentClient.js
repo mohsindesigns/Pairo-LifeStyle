@@ -400,11 +400,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   const handleCategorySelect = (catName) => {
     setSelectedCategory(catName);
     setCurrentPage(1);
-    const params = new URLSearchParams(window.location.search);
-    params.delete("category");
-    const basePath = catName ? `/shop/${catName.toLowerCase()}` : '/shop';
-    const newUrl = `${basePath}${params.toString() ? `?${params.toString()}` : ''}`;
-    silentReplaceState(newUrl);
+    const basePath = catName ? `/${catName.toLowerCase()}` : '/shop';
+    router.push(basePath);
   };
 
   const toggleType = (type) => {
@@ -453,7 +450,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setSearchQuery("");
     setSortBy("Most Popular");
     setCurrentPage(1);
-    silentReplaceState('/shop');
+    router.push('/shop');
   };
 
   const getActiveFilterCount = () => {
@@ -500,14 +497,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       <div className="pb-8 border-b border-border">
         <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">Categories</p>
         <div className="flex flex-col gap-3 text-xs">
-          <button
-            type="button"
-            onClick={() => handleCategorySelect("")}
-            className={`flex items-center justify-between py-1 w-full text-left transition-all ${!selectedCategory ? "font-bold text-foreground" : "text-foreground/65 hover:text-foreground"}`}
-          >
-            <span>All Products</span>
-            <span className="text-foreground/50 text-[10px]">{products.length}</span>
-          </button>
+
           {allCategories.map((cat) => {
             const dbCat = dbCategories.find(c => c.name.toLowerCase() === cat.toLowerCase());
             const isSelected = selectedCategory && (

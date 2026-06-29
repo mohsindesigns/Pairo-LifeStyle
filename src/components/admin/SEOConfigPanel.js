@@ -67,9 +67,9 @@ export default function SEOConfigPanel({
     const siteUrl = "https://pairo.store";
     
     let pathPrefix = "/";
-    if (parentType === "product") pathPrefix = "/product/";
+    if (parentType === "product") pathPrefix = "/shop/";
     else if (parentType === "blog") pathPrefix = "/blog/";
-    else if (parentType === "category") pathPrefix = "/shop/";
+    else if (parentType === "category") pathPrefix = "/";
 
     const generated = {
       ...seo,

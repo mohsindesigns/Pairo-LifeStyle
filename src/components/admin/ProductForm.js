@@ -73,6 +73,18 @@ export default function ProductForm({ productId = null }) {
    const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!productId);
    const [categories, setCategories] = useState([]);
 
+   const getPreviewCategorySlug = () => {
+      if (formData.primaryCategory) {
+         const match = categories.find(c => c._id === formData.primaryCategory);
+         if (match && match.slug) return match.slug;
+      }
+      if (formData.categories && formData.categories.length > 0) {
+         const match = categories.find(c => c._id === formData.categories[0]);
+         if (match && match.slug) return match.slug;
+      }
+      return "shop";
+   };
+
    const [formData, setFormData] = useState({
       name: "",
       slug: "",
@@ -105,6 +117,7 @@ export default function ProductForm({ productId = null }) {
          structuredData: ""
       },
       categories: [],
+      primaryCategory: "",
       attributes: [], // { name: "", type: "custom", values: [{ label: "", hex: "", image: "", value: "", variantImage: "" }] }
       variantCombinations: [], // { title: "", price: "", stock: "", sku: "", image: "" }
       stats: [],
@@ -132,6 +145,7 @@ export default function ProductForm({ productId = null }) {
                   productType: prodData.productType || "simple",
                   images: prodData.images || [],
                   categories: prodData.categories || [],
+                  primaryCategory: prodData.primaryCategory || "",
                   seo: {
                      title: "", description: "", keywords: [], focusKeyword: "",
                      canonicalUrl: "", noIndex: false, noFollow: false,
@@ -358,7 +372,7 @@ export default function ProductForm({ productId = null }) {
                       }}
                   />
                   <div className="text-[12px] text-gray-500 px-1 mt-1 flex items-center gap-1">
-                     Permalink: <span className="text-gray-400">pairolifestyle.com/product/</span>
+                     Permalink: <span className="text-gray-400">pairolifestyle.com/{getPreviewCategorySlug()}/</span>
                       <input
                          className="border-none bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px]"
                          value={formData.slug}
@@ -764,31 +778,53 @@ export default function ProductForm({ productId = null }) {
                </div>
 
                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex items-center justify-between">
-                     <span>Categories</span>
-                     <button type="button" onClick={() => router.push("/admin/categories")} className="text-[10px] text-[#2271b1] hover:underline font-normal">Manage</button>
-                  </div>
-                  <div className="p-4 max-h-48 overflow-y-auto">
-                     {categories.length === 0 ? (
-                        <p className="text-[11px] text-gray-400 italic">No categories found.</p>
-                     ) : (
-                        categories.map(cat => (
-                           <label key={cat._id} className="flex items-center gap-2 text-[13px] mb-2 cursor-pointer">
-                              <input 
-                                 type="checkbox" 
-                                 className="w-4 h-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1]" 
-                                 checked={(formData.categories || []).includes(cat._id)} 
-                                 onChange={e => {
-                                    const n = e.target.checked ? [...(formData.categories || []), cat._id] : (formData.categories || []).filter(id => id !== cat._id);
-                                    setFormData({ ...formData, categories: n });
-                                 }} 
-                              /> 
-                              {cat.name}
-                           </label>
-                        ))
-                     )}
-                  </div>
-               </div>
+                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex items-center justify-between">
+                      <span>Categories</span>
+                      <button type="button" onClick={() => router.push("/admin/categories")} className="text-[10px] text-[#2271b1] hover:underline font-normal">Manage</button>
+                   </div>
+                   <div className="p-4 max-h-48 overflow-y-auto border-b border-gray-100">
+                      {categories.length === 0 ? (
+                         <p className="text-[11px] text-gray-400 italic">No categories found.</p>
+                      ) : (
+                         categories.map(cat => (
+                            <label key={cat._id} className="flex items-center gap-2 text-[13px] mb-2 cursor-pointer">
+                               <input 
+                                  type="checkbox" 
+                                  className="w-4 h-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1]" 
+                                  checked={(formData.categories || []).includes(cat._id)} 
+                                  onChange={e => {
+                                     const n = e.target.checked ? [...(formData.categories || []), cat._id] : (formData.categories || []).filter(id => id !== cat._id);
+                                     let newPrimary = formData.primaryCategory;
+                                     if (!e.target.checked && formData.primaryCategory === cat._id) {
+                                        newPrimary = n.length > 0 ? n[0] : "";
+                                     } else if (e.target.checked && !formData.primaryCategory) {
+                                        newPrimary = cat._id;
+                                     }
+                                     setFormData({ ...formData, categories: n, primaryCategory: newPrimary });
+                                  }} 
+                               /> 
+                               {cat.name}
+                            </label>
+                         ))
+                      )}
+                   </div>
+                   <div className="p-4">
+                      <label className="text-[12px] font-bold text-gray-700 block mb-1">Primary Category</label>
+                      <select 
+                         className="w-full text-[13px] border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-[#2271b1] bg-white cursor-pointer"
+                         value={formData.primaryCategory || ""}
+                         onChange={(e) => setFormData({ ...formData, primaryCategory: e.target.value })}
+                      >
+                         <option value="">-- None --</option>
+                         {categories.filter(c => (formData.categories || []).includes(c._id)).map(cat => (
+                            <option key={cat._id} value={cat._id}>{cat.name}</option>
+                         ))}
+                      </select>
+                      <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
+                         Used for URL hierarchy, SEO canonical tags, and breadcrumbs.
+                      </p>
+                   </div>
+                </div>
 
                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Product Image</div>

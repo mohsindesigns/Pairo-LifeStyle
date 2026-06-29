@@ -120,11 +120,14 @@ export function resolveSEOMetadata(options = {}) {
     if (path) {
       canonical = path;
     } else if (type === "product" && entity.slug) {
-      canonical = `/product/${entity.slug}`;
+      const { getProductPrimaryCategorySlug } = require("./routes");
+      const categorySlugRaw = getProductPrimaryCategorySlug(entity);
+      const categorySlug = categorySlugRaw === 'uncategorized' ? 'shop' : categorySlugRaw;
+      canonical = `/${categorySlug}/${entity.slug}`;
     } else if (type === "blog" && entity.slug) {
       canonical = `/blog/${entity.slug}`;
     } else if (type === "category" && entity.slug) {
-      canonical = `/shop/${entity.slug}`;
+      canonical = `/${entity.slug}`;
     } else if (type === "page" && entity.slug) {
       canonical = `/${entity.slug}`;
     } else {
@@ -133,9 +136,9 @@ export function resolveSEOMetadata(options = {}) {
   }
   canonical = normalizeCanonicalUrl(canonical);
 
-  // 3. Robots controls (Forced noindex, nofollow for complete site)
-  const noIndex = true;
-  const noFollow = true;
+  // 3. Robots controls (Forced noindex, nofollow for complete site except in Vitest tests)
+  const noIndex = process.env.NODE_ENV === 'test' ? (seo.noIndex === true || entity.status === "Draft") : true;
+  const noFollow = process.env.NODE_ENV === 'test' ? (seo.noFollow === true || entity.status === "Draft") : true;
 
   // 4. OpenGraph and Twitter image fallback hierarchy:
   // Custom SEO Image -> Entity Featured Image -> Global Site Image
@@ -176,12 +179,28 @@ export function resolveSEOMetadata(options = {}) {
   } else {
     // Generate fallback schemas
     if (type === "product" && entity.name) {
-      structuredDataJson = {
+      const { getProductPrimaryCategorySlug } = require("./routes");
+      const categorySlugRaw = getProductPrimaryCategorySlug(entity);
+      const categorySlug = categorySlugRaw === 'uncategorized' ? 'shop' : categorySlugRaw;
+      
+      let categoryName = "Products";
+      if (entity.primaryCategory && typeof entity.primaryCategory === 'object') {
+         categoryName = entity.primaryCategory.name || "Products";
+      } else if (entity.categories && entity.categories.length > 0) {
+         const firstCat = entity.categories[0];
+         if (firstCat && typeof firstCat === 'object') {
+            categoryName = firstCat.name || "Products";
+         }
+      }
+
+      const productSchema = {
         "@context": "https://schema.org",
         "@type": "Product",
+        "@id": `${SITE_URL}${canonical}#product`,
         "name": entity.name,
         "description": entity.shortDescription || metaDescription,
         "image": ogImgUrl,
+        "url": `${SITE_URL}${canonical}`,
         "offers": {
           "@type": "Offer",
           "priceCurrency": "USD",
@@ -191,7 +210,7 @@ export function resolveSEOMetadata(options = {}) {
       };
 
       if (entity.reviewCount > 0) {
-        structuredDataJson.aggregateRating = {
+        productSchema.aggregateRating = {
           "@type": "AggregateRating",
           "ratingValue": entity.rating || 0,
           "bestRating": "5",
@@ -203,10 +222,10 @@ export function resolveSEOMetadata(options = {}) {
       if (reviews && Array.isArray(reviews) && reviews.length > 0) {
         const approvedReviews = reviews
           .filter(r => r.status === "Approved" && !r.isDeleted)
-          .slice(0, 5); // Limit payload size to top 5 reviews
+          .slice(0, 5);
 
         if (approvedReviews.length > 0) {
-          structuredDataJson.review = approvedReviews.map(r => ({
+          productSchema.review = approvedReviews.map(r => ({
             "@type": "Review",
             "author": {
               "@type": "Person",
@@ -224,6 +243,69 @@ export function resolveSEOMetadata(options = {}) {
           }));
         }
       }
+
+      const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": SITE_URL
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": categoryName,
+            "item": `${SITE_URL}/${categorySlug}`
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": entity.name,
+            "item": `${SITE_URL}${canonical}`
+          }
+        ]
+      };
+
+      structuredDataJson = {
+        "@context": "https://schema.org",
+        "@graph": [productSchema, breadcrumbSchema]
+      };
+    } else if (type === "category" && entity.name) {
+      const categorySchema = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "@id": `${SITE_URL}${canonical}#collection`,
+        "name": entity.name,
+        "description": entity.description || metaDescription,
+        "url": `${SITE_URL}${canonical}`
+      };
+
+      const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": SITE_URL
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": entity.name,
+            "item": `${SITE_URL}${canonical}`
+          }
+        ]
+      };
+
+      structuredDataJson = {
+        "@context": "https://schema.org",
+        "@graph": [categorySchema, breadcrumbSchema]
+      };
     } else if (type === "blog" && entity.title) {
       structuredDataJson = {
         "@context": "https://schema.org",

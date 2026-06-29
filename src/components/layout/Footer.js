@@ -1,6 +1,7 @@
 "use client";
 
 import { useSiteData } from "@/context/SiteContext";
+import { getCategoryUrl } from "@/lib/routes";
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -202,7 +203,7 @@ export default function Footer() {
             <ul className="space-y-3">
               {footerCategories.map((cat) => (
                 <li key={cat.slug || cat.name}>
-                  <Link href={`/shop/${cat.slug}`} className="text-white/70 hover:text-white font-bold text-[9px] uppercase tracking-widest transition-colors block">
+                  <Link href={getCategoryUrl(cat)} className="text-white/70 hover:text-white font-bold text-[9px] uppercase tracking-widest transition-colors block">
                     {cat.name}
                   </Link>
                 </li>

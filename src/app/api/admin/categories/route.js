@@ -66,6 +66,13 @@ export async function POST(req) {
     const type = data.type || "product";
     console.log("Determined type to save:", type);
     
+    // Route Collision Detection
+    const { validateSlug } = await import("@/lib/routes-server");
+    const collisionCheck = await validateSlug(data.slug);
+    if (!collisionCheck.valid) {
+      return NextResponse.json({ error: collisionCheck.error }, { status: 400 });
+    }
+    
     // Check if a category with this slug already exists (even if deleted) in the SAME type
     const existing = await Category.findOne({ slug: data.slug, type });
     
@@ -133,10 +140,30 @@ export async function PUT(req) {
     const oldCategory = await Category.findById(id);
     if (!oldCategory) return NextResponse.json({ error: "Category not found" }, { status: 404 });
 
+    // Route Collision Detection
+    if (data.slug && oldCategory.slug !== data.slug) {
+      const { validateSlug } = await import("@/lib/routes-server");
+      const collisionCheck = await validateSlug(data.slug, id);
+      if (!collisionCheck.valid) {
+        return NextResponse.json({ error: collisionCheck.error }, { status: 400 });
+      }
+    }
+
     // Register redirect if slug changed
     if (data.slug && oldCategory.slug && oldCategory.slug !== data.slug) {
       const { registerRedirect } = await import("@/lib/redirect-resolver");
-      await registerRedirect(`/shop/${oldCategory.slug}`, `/shop/${data.slug}`);
+      await registerRedirect(`/shop/${oldCategory.slug}`, `/${data.slug}`);
+      await registerRedirect(`/${oldCategory.slug}`, `/${data.slug}`);
+
+      // Register redirects for all products in this category
+      const Product = (await import("@/models/Product")).default;
+      const products = await Product.find({ categories: id, isDeleted: { $ne: true } }).lean();
+      for (const prod of products) {
+        if (prod.slug) {
+          await registerRedirect(`/${oldCategory.slug}/${prod.slug}`, `/${data.slug}/${prod.slug}`);
+          await registerRedirect(`/product/${prod.slug}`, `/${data.slug}/${prod.slug}`);
+        }
+      }
     }
 
     const category = await Category.findByIdAndUpdate(id, data, { new: true });

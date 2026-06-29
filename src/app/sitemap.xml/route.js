@@ -16,8 +16,8 @@ export async function GET() {
     // 1. Fetch products (Published, not deleted, not noIndexed)
     const products = await Product.find(
       { isDeleted: { $ne: true }, status: "Published", "seo.noIndex": { $ne: true } },
-      "slug updatedAt"
-    ).lean();
+      "slug updatedAt primaryCategory categories"
+    ).populate('categories').populate('primaryCategory').lean();
 
     // 2. Fetch blogs
     const blogs = await Blog.find(
@@ -60,9 +60,12 @@ export async function GET() {
     // Add products
     for (const prod of products) {
       if (prod.slug) {
+        const { getProductPrimaryCategorySlug } = require("@/lib/routes");
+        const categorySlugRaw = getProductPrimaryCategorySlug(prod);
+        const categorySlug = categorySlugRaw === 'uncategorized' ? 'shop' : categorySlugRaw;
         xml += `
   <url>
-    <loc>${siteUrl}/product/${prod.slug}</loc>
+    <loc>${siteUrl}/${categorySlug}/${prod.slug}</loc>
     <lastmod>${prod.updatedAt ? new Date(prod.updatedAt).toISOString() : new Date().toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -75,7 +78,7 @@ export async function GET() {
       if (cat.slug) {
         xml += `
   <url>
-    <loc>${siteUrl}/shop/${cat.slug}</loc>
+    <loc>${siteUrl}/${cat.slug}</loc>
     <lastmod>${cat.updatedAt ? new Date(cat.updatedAt).toISOString() : new Date().toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>

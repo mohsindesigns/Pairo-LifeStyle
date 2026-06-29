@@ -10,6 +10,7 @@ import logo from '../../assets/png-file.png';
 import SearchModal from "./SearchModal";
 import { useCart } from "@/context/CartContext";
 import { useSiteData } from "@/context/SiteContext";
+import { getProductUrl, getCategoryUrl } from "@/lib/routes";
 
 /**
  * Resolves a nav item href based on its type and value.
@@ -19,7 +20,7 @@ function resolveNavHref(item, dbPages, dbCategories, dbProducts) {
     switch (item.type) {
       case 'product': {
         const product = dbProducts?.find(p => p._id?.toString() === item.value || p.slug === item.value);
-        return product ? `/product/${product.slug}` : (item.href || item.value || '#');
+        return product ? getProductUrl(product) : (item.href || item.value || '#');
       }
       case 'page': {
         // Value is a page slug or _id; find the actual slug
@@ -27,7 +28,8 @@ function resolveNavHref(item, dbPages, dbCategories, dbProducts) {
         return page ? `/${page.slug}` : (item.href || item.value || '#');
       }
       case 'product_category': {
-        return `/shop/${item.value}`;
+        const cat = dbCategories?.find(c => c.slug === item.value || c._id?.toString() === item.value || c.name === item.value);
+        return cat ? getCategoryUrl(cat) : `/${item.value}`;
       }
       case 'blog_list': {
         return '/blog';
@@ -252,7 +254,7 @@ export default function Navbar() {
                               {item.itemDropdownCategories.map((cat) => (
                                 <Link
                                   key={cat.slug}
-                                  href={`/shop/${cat.slug}`}
+                                  href={getCategoryUrl(cat)}
                                   className="block px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.15em] text-black/60 hover:text-black hover:bg-black/[0.02] transition-colors"
                                 >
                                   {cat.name}
@@ -278,7 +280,7 @@ export default function Navbar() {
                               {item.itemDropdownProducts.map((prod) => (
                                 <Link
                                   key={prod._id}
-                                  href={`/product/${prod.slug}`}
+                                  href={getProductUrl(prod)}
                                   className="block px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.15em] text-black/60 hover:text-black hover:bg-black/[0.02] transition-colors truncate"
                                 >
                                   {prod.name || prod.title}
@@ -311,7 +313,7 @@ export default function Navbar() {
                                       {(item.itemMegaCategories || []).map((cat, catIdx) => (
                                         <Link
                                           key={cat.slug || cat.name}
-                                          href={`/shop/${cat.slug}`}
+                                          href={getCategoryUrl(cat)}
                                           className="group/lnk flex items-center gap-4 text-left"
                                         >
                                           <span className="text-[10px] font-mono text-black/50 group-hover/lnk:text-black transition-colors duration-300">0{catIdx + 1}</span>
@@ -339,7 +341,7 @@ export default function Navbar() {
                                   {(item.itemMegaCategories || []).slice(0, 3).map((cat) => (
                                     <Link
                                       key={`promo-${cat.slug || cat.name}`}
-                                      href={`/shop/${cat.slug}`}
+                                      href={getCategoryUrl(cat)}
                                       className="group/promo relative flex-1 min-w-[160px] max-w-[210px] aspect-[4/5] rounded-[20px] overflow-hidden bg-black/5 border border-black/5 shadow-sm hover:shadow-md transition-all duration-500"
                                     >
                                       <Image
@@ -474,7 +476,7 @@ export default function Navbar() {
                                 {(item.dropdownType === 'mega' || item.type === 'mega_menu') && (
                                   <div className="grid grid-cols-2 gap-4 mt-4">
                                     {item.itemMegaCategories.map((cat) => (
-                                      <Link key={cat.slug || cat.name} href={`/shop/${cat.slug}`} onClick={() => setIsOpen(false)}>
+                                      <Link key={cat.slug || cat.name} href={getCategoryUrl(cat)} onClick={() => setIsOpen(false)}>
                                         <div className="relative aspect-[3/4] rounded-xl overflow-hidden bg-black/5">
                                           <Image src={cat.image || '/placeholder.jpg'} alt={cat.name} fill className="object-cover" />
                                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/10 flex items-end p-3">

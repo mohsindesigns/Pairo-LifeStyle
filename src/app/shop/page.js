@@ -1,5 +1,4 @@
-import { Suspense } from "react";
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import ShopContentClient from "./ShopContentClient";
@@ -9,8 +8,17 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ searchParams }) {
   const resolvedSearchParams = await searchParams;
-  // If old ?category= format, metadata will be handled by the new /shop/[category] route after redirect
-  if (resolvedSearchParams.category) return {};
+  const categorySlug = resolvedSearchParams.category;
+  
+  if (categorySlug) {
+    const params = new URLSearchParams(resolvedSearchParams);
+    params.delete("category");
+    const queryString = params.toString();
+    const redirectUrl = queryString
+      ? `/${categorySlug}?${queryString}`
+      : `/${categorySlug}`;
+    permanentRedirect(redirectUrl);
+  }
 
   await dbConnect();
   const shopPage = await Page.findOne({ slug: "shop" }).lean();
@@ -30,12 +38,15 @@ export default async function ShopPage({ searchParams }) {
   const categorySlug = resolvedSearchParams.category;
   const typeSlug = resolvedSearchParams.type;
 
-  // Redirect old query-param format to clean path-based URL
+  // Redirect old query-param format to clean top-level path URL
   if (categorySlug) {
-    const redirectUrl = typeSlug
-      ? `/shop/${categorySlug}?type=${typeSlug}`
-      : `/shop/${categorySlug}`;
-    redirect(redirectUrl);
+    const params = new URLSearchParams(resolvedSearchParams);
+    params.delete("category");
+    const queryString = params.toString();
+    const redirectUrl = queryString
+      ? `/${categorySlug}?${queryString}`
+      : `/${categorySlug}`;
+    permanentRedirect(redirectUrl);
   }
 
   return (

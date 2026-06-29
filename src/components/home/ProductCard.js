@@ -6,6 +6,7 @@ import { ShoppingBag, Eye, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
+import { getProductUrl } from "@/lib/routes";
 
 export default function ProductCard({ product }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -24,7 +25,7 @@ export default function ProductCard({ product }) {
     >
       {/* Product Image Container */}
       <div className="relative aspect-square bg-[var(--secondary)] rounded-[16px] md:rounded-[24px] overflow-hidden border border-[var(--border)]">
-        <Link href={`/product/${productId}`} className="block h-full w-full">
+        <Link href={getProductUrl(product)} className="block h-full w-full">
           {/* Main Image */}
           <motion.div
             animate={{ opacity: isHovered && hoverImage ? 0 : 1, scale: isHovered ? 1.05 : 1 }}
@@ -78,7 +79,7 @@ export default function ProductCard({ product }) {
             Add to Bag
           </button>
 
-          <Link href={`/product/${productId}`} className="flex-1">
+          <Link href={getProductUrl(product)} className="flex-1">
             <button className="group/view w-full bg-white/90 backdrop-blur-md text-black h-9 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center shadow-xl translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 delay-75 ease-out border border-black/5 active:scale-95 hover:bg-neutral-100">
               <Eye className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </button>

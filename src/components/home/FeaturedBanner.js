@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
 import { ArrowRight } from "lucide-react";
 import siteData from "@/lib/data.json";
+import { getProductUrl, getCategoryUrl } from "@/lib/routes";
 
 export default function FeaturedBanner({
   title,
@@ -93,12 +94,11 @@ export default function FeaturedBanner({
               );
             })()}
 
-            {/* Action Area */}
             <div className="pt-2">
               <Link
                 href={
-                  linkType === "product" && productId ? `/product/${productId}` :
-                    linkType === "collection" && collectionId ? `/shop/${collectionId}` :
+                  linkType === "product" ? getProductUrl(propProduct || { slug: productId }) :
+                    linkType === "collection" && collectionId ? getCategoryUrl(collectionId) :
                       "#"
                 }
                 className="inline-block"

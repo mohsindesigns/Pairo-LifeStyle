@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState, useEffect } from "react";
 import { ArrowLeft, ArrowRight, Share2, ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, useScroll, useSpring } from "framer-motion";
+import { getProductUrl } from "@/lib/routes";
 
 const SectionHeader = ({ number, title }) => (
   <div className="flex items-center gap-3 mb-6">
@@ -295,7 +296,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
                   {post.showFeaturedProduct !== false && featuredProduct && featuredProduct.id !== "default" && (
                     <div id="archive" className="space-y-4 pt-6 border-t border-black/5">
                        <span className="text-[8px] font-bold tracking-[0.2em] text-black/30 uppercase">SHOP PIECE</span>
-                       <Link href={`/product/${featuredProduct._id || featuredProduct.id}`} className="block aspect-square rounded-[8px] overflow-hidden border border-black/5 group cursor-pointer relative">
+                       <Link href={getProductUrl(featuredProduct)} className="block aspect-square rounded-[8px] overflow-hidden border border-black/5 group cursor-pointer relative">
                           <img src={featuredProduct.images?.[0] || featuredProduct.image} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                        </Link>
                        <div className="space-y-1">
@@ -307,7 +308,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
                        
                        <div className="space-y-2.5">
                           <Link 
-                             href={`/product/${featuredProduct._id || featuredProduct.id}`}
+                             href={getProductUrl(featuredProduct)}
                              className="flex items-center justify-center gap-2 w-full bg-black text-white py-3.5 rounded-xl font-bold text-[9px] uppercase tracking-[0.2em] hover:bg-black/80 transition-all shadow-lg active:scale-[0.98]"
                           >
                              Go to product

@@ -5,6 +5,7 @@ import { Search, Plus, Trash2, Edit, ExternalLink, ImageIcon, Check, FileText } 
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { getCategoryUrl } from "@/lib/routes";
 
 export default function CategoryManager({ type = "product", title = "Categories" }) {
   const router = useRouter();
@@ -180,7 +181,7 @@ export default function CategoryManager({ type = "product", title = "Categories"
                             <span className="text-[#c3c4c7]">|</span>
                             <button onClick={() => handleDelete(cat._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
                             <span className="text-[#c3c4c7]">|</span>
-                            <Link href={`/shop/${cat.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
+                            <Link href={getCategoryUrl(cat)} target="_blank" className="hover:text-[#135e96]">View</Link>
                          </div>
                       </div>
                     </td>

@@ -52,7 +52,7 @@ export default function Hero({
     return () => clearInterval(timer);
   }, [hero.slides.length]);
 
-  if (!siteData && !propSlides) return <div className="h-[650px] bg-black/5 rounded-[40px] m-8 animate-pulse" />;
+  if ((!siteData && !propSlides) || !hero.slides || hero.slides.length === 0) return <div className="h-[550px] md:h-[650px] lg:h-[750px] bg-black/5 rounded-[32px] md:rounded-[40px] m-4 md:m-8 animate-pulse" />;
 
   const slideVariants = {
     initial: (direction) => ({ x: direction > 0 ? "20%" : "-20%", opacity: 0 }),

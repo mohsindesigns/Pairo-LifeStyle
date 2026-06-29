@@ -11,6 +11,7 @@ const ProductSchema = new mongoose.Schema({
   isFeatured: { type: Boolean, default: false },
   category: { type: String }, // Main category string (Legacy)
   categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], // Multi-category support
+  primaryCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
   collections: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Collection' }],
   
   // Pricing & Inventory

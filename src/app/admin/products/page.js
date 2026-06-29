@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { getProductUrl } from "@/lib/routes";
 
 export default function AdminProducts() {
   const router = useRouter();
@@ -295,7 +296,11 @@ export default function AdminProducts() {
                                  <span className="text-[#c3c4c7]">|</span>
                                  <button onClick={() => handleTrash(p._id)} className="hover:text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
                                  <span className="text-[#c3c4c7]">|</span>
-                                 <Link href={`/product/${p.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
+                                 <Link href={getProductUrl({
+                                    ...p,
+                                    categories: p.categories?.map(id => categories.find(c => c._id === id)).filter(Boolean),
+                                    primaryCategory: p.primaryCategory ? categories.find(c => c._id === p.primaryCategory) : null
+                                  })} target="_blank" className="hover:text-[#135e96]">View</Link>
                               </>
                            )}
                         </div>

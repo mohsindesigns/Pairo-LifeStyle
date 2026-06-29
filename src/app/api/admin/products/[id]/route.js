@@ -17,6 +17,7 @@ export async function GET(req, { params }) {
   try {
     const product = await Product.findById(id)
       .populate('categories')
+      .populate('primaryCategory')
       .populate('collections')
       .populate('relatedProducts')
       .populate('upsellProducts');
@@ -39,7 +40,7 @@ export async function PUT(req, { params }) {
   try {
     const data = await req.json();
     
-    const oldProduct = await Product.findById(id);
+    const oldProduct = await Product.findById(id).populate('categories').populate('primaryCategory');
     if (!oldProduct) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     // Auto-generate slug if it's being updated or missing
@@ -59,9 +60,27 @@ export async function PUT(req, { params }) {
     }
     data.slug = finalSlug;
 
-    // Register redirect if slug changed
-    if (data.slug && oldProduct.slug && oldProduct.slug !== data.slug) {
-      await registerRedirect(`/product/${oldProduct.slug}`, `/product/${data.slug}`);
+    // Register redirect if slug or primary category changed
+    const { getProductPrimaryCategorySlug } = await import("@/lib/routes");
+    const oldCatSlugRaw = getProductPrimaryCategorySlug(oldProduct);
+    const oldCatSlug = oldCatSlugRaw === 'uncategorized' ? 'shop' : oldCatSlugRaw;
+
+    const tempNewProduct = {
+      ...oldProduct.toObject(),
+      ...data
+    };
+    const newCatSlugRaw = getProductPrimaryCategorySlug(tempNewProduct);
+    const newCatSlug = newCatSlugRaw === 'uncategorized' ? 'shop' : newCatSlugRaw;
+
+    const slugChanged = oldProduct.slug !== finalSlug;
+    const categoryChanged = oldCatSlug !== newCatSlug;
+
+    if (slugChanged || categoryChanged) {
+      const oldPath = `/${oldCatSlug}/${oldProduct.slug}`;
+      const newPath = `/${newCatSlug}/${finalSlug}`;
+      await registerRedirect(oldPath, newPath);
+      await registerRedirect(`/product/${oldProduct.slug}`, newPath);
+      await registerRedirect(`/product/${finalSlug}`, newPath);
     }
 
     const product = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });

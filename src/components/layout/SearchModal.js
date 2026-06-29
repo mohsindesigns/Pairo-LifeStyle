@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, ArrowRight, TrendingUp } from "lucide-react";
 import siteData from "@/lib/data.json";
 import { useSiteData } from "@/context/SiteContext";
+import { getProductUrl, getCategoryUrl } from "@/lib/routes";
 
 export default function SearchModal({ isOpen, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -133,7 +134,7 @@ export default function SearchModal({ isOpen, onClose }) {
                           results.categories.map((cat) => (
                             <Link
                               key={cat.slug}
-                              href={`/shop/${cat.slug}`}
+                              href={getCategoryUrl(cat)}
                               onClick={onClose}
                               className="group block"
                             >
@@ -178,7 +179,7 @@ export default function SearchModal({ isOpen, onClose }) {
                         {results.products.map((product) => (
                           <Link
                             key={product._id || product.id}
-                            href={`/product/${product.slug || product.id || product._id}`}
+                            href={getProductUrl(product)}
                             onClick={onClose}
                             className="group"
                           >
@@ -211,7 +212,7 @@ export default function SearchModal({ isOpen, onClose }) {
                         <h4 className="text-[8px] md:text-[10px] font-bold text-black/30 uppercase tracking-[0.4em]">{search.popularCategories}</h4>
                         <div className="grid grid-cols-2 md:grid-cols-1 gap-3 md:gap-4">
                             {dbCategories.map((cat) => (
-                              <Link key={cat.slug} href={`/shop/${cat.slug}`} onClick={onClose} className="group block text-lg md:text-2xl font-bold heading-font uppercase tracking-tighter text-black/60 hover:text-black transition-colors">
+                              <Link key={cat.slug} href={getCategoryUrl(cat)} onClick={onClose} className="group block text-lg md:text-2xl font-bold heading-font uppercase tracking-tighter text-black/60 hover:text-black transition-colors">
                                 {cat.name}
                               </Link>
                             ))}
@@ -224,7 +225,7 @@ export default function SearchModal({ isOpen, onClose }) {
                           (() => {
                             const featuredCat = dbCategories[1] || dbCategories[0];
                             return (
-                              <Link href={`/shop/${featuredCat.slug}`} onClick={onClose} className="group relative aspect-[16/9] md:aspect-[16/7] block rounded-2xl md:rounded-3xl overflow-hidden bg-black/5">
+                              <Link href={getCategoryUrl(featuredCat)} onClick={onClose} className="group relative aspect-[16/9] md:aspect-[16/7] block rounded-2xl md:rounded-3xl overflow-hidden bg-black/5">
                                   <Image src={featuredCat.image || "/placeholder.jpg"} alt={featuredCat.name} fill sizes="(max-width: 768px) 100vw, 66vw" className="object-cover group-hover:scale-105 transition-transform duration-1000" />
                                   <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex flex-col justify-end p-4 md:p-6">
                                      <h3 className="text-xl md:text-2xl font-bold text-white uppercase tracking-tighter heading-font">{featuredCat.name} Collection</h3>
