@@ -480,7 +480,17 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     startTransition(() => {
       router.push('/shop');
     });
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+      document.body.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      window.scrollTo(0, 0);
+    }
   };
+
 
   const getActiveFilterCount = () => {
     let count = 0;
@@ -854,10 +864,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               <div className="mt-20 flex items-center justify-center gap-12 border-t border-border pt-12">
                 <button
                   type="button"
-                  onClick={() => {
-                    setCurrentPage(prev => Math.max(1, prev - 1));
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                   className={`text-[10px] font-bold uppercase tracking-widest transition-all ${currentPage === 1 ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
                     }`}
@@ -869,10 +876,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                     <button
                       key={i + 1}
                       type="button"
-                      onClick={() => {
-                        setCurrentPage(i + 1);
-                        window.scrollTo({ top: 0, behavior: "smooth" });
-                      }}
+                      onClick={() => handlePageChange(i + 1)}
                       className={`w-8 h-8 text-sm font-bold transition-all rounded-full ${currentPage === i + 1
                         ? "bg-foreground text-background"
                         : "text-foreground/50 hover:text-foreground hover:bg-foreground/10"
@@ -884,10 +888,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setCurrentPage(prev => Math.min(totalPages, prev + 1));
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
+                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
                   className={`text-[10px] font-bold uppercase tracking-widest transition-all ${currentPage === totalPages ? "opacity-10 cursor-not-allowed" : "text-foreground hover:text-foreground/75"
                     }`}
