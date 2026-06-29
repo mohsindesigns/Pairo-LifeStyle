@@ -562,29 +562,6 @@ export default function ShopContentClient({ initialCategory = null, initialType 
         </div>
       </div>
 
-      {/* Product Types */}
-      <div className="pb-8 border-b border-border">
-        <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">Product Type</p>
-        <div className="flex flex-wrap gap-2">
-          {dynamicProductTypes.map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => toggleType(type)}
-              className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${selectedTypes.includes(type)
-                ? "bg-foreground text-background border-foreground"
-                : "bg-transparent text-foreground/65 border-border hover:border-foreground/30 hover:text-foreground"
-                }`}
-            >
-              {type}
-              {selectedTypes.includes(type) && (
-                <X className="inline-block w-3 h-3 ml-2" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Price Range */}
       <div className="pb-8 border-b border-border">
         <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">
@@ -692,45 +669,15 @@ export default function ShopContentClient({ initialCategory = null, initialType 
         </div>
       </div>
 
-      {/* Custom Dynamic Attributes */}
-      {customAttributesMap.map((attr) => (
-        <div key={attr.name} className="pb-8 border-b border-border">
-          <p className="font-bold text-[10px] sm:text-xs uppercase tracking-[0.2em] text-foreground/60 mb-6">
-            {attr.name}
-            {selectedCustomAttrs[attr.name]?.length > 0 && (
-              <span className="ml-2 text-foreground">({selectedCustomAttrs[attr.name].length})</span>
-            )}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {attr.values.map((val) => {
-              const isSelected = selectedCustomAttrs[attr.name]?.includes(val);
-              return (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => toggleCustomAttr(attr.name, val)}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border ${isSelected
-                    ? "bg-foreground text-background border-foreground"
-                    : "bg-transparent text-foreground/65 border-border hover:border-foreground hover:text-foreground"
-                    }`}
-                >
-                  {val}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-
-      {/* Reset Filters */}
+      {/* Reset Filters - Styled for High Visibility */}
       <button
         type="button"
         onClick={resetFilters}
-        className="w-full text-foreground/60 hover:text-foreground py-4 font-bold text-[9px] uppercase tracking-[0.2em] transition-all hover:bg-foreground/[0.04] rounded-lg"
+        className="w-full mt-4 border border-foreground text-foreground hover:bg-foreground hover:text-background py-3 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all bg-transparent active:scale-98"
       >
         Clear All Filters
         {getActiveFilterCount() > 0 && (
-          <span className="ml-2 bg-foreground text-background px-2 py-1 rounded-full text-[8px]">
+          <span className="ml-2 bg-foreground text-background px-2.5 py-0.5 rounded-full text-[9px] font-bold">
             {getActiveFilterCount()}
           </span>
         )}
