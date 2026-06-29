@@ -169,27 +169,6 @@ export default async function ProductDetailPage({ params, searchParams }) {
         />
       )}
       <div className="container mx-auto px-4 sm:px-6 md:px-16 py-4 md:py-8">
-        <nav className="flex items-center gap-2 mb-6 text-[10px] md:text-[11px] font-medium uppercase tracking-wider text-primary/60 border-b border-black/5 pb-4 overflow-x-auto whitespace-nowrap scrollbar-hide">
-          <Link href="/" className="hover:text-primary transition-colors shrink-0">Home</Link>
-          <ChevronRight className="w-2.5 h-2.5 opacity-40 shrink-0" />
-          {primaryCategory && primaryCategory.slug ? (
-            <>
-              <Link
-                href={`/collections/${primaryCategory.slug}`}
-                className="hover:text-primary transition-colors shrink-0"
-              >
-                {primaryCategory.name}
-              </Link>
-              <ChevronRight className="w-2.5 h-2.5 opacity-40 shrink-0" />
-            </>
-          ) : (
-            <>
-              <Link href="/shop" className="hover:text-primary transition-colors shrink-0">Shop</Link>
-              <ChevronRight className="w-2.5 h-2.5 opacity-40 shrink-0" />
-            </>
-          )}
-          <span className="text-primary font-medium tracking-normal truncate">{product.name}</span>
-        </nav>
 
         <ProductMainSection product={sanitizedProduct} />
 
