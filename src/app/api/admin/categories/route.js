@@ -153,16 +153,19 @@ export async function PUT(req) {
     // Register redirect if slug changed
     if (data.slug && oldCategory.slug && oldCategory.slug !== data.slug) {
       const { registerRedirect } = await import("@/lib/redirect-resolver");
-      await registerRedirect(`/shop/${oldCategory.slug}`, `/${data.slug}`);
-      await registerRedirect(`/${oldCategory.slug}`, `/${data.slug}`);
+      await registerRedirect(`/shop/${oldCategory.slug}`, `/collections/${data.slug}`);
+      await registerRedirect(`/${oldCategory.slug}`, `/collections/${data.slug}`);
+      await registerRedirect(`/collections/${oldCategory.slug}`, `/collections/${data.slug}`);
+      await registerRedirect(`/product-category/${oldCategory.slug}`, `/collections/${data.slug}`);
 
       // Register redirects for all products in this category
       const Product = (await import("@/models/Product")).default;
       const products = await Product.find({ categories: id, isDeleted: { $ne: true } }).lean();
       for (const prod of products) {
         if (prod.slug) {
-          await registerRedirect(`/${oldCategory.slug}/${prod.slug}`, `/${data.slug}/${prod.slug}`);
-          await registerRedirect(`/product/${prod.slug}`, `/${data.slug}/${prod.slug}`);
+          await registerRedirect(`/${oldCategory.slug}/${prod.slug}`, `/product/${prod.slug}`);
+          await registerRedirect(`/collections/${oldCategory.slug}/${prod.slug}`, `/product/${prod.slug}`);
+          await registerRedirect(`/product-category/${oldCategory.slug}/${prod.slug}`, `/product/${prod.slug}`);
         }
       }
     }

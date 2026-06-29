@@ -77,10 +77,11 @@ export async function PUT(req, { params }) {
 
     if (slugChanged || categoryChanged) {
       const oldPath = `/${oldCatSlug}/${oldProduct.slug}`;
-      const newPath = `/${newCatSlug}/${finalSlug}`;
+      const newPath = `/product/${finalSlug}`;
       await registerRedirect(oldPath, newPath);
       await registerRedirect(`/product/${oldProduct.slug}`, newPath);
-      await registerRedirect(`/product/${finalSlug}`, newPath);
+      await registerRedirect(`/product-category/${oldCatSlug}/${oldProduct.slug}`, newPath);
+      await registerRedirect(`/collections/${oldCatSlug}/${oldProduct.slug}`, newPath);
     }
 
     const product = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
