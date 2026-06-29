@@ -754,8 +754,6 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                 <div className="flex items-center gap-2 text-white/60 text-[9px] font-bold uppercase tracking-widest mb-3">
                   <Link href="/" className="hover:text-white transition-colors">Home</Link>
                   <ChevronRight className="w-3 h-3 text-white/45" />
-                  <Link href="/shop" className="hover:text-white transition-colors">Shop</Link>
-                  <ChevronRight className="w-3 h-3 text-white/45" />
                   <span className="text-white/95">{currentDbCategory.name}</span>
                 </div>
                 <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold heading-font tracking-tighter uppercase leading-none text-white mb-2">
@@ -806,13 +804,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                 <Link href="/" className="hover:text-foreground transition-colors">Home</Link>
                 <ChevronRight className="w-3.5 h-3.5 text-foreground/45" />
                 {selectedCategory ? (
-                  <>
-                    <Link href="/shop" className="hover:text-foreground transition-colors">Shop</Link>
-                    <ChevronRight className="w-3.5 h-3.5 text-foreground/45" />
-                    <span className="text-foreground/90">
-                      {currentDbCategory ? currentDbCategory.name : selectedCategory}
-                    </span>
-                  </>
+                  <span className="text-foreground/90">
+                    {currentDbCategory ? currentDbCategory.name : selectedCategory}
+                  </span>
                 ) : (
                   <span className="text-foreground/90">Shop</span>
                 )}

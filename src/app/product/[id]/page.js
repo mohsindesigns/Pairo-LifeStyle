@@ -109,7 +109,18 @@ export default async function ProductDetailPage({ params, searchParams }) {
   }
 
   // Get primary category info for breadcrumbs
-  const primaryCategory = product.primaryCategory || (product.categories && product.categories[0]);
+  // Only use populated objects (have .slug/.name). If populate didn't resolve (deleted cat), skip to next.
+  const primaryCategory = (() => {
+    const candidate = product.primaryCategory || (product.categories && product.categories[0]);
+    if (candidate && typeof candidate === 'object' && candidate.slug && candidate.name) return candidate;
+    // Try the rest of categories[] if first was unpopulated
+    if (product.categories) {
+      for (const cat of product.categories) {
+        if (cat && typeof cat === 'object' && cat.slug && cat.name) return cat;
+      }
+    }
+    return null;
+  })();
 
   const { getAltTextMap } = await import("@/lib/mediaUsage");
   const allUrls = [
@@ -161,9 +172,14 @@ export default async function ProductDetailPage({ params, searchParams }) {
         <nav className="flex items-center gap-2 mb-6 text-[10px] md:text-[11px] font-medium uppercase tracking-wider text-primary/60 border-b border-black/5 pb-4 overflow-x-auto whitespace-nowrap scrollbar-hide">
           <Link href="/" className="hover:text-primary transition-colors shrink-0">Home</Link>
           <ChevronRight className="w-2.5 h-2.5 opacity-40 shrink-0" />
-          {primaryCategory ? (
+          {primaryCategory && primaryCategory.slug ? (
             <>
-              <Link href={`/collections/${primaryCategory.slug}`} className="hover:text-primary transition-colors shrink-0">{primaryCategory.name}</Link>
+              <Link
+                href={`/collections/${primaryCategory.slug}`}
+                className="hover:text-primary transition-colors shrink-0"
+              >
+                {primaryCategory.name}
+              </Link>
               <ChevronRight className="w-2.5 h-2.5 opacity-40 shrink-0" />
             </>
           ) : (
