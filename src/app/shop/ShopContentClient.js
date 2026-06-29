@@ -750,63 +750,64 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/20" />
 
-              {/* Banner content — full height flex column keeps breadcrumbs top, rest bottom */}
-              <div className="absolute inset-0 flex flex-col justify-between p-8 md:p-12 text-white z-10">
-
-                {/* TOP — breadcrumbs */}
-                <div className="flex items-center gap-2 text-white/60 text-[9px] font-bold uppercase tracking-widest">
+              {/* Banner content — all at bottom */}
+              <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 text-white z-10">
+                {/* Breadcrumbs — above category name */}
+                <div className="flex items-center gap-2 text-white/60 text-[9px] font-bold uppercase tracking-widest mb-3">
                   <Link href="/" className="hover:text-white transition-colors">Home</Link>
                   <ChevronRight className="w-3 h-3 text-white/45" />
                   <span className="text-white/95">{currentDbCategory.name}</span>
                 </div>
 
-                {/* BOTTOM — title, short description, count */}
-                <div>
-                  <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold heading-font tracking-tighter uppercase leading-none text-white mb-3">
-                    {currentDbCategory.name}
-                  </h1>
-                  {currentDbCategory.description && (
-                    <p className="text-sm sm:text-base text-white/80 font-medium mb-3 max-w-2xl leading-relaxed">
-                      {currentDbCategory.description}
-                    </p>
-                  )}
-                  <p className="text-[10px] sm:text-xs text-white/55 font-bold uppercase tracking-widest">
-                    {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
-                    {getActiveFilterCount() > 0 && ` • ${getActiveFilterCount()} filter${getActiveFilterCount() > 1 ? 's' : ''} active`}
+                {/* Category name */}
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold heading-font tracking-tighter uppercase leading-none text-white mb-3">
+                  {currentDbCategory.name}
+                </h1>
+
+                {/* Short description */}
+                {currentDbCategory.description && (
+                  <p className="text-sm lg:text-[15px] text-white/80 font-medium max-w-2xl leading-relaxed">
+                    {currentDbCategory.description}
                   </p>
-                </div>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-8 mb-8 border-b border-border pb-6">
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8 text-foreground"
+            {/* Sort bar — product count left, sort+filter right */}
+            <div className="flex items-center justify-between gap-8 mb-8 border-b border-border pb-6">
+              <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest">
+                {filteredProducts.length} {filteredProducts.length === 1 ? 'Product' : 'Products'}
+              </span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="font-bold text-sm bg-transparent focus:outline-none cursor-pointer uppercase pr-8 text-foreground"
+                  >
+                    <option>Most Popular</option>
+                    <option>Newest</option>
+                    <option>Price: Low to High</option>
+                    <option>Price: High to Low</option>
+                    <option>Name: A to Z</option>
+                    <option>Name: Z to A</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(true)}
+                  className="lg:hidden flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative hover:bg-foreground/90"
                 >
-                  <option>Most Popular</option>
-                  <option>Newest</option>
-                  <option>Price: Low to High</option>
-                  <option>Price: High to Low</option>
-                  <option>Name: A to Z</option>
-                  <option>Name: Z to A</option>
-                </select>
+                  <SlidersHorizontal className="w-4 h-4" />
+                  Filter
+                  {getActiveFilterCount() > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center">
+                      {getActiveFilterCount()}
+                    </span>
+                  )}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowFilters(true)}
-                className="lg:hidden flex items-center gap-2 px-6 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest active:scale-95 transition-transform relative hover:bg-foreground/90"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                Filter
-                {getActiveFilterCount() > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[8px] flex items-center justify-center">
-                    {getActiveFilterCount()}
-                  </span>
-                )}
-              </button>
             </div>
           </>
         ) : (
