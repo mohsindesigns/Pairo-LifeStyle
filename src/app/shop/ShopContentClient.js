@@ -65,21 +65,35 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   // 1. Dynamic Categories from actual product data or dbCategories
   const allCategories = useMemo(() => {
     const cats = new Set();
+    
+    const isActiveCategory = (c) => {
+      if (!c) return false;
+      if (c.isDeleted === true || c.isDeleted === 'true') return false;
+      if (c.status === 'Draft') return false;
+      return true;
+    };
+
     products.forEach(p => {
-      if (p.category) cats.add(p.category);
+      if (p.category) {
+        const dbCat = dbCategories.find(dc => dc.name.toLowerCase() === p.category.toLowerCase());
+        if (!dbCat || isActiveCategory(dbCat)) {
+          cats.add(p.category);
+        }
+      }
       if (p.categories && Array.isArray(p.categories)) {
         p.categories.forEach(c => {
-          if (c && typeof c === 'object' && c.name) {
+          if (c && typeof c === 'object' && c.name && isActiveCategory(c)) {
             cats.add(c.name);
           } else if (typeof c === 'string') {
             const dbCat = dbCategories.find(dc => dc._id === c || dc.slug === c);
-            if (dbCat) cats.add(dbCat.name);
+            if (dbCat && isActiveCategory(dbCat)) cats.add(dbCat.name);
           }
         });
       }
     });
+
     dbCategories
-      .filter(cat => cat.type === 'product' && cat.name)
+      .filter(cat => cat.type === 'product' && cat.name && isActiveCategory(cat))
       .forEach(cat => cats.add(cat.name));
 
     return Array.from(cats);
@@ -400,10 +414,11 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   };
 
   const handleCategorySelect = (catName) => {
-    setSelectedCategory(catName);
     setCurrentPage(1);
     const basePath = catName ? `/product-category/${catName.toLowerCase()}` : '/shop';
-    router.push(basePath);
+    startTransition(() => {
+      router.push(basePath);
+    });
   };
 
   const toggleType = (type) => {
@@ -452,7 +467,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setSearchQuery("");
     setSortBy("Most Popular");
     setCurrentPage(1);
-    router.push('/shop');
+    startTransition(() => {
+      router.push('/shop');
+    });
   };
 
   const getActiveFilterCount = () => {
