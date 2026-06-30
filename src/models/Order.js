@@ -87,6 +87,9 @@ const OrderSchema = new mongoose.Schema({
     capturedAt: { type: Date, default: Date.now }
   },
 
+  affiliateId: { type: mongoose.Schema.Types.ObjectId, ref: 'Affiliate', index: true },
+  affiliateReferralCode: { type: String, index: true },
+
   timeline: [{
     status: String,
     message: String,

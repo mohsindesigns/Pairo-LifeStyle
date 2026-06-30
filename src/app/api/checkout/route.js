@@ -11,6 +11,8 @@ import mongoose from "mongoose";
 import logger, { getContextLogger, LogCategory } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { validateLegacyDiscount, calculateEligibleSubtotal } from "@/lib/couponValidator";
+import Affiliate from "@/models/Affiliate";
+import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 
 export async function POST(req) {
   let session = null;
@@ -22,7 +24,7 @@ export async function POST(req) {
   let attempt = 0;
 
   const body = await req.json();
-  const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot } = body;
+  const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode } = body;
 
   while (attempt < MAX_RETRIES) {
     try {
@@ -172,6 +174,7 @@ export async function POST(req) {
             }
 
             // 5. Create Order
+            // 5. Create Order
             const count = await Order.countDocuments({ tenantId }, { session });
             const orderNumber = `PAI-${1000 + count + 1}`;
 
@@ -183,12 +186,59 @@ export async function POST(req) {
               }
             }
 
+            // Affiliate attribution lookup (Referral URL or Direct Coupon Code)
+            let affiliateId = null;
+            let affiliateReferralCode = null;
+            let activeAffiliate = null;
+
+            // 1. Resolve promo code (direct coupon) first to guarantee coupon override priority
+            const promoCodeToResolve = (financials.promoCode || "").toUpperCase().trim();
+            if (promoCodeToResolve) {
+                activeAffiliate = await Affiliate.findOne({
+                    $or: [
+                        { referralCode: promoCodeToResolve },
+                        { couponCode: promoCodeToResolve }
+                    ],
+                    status: 'Active'
+                }).session(session);
+            }
+
+            // 2. Fallback to browser referral cookie if no affiliate coupon was resolved
+            if (!activeAffiliate) {
+                const cookieCodeToResolve = (referralCode || "").toUpperCase().trim();
+                if (cookieCodeToResolve) {
+                    activeAffiliate = await Affiliate.findOne({
+                        $or: [
+                            { referralCode: cookieCodeToResolve },
+                            { couponCode: cookieCodeToResolve }
+                        ],
+                        status: 'Active'
+                    }).session(session);
+                }
+            }
+
+            if (activeAffiliate) {
+                // Prevent self-referrals
+                const buyerEmail = (customerEmail || authSession?.user?.email || "").toLowerCase().trim();
+                const affiliateEmail = (activeAffiliate.email || "").toLowerCase().trim();
+                
+                if (buyerEmail && buyerEmail === affiliateEmail) {
+                    log.warn({ buyerEmail }, "Attribution skipped: Self-referral detected.");
+                    activeAffiliate = null;
+                } else {
+                    affiliateId = activeAffiliate._id;
+                    affiliateReferralCode = activeAffiliate.referralCode;
+                }
+            }
+
             const [newOrder] = await Order.create([{
                 tenantId,
                 orderNumber,
                 idempotencyKey,
                 status: "Confirmed",
                 items: orderItems,
+                affiliateId,
+                affiliateReferralCode,
                 financials: {
                     ...financials,
                     discountTotal: finalDiscountTotal,
@@ -206,6 +256,11 @@ export async function POST(req) {
             }], { session });
 
             checkoutResult = newOrder;
+
+            // Generate affiliate commission pending record atomically inside transaction session
+            if (affiliateId && activeAffiliate) {
+                await CommissionEngine.calculateCommission(checkoutResult, activeAffiliate, session);
+            }
         });
 
         if (checkoutResult) {

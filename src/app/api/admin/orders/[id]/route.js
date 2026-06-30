@@ -5,6 +5,8 @@ import Product from "@/models/Product";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { can } from "@/lib/rbac";
+import mongoose from "mongoose";
+import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 
 export async function GET(req, { params }) {
   try {
@@ -95,6 +97,27 @@ export async function PATCH(req, { params }) {
     }
 
     await order.save();
+
+    // Commission Engine Lifecycle Triggers
+    if (status && status !== oldStatus) {
+      try {
+        if (status === "Delivered") {
+          // Find all pending commissions for this order and approve them
+          const commissions = await mongoose.model("AffiliateCommission").find({ orderId: order._id, status: "Pending" });
+          for (const comm of commissions) {
+            await CommissionEngine.approveCommission(comm._id);
+          }
+        } else if (status === "Cancelled") {
+          // Cancel commissions
+          await CommissionEngine.cancelCommission(order._id);
+        } else if (status === "Refunded") {
+          // Reverse commissions
+          await CommissionEngine.reverseCommission(order._id, "Refunded");
+        }
+      } catch (e) {
+        console.error("[Order Status Affiliate Trigger Error]", e);
+      }
+    }
 
     return NextResponse.json({ success: true, order });
 

@@ -16,6 +16,7 @@ export const RESERVED_ROUTES = [
   "admin-login",
   "affiliate",
   "affiliate-login",
+  "become-an-affiliate",
   "api",
   "search",
   "wishlist",

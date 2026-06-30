@@ -211,3 +211,208 @@ export async function sendSubmissionReply(toEmail, subject, message, customerNam
     throw err;
   }
 }
+
+/**
+ * Send Affiliate Application Received email
+ */
+export async function sendAffiliateApplicationReceived(toEmail, affiliateName) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log(`[Email Simulation] Affiliate Application Received → ${toEmail}`);
+    return;
+  }
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
+      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
+        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO AFFILIATES</h1>
+      </div>
+      <div style="padding: 40px 30px; background: #fff;">
+        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Hi ${affiliateName},</p>
+        <p style="font-size: 15px; color: #1a1a1a;">
+          Thank you for applying to the Pairo Affiliate Program! We have received your application and identity documents.
+        </p>
+        <p style="font-size: 15px; color: #1a1a1a; margin-top: 15px;">
+          Our review team is auditing your details. You will receive an email update with your login credentials as soon as your account is approved.
+        </p>
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
+          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
+          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
+        </div>
+      </div>
+      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
+        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      to: toEmail,
+      subject: "Affiliate Application Received — Pairo Lifestyle",
+      html,
+    });
+    console.log(`[Email] ✅ Affiliate Application Received sent to ${toEmail}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send application received email:', err.message);
+  }
+}
+
+/**
+ * Send Affiliate Application Approved email
+ */
+export async function sendAffiliateApplicationApproved(toEmail, affiliateName, referralCode) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log(`[Email Simulation] Affiliate Application Approved → ${toEmail}`);
+    return;
+  }
+
+  const loginUrl = `${process.env.NEXTAUTH_URL || "https://pairolifestyle.com"}/affiliate-login`;
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
+      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
+        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO AFFILIATES</h1>
+      </div>
+      <div style="padding: 40px 30px; background: #fff;">
+        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Dear ${affiliateName},</p>
+        <p style="font-size: 15px; color: #1a1a1a; font-weight: bold;">
+          Congratulations! Your application has been approved.
+        </p>
+        <p style="font-size: 15px; color: #1a1a1a; margin-top: 15px;">
+          You can now log in to your dedicated Affiliate Portal to start generating links, tracking conversions, and viewing commissions.
+        </p>
+        
+        <div style="background: #f9f9f9; padding: 20px; margin: 20px 0; border-radius: 4px; border-left: 4px solid #1a1a1a;">
+          <h4 style="margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Your Account Details</h4>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Portal Login:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Referral Code:</strong> ${referralCode}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>Commission Rate:</strong> 5% on all delivered orders</p>
+          <p style="margin: 4px 0; font-size: 14px; color: #e11d48; font-weight: 600; margin-top: 8px;">Please use the 'Forgot Password' link on the login page to set your account password.</p>
+        </div>
+
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
+          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
+          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
+        </div>
+      </div>
+      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
+        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      to: toEmail,
+      subject: "Affiliate Account Approved! — Pairo Lifestyle",
+      html,
+    });
+    console.log(`[Email] ✅ Affiliate Application Approved sent to ${toEmail}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send application approved email:', err.message);
+  }
+}
+
+/**
+ * Send Affiliate Application Rejected email
+ */
+export async function sendAffiliateApplicationRejected(toEmail, affiliateName, reason) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log(`[Email Simulation] Affiliate Application Rejected → ${toEmail}`);
+    return;
+  }
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
+      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
+        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO AFFILIATES</h1>
+      </div>
+      <div style="padding: 40px 30px; background: #fff;">
+        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Dear ${affiliateName},</p>
+        <p style="font-size: 15px; color: #1a1a1a;">
+          Thank you for your interest in the Pairo Affiliate Program.
+        </p>
+        <p style="font-size: 15px; color: #1a1a1a; margin-top: 15px;">
+          After reviewing your application details and marketing channels, we regret to inform you that we are unable to accept your application at this time.
+        </p>
+        ${reason ? `
+        <div style="background: #fff5f5; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0; border-radius: 4px; font-size: 14px; color: #991b1b;">
+          <strong>Review Notes:</strong> ${reason}
+        </div>
+        ` : ''}
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
+          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
+          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
+        </div>
+      </div>
+      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
+        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      to: toEmail,
+      subject: "Affiliate Application Update — Pairo Lifestyle",
+      html,
+    });
+    console.log(`[Email] ✅ Affiliate Application Rejected sent to ${toEmail}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send application rejected email:', err.message);
+  }
+}
+
+/**
+ * Send Affiliate Payout Update email
+ */
+export async function sendAffiliatePayoutUpdate(toEmail, affiliateName, amount, status, notes) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log(`[Email Simulation] Affiliate Payout Update → ${toEmail}`);
+    return;
+  }
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
+      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
+        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO AFFILIATES</h1>
+      </div>
+      <div style="padding: 40px 30px; background: #fff;">
+        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Dear ${affiliateName},</p>
+        <p style="font-size: 15px; color: #1a1a1a;">
+          This is an update regarding your affiliate payout request of <strong>$${amount.toLocaleString()}</strong>.
+        </p>
+        <p style="font-size: 15px; color: #1a1a1a; margin-top: 10px;">
+          Status: <strong style="text-transform: uppercase;">${status}</strong>
+        </p>
+        ${notes ? `
+        <div style="background: #f9f9f9; padding: 15px; border-left: 4px solid #1a1a1a; margin: 20px 0; border-radius: 4px; font-size: 14px; color: #374151;">
+          <strong>Notes:</strong> ${notes}
+        </div>
+        ` : ''}
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
+          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
+          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
+        </div>
+      </div>
+      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
+        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      to: toEmail,
+      subject: `Affiliate Payout Update: $${amount} — Pairo Lifestyle`,
+      html,
+    });
+    console.log(`[Email] ✅ Affiliate Payout Update sent to ${toEmail}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send payout update email:', err.message);
+  }
+}

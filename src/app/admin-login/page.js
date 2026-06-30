@@ -44,7 +44,7 @@ export default function AdminLoginPage() {
           attempts++;
         }
         if (session?.user?.isStaff) {
-          router.push("/admin");
+          window.location.replace("/admin");
         } else {
           setError("Session could not be established. Please try again.");
         }

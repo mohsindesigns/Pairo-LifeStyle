@@ -161,6 +161,21 @@ export default function CheckoutPage() {
             conditions: selectedShipping.conditions,
             capturedAt: new Date().toISOString()
           } : null,
+          referralCode: (() => {
+            try {
+              const cookieMatch = document.cookie.match(/(^|;)\s*pairo_ref\s*=\s*([^;]+)/);
+              if (cookieMatch) {
+                const parsed = JSON.parse(decodeURIComponent(cookieMatch[2]));
+                if (parsed && parsed.expiresAt > Date.now()) return parsed.code;
+              }
+              const stored = localStorage.getItem("pairo_ref");
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed && parsed.expiresAt > Date.now()) return parsed.code;
+              }
+            } catch (e) {}
+            return null;
+          })(),
           financials: {
             subtotal:      cartSubtotal,
             shippingCost:  shippingCost,

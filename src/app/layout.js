@@ -13,8 +13,9 @@ import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import ScriptLoader from "@/components/common/ScriptLoader";
 import ThemeStyle from "@/components/common/ThemeStyle";
 import { Toaster } from "react-hot-toast";
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import CookieConsent from "@/components/common/CookieConsent";
+import AffiliateTracker from "@/components/common/AffiliateTracker";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const poppins = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-poppins" });
@@ -190,6 +191,9 @@ export default async function RootLayout({ children }) {
         <AuthProvider>
           <Toaster position="top-right" />
           <CookieConsent />
+          <Suspense fallback={null}>
+            <AffiliateTracker />
+          </Suspense>
           <SiteProvider initialData={sanitizedConfig}>
             <CartProvider>
               <LayoutWrapper>

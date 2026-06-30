@@ -86,7 +86,7 @@ export default function AdminSidebar() {
   // Determine initial open accordion based on path
   useEffect(() => {
     if (pathname.startsWith("/admin/products") || pathname.startsWith("/admin/categories")) setOpenAccordion("products");
-    else if (pathname.startsWith("/admin/orders") || pathname.startsWith("/admin/customers") || pathname.startsWith("/admin/discounts")) setOpenAccordion("commerce");
+    else if (pathname.startsWith("/admin/orders") || pathname.startsWith("/admin/customers") || pathname.startsWith("/admin/discounts") || pathname.startsWith("/admin/affiliates")) setOpenAccordion("commerce");
     else if (pathname.startsWith("/admin/blogs")) setOpenAccordion("posts");
     else if (pathname.startsWith("/admin/pages")) setOpenAccordion("pages");
     else if (pathname.startsWith("/admin/settings/team") || pathname.startsWith("/admin/settings/roles")) setOpenAccordion("users");
@@ -161,6 +161,7 @@ export default function AdminSidebar() {
             <NavLink href="/admin/orders" exact isSubmenu>Orders</NavLink>
             <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>
             <NavLink href="/admin/discounts" exact isSubmenu>Coupons</NavLink>
+            <NavLink href="/admin/affiliates" exact isSubmenu>Affiliates</NavLink>
           </AccordionMenu>
 
           {/* Products Accordion */}
