@@ -187,7 +187,7 @@ export default function Navbar() {
         className={`sticky top-0 z-50 w-full transition-all duration-500 border-b border-black/5 h-20 md:h-24 flex items-center ${scrolled ? "bg-white/90 backdrop-blur-xl shadow-sm" : "bg-white"
           }`}
       >
-        <div className="container mx-auto px-4 md:px-8">
+        <div className="container mx-auto px-4">
           <nav className="flex items-center justify-between">
             <div className="flex-shrink-0">
               <Link href="/" className="flex items-center">

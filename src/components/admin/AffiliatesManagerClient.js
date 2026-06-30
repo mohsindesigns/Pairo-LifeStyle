@@ -57,6 +57,9 @@ export default function AffiliatesManagerClient({ userSession }) {
 
   // Document Modal Viewer
   const [viewingDocUrl, setViewingDocUrl] = useState(null);
+  
+  // Viewing Application Details Modal
+  const [viewingApplication, setViewingApplication] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -343,14 +346,20 @@ export default function AffiliatesManagerClient({ userSession }) {
                           {app.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                        <button
+                          onClick={() => setViewingApplication(app)}
+                          className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
+                        >
+                          View Details
+                        </button>
                         {app.status === 'Pending' && (
                           <button
                             onClick={() => {
                               setSelectedApplication(app);
                               setCustomCommissionRate(settings.defaultCommissionRate || 5);
                             }}
-                            className="bg-white border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f0f6fb] transition-all shadow-sm"
+                            className="bg-[#2271b1] border border-[#2271b1] text-white px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] hover:border-[#135e96] transition-all shadow-sm"
                           >
                             Review
                           </button>
@@ -585,6 +594,162 @@ export default function AffiliatesManagerClient({ userSession }) {
               </button>
             </div>
           </form>
+        )}
+
+        {/* Modal 0: View Application Details */}
+        {viewingApplication && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+            <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between flex-shrink-0">
+                <h3 className="text-[14px] font-bold text-[#1d2327]">Application Details: {viewingApplication.name}</h3>
+                <button
+                  type="button"
+                  onClick={() => setViewingApplication(null)}
+                  className="text-gray-400 hover:text-black focus:outline-none"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto space-y-6 text-[13px] text-gray-700">
+                {/* 1. General Profile */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">General Contact Profile</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                    <div><span className="text-[#646970] font-semibold">Full Legal Name:</span> <span className="text-[#1d2327] font-medium">{viewingApplication.name}</span></div>
+                    <div><span className="text-[#646970] font-semibold">Email Address:</span> <span className="text-[#2271b1]">{viewingApplication.email}</span></div>
+                    <div><span className="text-[#646970] font-semibold">Phone Number:</span> <span className="text-[#1d2327]">{viewingApplication.phone}</span></div>
+                    <div><span className="text-[#646970] font-semibold">Date of Birth:</span> <span className="text-[#1d2327]">{viewingApplication.dob ? new Date(viewingApplication.dob).toLocaleDateString() : "—"}</span></div>
+                    <div><span className="text-[#646970] font-semibold">Submission Date:</span> <span className="text-[#1d2327]">{new Date(viewingApplication.createdAt).toLocaleString()}</span></div>
+                    <div>
+                      <span className="text-[#646970] font-semibold">Status:</span>{" "}
+                      <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
+                        viewingApplication.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
+                        viewingApplication.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-[#d6b656]'
+                      }`}>
+                        {viewingApplication.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Postal Address */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">Postal Address</h4>
+                  <div className="space-y-1">
+                    <div><span className="text-[#646970] font-semibold">Street:</span> <span className="text-[#1d2327]">{viewingApplication.address?.street || "—"}</span></div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div><span className="text-[#646970] font-semibold">City:</span> <span className="text-[#1d2327]">{viewingApplication.address?.city || "—"}</span></div>
+                      <div><span className="text-[#646970] font-semibold">State/Province:</span> <span className="text-[#1d2327]">{viewingApplication.address?.state || "—"}</span></div>
+                      <div><span className="text-[#646970] font-semibold">Zip/Postal Code:</span> <span className="text-[#1d2327]">{viewingApplication.address?.zipCode || "—"}</span></div>
+                    </div>
+                    <div><span className="text-[#646970] font-semibold">Country:</span> <span className="text-[#1d2327]">{viewingApplication.address?.country || "—"}</span></div>
+                  </div>
+                </div>
+
+                {/* 3. Payout & Banking Info */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">Banking & Payout Profile</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 bg-[#f6f7f7] p-3 border border-[#ccd0d4] rounded-[3px]">
+                    <div className="sm:col-span-2"><span className="text-[#646970] font-semibold">Account Holder Name:</span> <span className="text-[#1d2327] font-bold">{viewingApplication.bankingInfo?.accountHolder || "—"}</span></div>
+                    <div><span className="text-[#646970] font-semibold">Bank Name:</span> <span className="text-[#1d2327]">{viewingApplication.bankingInfo?.bankName || "—"}</span></div>
+                    <div><span className="text-[#646970] font-semibold">Account / IBAN:</span> <span className="text-[#1d2327] font-mono">{viewingApplication.bankingInfo?.accountNumber || "—"}</span></div>
+                    <div><span className="text-[#646970] font-semibold">SWIFT/BIC Code:</span> <span className="text-[#1d2327] font-mono">{viewingApplication.bankingInfo?.swiftCode || "—"}</span></div>
+                    <div><span className="text-[#646970] font-semibold">Routing Number:</span> <span className="text-[#1d2327] font-mono">{viewingApplication.bankingInfo?.routingNumber || "—"}</span></div>
+                    <div className="sm:col-span-2"><span className="text-[#646970] font-semibold">PayPal Email Address:</span> <span className="text-[#1d2327]">{viewingApplication.bankingInfo?.paypalEmail || "—"}</span></div>
+                  </div>
+                </div>
+
+                {/* 4. Business & Strategy */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">Marketing Strategy & Reach</h4>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div><span className="text-[#646970] font-semibold">Company Name:</span> <span className="text-[#1d2327]">{viewingApplication.companyName || "—"}</span></div>
+                      <div>
+                        <span className="text-[#646970] font-semibold">Website:</span>{" "}
+                        {viewingApplication.website ? (
+                          <a href={viewingApplication.website} target="_blank" rel="noreferrer" className="text-[#2271b1] hover:underline inline-flex items-center gap-1">
+                            {viewingApplication.website} <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : "—"}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[#646970] font-semibold">Social Media Channels:</span>{" "}
+                      <span className="text-[#1d2327]">{viewingApplication.socialLinks || "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div><span className="text-[#646970] font-semibold">Monthly Reach / Traffic:</span> <span className="text-[#1d2327] font-medium">{viewingApplication.marketingAnswers?.audienceSize || "—"}</span></div>
+                      <div><span className="text-[#646970] font-semibold">Affiliate Experience:</span> <span className="text-[#1d2327] font-medium">{viewingApplication.marketingAnswers?.experience || "—"}</span></div>
+                    </div>
+                    <div>
+                      <span className="text-[#646970] font-semibold block mb-0.5">Promotion Methodology:</span>
+                      <p className="bg-[#f6f7f7] p-2.5 border border-[#ccd0d4] rounded-[2px] text-gray-600 text-[12px] whitespace-pre-line leading-relaxed">
+                        {viewingApplication.marketingAnswers?.promotionStrategy || "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. Documents */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">KYC / Identity Verification Documents</h4>
+                  <div className="flex flex-wrap gap-3">
+                    {viewingApplication.identityDocuments && viewingApplication.identityDocuments.length > 0 ? (
+                      viewingApplication.identityDocuments.map((filename, idx) => (
+                        <div key={idx} className="border border-[#ccd0d4] p-3 rounded-[3px] bg-[#f6f7f7] flex items-center justify-between gap-4 w-full sm:w-[48%]">
+                          <span className="font-mono text-[11px] truncate max-w-[150px]">{filename}</span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setViewingDocUrl(getDocumentUrl(filename))}
+                              className="text-[#2271b1] hover:text-[#135e96] hover:underline font-bold text-[11px] uppercase cursor-pointer"
+                            >
+                              Preview
+                            </button>
+                            <a
+                              href={getDocumentUrl(filename)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-gray-600 hover:text-black hover:underline font-bold text-[11px] uppercase inline-flex items-center gap-0.5"
+                            >
+                              Download <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-gray-400 italic text-[12px]">No document attachments present.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-[#ccd0d4] bg-[#f6f7f7] flex justify-end gap-2 flex-shrink-0">
+                {viewingApplication.status === "Pending" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedApplication(viewingApplication);
+                      setCustomCommissionRate(settings.defaultCommissionRate || 5);
+                      setViewingApplication(null);
+                    }}
+                    className="bg-[#2271b1] border border-[#2271b1] text-white hover:bg-[#135e96] hover:border-[#135e96] px-4 py-2 text-[12px] font-bold rounded-[3px] shadow-sm uppercase tracking-wider cursor-pointer"
+                  >
+                    Proceed to Review
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setViewingApplication(null)}
+                  className="border border-[#ccd0d4] bg-white text-gray-700 hover:bg-[#f6f7f7] px-4 py-2 text-[12px] font-bold rounded-[3px] shadow-sm uppercase tracking-wider cursor-pointer"
+                >
+                  Close Detail
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Modal 1: Review Application */}

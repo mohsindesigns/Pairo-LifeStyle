@@ -111,7 +111,7 @@ export default function OrderDetailPage() {
                   {order.createdAt ? new Date(order.createdAt).toLocaleString() : "N/A"}
                 </span>
               </div>
-              <div className={`p-6 grid grid-cols-1 ${order.affiliateId ? "md:grid-cols-4" : "md:grid-cols-3"} gap-8`}>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
 
                 {/* Customer */}
                 <div className="space-y-3">
@@ -125,6 +125,20 @@ export default function OrderDetailPage() {
                       Purchased as {order.customer?.isGuest ? "Guest" : "Member"}
                     </p>
                   </div>
+                  {order.affiliateId && (
+                    <div className="pt-4 border-t border-[#ccd0d4] space-y-2">
+                      <p className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-[3px] border border-blue-100 inline-block text-[11px] uppercase tracking-wider">
+                        Referred Order
+                      </p>
+                      <div className="text-[13px] space-y-1">
+                        <p className="font-bold text-[#1d2327]">{order.affiliateId.name || "—"}</p>
+                        <p className="text-[#646970] text-[12px]">Code: <span className="font-mono font-bold text-black">{order.affiliateId.referralCode || order.affiliateReferralCode}</span></p>
+                        <p className="text-[11px] text-[#8c8f94] font-mono">
+                          ID: {order.affiliateId.affiliateId || "—"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Shipping */}
@@ -162,25 +176,6 @@ export default function OrderDetailPage() {
                     </p>
                   </div>
                 </div>
-
-                {/* Affiliate Referral */}
-                {order.affiliateId && (
-                  <div className="space-y-3">
-                    <h3 className="text-[13px] font-bold flex items-center gap-2 text-gray-700">
-                      <Users className="w-4 h-4 text-[#8c8f94]" /> Referral
-                    </h3>
-                    <div className="text-[13px] space-y-1">
-                      <p className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-[3px] border border-blue-100 inline-block text-[11px] uppercase tracking-wider">
-                        Referred Order
-                      </p>
-                      <p className="font-bold text-[#1d2327] mt-1">{order.affiliateId.name || "—"}</p>
-                      <p className="text-[#646970] text-[12px]">Code: <span className="font-mono font-bold text-black">{order.affiliateId.referralCode || order.affiliateReferralCode}</span></p>
-                      <p className="text-[11px] text-[#8c8f94] font-mono pt-1">
-                        ID: {order.affiliateId.affiliateId || "—"}
-                      </p>
-                    </div>
-                  </div>
-                )}
 
               </div>
 
