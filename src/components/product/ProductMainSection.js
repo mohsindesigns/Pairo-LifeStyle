@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useCart } from "@/context/CartContext";
 import ProductGallery from "./ProductGallery";
 import ClientProductActions from "./ClientProductActions";
 import {
@@ -58,6 +59,24 @@ export default function ProductMainSection({ product }) {
     displayStock = product.variantCombinations.reduce((sum, v) => sum + (Number(v.stock) || 0), 0);
   }
 
+  // Affiliate referral customer discount
+  const { affiliateDiscount } = useCart();
+  const hasAffiliateDiscount = affiliateDiscount && affiliateDiscount.type !== 'None' && affiliateDiscount.value > 0;
+  const affiliateDiscountedPrice = (() => {
+    if (!hasAffiliateDiscount) return null;
+    if (affiliateDiscount.type === 'Percentage') {
+      return Math.max(0, displayPrice * (1 - affiliateDiscount.value / 100));
+    } else if (affiliateDiscount.type === 'Fixed') {
+      return Math.max(0, displayPrice - affiliateDiscount.value);
+    }
+    return null;
+  })();
+  const affiliateSavingsLabel = hasAffiliateDiscount
+    ? affiliateDiscount.type === 'Percentage'
+      ? `${affiliateDiscount.value}% Referral Discount`
+      : `$${affiliateDiscount.value} Referral Discount`
+    : null;
+
   const categoryName = product.categories?.[0]?.name || product.category || "Collection";
 
   return (
@@ -92,13 +111,25 @@ export default function ProductMainSection({ product }) {
           </p>
 
           <div className="flex items-center flex-wrap gap-3.5">
-            <span className="text-2xl font-semibold tracking-tight text-primary">${displayPrice}</span>
-            {displayCompareAtPrice > displayPrice && (
+            {hasAffiliateDiscount && affiliateDiscountedPrice !== null ? (
               <>
-                <span className="text-sm font-medium text-primary/40 line-through">${displayCompareAtPrice}</span>
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-[var(--radius,0px)] select-none">
-                  Save {Math.round(((displayCompareAtPrice - displayPrice) / displayCompareAtPrice) * 100)}%
+                <span className="text-2xl font-semibold tracking-tight text-emerald-600">${affiliateDiscountedPrice.toFixed(2)}</span>
+                <span className="text-sm font-medium text-primary/40 line-through">${displayPrice}</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-[var(--radius,0px)] select-none">
+                  {affiliateSavingsLabel}
                 </span>
+              </>
+            ) : (
+              <>
+                <span className="text-2xl font-semibold tracking-tight text-primary">${displayPrice}</span>
+                {displayCompareAtPrice > displayPrice && (
+                  <>
+                    <span className="text-sm font-medium text-primary/40 line-through">${displayCompareAtPrice}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-[var(--radius,0px)] select-none">
+                      Save {Math.round(((displayCompareAtPrice - displayPrice) / displayCompareAtPrice) * 100)}%
+                    </span>
+                  </>
+                )}
               </>
             )}
             {displaySku && (

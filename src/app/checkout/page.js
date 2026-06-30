@@ -19,7 +19,9 @@ export default function CheckoutPage() {
     applyPromoCode,
     removePromoCode,
     selectedShipping,
-    setSelectedShipping
+    setSelectedShipping,
+    affiliateDiscount,
+    affiliateDiscountAmount
   } = useCart();
   const [isProcessing, setIsProcessing] = useState(false);
   const [promoCode, setPromoCode] = useState("");
@@ -453,6 +455,15 @@ export default function CheckoutPage() {
                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-emerald-600">
                     <span>Discount ({(appliedPromo?.type === 'percentage' || appliedPromo?.type === 'percentage_discount') ? `${appliedPromo?.value}%` : 'Fixed'})</span>
                     <span>-${discountTotal.toLocaleString()}</span>
+                  </div>
+                )}
+                {affiliateDiscount?.type !== 'None' && affiliateDiscountAmount > 0 && (
+                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-emerald-600">
+                    <span>
+                      Referral Discount
+                      {affiliateDiscount.type === 'Percentage' ? ` (${affiliateDiscount.value}%)` : ''}
+                    </span>
+                    <span>-${affiliateDiscountAmount.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center text-[12px] font-bold uppercase tracking-widest text-foreground/70">

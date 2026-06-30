@@ -15,6 +15,7 @@ export default function BecomeAffiliateClient() {
     email: "",
     phone: "",
     dob: "",
+    referralCode: "",
     
     country: "",
     state: "",
@@ -40,6 +41,10 @@ export default function BecomeAffiliateClient() {
   });
 
   const [idFiles, setIdFiles] = useState([]);
+  const [profilePhotoFile, setProfilePhotoFile] = useState(null);
+  const [bankDocFile, setBankDocFile] = useState(null);
+  const [checkingCode, setCheckingCode] = useState(false);
+  const [codeAvailable, setCodeAvailable] = useState(null); // null | true | false
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -52,11 +57,31 @@ export default function BecomeAffiliateClient() {
     }
   };
 
-  const nextStep = () => {
+  const nextStep = async () => {
     if (step === 1) {
       if (!formData.name || !formData.email || !formData.phone || !formData.dob) {
         toast.error("Please fill in all personal details.");
         return;
+      }
+      // Validate referral code format if provided
+      if (formData.referralCode && !/^[A-Za-z0-9_-]+$/.test(formData.referralCode)) {
+        toast.error("Referral code may only contain letters, numbers, hyphens, and underscores.");
+        return;
+      }
+      // Check uniqueness if a code is entered
+      if (formData.referralCode) {
+        setCheckingCode(true);
+        try {
+          const checkRes = await fetch(`/api/affiliate/check-code?code=${encodeURIComponent(formData.referralCode)}`);
+          const checkData = await checkRes.json();
+          if (checkData.taken) {
+            toast.error("That referral code is already taken. Please choose another.");
+            setCheckingCode(false);
+            return;
+          }
+          setCodeAvailable(true);
+        } catch { /* allow continue on network error */ }
+        finally { setCheckingCode(false); }
       }
     } else if (step === 2) {
       if (!formData.country || !formData.state || !formData.city || !formData.zipCode || !formData.street) {
@@ -96,6 +121,11 @@ export default function BecomeAffiliateClient() {
     idFiles.forEach((file) => {
       dataToSend.append("identityDocuments", file);
     });
+    
+    // Append profile photo and bank doc
+    if (profilePhotoFile) dataToSend.append("profilePhoto", profilePhotoFile);
+    if (bankDocFile) dataToSend.append("bankVerificationDocument", bankDocFile);
+
 
     try {
       const res = await fetch("/api/affiliate/register", {
@@ -351,6 +381,16 @@ export default function BecomeAffiliateClient() {
                     placeholder="Optional backup method" 
                     className="w-full px-4 py-3 rounded-[3px] border border-gray-300 bg-white focus:border-black focus:ring-1 focus:ring-black focus:outline-none text-[13px] transition-all"
                   />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Bank Verification Document <span className="text-neutral-300 font-normal normal-case">(optional but recommended)</span></label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,application/pdf"
+                    onChange={e => setBankDocFile(e.target.files?.[0] || null)}
+                    className="w-full text-[12px] text-gray-500 file:mr-4 file:py-2 file:px-3 file:rounded-[3px] file:border file:border-gray-200 file:bg-white file:text-[12px] file:font-medium hover:file:bg-gray-50"
+                  />
+                  <p className="text-[10px] text-neutral-400">Bank statement, voided cheque, or bank letter. PDF, JPG, or PNG. Max 5MB.</p>
                 </div>
               </div>
             </div>

@@ -16,7 +16,15 @@ import {
   Users,
   Palette,
   MessageSquare,
-  Wrench
+  Wrench,
+  Link2,
+  BarChart2,
+  DollarSign,
+  MousePointerClick,
+  CreditCard,
+  ClipboardList,
+  UserCheck,
+  SlidersHorizontal
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -86,7 +94,8 @@ export default function AdminSidebar() {
   // Determine initial open accordion based on path
   useEffect(() => {
     if (pathname.startsWith("/admin/products") || pathname.startsWith("/admin/categories")) setOpenAccordion("products");
-    else if (pathname.startsWith("/admin/orders") || pathname.startsWith("/admin/customers") || pathname.startsWith("/admin/discounts") || pathname.startsWith("/admin/affiliates")) setOpenAccordion("commerce");
+    else if (pathname.startsWith("/admin/affiliates")) setOpenAccordion("affiliates");
+    else if (pathname.startsWith("/admin/orders") || pathname.startsWith("/admin/customers") || pathname.startsWith("/admin/discounts")) setOpenAccordion("commerce");
     else if (pathname.startsWith("/admin/blogs")) setOpenAccordion("posts");
     else if (pathname.startsWith("/admin/pages")) setOpenAccordion("pages");
     else if (pathname.startsWith("/admin/settings/team") || pathname.startsWith("/admin/settings/roles")) setOpenAccordion("users");
@@ -161,7 +170,43 @@ export default function AdminSidebar() {
             <NavLink href="/admin/orders" exact isSubmenu>Orders</NavLink>
             <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>
             <NavLink href="/admin/discounts" exact isSubmenu>Coupons</NavLink>
-            <NavLink href="/admin/affiliates" exact isSubmenu>Affiliates</NavLink>
+          </AccordionMenu>
+
+          {/* Affiliates — Dedicated Module */}
+          <AccordionMenu
+            title="Affiliates" icon={Link2}
+            isOpen={openAccordion === "affiliates"} onToggle={() => handleToggle("affiliates")}
+          >
+            <NavLink href="/admin/affiliates?view=overview" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><BarChart2 size={11}/>Overview</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=requests" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><ClipboardList size={11}/>Applications</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=list" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><UserCheck size={11}/>All Affiliates</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=links" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><Link2 size={11}/>Referral Links</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=orders" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><ShoppingCart size={11}/>Orders</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=conversions" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><MousePointerClick size={11}/>Conversions</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=commissions" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><DollarSign size={11}/>Commissions</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=payouts" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><CreditCard size={11}/>Payouts</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=analytics" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><BarChart2 size={11}/>Analytics</span>
+            </NavLink>
+            <NavLink href="/admin/affiliates?view=settings" isSubmenu>
+              <span style={{display:'flex',alignItems:'center',gap:'6px'}}><SlidersHorizontal size={11}/>Settings</span>
+            </NavLink>
           </AccordionMenu>
 
           {/* Products Accordion */}

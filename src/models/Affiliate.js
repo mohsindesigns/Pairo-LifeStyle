@@ -13,6 +13,8 @@ const AffiliateSchema = new mongoose.Schema({
   balance: { type: Number, default: 0 }, // Available to pay
   lifetimeEarnings: { type: Number, default: 0 }, // Cumulative commissions approved
   couponCode: { type: String, unique: true, sparse: true, index: true }, // Optional direct coupon code
+  customerDiscountType: { type: String, enum: ['Percentage', 'Fixed', 'None'], default: 'None' },
+  customerDiscountValue: { type: Number, default: 0 },
   
   tenantId: { type: String, default: 'default', index: true }, // SaaS multi-tenancy
   isVerified: { type: Boolean, default: false }, // Email verification flag
@@ -49,7 +51,10 @@ const AffiliateSchema = new mongoose.Schema({
   },
   
   ipAddress: String,
-  deviceInfo: String
+  deviceInfo: String,
+  profilePhoto: String, // Profile photo filename (copied from application on approval)
+  resetPasswordToken: String, // Used for forgot-password flow
+  resetPasswordExpires: Date   // Token expiry (1 hour from generation)
 }, { 
   timestamps: true,
   versionKey: '__v',

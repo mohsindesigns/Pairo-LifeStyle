@@ -41,7 +41,7 @@ export async function PUT(req) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { affiliateId, name, email, commissionRate, commissionType, status, couponCode, password, __v } = body;
+    const { affiliateId, name, email, commissionRate, commissionType, status, couponCode, password, referralCode, customerDiscountType, customerDiscountValue, __v } = body;
 
     if (!affiliateId) {
       return NextResponse.json({ error: "Affiliate ID is required." }, { status: 400 });
@@ -64,10 +64,25 @@ export async function PUT(req) {
     if (email) affiliate.email = email.toLowerCase().trim();
     if (commissionRate !== undefined) affiliate.commissionRate = Number(commissionRate);
     if (commissionType !== undefined) affiliate.commissionType = commissionType;
+    if (customerDiscountType !== undefined) affiliate.customerDiscountType = customerDiscountType;
+    if (customerDiscountValue !== undefined) affiliate.customerDiscountValue = Number(customerDiscountValue);
     if (status) affiliate.status = status;
     
     if (couponCode !== undefined) {
       affiliate.couponCode = couponCode ? couponCode.toUpperCase().trim() : undefined;
+    }
+
+    // Referral code update (admin only — validated for uniqueness)
+    if (referralCode !== undefined && referralCode !== "") {
+      const cleanCode = referralCode.toUpperCase().trim();
+      if (!/^[A-Za-z0-9_-]+$/.test(cleanCode)) {
+        return NextResponse.json({ error: "Referral code may only contain letters, numbers, hyphens, and underscores." }, { status: 400 });
+      }
+      const conflict = await Affiliate.findOne({ referralCode: cleanCode, _id: { $ne: affiliateId } });
+      if (conflict) {
+        return NextResponse.json({ error: "Referral code is already in use by another affiliate." }, { status: 400 });
+      }
+      affiliate.referralCode = cleanCode;
     }
 
     if (password) {

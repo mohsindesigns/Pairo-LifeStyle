@@ -60,7 +60,9 @@ export async function POST(req) {
         success: true,
         affiliateId: affiliate._id,
         referralCode: affiliate.referralCode,
-        cookieDurationDays: settings.cookieDurationDays || 30
+        cookieDurationDays: settings.cookieDurationDays || 30,
+        customerDiscountType: affiliate.customerDiscountType || 'None',
+        customerDiscountValue: affiliate.customerDiscountValue || 0
       });
     }
 
@@ -88,7 +90,9 @@ export async function POST(req) {
       success: true,
       affiliateId: affiliate._id,
       referralCode: affiliate.referralCode,
-      cookieDurationDays: settings.cookieDurationDays || 30
+      cookieDurationDays: settings.cookieDurationDays || 30,
+      customerDiscountType: affiliate.customerDiscountType || 'None',
+      customerDiscountValue: affiliate.customerDiscountValue || 0
     });
 
   } catch (error) {

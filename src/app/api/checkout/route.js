@@ -231,6 +231,31 @@ export async function POST(req) {
                 }
             }
 
+            // ─── Affiliate Customer Discount ─────────────────────────────────────────
+            // Calculated independently from affiliate commission. Commission engine uses
+            // the original subtotal; the customer discount reduces what the customer pays.
+            let affiliateDiscountType = 'None';
+            let affiliateDiscountValue = 0;
+            let affiliateDiscountAmount = 0;
+
+            if (activeAffiliate && affiliateId) {
+                affiliateDiscountType = activeAffiliate.customerDiscountType || 'None';
+                affiliateDiscountValue = activeAffiliate.customerDiscountValue || 0;
+
+                if (affiliateDiscountType === 'Percentage' && affiliateDiscountValue > 0) {
+                    affiliateDiscountAmount = Math.round((financials.subtotal * (affiliateDiscountValue / 100)) * 100) / 100;
+                } else if (affiliateDiscountType === 'Fixed' && affiliateDiscountValue > 0) {
+                    affiliateDiscountAmount = Math.min(affiliateDiscountValue, financials.subtotal);
+                }
+            }
+
+            // Recalculate authoritative total server-side (prevents client-side tampering)
+            const authoritativeTotal = Math.max(
+                0,
+                (financials.subtotal || 0) - finalDiscountTotal - affiliateDiscountAmount +
+                Number(financials.shippingCost || 0) + Number(financials.tax || 0)
+            );
+
             const [newOrder] = await Order.create([{
                 tenantId,
                 orderNumber,
@@ -240,9 +265,17 @@ export async function POST(req) {
                 affiliateId,
                 affiliateReferralCode,
                 financials: {
-                    ...financials,
-                    discountTotal: finalDiscountTotal,
-                    appliedPromotions: finalAppliedPromotions
+                    subtotal:              financials.subtotal,
+                    shippingCost:          financials.shippingCost || 0,
+                    tax:                   financials.tax || 0,
+                    discountTotal:         finalDiscountTotal,
+                    affiliateDiscountType,
+                    affiliateDiscountValue,
+                    affiliateDiscountAmount,
+                    total:                 authoritativeTotal,
+                    currency:              financials.currency || 'USD',
+                    promoCode:             financials.promoCode || null,
+                    appliedPromotions:     finalAppliedPromotions
                 },
                 customer: {
                     userId: authSession?.user?.id || null,
@@ -254,6 +287,7 @@ export async function POST(req) {
                 shippingSnapshot: shippingSnapshot ?? null,
                 customerNote
             }], { session });
+
 
             checkoutResult = newOrder;
 

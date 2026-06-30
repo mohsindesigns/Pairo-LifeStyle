@@ -80,9 +80,17 @@ const InvoiceTemplate = ({ order }) => {
               <span>-${(Number(order.financials.discountTotal)).toLocaleString()}</span>
             </div>
           ) : null}
+          {order.financials?.affiliateDiscountAmount && Number(order.financials.affiliateDiscountAmount) > 0 ? (
+            <div className="flex justify-between text-sm text-emerald-600 font-bold">
+              <span>Referral Discount ({order.affiliateReferralCode})</span>
+              <span>-${(Number(order.financials.affiliateDiscountAmount)).toLocaleString()}</span>
+            </div>
+          ) : null}
           <div className="flex justify-between text-sm text-black/40">
             <span>Shipping</span>
-            <span className="font-bold text-black">Complimentary</span>
+            <span className="font-bold text-black">
+              {order.financials.shippingCost > 0 ? `$${order.financials.shippingCost.toLocaleString()}` : "Complimentary"}
+            </span>
           </div>
           <div className="pt-4 border-t-2 border-black flex justify-between items-end">
             <span className="text-[10px] font-bold uppercase tracking-widest">Balance Total</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 
 const CartContext = createContext();
@@ -39,6 +39,44 @@ export function CartProvider({ children }) {
 
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [selectedShipping, setSelectedShipping] = useState(null);
+  const [affiliateDiscount, setAffiliateDiscount] = useState({ type: 'None', value: 0, code: null });
+
+  // Read affiliate referral cookie/localStorage on mount and whenever storage changes
+  const readAffiliateCookie = useCallback(() => {
+    try {
+      const cookieMatch = document.cookie.match(/(^|;)\s*pairo_ref\s*=\s*([^;]+)/);
+      if (cookieMatch) {
+        const parsed = JSON.parse(decodeURIComponent(cookieMatch[2]));
+        if (parsed && parsed.expiresAt > Date.now()) {
+          setAffiliateDiscount({
+            type: parsed.customerDiscountType || 'None',
+            value: parsed.customerDiscountValue || 0,
+            code: parsed.code || null
+          });
+          return;
+        }
+      }
+      const stored = localStorage.getItem('pairo_ref');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.expiresAt > Date.now()) {
+          setAffiliateDiscount({
+            type: parsed.customerDiscountType || 'None',
+            value: parsed.customerDiscountValue || 0,
+            code: parsed.code || null
+          });
+          return;
+        }
+      }
+    } catch (e) {}
+    setAffiliateDiscount({ type: 'None', value: 0, code: null });
+  }, []);
+
+  useEffect(() => {
+    readAffiliateCookie();
+    window.addEventListener('storage', readAffiliateCookie);
+    return () => window.removeEventListener('storage', readAffiliateCookie);
+  }, [readAffiliateCookie]);
 
   // Load promo code from localStorage when storageKey changes
   useEffect(() => {
@@ -157,7 +195,7 @@ export function CartProvider({ children }) {
     }
   }, [cartItems, cartSubtotal]);
 
-  // Dynamic discount calculation
+  // Dynamic promo discount calculation
   const discountTotal = (() => {
     if (!appliedPromo) return 0;
     
@@ -173,8 +211,19 @@ export function CartProvider({ children }) {
     }
   })();
 
-  // Grand total = subtotal - discount + shipping
-  const cartTotal = Math.max(0, cartSubtotal - discountTotal + shippingCost);
+  // Affiliate customer discount (independent from promo codes)
+  const affiliateDiscountAmount = (() => {
+    if (!affiliateDiscount || affiliateDiscount.type === 'None' || !affiliateDiscount.value) return 0;
+    if (affiliateDiscount.type === 'Percentage') {
+      return Math.round((cartSubtotal * affiliateDiscount.value / 100) * 100) / 100;
+    } else if (affiliateDiscount.type === 'Fixed') {
+      return Math.min(affiliateDiscount.value, cartSubtotal);
+    }
+    return 0;
+  })();
+
+  // Grand total = subtotal - promo discount - affiliate discount + shipping
+  const cartTotal = Math.max(0, cartSubtotal - discountTotal - affiliateDiscountAmount + shippingCost);
 
   const applyPromoCode = async (code, email = null) => {
     if (!code) return { success: false, error: "No code provided" };
@@ -225,7 +274,9 @@ export function CartProvider({ children }) {
         applyPromoCode,
         removePromoCode,
         selectedShipping,
-        setSelectedShipping
+        setSelectedShipping,
+        affiliateDiscount,
+        affiliateDiscountAmount
       }}
     >
       {children}

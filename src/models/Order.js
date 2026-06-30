@@ -29,6 +29,9 @@ const OrderSchema = new mongoose.Schema({
     shippingCost: { type: Number, default: 0 },
     tax: { type: Number, default: 0 },
     discountTotal: { type: Number, default: 0 },
+    affiliateDiscountType: { type: String, enum: ['Percentage', 'Fixed', 'None'], default: 'None' },
+    affiliateDiscountValue: { type: Number, default: 0 },
+    affiliateDiscountAmount: { type: Number, default: 0 },
     total: Number,
     currency: { type: String, default: 'USD' },
     promoCode: String, // Keep for legacy/simple reference

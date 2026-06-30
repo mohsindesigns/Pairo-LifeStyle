@@ -51,7 +51,9 @@ export default function AffiliateTracker() {
               timestamp: Date.now(),
               landingUrl: window.location.href,
               referrer: document.referrer,
-              expiresAt: expires.getTime()
+              expiresAt: expires.getTime(),
+              customerDiscountType: data.customerDiscountType || 'None',
+              customerDiscountValue: data.customerDiscountValue || 0
             };
 
             // Set secure cookie

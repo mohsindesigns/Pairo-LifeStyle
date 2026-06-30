@@ -19,33 +19,42 @@ export async function PUT(req) {
 
     const body = await req.json().catch(() => ({}));
     
-    // Extract and structure data
-    const address = {
-      street: body.street || "",
-      city: body.city || "",
-      state: body.state || "",
-      zipCode: body.zipCode || "",
-      country: body.country || ""
-    };
+    // Build partial update — only include fields that are explicitly provided
+    const setFields = {};
+    
+    if (body.street !== undefined || body.city !== undefined || body.state !== undefined || body.zipCode !== undefined || body.country !== undefined) {
+      // Fetch existing address to merge
+      const existing = await Affiliate.findById(session.user.id).select("address").lean();
+      setFields.address = {
+        street: body.street !== undefined ? body.street : (existing?.address?.street || ""),
+        city: body.city !== undefined ? body.city : (existing?.address?.city || ""),
+        state: body.state !== undefined ? body.state : (existing?.address?.state || ""),
+        zipCode: body.zipCode !== undefined ? body.zipCode : (existing?.address?.zipCode || ""),
+        country: body.country !== undefined ? body.country : (existing?.address?.country || "")
+      };
+    }
 
-    const bankingInfo = {
-      accountHolder: body.accountHolder || "",
-      bankName: body.bankName || "",
-      accountNumber: body.accountNumber || "",
-      iban: body.iban || "",
-      swiftCode: body.swiftCode || "",
-      routingNumber: body.routingNumber || "",
-      paypalEmail: body.paypalEmail || ""
-    };
+    if (body.accountHolder !== undefined || body.bankName !== undefined || body.accountNumber !== undefined || 
+        body.iban !== undefined || body.swiftCode !== undefined || body.routingNumber !== undefined || body.paypalEmail !== undefined) {
+      const existing = await Affiliate.findById(session.user.id).select("bankingInfo").lean();
+      setFields.bankingInfo = {
+        accountHolder: body.accountHolder !== undefined ? body.accountHolder : (existing?.bankingInfo?.accountHolder || ""),
+        bankName: body.bankName !== undefined ? body.bankName : (existing?.bankingInfo?.bankName || ""),
+        accountNumber: body.accountNumber !== undefined ? body.accountNumber : (existing?.bankingInfo?.accountNumber || ""),
+        iban: body.iban !== undefined ? body.iban : (existing?.bankingInfo?.iban || ""),
+        swiftCode: body.swiftCode !== undefined ? body.swiftCode : (existing?.bankingInfo?.swiftCode || ""),
+        routingNumber: body.routingNumber !== undefined ? body.routingNumber : (existing?.bankingInfo?.routingNumber || ""),
+        paypalEmail: body.paypalEmail !== undefined ? body.paypalEmail : (existing?.bankingInfo?.paypalEmail || "")
+      };
+    }
+
+    if (Object.keys(setFields).length === 0) {
+      return NextResponse.json({ error: "No fields provided to update." }, { status: 400 });
+    }
 
     const updatedAffiliate = await Affiliate.findByIdAndUpdate(
       session.user.id,
-      {
-        $set: {
-          address,
-          bankingInfo
-        }
-      },
+      { $set: setFields },
       { new: true }
     );
 

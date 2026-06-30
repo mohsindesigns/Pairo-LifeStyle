@@ -7,7 +7,7 @@ import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 
 export default function CartDrawer() {
-  const { isCartOpen, setIsCartOpen, cartItems, updateQuantity, removeFromCart, cartSubtotal } = useCart();
+  const { isCartOpen, setIsCartOpen, cartItems, updateQuantity, removeFromCart, cartSubtotal, affiliateDiscount, affiliateDiscountAmount } = useCart();
 
   const drawerVariants = {
     hidden: { x: "100%" },
@@ -160,6 +160,12 @@ export default function CartDrawer() {
                     <span className="text-black/50 uppercase tracking-widest font-bold text-[10px]">Subtotal</span>
                     <span className="text-lg font-bold heading-font tracking-tight">${cartSubtotal.toFixed(0)}</span>
                   </div>
+                  {affiliateDiscount?.type !== 'None' && affiliateDiscountAmount > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-emerald-600 uppercase tracking-widest font-bold text-[10px]">Referral Discount</span>
+                      <span className="text-[12px] font-bold text-emerald-600">-${affiliateDiscountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-black/50 uppercase tracking-widest font-bold text-[10px]">Shipping</span>
                     <span className="text-[10px] font-bold text-black/75 uppercase tracking-widest">

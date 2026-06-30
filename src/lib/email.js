@@ -417,3 +417,58 @@ export async function sendAffiliatePayoutUpdate(toEmail, affiliateName, amount, 
     console.error('[Email] ❌ Failed to send payout update email:', err.message);
   }
 }
+
+/**
+ * Send Affiliate Password Reset Email
+ */
+export async function sendAffiliatePasswordReset(toEmail, name, resetUrl) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log(`[Email Simulation] Password Reset → ${toEmail} | Reset URL: ${resetUrl}`);
+    return;
+  }
+
+  const firstName = name?.split(' ')[0] || 'Partner';
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; color: #1a1a1a; background: #fff;">
+      <div style="background: #1a1a1a; padding: 28px 32px; text-align: center;">
+        <h1 style="color: #fff; margin: 0; letter-spacing: 6px; font-size: 20px; font-weight: 800; text-transform: uppercase;">PAIRO</h1>
+        <p style="color: #888; margin: 6px 0 0; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;">Partner Portal</p>
+      </div>
+      <div style="padding: 40px 32px;">
+        <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 8px;">Reset Your Password</h2>
+        <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 28px;">
+          Hi ${firstName}, we received a request to reset the password for your PAIRO Partner account.<br/>
+          Click the button below to create a new password. This link expires in <strong>1 hour</strong>.
+        </p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${resetUrl}" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 14px 36px; border-radius: 3px; font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; text-decoration: none;">
+            Reset Password
+          </a>
+        </div>
+        <p style="color: #888; font-size: 12px; line-height: 1.6; border-top: 1px solid #eee; padding-top: 20px; margin: 0;">
+          If you did not request a password reset, please ignore this email — your account is safe.<br/>
+          For security, do not share this link with anyone.
+        </p>
+      </div>
+      <div style="border-top: 1px solid #eee; padding: 18px 32px; text-align: center;">
+        <p style="font-size: 11px; color: #bbb; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
+          Pairo Excellence • Partner Programme
+        </p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"PAIRO Partners" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      to: toEmail,
+      subject: `Reset Your PAIRO Partner Password`,
+      html,
+    });
+    console.log(`[Email] ✅ Password reset email sent to ${toEmail}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send password reset email:', err.message);
+    throw err;
+  }
+}

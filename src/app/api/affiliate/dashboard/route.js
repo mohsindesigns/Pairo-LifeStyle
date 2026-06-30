@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
-import Affiliate from "@/models/Affiliate";
+import Affiliate, { decryptAffiliate } from "@/models/Affiliate";
 import AffiliateClick from "@/models/AffiliateClick";
 import AffiliateCommission from "@/models/AffiliateCommission";
 import AffiliatePayout from "@/models/AffiliatePayout";
@@ -16,15 +16,17 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const affiliate = await Affiliate.findById(session.user.id).lean();
-    if (!affiliate) {
+    const rawAffiliate = await Affiliate.findById(session.user.id).lean();
+    if (!rawAffiliate) {
       return NextResponse.json({ error: "Affiliate not found" }, { status: 404 });
     }
 
-    if (affiliate.status !== 'Active') {
+    if (rawAffiliate.status !== 'Active') {
       return NextResponse.json({ error: "Unauthorized: Account suspended or inactive" }, { status: 403 });
     }
 
+    // Decrypt sensitive banking fields before returning to client (fixes pre-fill bug)
+    const affiliate = decryptAffiliate(rawAffiliate);
     const affiliateId = affiliate._id;
 
     // 1. Gather counts and balances in parallel

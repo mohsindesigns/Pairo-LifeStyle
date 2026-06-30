@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
-import { Users, CheckSquare, Coins, Settings, Eye, X, ExternalLink } from "lucide-react";
+import { Users, CheckSquare, Coins, Settings, Eye, X, ExternalLink, RefreshCw, BarChart2, Link2, ShoppingCart, MousePointerClick, DollarSign, CreditCard, TrendingUp, AlertCircle } from "lucide-react";
 
 export default function AffiliatesManagerClient({ userSession }) {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("requests");
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +34,8 @@ export default function AffiliatesManagerClient({ userSession }) {
   const [notes, setNotes] = useState("");
   const [customCommissionRate, setCustomCommissionRate] = useState(5);
   const [commissionType, setCommissionType] = useState("Percentage");
+  const [reviewDiscountType, setReviewDiscountType] = useState("None");
+  const [reviewDiscountValue, setReviewDiscountValue] = useState(0);
   const [submittingReview, setSubmittingReview] = useState(false);
 
   // Edit Affiliate inputs
@@ -40,6 +44,8 @@ export default function AffiliatesManagerClient({ userSession }) {
     email: "",
     commissionRate: 5,
     commissionType: "Percentage",
+    customerDiscountType: "None",
+    customerDiscountValue: 0,
     status: "Active",
     couponCode: "",
     password: ""
@@ -60,6 +66,14 @@ export default function AffiliatesManagerClient({ userSession }) {
   
   // Viewing Application Details Modal
   const [viewingApplication, setViewingApplication] = useState(null);
+
+  // Referral Code states for review/edit modals
+  const [reviewReferralCode, setReviewReferralCode] = useState("");
+  const [editReferralCode, setEditReferralCode] = useState("");
+  const [referralCodeError, setReferralCodeError] = useState("");
+
+  // Overview stats
+  const [overviewStats, setOverviewStats] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -83,8 +97,11 @@ export default function AffiliatesManagerClient({ userSession }) {
   };
 
   useEffect(() => {
+    // Sync tab with ?view= URL param
+    const view = searchParams.get("view");
+    if (view) setActiveTab(view);
     loadData();
-  }, []);
+  }, [searchParams]);
 
   const handleApplicationReview = async (e) => {
     e.preventDefault();
@@ -99,7 +116,10 @@ export default function AffiliatesManagerClient({ userSession }) {
           notes,
           rejectionReason,
           customCommissionRate,
-          commissionType
+          commissionType,
+          customerDiscountType: reviewAction === "Approve" ? reviewDiscountType : undefined,
+          customerDiscountValue: reviewAction === "Approve" ? reviewDiscountValue : undefined,
+          referralCode: reviewReferralCode || undefined
         })
       });
 
@@ -130,7 +150,8 @@ export default function AffiliatesManagerClient({ userSession }) {
         body: JSON.stringify({
           affiliateId: selectedAffiliate._id,
           __v: currentAff?.__v, // Send version key for validation
-          ...editForm
+          ...editForm,
+          referralCode: editReferralCode || undefined  // Admin-editable
         })
       });
 
@@ -358,6 +379,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                             onClick={() => {
                               setSelectedApplication(app);
                               setCustomCommissionRate(settings.defaultCommissionRate || 5);
+                              setReviewReferralCode(app.referralCode || ""); // Pre-fill with applicant's chosen code
                             }}
                             className="bg-[#2271b1] border border-[#2271b1] text-white px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] hover:border-[#135e96] transition-all shadow-sm"
                           >
@@ -419,11 +441,14 @@ export default function AffiliatesManagerClient({ userSession }) {
                         <button
                           onClick={() => {
                             setSelectedAffiliate(aff);
+                            setEditReferralCode(aff.referralCode || "");
                             setEditForm({
                               name: aff.name,
                               email: aff.email,
                               commissionRate: aff.commissionRate,
                               commissionType: aff.commissionType || "Percentage",
+                              customerDiscountType: aff.customerDiscountType || "None",
+                              customerDiscountValue: aff.customerDiscountValue || 0,
                               status: aff.status,
                               couponCode: aff.couponCode || "",
                               password: ""
@@ -622,6 +647,13 @@ export default function AffiliatesManagerClient({ userSession }) {
                     <div><span className="text-[#646970] font-semibold">Date of Birth:</span> <span className="text-[#1d2327]">{viewingApplication.dob ? new Date(viewingApplication.dob).toLocaleDateString() : "—"}</span></div>
                     <div><span className="text-[#646970] font-semibold">Submission Date:</span> <span className="text-[#1d2327]">{new Date(viewingApplication.createdAt).toLocaleString()}</span></div>
                     <div>
+                      <span className="text-[#646970] font-semibold">Preferred Referral Code:</span>{" "}
+                      {viewingApplication.referralCode
+                        ? <code className="bg-[#fff2cc] border border-[#d6b656] text-[#634f00] px-2 py-0.5 rounded text-[12px] font-mono font-bold">{viewingApplication.referralCode}</code>
+                        : <span className="text-[#646970] italic">Will be auto-generated</span>
+                      }
+                    </div>
+                    <div>
                       <span className="text-[#646970] font-semibold">Status:</span>{" "}
                       <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
                         viewingApplication.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
@@ -811,6 +843,72 @@ export default function AffiliatesManagerClient({ userSession }) {
                         className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
                       />
                     </div>
+
+                    {/* Customer Discount — independent from commission */}
+                    <div className="border-t border-[#eee] pt-4 space-y-3">
+                      <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Customer Discount (optional)</p>
+                      <div className="space-y-1">
+                        <label className="text-[12px] font-bold text-[#1d2327]">Discount Type</label>
+                        <select
+                          value={reviewDiscountType}
+                          onChange={(e) => {
+                            setReviewDiscountType(e.target.value);
+                            setReviewDiscountValue(0);
+                          }}
+                          className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                        >
+                          <option value="None">None — No customer discount</option>
+                          <option value="Percentage">Percentage Discount (%)</option>
+                          <option value="Fixed">Fixed Amount Discount ($)</option>
+                        </select>
+                      </div>
+                      {reviewDiscountType !== "None" && (
+                        <div className="space-y-1">
+                          <label className="text-[12px] font-bold text-[#1d2327]">
+                            {reviewDiscountType === "Percentage" ? "Discount Rate (%)" : "Discount Amount ($)"}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max={reviewDiscountType === "Percentage" ? 100 : 10000}
+                            value={reviewDiscountValue}
+                            onChange={(e) => setReviewDiscountValue(Number(e.target.value))}
+                            placeholder={reviewDiscountType === "Percentage" ? "e.g. 10" : "e.g. 5"}
+                            className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                          />
+                          <p className="text-[11px] text-[#646970]">
+                            Customers using this referral link will receive this discount on their order.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[12px] font-bold text-[#1d2327]">Referral Code *</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={reviewReferralCode}
+                          onChange={e => setReviewReferralCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                          placeholder="Auto-generated from name if empty"
+                          className="flex-1 border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                            setReviewReferralCode(Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join(""));
+                          }}
+                          className="shrink-0 bg-[#f6f7f7] border border-[#ccd0d4] text-[#2c3338] hover:bg-[#e0e0e0] px-3 py-1.5 rounded-[3px] text-[12px] font-bold transition-all"
+                          title="Generate a random referral code"
+                        >
+                          Generate
+                        </button>
+                      </div>
+                      {selectedApplication?.referralCode && (
+                        <p className="text-[11px] text-[#646970]">Applicant requested: <code className="font-mono font-bold text-amber-700">{selectedApplication.referralCode}</code></p>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <div className="space-y-1">
@@ -923,6 +1021,42 @@ export default function AffiliatesManagerClient({ userSession }) {
                   />
                 </div>
 
+                {/* Customer Discount — independent from commission */}
+                <div className="border-t border-[#eee] pt-4 space-y-3">
+                  <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Customer Discount</p>
+                  <div className="space-y-1">
+                    <label className="text-[12px] font-bold text-[#1d2327]">Discount Type</label>
+                    <select
+                      value={editForm.customerDiscountType}
+                      onChange={(e) => setEditForm({ ...editForm, customerDiscountType: e.target.value, customerDiscountValue: 0 })}
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                    >
+                      <option value="None">None — No customer discount</option>
+                      <option value="Percentage">Percentage Discount (%)</option>
+                      <option value="Fixed">Fixed Amount Discount ($)</option>
+                    </select>
+                  </div>
+                  {editForm.customerDiscountType !== "None" && (
+                    <div className="space-y-1">
+                      <label className="text-[12px] font-bold text-[#1d2327]">
+                        {editForm.customerDiscountType === "Percentage" ? "Discount Rate (%)" : "Discount Amount ($)"}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={editForm.customerDiscountType === "Percentage" ? 100 : 10000}
+                        value={editForm.customerDiscountValue}
+                        onChange={(e) => setEditForm({ ...editForm, customerDiscountValue: Number(e.target.value) })}
+                        placeholder={editForm.customerDiscountType === "Percentage" ? "e.g. 10" : "e.g. 5"}
+                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                      />
+                      <p className="text-[11px] text-[#646970]">
+                        Customers using this referral link will receive this discount on their order.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-[12px] font-bold text-[#1d2327]">Status</label>
                   <select
@@ -944,6 +1078,31 @@ export default function AffiliatesManagerClient({ userSession }) {
                     placeholder="Leave empty for none"
                     className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono"
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[12px] font-bold text-[#1d2327]">Referral Code</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={editReferralCode}
+                      onChange={e => setEditReferralCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                      placeholder="Unique referral code"
+                      className="flex-1 border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                        setEditReferralCode(Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join(""));
+                      }}
+                      className="shrink-0 bg-[#f6f7f7] border border-[#ccd0d4] text-[#2c3338] hover:bg-[#e0e0e0] px-3 py-1.5 rounded-[3px] text-[12px] font-bold"
+                      title="Generate a random referral code"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#646970]">Current: <code className="font-mono font-bold">{selectedAffiliate?.referralCode || "N/A"}</code></p>
                 </div>
 
                 <div className="space-y-1">

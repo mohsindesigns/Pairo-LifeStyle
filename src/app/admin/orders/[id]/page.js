@@ -239,25 +239,50 @@ export default function OrderDetailPage() {
 
               {/* Financial Summary */}
               <div className="p-6 bg-gray-50/50 border-t border-[#ccd0d4] flex flex-col items-end space-y-2">
-                <div className="flex justify-between w-48 text-[13px]">
+                <div className="flex justify-between w-56 text-[13px]">
                   <span className="text-[#646970]">Subtotal:</span>
                   <span className="font-bold text-[#1d2327]">
                     ${(order.financials?.subtotal || 0).toLocaleString()}
                   </span>
                 </div>
                 {order.financials?.discountTotal && Number(order.financials.discountTotal) > 0 ? (
-                  <div className="flex justify-between w-48 text-[13px]">
-                    <span className="text-[#646970]">Discount:</span>
+                  <div className="flex justify-between w-56 text-[13px]">
+                    <span className="text-[#646970]">Promo Discount:</span>
                     <span className="text-green-700 font-medium">
                       -${(Number(order.financials.discountTotal)).toLocaleString()}
                     </span>
                   </div>
                 ) : null}
-                <div className="flex justify-between w-48 text-[13px]">
+                {order.financials?.affiliateDiscountAmount && Number(order.financials.affiliateDiscountAmount) > 0 ? (
+                  <div className="flex justify-between w-56 text-[13px]">
+                    <span className="text-[#646970] flex items-center gap-1">
+                      Referral Discount
+                      {order.financials.affiliateDiscountType === 'Percentage' && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1 py-0.5 rounded">
+                          {order.financials.affiliateDiscountValue}%
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-emerald-700 font-medium">
+                      -${(Number(order.financials.affiliateDiscountAmount)).toFixed(2)}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between w-56 text-[13px]">
                   <span className="text-[#646970]">Shipping:</span>
-                  <span className="text-green-700 font-medium">Free</span>
+                  <span className="text-green-700 font-medium">
+                    {order.financials?.shippingCost > 0
+                      ? `$${order.financials.shippingCost.toLocaleString()}`
+                      : 'Free'}
+                  </span>
                 </div>
-                <div className="flex justify-between w-48 text-[16px] font-bold border-t border-[#ccd0d4] pt-2 mt-2 text-[#1d2327]">
+                {order.financials?.tax > 0 && (
+                  <div className="flex justify-between w-56 text-[13px]">
+                    <span className="text-[#646970]">Tax:</span>
+                    <span className="font-medium text-[#1d2327]">${order.financials.tax.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between w-56 text-[16px] font-bold border-t border-[#ccd0d4] pt-2 mt-2 text-[#1d2327]">
                   <span>Total:</span>
                   <span>${(order.financials?.total || 0).toLocaleString()}</span>
                 </div>
@@ -303,7 +328,45 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* Order Notes / Timeline */}
+            {/* Affiliate Attribution */}
+            {order.affiliateReferralCode && (
+              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
+                <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5 text-[#2271b1]" />
+                  <h2 className="text-[14px] font-bold text-[#1d2327]">Affiliate Attribution</h2>
+                </div>
+                <div className="p-4 space-y-3 text-[13px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#646970] font-medium">Referral Code</span>
+                    <span className="font-mono font-bold text-[#1d2327] bg-gray-100 px-2 py-0.5 rounded text-[12px]">
+                      {order.affiliateReferralCode}
+                    </span>
+                  </div>
+                  {order.financials?.affiliateDiscountType && order.financials.affiliateDiscountType !== 'None' && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[#646970] font-medium">Customer Discount</span>
+                      <span className="text-emerald-700 font-bold">
+                        {order.financials.affiliateDiscountType === 'Percentage'
+                          ? `${order.financials.affiliateDiscountValue}%`
+                          : `$${order.financials.affiliateDiscountValue}`}
+                        {' '}off
+                        {order.financials.affiliateDiscountAmount > 0 && (
+                          <span className="ml-1 text-emerald-600 font-normal text-[11px]">
+                            (saved ${Number(order.financials.affiliateDiscountAmount).toFixed(2)})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <div className="mt-1 pt-3 border-t border-[#ccd0d4]">
+                    <p className="text-[11px] text-[#646970] italic">
+                      Commission calculation uses original subtotal (${(order.financials?.subtotal || 0).toLocaleString()}) before discounts.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
               <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
                 <h2 className="text-[14px] font-bold text-[#1d2327]">Order Notes</h2>

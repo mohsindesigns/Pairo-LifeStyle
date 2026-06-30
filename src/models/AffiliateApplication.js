@@ -40,6 +40,11 @@ const AffiliateApplicationSchema = new mongoose.Schema({
   },
   
   identityDocuments: [String], // URLs to driver license, passport, national ID scans
+  profilePhoto: String, // Profile photo filename (stored in private/kyc/)
+  bankVerificationDocument: String, // Bank statement / certificate filename (stored in private/kyc/)
+  referralCode: { type: String, unique: true, sparse: true, index: true }, // Applicant's preferred code (editable by admin before approval)
+  customerDiscountType: { type: String, enum: ['Percentage', 'Fixed', 'None'], default: 'None' },
+  customerDiscountValue: { type: Number, default: 0 },
   status: { type: String, enum: ['Pending', 'Under Review', 'Approved', 'Rejected'], default: 'Pending', index: true },
   rejectionReason: String,
   notes: String, // Internal admin comments

@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import CartDrawer from "@/components/layout/CartDrawer";
+import AffiliateDiscountBanner from "@/components/common/AffiliateDiscountBanner";
 
 export default function LayoutWrapper({ children }) {
   const pathname = usePathname();
@@ -16,6 +17,7 @@ export default function LayoutWrapper({ children }) {
   return (
     <>
       <Navbar />
+      <AffiliateDiscountBanner />
       <CartDrawer />
       <main>{children}</main>
       <Footer />
