@@ -48,7 +48,8 @@ export default function AffiliatesManagerClient({ userSession }) {
     customerDiscountValue: 0,
     status: "Active",
     couponCode: "",
-    password: ""
+    password: "",
+    createdAt: ""
   });
   const [submittingEdit, setSubmittingEdit] = useState(false);
 
@@ -178,17 +179,18 @@ export default function AffiliatesManagerClient({ userSession }) {
             zipCode: editForm.zipCode,
             country: editForm.country,
           },
-          bankingInfo: {
-            accountHolder: editForm.accountHolder,
-            bankName: editForm.bankName,
-            accountNumber: editForm.accountNumber,
-            iban: editForm.iban,
-            swiftCode: editForm.swiftCode,
-            routingNumber: editForm.routingNumber,
-            paypalEmail: editForm.paypalEmail,
-          }
-        })
-      });
+            bankingInfo: {
+              accountHolder: editForm.accountHolder,
+              bankName: editForm.bankName,
+              accountNumber: editForm.accountNumber,
+              iban: editForm.iban,
+              swiftCode: editForm.swiftCode,
+              routingNumber: editForm.routingNumber,
+              paypalEmail: editForm.paypalEmail,
+            },
+            createdAt: editForm.createdAt ? new Date(editForm.createdAt).toISOString() : undefined,
+          })
+        });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save affiliate settings.");
@@ -811,6 +813,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                               // Business
                               companyName: aff.businessInfo?.companyName || "",
                               website: aff.businessInfo?.website || "",
+                              createdAt: aff.createdAt ? new Date(aff.createdAt).toISOString().slice(0, 16) : "",
                             });
                           }}
                           className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
@@ -1434,6 +1437,22 @@ export default function AffiliatesManagerClient({ userSession }) {
               </div>
 
               <form onSubmit={handleAffiliateEditSubmit} className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4 bg-[#f6f7f7] border border-[#ccd0d4] p-3 rounded-[3px] text-[12px]">
+                  <div>
+                    <span className="font-bold text-[#646970] block uppercase tracking-wider text-[10px]">Affiliate ID</span>
+                    <span className="text-black font-semibold font-mono text-[13px]">{selectedAffiliate.affiliateId || "—"}</span>
+                  </div>
+                  <div>
+                    <label className="font-bold text-[#646970] block uppercase tracking-wider text-[10px] mb-1">Account Created At</label>
+                    <input
+                      type="datetime-local"
+                      value={editForm.createdAt}
+                      onChange={(e) => setEditForm({ ...editForm, createdAt: e.target.value })}
+                      className="border border-[#8c8f94] bg-white rounded-[3px] px-2 py-0.5 outline-none text-[12px] font-mono text-black w-full"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-[12px] font-bold text-[#1d2327]">Display Name</label>
                   <input

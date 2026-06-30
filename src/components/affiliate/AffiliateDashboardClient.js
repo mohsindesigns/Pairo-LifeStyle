@@ -801,7 +801,7 @@ export default function AffiliateDashboardClient({ userSession }) {
               <h3 className="text-[13px] font-bold uppercase tracking-wider text-black border-b border-neutral-100 pb-2">
                 Referral & Commission Rates (Read-only)
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-neutral-50 p-4 rounded-lg border border-neutral-200">
                 <div>
                   <p className="text-[10px] uppercase font-bold text-gray-400">Referral Code</p>
                   <p className="text-sm font-bold text-black font-mono mt-0.5">{profile?.referralCode || "—"}</p>
@@ -824,6 +824,12 @@ export default function AffiliateDashboardClient({ userSession }) {
                       : profile?.customerDiscountType === "Percentage"
                       ? `${profile.customerDiscountValue}% Off`
                       : `$${profile.customerDiscountValue} Off`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-gray-400">Account Created</p>
+                  <p className="text-sm font-bold text-black font-mono mt-0.5">
+                    {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "—"}
                   </p>
                 </div>
               </div>

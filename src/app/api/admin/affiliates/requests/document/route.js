@@ -4,11 +4,14 @@ import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 import path from "path";
 import fs from "fs";
+import dbConnect from "@/lib/db";
+import Affiliate from "@/models/Affiliate";
 
 export async function GET(req) {
   try {
+    await dbConnect();
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isStaff || !can(session.user, "affiliates.view")) {
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -17,6 +20,32 @@ export async function GET(req) {
 
     if (!filename) {
       return NextResponse.json({ error: "Filename is required" }, { status: 400 });
+    }
+
+    let isAuthorized = false;
+
+    // Staff access check
+    if (session.user?.isStaff && can(session.user, "affiliates.view")) {
+      isAuthorized = true;
+    }
+
+    // Affiliate self access check
+    if (!isAuthorized && session.user?.isAffiliate) {
+      const affiliate = await Affiliate.findById(session.user.id)
+        .select("profilePhoto bankVerificationDocument identityDocuments")
+        .lean();
+      if (affiliate) {
+        const isProfilePhoto = affiliate.profilePhoto === filename;
+        const isBankDoc = affiliate.bankVerificationDocument === filename;
+        const isIdentityDoc = affiliate.identityDocuments?.includes(filename);
+        if (isProfilePhoto || isBankDoc || isIdentityDoc) {
+          isAuthorized = true;
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: "Unauthorized to view this document" }, { status: 403 });
     }
 
     // Resolve path inside the private directory

@@ -22,6 +22,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
+    const affiliateOnly = searchParams.get("affiliateOnly") === "true";
     const page = parseInt(searchParams.get("page")) || 1;
     const limit = parseInt(searchParams.get("limit")) || 10;
     const skip = (page - 1) * limit;
@@ -33,6 +34,11 @@ export async function GET(req) {
     // Filter by status if not "all"
     if (status && status !== "all") {
       query.status = status;
+    }
+
+    // Filter by affiliate if affiliateOnly is requested
+    if (affiliateOnly) {
+      query.affiliateReferralCode = { $exists: true, $ne: null, $ne: "" };
     }
 
     // Search logic

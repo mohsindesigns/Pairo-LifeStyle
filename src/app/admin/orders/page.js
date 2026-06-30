@@ -18,6 +18,7 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [affiliateOnly, setAffiliateOnly] = useState(false);
   const [pagination, setPagination] = useState({ total: 0, pages: 1, currentPage: 1 });
   
   const [selectedIds, setSelectedIds] = useState([]);
@@ -26,7 +27,7 @@ export default function AdminOrdersPage() {
   const fetchOrders = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/orders?page=${page}&status=${statusFilter}&search=${search}`);
+      const res = await fetch(`/api/admin/orders?page=${page}&status=${statusFilter}&search=${search}&affiliateOnly=${affiliateOnly}`);
       const data = await res.json();
       if (data.success) {
         setOrders(data.orders);
@@ -37,7 +38,7 @@ export default function AdminOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, affiliateOnly]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -153,6 +154,18 @@ export default function AdminOrdersPage() {
                  <option>Delete Permanently</option>
               </select>
               <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
+           </div>
+           
+           <div className="flex items-center gap-4">
+              <label className="inline-flex items-center gap-2 text-[13px] cursor-pointer select-none">
+                 <input
+                    type="checkbox"
+                    checked={affiliateOnly}
+                    onChange={(e) => setAffiliateOnly(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1]"
+                 />
+                 <span className="font-bold text-[#1d2327]">Affiliate Orders Only</span>
+              </label>
            </div>
            <div className="flex items-center gap-2 w-full md:w-auto">
               <input 

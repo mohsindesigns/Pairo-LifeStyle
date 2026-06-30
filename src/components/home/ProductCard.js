@@ -32,7 +32,7 @@ export default function ProductCard({ product }) {
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0"
           >
-            {mainImage && (
+             {mainImage && (
               <Image
                 src={mainImage}
                 alt={product.imageAlts?.[mainImage] || product.name || "Product"}
@@ -40,7 +40,7 @@ export default function ProductCard({ product }) {
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 className="object-cover"
                 quality={75}
-                unoptimized={process.env.NODE_ENV === 'development'}
+                unoptimized={process.env.NODE_ENV === 'development' || (!mainImage.startsWith("http") && !mainImage.includes("cloudinary.com"))}
               />
             )}
           </motion.div>
@@ -60,7 +60,7 @@ export default function ProductCard({ product }) {
                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                 className="object-cover"
                 quality={75}
-                unoptimized={process.env.NODE_ENV === 'development'}
+                unoptimized={process.env.NODE_ENV === 'development' || (!hoverImage.startsWith("http") && !hoverImage.includes("cloudinary.com"))}
               />
             </motion.div>
           )}

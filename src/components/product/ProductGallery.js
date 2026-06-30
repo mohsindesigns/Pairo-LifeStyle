@@ -45,6 +45,7 @@ export default function ProductGallery({ images = [], variantImage, productName 
                 fill
                 className="object-cover"
                 sizes="72px"
+                unoptimized={!img.startsWith("http") && !img.includes("cloudinary.com")}
               />
             </button>
           );
@@ -63,6 +64,7 @@ export default function ProductGallery({ images = [], variantImage, productName 
           priority
           sizes="(max-width: 768px) 100vw, 50vw"
           decoding="async"
+          unoptimized={!displayImage.startsWith("http") && !displayImage.includes("cloudinary.com")}
         />
         <div className="absolute top-3 right-3 bg-white/80 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm">
           <ZoomIn className="w-4 h-4 text-black/50" />

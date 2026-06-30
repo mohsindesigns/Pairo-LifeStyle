@@ -41,7 +41,11 @@ export async function PUT(req) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { affiliateId, name, email, commissionRate, commissionType, status, couponCode, password, referralCode, customerDiscountType, customerDiscountValue, __v } = body;
+    const { 
+      affiliateId, name, email, commissionRate, commissionType, status, 
+      couponCode, password, referralCode, customerDiscountType, customerDiscountValue, 
+      address, bankingInfo, companyName, website, createdAt, __v 
+    } = body;
 
     if (!affiliateId) {
       return NextResponse.json({ error: "Affiliate ID is required." }, { status: 400 });
@@ -67,9 +71,43 @@ export async function PUT(req) {
     if (customerDiscountType !== undefined) affiliate.customerDiscountType = customerDiscountType;
     if (customerDiscountValue !== undefined) affiliate.customerDiscountValue = Number(customerDiscountValue);
     if (status) affiliate.status = status;
+    if (createdAt) affiliate.createdAt = new Date(createdAt);
     
     if (couponCode !== undefined) {
       affiliate.couponCode = couponCode ? couponCode.toUpperCase().trim() : undefined;
+    }
+
+    // Address merge/override
+    if (address) {
+      affiliate.address = {
+        street: address.street || "",
+        city: address.city || "",
+        state: address.state || "",
+        zipCode: address.zipCode || "",
+        country: address.country || "",
+      };
+    }
+
+    // Banking info merge/override (sensitive fields will be encrypted by schema pre-save hook)
+    if (bankingInfo) {
+      affiliate.bankingInfo = {
+        accountHolder: bankingInfo.accountHolder || "",
+        bankName: bankingInfo.bankName || "",
+        accountNumber: bankingInfo.accountNumber || "",
+        iban: bankingInfo.iban || "",
+        swiftCode: bankingInfo.swiftCode || "",
+        routingNumber: bankingInfo.routingNumber || "",
+        paypalEmail: bankingInfo.paypalEmail || "",
+      };
+    }
+
+    // Business details
+    if (companyName !== undefined || website !== undefined) {
+      affiliate.businessInfo = {
+        companyName: companyName !== undefined ? companyName : (affiliate.businessInfo?.companyName || ""),
+        website: website !== undefined ? website : (affiliate.businessInfo?.website || ""),
+        socialLinks: affiliate.businessInfo?.socialLinks || [],
+      };
     }
 
     // Referral code update (admin only — validated for uniqueness)

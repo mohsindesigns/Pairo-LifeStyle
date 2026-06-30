@@ -184,7 +184,14 @@ export default function SearchModal({ isOpen, onClose }) {
                             className="group"
                           >
                             <div className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden bg-black/5 mb-2 md:mb-2.5">
-                              <Image src={product.image || "/placeholder.jpg"} alt={product.name} fill sizes="(max-width: 768px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
+                              <Image 
+                                src={product.image || "/placeholder.jpg"} 
+                                alt={product.name} 
+                                fill 
+                                sizes="(max-width: 768px) 50vw, 33vw" 
+                                className="object-cover group-hover:scale-105 transition-transform duration-700" 
+                                unoptimized={product.image ? (!product.image.startsWith("http") && !product.image.includes("cloudinary.com")) : false}
+                              />
                             </div>
                             <div className="space-y-0.5 md:space-y-1">
                                <p className="text-[7px] md:text-[8px] font-bold text-black/30 uppercase tracking-widest">{product.category}</p>
