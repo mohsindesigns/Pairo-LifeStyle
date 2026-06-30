@@ -49,12 +49,12 @@ export default function CategoryBanner({
                 {categoriesConfig.label || "The Collection"}
               </span>
             </div>
-            <p className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold heading-font tracking-tighter text-[#000000] uppercase leading-none truncate">
+            <p className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold heading-font tracking-tighter text-[#000000] uppercase leading-none truncate">
               {categoriesConfig.title || "Shop By Category"}
             </p>
           </div>
 
-          <Link href="/shop" className="group relative hidden sm:flex items-center gap-4 border border-black px-10 py-4 rounded-full font-bold text-[10px] uppercase tracking-[0.2em] overflow-hidden transition-all duration-500 hover:text-white active:scale-95">
+          <Link href="/shop" className="group relative hidden sm:flex items-center gap-4 border border-black px-6 py-2 rounded-full font-bold text-[10px] uppercase tracking-[0.2em] overflow-hidden transition-all duration-500 hover:text-white active:scale-95">
             <span className="relative z-10">{categoriesConfig.viewAll || "Explore All"}</span>
             <ArrowRight className="w-4 h-4 relative z-10 transition-transform duration-500 group-hover:translate-x-1" />
             <div className="absolute inset-0 bg-black translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[0.22, 1, 0.36, 1]" />
@@ -98,22 +98,22 @@ export default function CategoryBanner({
                 <div className={`absolute inset-0 p-5 sm:p-8 md:p-12 flex flex-col justify-end items-center text-center ${isSmall ? '' : 'sm:items-start sm:text-left'}`}>
                   <div className={`space-y-3 sm:space-y-5 w-full flex flex-col items-center ${isSmall ? '' : 'sm:items-start'}`}>
                     <div className="space-y-1 sm:space-y-2">
-                       <span className="inline-flex bg-white/10 backdrop-blur-md text-white text-[8px] font-bold px-2.5 py-1 rounded-md tracking-[0.2em] uppercase border border-white/10">
-                         DEPARTMENT 0{index + 1}
-                       </span>
-                       <p className="text-[18px] sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white uppercase tracking-tighter leading-[0.9]">
-                         {category.name}
-                       </p>
+                      <span className="inline-flex bg-white/10 backdrop-blur-md text-white text-[8px] font-bold px-2.5 py-1 rounded-md tracking-[0.2em] uppercase border border-white/10">
+                        DEPARTMENT 0{index + 1}
+                      </span>
+                      <p className="text-[18px] sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white uppercase tracking-tighter leading-[0.9]">
+                        {category.name}
+                      </p>
                     </div>
 
                     <div className={`w-full flex justify-center ${isSmall ? '' : 'sm:justify-start'}`}>
-                       <button className="group/btn relative overflow-hidden bg-white text-black px-6 py-2.5 sm:px-10 sm:py-3.5 rounded-full font-bold text-[8px] sm:text-[10px] uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl active:scale-95">
-                          <span className="relative z-10 flex items-center gap-2 sm:gap-3 group-hover/btn:text-white transition-colors duration-300">
-                            {exploreText}
-                            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </span>
-                          <div className="absolute inset-0 bg-black translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500" />
-                       </button>
+                      <button className="group/btn relative overflow-hidden bg-white text-black px-6 py-2.5 sm:px-10 sm:py-3.5 rounded-full font-bold text-[8px] sm:text-[10px] uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl active:scale-95">
+                        <span className="relative z-10 flex items-center gap-2 sm:gap-3 group-hover/btn:text-white transition-colors duration-300">
+                          {exploreText}
+                          <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </span>
+                        <div className="absolute inset-0 bg-black translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500" />
+                      </button>
                     </div>
                   </div>
                 </div>
