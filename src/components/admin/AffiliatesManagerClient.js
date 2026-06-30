@@ -72,23 +72,34 @@ export default function AffiliatesManagerClient({ userSession }) {
   const [editReferralCode, setEditReferralCode] = useState("");
   const [referralCodeError, setReferralCodeError] = useState("");
 
-  // Overview stats
+  // Overview stats & activity
   const [overviewStats, setOverviewStats] = useState(null);
+  const [activityData, setActivityData] = useState({ clicks: [], commissions: [], referredOrders: [] });
+  const [autoPromos, setAutoPromos] = useState([]);
+  const [disablingPromos, setDisablingPromos] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [reqsRes, affsRes, paysRes, settsRes] = await Promise.all([
+      const [reqsRes, affsRes, paysRes, settsRes, ovRes, actRes, promoRes] = await Promise.all([
         fetch("/api/admin/affiliates/requests").then(r => r.json()),
         fetch("/api/admin/affiliates/list").then(r => r.json()),
         fetch("/api/admin/affiliates/payouts").then(r => r.json()),
-        fetch("/api/admin/affiliates/settings").then(r => r.json())
+        fetch("/api/admin/affiliates/settings").then(r => r.json()),
+        fetch("/api/admin/affiliates/overview").then(r => r.json()).catch(() => ({})),
+        fetch("/api/admin/affiliates/activity").then(r => r.json()).catch(() => ({})),
+        fetch("/api/admin/promotions?status=Active").then(r => r.json()).catch(() => ([]))
       ]);
 
       if (reqsRes.success) setApplications(reqsRes.applications);
       if (affsRes.success) setAffiliates(affsRes.affiliates);
       if (paysRes.success) setPayouts(paysRes.payouts);
       if (settsRes.success) setSettings(settsRes.settings);
+      if (ovRes.success) setOverviewStats(ovRes);
+      if (actRes.success) setActivityData(actRes);
+      // Filter only automatic active promotions
+      const promos = Array.isArray(promoRes) ? promoRes : [];
+      setAutoPromos(promos.filter(p => p.isAutomatic));
     } catch (e) {
       toast.error("Failed to load administration database records.");
     } finally {
@@ -149,9 +160,33 @@ export default function AffiliatesManagerClient({ userSession }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           affiliateId: selectedAffiliate._id,
-          __v: currentAff?.__v, // Send version key for validation
-          ...editForm,
-          referralCode: editReferralCode || undefined  // Admin-editable
+          __v: currentAff?.__v,
+          name: editForm.name,
+          email: editForm.email,
+          commissionRate: editForm.commissionRate,
+          commissionType: editForm.commissionType,
+          customerDiscountType: editForm.customerDiscountType,
+          customerDiscountValue: editForm.customerDiscountValue,
+          status: editForm.status,
+          couponCode: editForm.couponCode,
+          password: editForm.password,
+          referralCode: editReferralCode || undefined,
+          address: {
+            street: editForm.street,
+            city: editForm.city,
+            state: editForm.state,
+            zipCode: editForm.zipCode,
+            country: editForm.country,
+          },
+          bankingInfo: {
+            accountHolder: editForm.accountHolder,
+            bankName: editForm.bankName,
+            accountNumber: editForm.accountNumber,
+            iban: editForm.iban,
+            swiftCode: editForm.swiftCode,
+            routingNumber: editForm.routingNumber,
+            paypalEmail: editForm.paypalEmail,
+          }
         })
       });
 
@@ -289,9 +324,15 @@ export default function AffiliatesManagerClient({ userSession }) {
         {/* WP-Style Subsubsub Navigation */}
         <div className="flex flex-wrap items-center gap-1.5 text-[13px] text-[#646970] border-b border-[#ccd0d4] pb-2">
           {[
+            { id: "overview", label: "Overview", count: null },
             { id: "requests", label: "Applications", count: applications.filter(a => a.status === 'Pending').length },
             { id: "list", label: "Active Affiliates", count: affiliates.length },
+            { id: "links", label: "Referral Links", count: null },
+            { id: "orders", label: "Referred Orders", count: activityData.referredOrders?.length ?? null },
+            { id: "conversions", label: "Conversions", count: null },
+            { id: "commissions", label: "Commissions", count: activityData.commissions?.length ?? null },
             { id: "payouts", label: "Payout Requests", count: payouts.filter(p => p.status === 'Requested').length },
+            { id: "analytics", label: "Analytics", count: null },
             { id: "settings", label: "Global Settings", count: null }
           ].map((tab, idx, arr) => (
             <span key={tab.id} className="flex items-center gap-1.5">
@@ -311,6 +352,311 @@ export default function AffiliatesManagerClient({ userSession }) {
             </span>
           ))}
         </div>
+
+        {/* Tab: Overview */}
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Total Affiliates", value: overviewStats?.stats?.totalAffiliates ?? affiliates.length, icon: Users },
+                { label: "Total Clicks", value: overviewStats?.stats?.totalClicks ?? 0, icon: MousePointerClick },
+                { label: "Referred Orders", value: overviewStats?.stats?.totalReferralOrders ?? 0, icon: ShoppingCart },
+                { label: "Conversion Rate", value: `${overviewStats?.stats?.conversionRate ?? 0}%`, icon: TrendingUp },
+                { label: "Total Revenue", value: `$${(overviewStats?.stats?.totalRevenue ?? 0).toFixed(2)}`, icon: DollarSign },
+                { label: "Commission Paid", value: `$${(overviewStats?.stats?.totalCommissionPaid ?? 0).toFixed(2)}`, icon: CreditCard },
+                { label: "Pending Commission", value: `$${(overviewStats?.stats?.pendingCommission ?? 0).toFixed(2)}`, icon: Coins },
+                { label: "Total Paid Out", value: `$${(overviewStats?.stats?.totalPaid ?? 0).toFixed(2)}`, icon: BarChart2 },
+              ].map(({ label, value, icon: Icon }) => (
+                <div key={label} className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-3 shadow-sm rounded-[3px]">
+                  <div className="p-2.5 bg-[#f0f6fb] text-[#2271b1] rounded-full shrink-0"><Icon className="w-4 h-4" /></div>
+                  <div>
+                    <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider leading-tight">{label}</p>
+                    <p className="text-lg font-bold text-[#1d2327] mt-0.5">{value}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Top Affiliates */}
+            {overviewStats?.topAffiliates?.length > 0 && (
+              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
+                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4]"><h3 className="text-[13px] font-bold text-[#1d2327]">Top Performing Partners</h3></div>
+                <table className="w-full text-[13px]">
+                  <thead><tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
+                    <th className="px-4 py-2 text-left">Affiliate</th>
+                    <th className="px-4 py-2 text-left">Code</th>
+                    <th className="px-4 py-2 text-right">Lifetime Earnings</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-[#f0f0f1]">
+                    {overviewStats.topAffiliates.map(a => (
+                      <tr key={a._id} className="hover:bg-[#fbfbfb]">
+                        <td className="px-4 py-2.5 font-bold text-[#1d2327]">{a.name}</td>
+                        <td className="px-4 py-2.5 font-mono text-[12px]">{a.referralCode}</td>
+                        <td className="px-4 py-2.5 text-right font-bold">${(a.lifetimeEarnings ?? 0).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Recent Orders */}
+            {overviewStats?.recentOrders?.length > 0 && (
+              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
+                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4]"><h3 className="text-[13px] font-bold text-[#1d2327]">Recent Referred Orders</h3></div>
+                <table className="w-full text-[13px]">
+                  <thead><tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
+                    <th className="px-4 py-2 text-left">Order</th>
+                    <th className="px-4 py-2 text-left">Ref Code</th>
+                    <th className="px-4 py-2 text-right">Total</th>
+                    <th className="px-4 py-2 text-right">Date</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-[#f0f0f1]">
+                    {overviewStats.recentOrders.map(o => (
+                      <tr key={o._id} className="hover:bg-[#fbfbfb]">
+                        <td className="px-4 py-2.5 font-mono font-bold text-[12px]">{o.orderNumber}</td>
+                        <td className="px-4 py-2.5 font-mono text-[12px]">{o.affiliateReferralCode}</td>
+                        <td className="px-4 py-2.5 text-right">${(o.financials?.total ?? 0).toFixed(2)}</td>
+                        <td className="px-4 py-2.5 text-right text-[#646970]">{new Date(o.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {!overviewStats && (
+              <div className="bg-white border border-[#ccd0d4] p-12 text-center text-[#646970] rounded-[3px]">
+                <BarChart2 className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                <p className="text-[13px] font-medium">No overview data available yet. Stats will appear once affiliates generate activity.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Referral Links */}
+        {activeTab === "links" && (
+          <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
+            <table className="w-full text-left border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Code</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Customer Discount</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Referral Link</th>
+                  <th className="px-4 py-3 w-24 text-right"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f0f0f1]">
+                {affiliates.length === 0 ? (
+                  <tr><td colSpan="5" className="p-8 text-center text-gray-400 italic">No active affiliates registered.</td></tr>
+                ) : affiliates.map(aff => {
+                  const link = typeof window !== 'undefined' ? `${window.location.origin}/?ref=${aff.referralCode}` : `https://pairolifestyle.com/?ref=${aff.referralCode}`;
+                  const discountLabel = aff.customerDiscountType === 'None' || !aff.customerDiscountValue ? 'None' :
+                    aff.customerDiscountType === 'Percentage' ? `${aff.customerDiscountValue}% Off` : `$${aff.customerDiscountValue} Off`;
+                  return (
+                    <tr key={aff._id} className="hover:bg-[#fbfbfb] transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="font-bold text-[#1d2327]">{aff.name}</span>
+                        <div className="text-[11px] text-[#646970] mt-0.5">{aff.email}</div>
+                      </td>
+                      <td className="px-4 py-3 font-mono font-bold text-black">{aff.referralCode}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold ${discountLabel === 'None' ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-green-700'}`}>
+                          {discountLabel}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-[11px] text-[#646970] truncate max-w-xs">{link}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(link); toast.success("Link copied!"); }}
+                          className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[11px] font-bold hover:bg-[#f6f7f7] shadow-sm"
+                        >
+                          Copy
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab: Referred Orders */}
+        {activeTab === "orders" && (
+          <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
+            <table className="w-full text-left border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Order #</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Customer</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Ref Code</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Subtotal</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Ref Discount</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f0f0f1]">
+                {activityData.referredOrders?.length === 0 ? (
+                  <tr><td colSpan="7" className="p-8 text-center text-gray-400 italic">No referred orders yet.</td></tr>
+                ) : activityData.referredOrders?.map(o => (
+                  <tr key={o._id} className="hover:bg-[#fbfbfb]">
+                    <td className="px-4 py-2.5 font-mono font-bold text-[12px] text-[#2271b1]">{o.orderNumber}</td>
+                    <td className="px-4 py-2.5 text-[#646970]">{new Date(o.createdAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-2.5 text-[12px]">{o.customer?.email || '—'}</td>
+                    <td className="px-4 py-2.5 font-mono font-bold">{o.affiliateReferralCode}</td>
+                    <td className="px-4 py-2.5 text-right">${(o.financials?.subtotal ?? 0).toFixed(2)}</td>
+                    <td className="px-4 py-2.5 text-right text-green-700 font-bold">
+                      {o.financials?.affiliateDiscountAmount > 0 ? `-$${o.financials.affiliateDiscountAmount.toFixed(2)}` : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-bold">${(o.financials?.total ?? 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab: Conversions */}
+        {activeTab === "conversions" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-white border border-[#ccd0d4] p-4 rounded-[3px] shadow-sm text-center">
+                <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Total Clicks</p>
+                <p className="text-2xl font-bold text-[#1d2327]">{activityData.clicks?.length ?? 0}</p>
+              </div>
+              <div className="bg-white border border-[#ccd0d4] p-4 rounded-[3px] shadow-sm text-center">
+                <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Referred Orders</p>
+                <p className="text-2xl font-bold text-[#1d2327]">{activityData.referredOrders?.length ?? 0}</p>
+              </div>
+              <div className="bg-white border border-[#ccd0d4] p-4 rounded-[3px] shadow-sm text-center">
+                <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Conversion Rate</p>
+                <p className="text-2xl font-bold text-[#1d2327]">
+                  {activityData.clicks?.length > 0
+                    ? `${((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1)}%`
+                    : '0%'}
+                </p>
+              </div>
+            </div>
+            <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
+              <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4]"><h3 className="text-[13px] font-bold">Recent Clicks</h3></div>
+              <table className="w-full text-[13px]">
+                <thead><tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
+                  <th className="px-4 py-2 text-left">Date</th>
+                  <th className="px-4 py-2 text-left">Affiliate</th>
+                  <th className="px-4 py-2 text-left">Ref Code</th>
+                  <th className="px-4 py-2 text-left">IP / Source</th>
+                </tr></thead>
+                <tbody className="divide-y divide-[#f0f0f1]">
+                  {activityData.clicks?.length === 0 ? (
+                    <tr><td colSpan="4" className="p-6 text-center text-gray-400 italic">No clicks tracked yet.</td></tr>
+                  ) : activityData.clicks?.slice(0, 50).map((c, i) => (
+                    <tr key={c._id || i} className="hover:bg-[#fbfbfb]">
+                      <td className="px-4 py-2 text-[#646970]">{new Date(c.createdAt).toLocaleString()}</td>
+                      <td className="px-4 py-2 font-medium">{c.affiliateId?.name || '—'}</td>
+                      <td className="px-4 py-2 font-mono">{c.affiliateId?.referralCode || c.referralCode || '—'}</td>
+                      <td className="px-4 py-2 font-mono text-[11px] text-[#646970]">{c.ipAddress || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Commissions */}
+        {activeTab === "commissions" && (
+          <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
+            <table className="w-full text-left border-collapse text-[13px]">
+              <thead>
+                <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Order</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Rate</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Amount</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Status</th>
+                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#f0f0f1]">
+                {activityData.commissions?.length === 0 ? (
+                  <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">No commissions recorded yet.</td></tr>
+                ) : activityData.commissions?.map(c => (
+                  <tr key={c._id} className="hover:bg-[#fbfbfb]">
+                    <td className="px-4 py-2.5">
+                      <span className="font-bold text-[#1d2327]">{c.affiliateId?.name || 'Unknown'}</span>
+                      <div className="text-[11px] text-[#646970] font-mono">{c.affiliateId?.referralCode}</div>
+                    </td>
+                    <td className="px-4 py-2.5 font-mono text-[12px]">{c.orderNumber || '—'}</td>
+                    <td className="px-4 py-2.5">{c.commissionType === 'Fixed' ? `$${c.commissionRate}` : `${c.commissionRate}%`}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-[#1d2327]">${(c.commissionAmount ?? 0).toFixed(2)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase ${
+                        c.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
+                        c.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-amber-700'
+                      }`}>{c.status}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-[#646970]">{new Date(c.createdAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab: Analytics */}
+        {activeTab === "analytics" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Conversion Rate", value: overviewStats?.stats?.conversionRate ? `${overviewStats.stats.conversionRate}%` : `${activityData.clicks?.length > 0 ? ((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1) : 0}%` },
+                { label: "Total Clicks", value: overviewStats?.stats?.totalClicks ?? activityData.clicks?.length ?? 0 },
+                { label: "Total Orders", value: overviewStats?.stats?.totalReferralOrders ?? activityData.referredOrders?.length ?? 0 },
+                { label: "Total Revenue", value: `$${(overviewStats?.stats?.totalRevenue ?? 0).toFixed(2)}` },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-white border border-[#ccd0d4] p-4 rounded-[3px] shadow-sm text-center">
+                  <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">{label}</p>
+                  <p className="text-2xl font-bold text-[#1d2327]">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {overviewStats?.chartData?.length > 0 && (
+              <div className="bg-white border border-[#ccd0d4] rounded-[3px] p-6 shadow-sm">
+                <h3 className="text-[13px] font-bold text-[#1d2327] mb-4 border-b border-[#ccd0d4] pb-2">Monthly Click & Order Trend</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[13px]">
+                    <thead><tr className="text-[11px] font-bold uppercase text-[#646970] border-b border-[#ccd0d4]">
+                      <th className="py-2 text-left">Month</th>
+                      <th className="py-2 text-right">Clicks</th>
+                      <th className="py-2 text-right">Orders</th>
+                      <th className="py-2 text-right">Conv. Rate</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {overviewStats.chartData.map(row => (
+                        <tr key={row.month} className="hover:bg-[#fbfbfb]">
+                          <td className="py-2 font-medium">{row.month}</td>
+                          <td className="py-2 text-right">{row.clicks}</td>
+                          <td className="py-2 text-right">{row.orders}</td>
+                          <td className="py-2 text-right">{row.clicks > 0 ? `${((row.orders/row.clicks)*100).toFixed(1)}%` : '0%'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {!overviewStats && (
+              <div className="bg-white border border-[#ccd0d4] p-12 text-center text-[#646970] rounded-[3px]">
+                <TrendingUp className="w-8 h-8 mx-auto mb-3 opacity-30" />
+                <p className="text-[13px] font-medium">Analytics data will appear once affiliates generate clicks and orders.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tab 1: Requests */}
         {activeTab === "requests" && (
@@ -443,15 +789,32 @@ export default function AffiliatesManagerClient({ userSession }) {
                             setSelectedAffiliate(aff);
                             setEditReferralCode(aff.referralCode || "");
                             setEditForm({
-                              name: aff.name,
-                              email: aff.email,
-                              commissionRate: aff.commissionRate,
+                              name: aff.name || "",
+                              email: aff.email || "",
+                              commissionRate: aff.commissionRate ?? 5,
                               commissionType: aff.commissionType || "Percentage",
                               customerDiscountType: aff.customerDiscountType || "None",
                               customerDiscountValue: aff.customerDiscountValue || 0,
-                              status: aff.status,
+                              status: aff.status || "Active",
                               couponCode: aff.couponCode || "",
-                              password: ""
+                              password: "",
+                              // Address
+                              street: aff.address?.street || "",
+                              city: aff.address?.city || "",
+                              state: aff.address?.state || "",
+                              zipCode: aff.address?.zipCode || "",
+                              country: aff.address?.country || "",
+                              // Banking
+                              accountHolder: aff.bankingInfo?.accountHolder || "",
+                              bankName: aff.bankingInfo?.bankName || "",
+                              accountNumber: aff.bankingInfo?.accountNumber || "",
+                              iban: aff.bankingInfo?.iban || "",
+                              swiftCode: aff.bankingInfo?.swiftCode || "",
+                              routingNumber: aff.bankingInfo?.routingNumber || "",
+                              paypalEmail: aff.bankingInfo?.paypalEmail || "",
+                              // Business
+                              companyName: aff.businessInfo?.companyName || "",
+                              website: aff.businessInfo?.website || "",
                             });
                           }}
                           className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
@@ -609,6 +972,61 @@ export default function AffiliatesManagerClient({ userSession }) {
               </div>
             </div>
 
+            {/* Danger Zone: Automatic Promotions */}
+            <div className="border border-red-200 rounded-[3px] p-5 bg-red-50 space-y-3">
+              <h4 className="text-[13px] font-bold text-red-800 uppercase tracking-wider">⚠ Automatic Promotions Diagnostic</h4>
+              <p className="text-[12px] text-red-700">
+                If orders are showing an unexpected promo discount, it is caused by an active automatic promotion in your database.
+                {autoPromos.length > 0
+                  ? ` Found ${autoPromos.length} active automatic promotion(s) below:`
+                  : " No active automatic promotions found in database."}
+              </p>
+              {autoPromos.length > 0 && (
+                <div className="space-y-2">
+                  {autoPromos.map(p => (
+                    <div key={p._id} className="flex items-center justify-between bg-white border border-red-200 rounded-[3px] px-3 py-2">
+                      <div>
+                        <span className="font-bold text-[13px] text-[#1d2327]">{p.title || p.name}</span>
+                        <span className="ml-2 text-[11px] text-red-600 font-mono">isAutomatic: true</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!confirm(`Deactivate "${p.title || p.name}"?`)) return;
+                          const r = await fetch("/api/admin/promotions", {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ promotionId: p._id, adminStatus: "Draft" })
+                          });
+                          if (r.ok) { toast.success("Promotion deactivated."); loadData(); }
+                          else toast.error("Failed to deactivate.");
+                        }}
+                        className="bg-red-600 text-white px-3 py-1 rounded-[3px] text-[11px] font-bold hover:bg-red-700 cursor-pointer"
+                      >
+                        Deactivate
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    disabled={disablingPromos}
+                    onClick={async () => {
+                      if (!confirm("Deactivate ALL automatic promotions? This will stop all surprise discounts.")) return;
+                      setDisablingPromos(true);
+                      const r = await fetch("/api/admin/promotions", { method: "DELETE" });
+                      const d = await r.json();
+                      if (r.ok) { toast.success(d.message); loadData(); }
+                      else toast.error("Failed.");
+                      setDisablingPromos(false);
+                    }}
+                    className="w-full bg-red-700 text-white px-4 py-2 text-[12px] font-bold rounded-[3px] hover:bg-red-800 disabled:opacity-50 uppercase tracking-wider cursor-pointer"
+                  >
+                    {disablingPromos ? "Deactivating..." : "Deactivate ALL Automatic Promotions"}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="pt-4 border-t border-[#ccd0d4]">
               <button
                 type="submit"
@@ -640,6 +1058,27 @@ export default function AffiliatesManagerClient({ userSession }) {
                 {/* 1. General Profile */}
                 <div className="space-y-2">
                   <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">General Contact Profile</h4>
+                  
+                  {viewingApplication.profilePhoto && (
+                    <div className="flex items-center gap-3 pb-3">
+                      <img
+                        src={getDocumentUrl(viewingApplication.profilePhoto)}
+                        alt="Profile avatar"
+                        className="w-16 h-16 rounded-full object-cover border border-[#ccd0d4] bg-neutral-100"
+                      />
+                      <div>
+                        <p className="text-[11px] font-bold text-[#646970] uppercase">Uploaded Profile Photo</p>
+                        <button
+                          type="button"
+                          onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.profilePhoto))}
+                          className="text-[#2271b1] hover:underline text-[12px] font-medium"
+                        >
+                          View Full Photo
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                     <div><span className="text-[#646970] font-semibold">Full Legal Name:</span> <span className="text-[#1d2327] font-medium">{viewingApplication.name}</span></div>
                     <div><span className="text-[#646970] font-semibold">Email Address:</span> <span className="text-[#2271b1]">{viewingApplication.email}</span></div>
@@ -726,12 +1165,13 @@ export default function AffiliatesManagerClient({ userSession }) {
 
                 {/* 5. Documents */}
                 <div className="space-y-2">
-                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">KYC / Identity Verification Documents</h4>
+                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">KYC / Identity & Bank Verification Documents</h4>
                   <div className="flex flex-wrap gap-3">
-                    {viewingApplication.identityDocuments && viewingApplication.identityDocuments.length > 0 ? (
+                    {/* Identity Documents */}
+                    {viewingApplication.identityDocuments && viewingApplication.identityDocuments.length > 0 && (
                       viewingApplication.identityDocuments.map((filename, idx) => (
-                        <div key={idx} className="border border-[#ccd0d4] p-3 rounded-[3px] bg-[#f6f7f7] flex items-center justify-between gap-4 w-full sm:w-[48%]">
-                          <span className="font-mono text-[11px] truncate max-w-[150px]">{filename}</span>
+                        <div key={`id-${idx}`} className="border border-[#ccd0d4] p-3 rounded-[3px] bg-[#f6f7f7] flex items-center justify-between gap-4 w-full sm:w-[48%]">
+                          <span className="font-mono text-[11px] truncate max-w-[150px]" title={filename}>{filename}</span>
                           <div className="flex gap-2">
                             <button
                               type="button"
@@ -751,7 +1191,35 @@ export default function AffiliatesManagerClient({ userSession }) {
                           </div>
                         </div>
                       ))
-                    ) : (
+                    )}
+
+                    {/* Bank Verification Document */}
+                    {viewingApplication.bankVerificationDocument && (
+                      <div className="border border-[#ccd0d4] p-3 rounded-[3px] bg-amber-50/50 flex items-center justify-between gap-4 w-full sm:w-[48%]">
+                        <span className="font-mono text-[11px] truncate max-w-[150px]" title={viewingApplication.bankVerificationDocument}>
+                          {viewingApplication.bankVerificationDocument}
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.bankVerificationDocument))}
+                            className="text-amber-700 hover:text-amber-900 hover:underline font-bold text-[11px] uppercase cursor-pointer"
+                          >
+                            Preview
+                          </button>
+                          <a
+                            href={getDocumentUrl(viewingApplication.bankVerificationDocument)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-gray-600 hover:text-black hover:underline font-bold text-[11px] uppercase inline-flex items-center gap-0.5"
+                          >
+                            Download <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      </div>
+                    )}
+
+                    {(!viewingApplication.identityDocuments || viewingApplication.identityDocuments.length === 0) && !viewingApplication.bankVerificationDocument && (
                       <p className="text-gray-400 italic text-[12px]">No document attachments present.</p>
                     )}
                   </div>
@@ -1115,6 +1583,80 @@ export default function AffiliatesManagerClient({ userSession }) {
                     className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
                   />
                 </div>
+
+                {/* Address Section */}
+                <div className="border-t border-[#eee] pt-4 space-y-3">
+                  <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Address</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">Street</label>
+                      <input type="text" value={editForm.street} onChange={e => setEditForm({...editForm, street: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" placeholder="Street address" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">City</label>
+                      <input type="text" value={editForm.city} onChange={e => setEditForm({...editForm, city: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">State / Province</label>
+                      <input type="text" value={editForm.state} onChange={e => setEditForm({...editForm, state: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">Zip / Postal Code</label>
+                      <input type="text" value={editForm.zipCode} onChange={e => setEditForm({...editForm, zipCode: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">Country</label>
+                      <input type="text" value={editForm.country} onChange={e => setEditForm({...editForm, country: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Banking Section */}
+                <div className="border-t border-[#eee] pt-4 space-y-3">
+                  <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Banking Info</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">Account Holder Name</label>
+                      <input type="text" value={editForm.accountHolder} onChange={e => setEditForm({...editForm, accountHolder: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">Bank Name</label>
+                      <input type="text" value={editForm.bankName} onChange={e => setEditForm({...editForm, bankName: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">Account Number</label>
+                      <input type="text" value={editForm.accountNumber} onChange={e => setEditForm({...editForm, accountNumber: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">IBAN</label>
+                      <input type="text" value={editForm.iban} onChange={e => setEditForm({...editForm, iban: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">SWIFT / BIC</label>
+                      <input type="text" value={editForm.swiftCode} onChange={e => setEditForm({...editForm, swiftCode: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">Routing Number</label>
+                      <input type="text" value={editForm.routingNumber} onChange={e => setEditForm({...editForm, routingNumber: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-[11px] font-bold text-[#1d2327]">PayPal Email</label>
+                      <input type="email" value={editForm.paypalEmail} onChange={e => setEditForm({...editForm, paypalEmail: e.target.value})} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profile photo display (read-only) */}
+                {selectedAffiliate?.profilePhoto && (
+                  <div className="border-t border-[#eee] pt-4 space-y-2">
+                    <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Profile Photo</p>
+                    <img
+                      src={getDocumentUrl(selectedAffiliate.profilePhoto)}
+                      alt="Profile"
+                      className="w-16 h-16 rounded-full object-cover border border-[#ccd0d4]"
+                    />
+                  </div>
+                )}
 
                 <div className="pt-4 flex justify-end gap-2 border-t border-[#ccd0d4]">
                   <button

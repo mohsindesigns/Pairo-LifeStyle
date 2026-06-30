@@ -194,10 +194,10 @@ export default function AffiliateDashboardClient({ userSession }) {
   }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-[#FAF9F6] text-black font-sans">
+    <div className="flex flex-col md:flex-row bg-[#FAF9F6] text-black font-sans min-h-screen md:h-screen md:overflow-hidden">
       
       {/* Sidebar Navigation */}
-      <aside className="w-full md:w-64 border-r border-neutral-200 bg-neutral-900 text-neutral-300 p-6 md:p-8 space-y-8 flex-shrink-0 flex flex-col justify-between">
+      <aside className="w-full md:w-64 border-r border-neutral-200 bg-neutral-900 text-neutral-300 p-6 md:p-8 space-y-8 flex-shrink-0 flex flex-col justify-between md:h-screen md:sticky md:top-0 md:overflow-y-auto">
         <div className="space-y-8">
           <div className="space-y-2 pb-6 border-b border-neutral-800">
             <p className="text-[9px] font-bold text-neutral-400 uppercase tracking-[0.25em]">Pairo Partners</p>
@@ -247,7 +247,7 @@ export default function AffiliateDashboardClient({ userSession }) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-6 md:p-10 space-y-10 overflow-x-hidden">
+      <main className="flex-1 p-6 md:p-10 space-y-10 overflow-x-hidden md:h-screen md:overflow-y-auto">
         {/* Top Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-neutral-200 gap-4">
           <div>

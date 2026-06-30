@@ -21,12 +21,16 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [newNote, setNewNote] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
 
   const fetchOrder = useCallback(async () => {
     try {
       const res = await fetch(`/api/admin/orders/${id}`);
       const data = await res.json();
-      if (data.success) setOrder(data.order);
+      if (data.success) {
+        setOrder(data.order);
+        setSelectedStatus(data.order.status || "Pending");
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -303,8 +307,8 @@ export default function OrderDetailPage() {
                   <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Status</label>
                   <select
                     className="w-full border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] outline-none bg-white focus:border-[#2271b1]"
-                    value={order.status || "Pending"}
-                    onChange={(e) => updateStatus(e.target.value)}
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
                     disabled={updating}
                   >
                     {[
@@ -319,10 +323,11 @@ export default function OrderDetailPage() {
                     Created: {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "N/A"}
                   </span>
                   <button
-                    onClick={() => updateStatus(order.status)}
-                    className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold hover:bg-[#135e96] transition-colors shadow-sm"
+                    onClick={() => updateStatus(selectedStatus)}
+                    disabled={updating || selectedStatus === order.status}
+                    className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold hover:bg-[#135e96] transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Update
+                    {updating ? "Saving..." : "Update"}
                   </button>
                 </div>
               </div>

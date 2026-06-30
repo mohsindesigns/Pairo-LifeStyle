@@ -4,11 +4,8 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
 import Link from "next/link";
-
-const GOLD = "#d4af37";
-const GOLD_LIGHT = "#f5d97e";
 
 export default function AffiliateLoginClient() {
   const router = useRouter();
@@ -31,7 +28,7 @@ export default function AffiliateLoginClient() {
         email: email.toLowerCase().trim(),
         password,
         loginType: "affiliate",
-        redirect: false
+        redirect: false,
       });
 
       if (res?.error) {
@@ -47,114 +44,114 @@ export default function AffiliateLoginClient() {
     }
   };
 
-  const inputBase = {
-    width: "100%", boxSizing: "border-box",
-    background: "rgba(255,255,255,0.04)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "8px", color: "#fff",
-    fontSize: "14px", outline: "none",
-    transition: "border-color 0.2s, box-shadow 0.2s",
-    fontFamily: "inherit",
-  };
-
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {error && (
-        <div style={{
-          display: "flex", alignItems: "flex-start", gap: "10px",
-          background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
-          borderRadius: "8px", padding: "12px 14px"
-        }}>
-          <AlertCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: "1px" }} />
-          <p style={{ margin: 0, fontSize: "13px", color: "#f87171", lineHeight: 1.5 }}>{error}</p>
-        </div>
-      )}
+    <div className="min-h-screen bg-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-md w-full space-y-10">
 
-      {/* Email */}
-      <div>
-        <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase", marginBottom: "8px" }}>
-          Email Address
-        </label>
-        <div style={{ position: "relative" }}>
-          <Mail size={15} color="rgba(255,255,255,0.25)" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-            style={{ ...inputBase, padding: "12px 14px 12px 42px" }}
-            onFocus={e => { e.target.style.borderColor = "rgba(212,175,55,0.5)"; e.target.style.boxShadow = "0 0 0 3px rgba(212,175,55,0.08)"; }}
-            onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.1)"; e.target.style.boxShadow = "none"; }}
-          />
+        {/* Header */}
+        <div className="text-center">
+          <p className="text-[10px] font-bold text-black/30 uppercase tracking-[0.3em] mb-3">
+            Pairo Partners Program
+          </p>
+          <h1 className="text-3xl font-bold heading-font uppercase tracking-tight text-black">
+            Partner Login
+          </h1>
+          <p className="mt-3 text-black/40 text-sm">
+            Access your affiliate dashboard to track earnings and referrals.
+          </p>
         </div>
-      </div>
 
-      {/* Password */}
-      <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-          <label style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.45)", letterSpacing: "1px", textTransform: "uppercase" }}>
-            Password
-          </label>
-          <Link href="/affiliate/forgot-password" style={{ fontSize: "11px", color: "rgba(212,175,55,0.7)", textDecoration: "none", letterSpacing: "0.5px", transition: "color 0.2s" }}
-            onMouseEnter={e => e.currentTarget.style.color = GOLD}
-            onMouseLeave={e => e.currentTarget.style.color = "rgba(212,175,55,0.7)"}
-          >
-            Forgot password?
-          </Link>
-        </div>
-        <div style={{ position: "relative" }}>
-          <Lock size={15} color="rgba(255,255,255,0.25)" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <input
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            style={{ ...inputBase, padding: "12px 44px 12px 42px" }}
-            onFocus={e => { e.target.style.borderColor = "rgba(212,175,55,0.5)"; e.target.style.boxShadow = "0 0 0 3px rgba(212,175,55,0.08)"; }}
-            onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.1)"; e.target.style.boxShadow = "none"; }}
-          />
+        {/* Form */}
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          {error && (
+            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 flex items-start gap-3">
+              <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+              <p className="text-[12px] text-red-600 font-medium leading-relaxed">{error}</p>
+            </div>
+          )}
+
+          {/* Email */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-black/40 uppercase tracking-widest px-1">
+              Email Address
+            </label>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="partner@example.com"
+              className="block w-full px-4 py-4 bg-gray-50 border border-transparent rounded-xl text-sm font-medium focus:bg-white focus:border-black outline-none transition-all"
+            />
+          </div>
+
+          {/* Password */}
+          <div className="space-y-1">
+            <div className="flex justify-between px-1">
+              <label className="text-[10px] font-bold text-black/40 uppercase tracking-widest">
+                Password
+              </label>
+            </div>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="block w-full px-4 py-4 pr-12 bg-gray-50 border border-transparent rounded-xl text-sm font-medium focus:bg-white focus:border-black outline-none transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-black/30 hover:text-black transition-colors"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Submit */}
           <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex", alignItems: "center" }}
-            aria-label={showPassword ? "Hide password" : "Show password"}
+            type="submit"
+            disabled={loading}
+            className="w-full h-14 bg-black text-white rounded-xl text-xs font-bold uppercase tracking-[0.2em] hover:bg-black/90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
           >
-            {showPassword
-              ? <EyeOff size={15} color="rgba(255,255,255,0.35)" />
-              : <Eye size={15} color="rgba(255,255,255,0.35)" />
-            }
+            {loading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Authenticating...
+              </>
+            ) : (
+              <>
+                Sign In
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
-        </div>
+
+          {/* Footer links */}
+          <div className="text-center pt-2 space-y-3">
+            <p className="text-xs text-black/40">
+              Not a partner yet?{" "}
+              <Link
+                href="/become-affiliate"
+                className="text-black font-bold hover:underline underline-offset-4"
+              >
+                Apply to join
+              </Link>
+            </p>
+            <p className="text-xs text-black/30">
+              <Link href="/" className="hover:text-black transition-colors">
+                ← Back to store
+              </Link>
+            </p>
+          </div>
+        </form>
       </div>
-
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={loading}
-        style={{
-          width: "100%", marginTop: "4px",
-          background: loading ? "rgba(212,175,55,0.35)" : `linear-gradient(135deg, ${GOLD}, ${GOLD_LIGHT})`,
-          border: "none", borderRadius: "8px",
-          color: "#0a0a0a", fontWeight: 800,
-          fontSize: "12px", letterSpacing: "2px", textTransform: "uppercase",
-          padding: "14px 20px",
-          cursor: loading ? "not-allowed" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          transition: "opacity 0.2s, transform 0.15s",
-          boxShadow: loading ? "none" : "0 4px 16px rgba(212,175,55,0.25)"
-        }}
-        onMouseEnter={e => { if (!loading) e.currentTarget.style.transform = "translateY(-1px)"; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
-      >
-        {loading
-          ? <><Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> Authenticating...</>
-          : <>Access Dashboard <ArrowRight size={14} /></>
-        }
-      </button>
-
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-    </form>
+    </div>
   );
 }

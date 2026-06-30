@@ -5,6 +5,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import CartDrawer from "@/components/layout/CartDrawer";
 import AffiliateDiscountBanner from "@/components/common/AffiliateDiscountBanner";
+import ReferralDiscountPopup from "@/components/common/ReferralDiscountPopup";
 
 export default function LayoutWrapper({ children }) {
   const pathname = usePathname();
@@ -18,9 +19,11 @@ export default function LayoutWrapper({ children }) {
     <>
       <Navbar />
       <AffiliateDiscountBanner />
+      <ReferralDiscountPopup />
       <CartDrawer />
       <main>{children}</main>
       <Footer />
     </>
   );
 }
+

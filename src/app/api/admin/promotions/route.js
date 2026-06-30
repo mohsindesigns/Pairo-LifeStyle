@@ -70,3 +70,45 @@ export async function POST(req) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+// PATCH: toggle adminStatus of a single promotion (Active ↔ Draft)
+export async function PATCH(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  await dbConnect();
+  try {
+    const { promotionId, adminStatus } = await req.json();
+    if (!promotionId || !adminStatus) {
+      return NextResponse.json({ error: "promotionId and adminStatus required" }, { status: 400 });
+    }
+    await Promotion.updateOne({ _id: promotionId }, { $set: { adminStatus } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// DELETE: bulk-deactivate ALL active automatic promotions (fixes the surprise-discount bug)
+export async function DELETE(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  await dbConnect();
+  try {
+    const result = await Promotion.updateMany(
+      { isAutomatic: true, adminStatus: "Active" },
+      { $set: { adminStatus: "Draft" } }
+    );
+    return NextResponse.json({
+      success: true,
+      deactivated: result.modifiedCount,
+      message: `${result.modifiedCount} automatic promotion(s) deactivated.`
+    });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
