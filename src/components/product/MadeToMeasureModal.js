@@ -72,7 +72,7 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
   const renderField = (field) => (
     <div key={field.key} className="relative">
-      <label className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-black mb-1.5">
+      <label className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-widest text-black mb-1.5">
         {field.label}
         <button
           type="button"
@@ -126,7 +126,7 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-[300px] xs:max-w-sm sm:max-w-lg md:max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border border-black animate-m2m-up rounded-[var(--radius,0px)]">
+      <div className="relative w-full max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border border-black animate-m2m-up rounded-[var(--radius,0px)]">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black shrink-0">

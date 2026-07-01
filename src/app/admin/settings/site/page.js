@@ -36,6 +36,39 @@ function ImagePicker({ value, onChange, label, description }) {
   );
 }
 
+/* Inline image picker for mega menu banner (not a table row) */
+function MegaBannerImagePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="border border-[#2271b1] text-[#2271b1] rounded-[3px] px-3 py-[5px] text-[12px] font-medium hover:bg-[#f0f6fb] transition-colors"
+      >
+        {value ? 'Replace Image' : 'Select Image'}
+      </button>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="text-[#d63638] text-[12px] hover:underline"
+        >
+          Remove
+        </button>
+      )}
+      {open && (
+        <MediaPickerModal
+          open
+          onClose={() => setOpen(false)}
+          onSelect={(sel) => { onChange(sel.url); setOpen(false); }}
+          title="Select Banner Image"
+        />
+      )}
+    </>
+  );
+}
+
 /* ── Table row helpers ───────────────────────────────────────── */
 function TextRow({ label, description, value, onChange, placeholder, textarea }) {
   return (
@@ -245,26 +278,74 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
 
               {/* Mega Menu Sub-Items Builder */}
               {item.type === 'mega_menu' && (
-                <div className="border-t border-[#c3c4c7] bg-[#fbfbfc] p-4 pl-8">
-                  <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-3">Mega Menu — Featured Categories</h4>
-                  <p className="text-[11px] text-[#646970] mb-3">Select which categories appear inside the mega menu dropdown for this item.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-2">
-                    {dbCategories.map(cat => {
-                      const megaIds = item.megaCategoryIds || [];
-                      const selected = megaIds.includes(cat.slug);
-                      return (
-                        <label key={cat.slug} className={`flex items-center gap-2.5 p-2.5 border rounded-[3px] cursor-pointer transition-colors text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
-                          <input type="checkbox" checked={selected} onChange={() => {
-                            const updated = selected ? megaIds.filter(s => s !== cat.slug) : [...megaIds, cat.slug];
-                            updateNav(idx, { megaCategoryIds: updated });
-                          }} />
-                          {cat.image && <img src={cat.image} alt="" className="w-6 h-6 rounded object-cover" />}
-                          <span className="font-medium text-[#1d2327]">{cat.name}</span>
-                        </label>
-                      );
-                    })}
+                <div className="border-t border-[#c3c4c7] bg-[#fbfbfc] p-4 pl-8 space-y-5">
+                  {/* Category Selection */}
+                  <div>
+                    <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-3">Mega Menu — Featured Categories</h4>
+                    <p className="text-[11px] text-[#646970] mb-3">Select which categories appear inside the mega menu dropdown for this item.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-2">
+                      {dbCategories.map(cat => {
+                        const megaIds = item.megaCategoryIds || [];
+                        const selected = megaIds.includes(cat.slug);
+                        return (
+                          <label key={cat.slug} className={`flex items-center gap-2.5 p-2.5 border rounded-[3px] cursor-pointer transition-colors text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
+                            <input type="checkbox" checked={selected} onChange={() => {
+                              const updated = selected ? megaIds.filter(s => s !== cat.slug) : [...megaIds, cat.slug];
+                              updateNav(idx, { megaCategoryIds: updated });
+                            }} />
+                            {cat.image && <img src={cat.image} alt="" className="w-6 h-6 rounded object-cover" />}
+                            <span className="font-medium text-[#1d2327]">{cat.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {dbCategories.length === 0 && <p className="text-[11px] text-[#646970] italic">No categories found.</p>}
                   </div>
-                  {dbCategories.length === 0 && <p className="text-[11px] text-[#646970] italic">No categories found.</p>}
+
+                  {/* Promotional Banner */}
+                  <div className="border-t border-[#e0e0e0] pt-5">
+                    <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-1">Promotional Banner</h4>
+                    <p className="text-[11px] text-[#646970] mb-4">This banner fills the right side of the mega menu. On hover over a category, it crossfades to that category's image.</p>
+
+                    {/* Banner Image */}
+                    <div className="mb-4">
+                      <label className="block text-[12px] font-semibold text-[#1d2327] mb-2">Banner Image</label>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {item.megaBannerImage && (
+                          <img src={item.megaBannerImage} alt="Banner preview" className="h-20 w-auto rounded-[4px] border border-[#c3c4c7] object-cover bg-[#f0f0f1]" />
+                        )}
+                        <MegaBannerImagePicker
+                          value={item.megaBannerImage}
+                          onChange={url => updateNav(idx, { megaBannerImage: url })}
+                        />
+                      </div>
+                      <p className="text-[11px] text-[#646970] mt-1">Recommended: portrait ratio (3:4). Should be high quality.</p>
+                    </div>
+
+                    {/* Banner Heading */}
+                    <div className="mb-3">
+                      <label className="block text-[12px] font-semibold text-[#1d2327] mb-1">Banner Heading</label>
+                      <input
+                        type="text"
+                        value={item.megaBannerHeading || ''}
+                        onChange={e => updateNav(idx, { megaBannerHeading: e.target.value })}
+                        placeholder="e.g. New Arrivals"
+                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
+                      />
+                    </div>
+
+                    {/* Banner Description */}
+                    <div>
+                      <label className="block text-[12px] font-semibold text-[#1d2327] mb-1">Banner Description</label>
+                      <textarea
+                        rows={2}
+                        value={item.megaBannerDesc || ''}
+                        onChange={e => updateNav(idx, { megaBannerDesc: e.target.value })}
+                        placeholder="e.g. Explore our latest collection of premium shearling jackets."
+                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white resize-none"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 

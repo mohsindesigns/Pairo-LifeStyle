@@ -49,6 +49,111 @@ function resolveNavHref(item, dbPages, dbCategories, dbProducts) {
 }
 
 
+function MegaMenuContent({ item }) {
+  const megaCategories = item.itemMegaCategories || [];
+  const catCount = megaCategories.length;
+  const useTwoCols = catCount > 5;
+  const leftSpan = useTwoCols ? "col-span-7" : "col-span-4";
+  const rightSpan = useTwoCols ? "col-span-5" : "col-span-8";
+
+  // State to track the currently hovered category's image
+  const [hoveredImage, setHoveredImage] = useState(null);
+
+  // Original/Default image
+  const defaultImage = item.megaBannerImage || (megaCategories[0]?.image || '/placeholder.jpg');
+
+  return (
+    <div className="grid grid-cols-12 gap-8">
+      {/* Left Navigation Pane */}
+      <div className={`${leftSpan} flex flex-col justify-between border-r border-black/[0.05] pr-8 py-2`}>
+        <div>
+          <span className="block text-[8px] font-black text-black/80 tracking-[0.3em] uppercase mb-6">Collections</span>
+          <div className={useTwoCols ? "grid grid-cols-2 gap-x-8 gap-y-4" : "flex flex-col gap-4"}>
+            {megaCategories.map((cat, catIdx) => (
+              <Link
+                key={cat.slug || cat.name}
+                href={getCategoryUrl(cat)}
+                className="group/lnk flex items-center gap-4 text-left"
+                onMouseEnter={() => setHoveredImage(cat.image)}
+                onMouseLeave={() => setHoveredImage(null)}
+              >
+                <span className="text-[10px] font-mono text-black/50 group-hover/lnk:text-black transition-colors duration-300">
+                  {catIdx + 1 < 10 ? `0${catIdx + 1}` : catIdx + 1}
+                </span>
+                <div className="relative py-0.5">
+                  <span className="text-[12px] font-bold uppercase tracking-[0.2em] text-black/85 group-hover/lnk:text-black transition-colors duration-300">
+                    {cat.name}
+                  </span>
+                  {/* Micro-underline animation */}
+                  <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-black/85 transition-all duration-300 group-hover/lnk:w-full" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 pt-4 border-t border-black/[0.03]">
+          <Link href="/shop" className="text-[11px] uppercase tracking-[0.25em] text-black/80 hover:text-black transition-colors flex items-center gap-1.5">
+            View All Products <span className="translate-y-[-0.5px]">→</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Right Visual Pane - Premium Banner */}
+      <div className={`${rightSpan} flex items-stretch pl-2`}>
+        <div className="relative w-full self-stretch min-h-[320px] rounded-[24px] overflow-hidden border border-black/5 shadow-md bg-black/5 group/banner">
+          {/* Base Background (Default/Promotional Banner Image) */}
+          <div className="absolute inset-0 z-0">
+            <Image
+              src={defaultImage}
+              alt="Promotional Banner"
+              fill
+              sizes="500px"
+              priority
+              className="object-cover transition-transform duration-[1200ms] ease-out group-hover/banner:scale-105"
+            />
+          </div>
+
+          {/* Hover Overlay Image Layer */}
+          <div 
+            className="absolute inset-0 z-10 transition-opacity duration-500 ease-in-out"
+            style={{ opacity: hoveredImage ? 1 : 0 }}
+          >
+            {hoveredImage && (
+              <Image
+                src={hoveredImage}
+                alt="Category Preview"
+                fill
+                sizes="500px"
+                className="object-cover transition-transform duration-[1200ms] ease-out group-hover/banner:scale-105"
+              />
+            )}
+          </div>
+
+          {/* Dark Overlay/Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/10 z-20" />
+
+          {/* Premium Editorial Content */}
+          <div className="absolute inset-x-0 bottom-0 p-8 flex flex-col items-start gap-2 z-30 select-none">
+            <span className="text-[8px] font-bold tracking-[0.3em] text-white/70 uppercase">Discover</span>
+            {item.megaBannerHeading && (
+              <h4 className="text-[18px] md:text-[22px] font-bold uppercase tracking-[0.15em] text-white w-full leading-tight">
+                {item.megaBannerHeading}
+              </h4>
+            )}
+            {item.megaBannerDesc && (
+              <p className="text-[11px] tracking-wide text-white/80 max-w-md font-light leading-relaxed">
+                {item.megaBannerDesc}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -312,78 +417,7 @@ export default function Navbar() {
                             className="absolute top-full left-1/2 -translate-x-1/2 pt-2 z-50 pointer-events-auto"
                           >
                             <div className="bg-white/98 backdrop-blur-xl border border-black/[0.06] rounded-[32px] p-8 shadow-[0_30px_70px_rgba(0,0,0,0.12)] w-[960px] max-w-[95vw] overflow-hidden">
-                              {(() => {
-                                const megaCategories = item.itemMegaCategories || [];
-                                const catCount = megaCategories.length;
-                                const useTwoCols = catCount > 5;
-                                const leftSpan = useTwoCols ? "col-span-7" : "col-span-4";
-                                const rightSpan = useTwoCols ? "col-span-5" : "col-span-8";
-                                const promoCount = useTwoCols ? 2 : 3;
-
-                                return (
-                                  <div className="grid grid-cols-12 gap-8">
-                                    {/* Left Navigation Pane */}
-                                    <div className={`${leftSpan} flex flex-col justify-between border-r border-black/[0.05] pr-8 py-2`}>
-                                      <div>
-                                        <span className="block text-[8px] font-black text-black/80 tracking-[0.3em] uppercase mb-6">Collections</span>
-                                        <div className={useTwoCols ? "grid grid-cols-2 gap-x-8 gap-y-4" : "flex flex-col gap-4"}>
-                                          {megaCategories.map((cat, catIdx) => (
-                                            <Link
-                                              key={cat.slug || cat.name}
-                                              href={getCategoryUrl(cat)}
-                                              className="group/lnk flex items-center gap-4 text-left"
-                                            >
-                                              <span className="text-[10px] font-mono text-black/50 group-hover/lnk:text-black transition-colors duration-300">
-                                                {catIdx + 1 < 10 ? `0${catIdx + 1}` : catIdx + 1}
-                                              </span>
-                                              <div className="relative py-0.5">
-                                                <span className="text-[12px] font-bold uppercase tracking-[0.2em] text-black/85 group-hover/lnk:text-black transition-colors duration-300">
-                                                  {cat.name}
-                                                </span>
-                                                {/* Micro-underline animation */}
-                                                <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-black/85 transition-all duration-300 group-hover/lnk:w-full" />
-                                              </div>
-                                            </Link>
-                                          ))}
-                                        </div>
-                                      </div>
-
-                                      <div className="mt-8 pt-4 border-t border-black/[0.03]">
-                                        <Link href="/shop" className="text-[11px]  uppercase tracking-[0.25em] text-black/80 hover:text-black transition-colors flex items-center gap-1.5">
-                                          View All Products <span className="translate-y-[-0.5px]">→</span>
-                                        </Link>
-                                      </div>
-                                    </div>
-
-                                    {/* Right Visual Pane */}
-                                    <div className={`${rightSpan} flex items-center justify-start gap-6 pl-2`}>
-                                      {megaCategories.slice(0, promoCount).map((cat) => (
-                                        <Link
-                                          key={`promo-${cat.slug || cat.name}`}
-                                          href={getCategoryUrl(cat)}
-                                          className="group/promo relative flex-1 min-w-[150px] max-w-[210px] aspect-[4/5] rounded-[20px] overflow-hidden bg-black/5 border border-black/5 shadow-sm hover:shadow-md transition-all duration-500"
-                                        >
-                                          <Image
-                                            src={cat.image || '/placeholder.jpg'}
-                                            alt={cat.name}
-                                            fill
-                                            sizes="210px"
-                                            className="object-cover transition-transform duration-1000 ease-out group-hover/promo:scale-105"
-                                          />
-                                          {/* Gradient Overlay */}
-                                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500" />
-
-                                          {/* Editorial Content */}
-                                          <div className="absolute inset-x-0 bottom-0 p-5 flex flex-col items-start gap-1">
-                                            <span className="text-[7px] font-bold tracking-[0.25em] text-white/80 uppercase">Discover</span>
-                                            <h4 className="text-[11px] font-bold uppercase tracking-[0.15em] text-white w-full leading-snug">{cat.name}</h4>
-                                          </div>
-                                        </Link>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
+                              <MegaMenuContent item={item} />
                             </div>
                           </motion.div>
                         )}

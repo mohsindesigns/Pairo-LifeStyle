@@ -4,25 +4,25 @@ import { useState, useEffect } from "react";
 import { X, Play } from "lucide-react";
 
 const SIZES_CM = [
-  { size: "XS",  us: "34",      eu: "44",      chest: "86 - 89",   sleeves: "63.5" },
-  { size: "S",   us: "36 - 38", eu: "46 - 48", chest: "91 - 97",   sleeves: "64.5" },
-  { size: "M",   us: "40",      eu: "50",      chest: "99 - 104",  sleeves: "66" },
-  { size: "L",   us: "42 - 44", eu: "52 - 54", chest: "106 - 112", sleeves: "67" },
-  { size: "XL",  us: "46",      eu: "56",      chest: "114 - 119", sleeves: "68.5" },
+  { size: "XS", us: "34", eu: "44", chest: "86 - 89", sleeves: "63.5" },
+  { size: "S", us: "36 - 38", eu: "46 - 48", chest: "91 - 97", sleeves: "64.5" },
+  { size: "M", us: "40", eu: "50", chest: "99 - 104", sleeves: "66" },
+  { size: "L", us: "42 - 44", eu: "52 - 54", chest: "106 - 112", sleeves: "67" },
+  { size: "XL", us: "46", eu: "56", chest: "114 - 119", sleeves: "68.5" },
   { size: "2XL", us: "48 - 50", eu: "58 - 60", chest: "122 - 127", sleeves: "70" },
-  { size: "3XL", us: "52",      eu: "62",      chest: "129 - 135", sleeves: "71" },
+  { size: "3XL", us: "52", eu: "62", chest: "129 - 135", sleeves: "71" },
   { size: "4XL", us: "54 - 56", eu: "64 - 66", chest: "137 - 142", sleeves: "72" },
 ];
 
 const SIZES_IN = [
-  { size: "XS",  us: "34",      eu: "44",      chest: "34 - 35",   sleeves: "25" },
-  { size: "S",   us: "36 - 38", eu: "46 - 48", chest: "36 - 38",   sleeves: "25.4" },
-  { size: "M",   us: "40",      eu: "50",      chest: "39 - 41",   sleeves: "26" },
-  { size: "L",   us: "42 - 44", eu: "52 - 54", chest: "42 - 44",   sleeves: "26.4" },
-  { size: "XL",  us: "46",      eu: "56",      chest: "45 - 47",   sleeves: "27" },
-  { size: "2XL", us: "48 - 50", eu: "58 - 60", chest: "48 - 50",   sleeves: "27.6" },
-  { size: "3XL", us: "52",      eu: "62",      chest: "51 - 53",   sleeves: "28" },
-  { size: "4XL", us: "54 - 56", eu: "64 - 66", chest: "54 - 56",   sleeves: "28.3" },
+  { size: "XS", us: "34", eu: "44", chest: "34 - 35", sleeves: "25" },
+  { size: "S", us: "36 - 38", eu: "46 - 48", chest: "36 - 38", sleeves: "25.4" },
+  { size: "M", us: "40", eu: "50", chest: "39 - 41", sleeves: "26" },
+  { size: "L", us: "42 - 44", eu: "52 - 54", chest: "42 - 44", sleeves: "26.4" },
+  { size: "XL", us: "46", eu: "56", chest: "45 - 47", sleeves: "27" },
+  { size: "2XL", us: "48 - 50", eu: "58 - 60", chest: "48 - 50", sleeves: "27.6" },
+  { size: "3XL", us: "52", eu: "62", chest: "51 - 53", sleeves: "28" },
+  { size: "4XL", us: "54 - 56", eu: "64 - 66", chest: "54 - 56", sleeves: "28.3" },
 ];
 
 export default function SizeGuideModal({ isOpen, onClose }) {
@@ -46,8 +46,8 @@ export default function SizeGuideModal({ isOpen, onClose }) {
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-[300px] xs:max-w-sm sm:max-w-lg md:max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border border-black animate-sg-up rounded-[var(--radius,0px)]">
-        
+      <div className="relative w-full max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border border-black animate-sg-up rounded-[var(--radius,0px)]">
+
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black shrink-0">
           <p className="text-[13px] sm:text-[15px] font-bold uppercase tracking-widest text-black">
@@ -63,30 +63,28 @@ export default function SizeGuideModal({ isOpen, onClose }) {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-5 py-6 space-y-8 min-h-0">
-          
+
           {/* Table Area */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-[11px] sm:text-[12px] font-bold uppercase tracking-[0.2em] text-black">
-                Men&apos;s Wear
+                Pairo
               </h3>
               {/* Unit Toggle */}
               <div className="flex border border-black rounded-[var(--radius,0px)] overflow-hidden shrink-0">
                 <button
                   type="button"
                   onClick={() => setUnit("cm")}
-                  className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all ${
-                    unit === "cm" ? "bg-black text-white" : "bg-white text-black hover:bg-black/5"
-                  }`}
+                  className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all ${unit === "cm" ? "bg-black text-white" : "bg-white text-black hover:bg-black/5"
+                    }`}
                 >
                   CM
                 </button>
                 <button
                   type="button"
                   onClick={() => setUnit("in")}
-                  className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all border-l border-black ${
-                    unit === "in" ? "bg-black text-white" : "bg-white text-black hover:bg-black/5"
-                  }`}
+                  className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-all border-l border-black ${unit === "in" ? "bg-black text-white" : "bg-white text-black hover:bg-black/5"
+                    }`}
                 >
                   IN
                 </button>
@@ -129,7 +127,7 @@ export default function SizeGuideModal({ isOpen, onClose }) {
             {/* Responsive Video Container */}
             <div className="w-full aspect-video border border-black rounded-[var(--radius,0px)] bg-black overflow-hidden relative group">
               {!showVideo ? (
-                <div 
+                <div
                   className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 cursor-pointer bg-neutral-900 transition-opacity hover:opacity-95"
                   onClick={() => setShowVideo(true)}
                 >

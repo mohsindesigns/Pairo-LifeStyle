@@ -209,6 +209,20 @@ export const SECTION_SCHEMAS = {
         { name: "value", label: "Channel Value (Email/Phone)", type: "text" }
       ]},
       { name: "socialLabel", label: "Social Label", type: "text" },
+      { name: "socialLinks", label: "Social Icons", type: "repeater", fields: [
+        { name: "platform", label: "Platform", type: "select", options: [
+          { label: "Instagram", value: "instagram" },
+          { label: "Facebook", value: "facebook" },
+          { label: "Twitter / X", value: "twitter" },
+          { label: "TikTok", value: "tiktok" },
+          { label: "YouTube", value: "youtube" },
+          { label: "LinkedIn", value: "linkedin" },
+          { label: "Pinterest", value: "pinterest" },
+          { label: "Snapchat", value: "snapchat" },
+          { label: "WhatsApp", value: "whatsapp" }
+        ]},
+        { name: "url", label: "URL (full link)", type: "text" }
+      ]},
       { name: "formTitle", label: "Form Heading", type: "text" },
       { name: "formSubtitle", label: "Form Subheading", type: "text" },
       { name: "subjects", label: "Form Subjects (Comma separated)", type: "text" },
