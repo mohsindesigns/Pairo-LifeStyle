@@ -158,8 +158,8 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
                 type="button"
                 onClick={() => setUnit(u)}
                 className={`h-8 px-4 rounded-[var(--radius,0px)] text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 border ${unit === u
-                    ? "bg-black text-white border-black"
-                    : "bg-white text-black border-black/30 hover:border-black"
+                  ? "bg-black text-white border-black"
+                  : "bg-white text-black border-black/30 hover:border-black"
                   }`}
               >
                 {u}
@@ -209,8 +209,8 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
             onClick={handleAdd}
             disabled={adding || added}
             className={`w-full h-12 rounded-[var(--radius,0px)] font-bold uppercase tracking-[0.2em] text-[12px] md:text-[13px] flex items-center justify-center gap-2.5 transition-all duration-300 border ${added
-                ? "bg-emerald-600 border-emerald-600 text-white"
-                : "bg-black border-black text-white hover:bg-black/90 active:scale-[0.98] disabled:opacity-60"
+              ? "bg-emerald-600 border-emerald-600 text-white"
+              : "bg-black border-black text-white hover:bg-black/90 active:scale-[0.98] disabled:opacity-60"
               }`}
           >
             {added ? (
