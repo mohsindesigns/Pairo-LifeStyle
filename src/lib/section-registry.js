@@ -15,6 +15,7 @@ export const SECTION_REGISTRY = {
   cta_section: dynamic(() => import("@/components/sections/CTASection")),
   contact_hero: dynamic(() => import("@/components/sections/ContactHero")),
   contact_section: dynamic(() => import("@/components/sections/ContactSection")),
+  rich_text: dynamic(() => import("@/components/sections/RichTextSection")),
 };
 
 export const getSectionComponent = (type) => {

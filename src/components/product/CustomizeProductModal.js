@@ -20,9 +20,9 @@ import {
 } from "lucide-react";
 
 /* ─── Option definitions ─────────────────────────────────────────────── */
-const LEATHER_COLORS = ["None", "Black", "Brown", "Blue", "Other"];
-const LEATHER_TYPES = ["None", "Sheepskin", "Goatskin", "Cowhide", "Calfhide", "Other"];
-const INNER_LININGS = [
+const LEATHER_COLORS  = ["None", "Black", "Brown", "Blue", "Other"];
+const LEATHER_TYPES   = ["None", "Sheepskin", "Goatskin", "Cowhide", "Calfhide", "Other"];
+const INNER_LININGS   = [
   "None",
   "Non Quilted (Polyester)",
   "Change Color (Quilted)",
@@ -31,17 +31,17 @@ const INNER_LININGS = [
   "Other",
 ];
 const HARDWARE_COLORS = ["None", "Silver", "Brass", "Black", "Other"];
-const FUR_TYPES = ["None", "Faux Fur", "Shearling", "Rabbit", "Fox", "Mink", "Wool", "Other"];
-const FUR_COLORS = ["White", "Black", "Brown", "Grey", "Cream", "Beige", "Custom"];
-const FUR_PLACEMENTS = ["Collar", "Hood", "Sleeves", "Cuffs", "Front", "Back"];
-const FUR_DENSITIES = ["Light", "Medium", "Heavy"];
-const ARTWORK_SLOTS = [
-  { key: "leftChest", label: "Left Chest" },
+const FUR_TYPES       = ["None", "Faux Fur", "Shearling", "Rabbit", "Fox", "Mink", "Wool", "Other"];
+const FUR_COLORS      = ["White", "Black", "Brown", "Grey", "Cream", "Beige", "Custom"];
+const FUR_PLACEMENTS  = ["Collar", "Hood", "Sleeves", "Cuffs", "Front", "Back"];
+const FUR_DENSITIES   = ["Light", "Medium", "Heavy"];
+const ARTWORK_SLOTS   = [
+  { key: "leftChest",  label: "Left Chest" },
   { key: "rightChest", label: "Right Chest" },
-  { key: "leftArm", label: "Left Arm" },
-  { key: "rightArm", label: "Right Arm" },
-  { key: "back", label: "Back" },
-  { key: "other", label: "Other Placement" },
+  { key: "leftArm",   label: "Left Arm" },
+  { key: "rightArm",  label: "Right Arm" },
+  { key: "back",      label: "Back" },
+  { key: "other",     label: "Other Placement" },
 ];
 const ACCEPTED_FORMATS = ".png,.jpg,.jpeg,.svg,.pdf,.ai,.eps,.webp";
 
@@ -49,23 +49,22 @@ const ACCEPTED_FORMATS = ".png,.jpg,.jpeg,.svg,.pdf,.ai,.eps,.webp";
 function Section({ icon: Icon, title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-2 border-gray-300 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+    <div className="border-2 border-black rounded-[4px] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 bg-gray-100 hover:bg-gray-200 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-black/5 transition-colors text-left"
       >
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-800 shrink-0" />
-          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-900 truncate">{title}</span>
+        <div className="flex items-center gap-2">
+          <Icon className="w-3.5 h-3.5 text-black" />
+          <span className="text-[10px] font-black uppercase tracking-wider text-black">{title}</span>
         </div>
         <ChevronDown
-          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-700 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""
-            }`}
+          className={`w-3.5 h-3.5 text-black transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
       {open && (
-        <div className="px-3 sm:px-5 pb-4 sm:pb-5 pt-3 space-y-3 sm:space-y-4 bg-white border-t-2 border-gray-200">
+        <div className="px-4 pb-4 pt-3 space-y-3 border-t-2 border-black bg-white">
           {children}
         </div>
       )}
@@ -76,16 +75,17 @@ function Section({ icon: Icon, title, children, defaultOpen = false }) {
 /* ─── Pill select ────────────────────────────────────────────────────── */
 function PillSelect({ options, value, onChange }) {
   return (
-    <div className="flex flex-wrap gap-1.5 sm:gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {options.map((opt) => (
         <button
           key={opt}
           type="button"
           onClick={() => onChange(opt)}
-          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider border-2 transition-all ${value === opt
-              ? "bg-gray-900 text-white border-gray-900 shadow-md scale-105"
-              : "bg-white text-gray-900 border-gray-400 hover:border-gray-900 hover:bg-gray-50 hover:shadow-sm"
-            }`}
+          className={`px-2.5 py-1 rounded-[4px] text-[9px] font-black uppercase tracking-wider border-2 transition-all ${
+            value === opt
+              ? "bg-black text-white border-black"
+              : "bg-white text-black border-black/30 hover:border-black hover:bg-black/5"
+          }`}
         >
           {opt}
         </button>
@@ -101,18 +101,19 @@ function MultiPillSelect({ options, values, onChange }) {
     else onChange([...values, v]);
   };
   return (
-    <div className="flex flex-wrap gap-1.5 sm:gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {options.map((opt) => (
         <button
           key={opt}
           type="button"
           onClick={() => toggle(opt)}
-          className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider border-2 transition-all flex items-center gap-1.5 sm:gap-2 ${values.includes(opt)
-              ? "bg-gray-900 text-white border-gray-900 shadow-md scale-105"
-              : "bg-white text-gray-900 border-gray-400 hover:border-gray-900 hover:bg-gray-50 hover:shadow-sm"
-            }`}
+          className={`px-2.5 py-1 rounded-[4px] text-[9px] font-black uppercase tracking-wider border-2 transition-all flex items-center gap-1 ${
+            values.includes(opt)
+              ? "bg-black text-white border-black"
+              : "bg-white text-black border-black/30 hover:border-black hover:bg-black/5"
+          }`}
         >
-          {values.includes(opt) && <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5" strokeWidth={3} />}
+          {values.includes(opt) && <Check className="w-2.5 h-2.5" strokeWidth={2.5} />}
           {opt}
         </button>
       ))}
@@ -122,7 +123,7 @@ function MultiPillSelect({ options, values, onChange }) {
 
 /* ─── Text input shared style ────────────────────────────────────────── */
 const inputCls =
-  "w-full border-2 border-gray-300 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-gray-900 placeholder-gray-500 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/20 transition-all bg-white font-medium";
+  "w-full border-2 border-black rounded-[4px] px-2.5 py-2 text-[11px] text-black placeholder-neutral-600 font-bold outline-none focus:border-black focus:ring-1 focus:ring-black transition-all bg-white";
 
 /* ─── Artwork upload slot ────────────────────────────────────────────── */
 function ArtworkSlot({ slot, artwork, onChange }) {
@@ -152,33 +153,30 @@ function ArtworkSlot({ slot, artwork, onChange }) {
   };
 
   return (
-    <div className="space-y-1.5 sm:space-y-2">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-2.5 sm:p-3 border-2 border-gray-300 rounded-lg bg-white hover:border-gray-400 transition-colors">
-        <div className="sm:w-24 shrink-0">
-          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-900">{slot.label}</p>
+    <div className="space-y-1">
+      <div className="flex items-center gap-2.5 p-2.5 border-2 border-black rounded-[4px] bg-white">
+        <div className="shrink-0 w-24">
+          <p className="text-[9px] font-black uppercase tracking-wider text-black">{slot.label}</p>
         </div>
         <div className="flex-1 flex items-center gap-2">
           {artwork?.url ? (
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded border-2 border-gray-300 overflow-hidden shrink-0">
+              <div className="w-7 h-7 rounded-[1px] border border-black overflow-hidden shrink-0">
                 {artwork.url.match(/\.(png|jpg|jpeg|svg|webp)$/i) ? (
                   <img src={artwork.url} alt={artwork.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                    <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                  <div className="w-full h-full bg-black/5 flex items-center justify-center">
+                    <FileText className="w-3.5 h-3.5 text-black" />
                   </div>
                 )}
               </div>
-              <span className="text-[10px] sm:text-xs text-gray-900 font-medium truncate flex-1">{artwork.name}</span>
+              <span className="text-[9px] text-black font-bold truncate flex-1">{artwork.name}</span>
               <button
                 type="button"
-                onClick={() => {
-                  onChange(null);
-                  setUploadError(null);
-                }}
-                className="text-gray-500 hover:text-red-600 transition-colors shrink-0 p-1"
+                onClick={() => { onChange(null); setUploadError(null); }}
+                className="text-black hover:text-red-650 transition-colors shrink-0"
               >
-                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
@@ -186,12 +184,12 @@ function ArtworkSlot({ slot, artwork, onChange }) {
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-bold uppercase tracking-wider text-gray-900 border-2 border-dashed border-gray-400 hover:border-gray-900 hover:bg-gray-50 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg transition-all bg-white disabled:opacity-50 w-full sm:w-auto justify-center"
+              className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-black border-2 border-dashed border-black/40 hover:border-black px-2.5 py-1.5 rounded-[4px] transition-all bg-white disabled:opacity-60"
             >
               {uploading ? (
-                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
-                <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <Upload className="w-3 h-3" />
               )}
               {uploading ? "Uploading..." : "Upload File"}
             </button>
@@ -206,8 +204,8 @@ function ArtworkSlot({ slot, artwork, onChange }) {
         </div>
       </div>
       {uploadError && (
-        <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-red-700 bg-red-50 border-2 border-red-300 rounded-lg p-2 font-medium">
-          <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+        <div className="flex items-center gap-1.5 text-[9px] text-red-600 font-bold">
+          <AlertCircle className="w-3 h-3 shrink-0" />
           {uploadError}
         </div>
       )}
@@ -255,37 +253,26 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
       setStep("form");
       setSubmitError(null);
       setCustomer({ name: "", email: "", phone: "" });
-      setLeatherColor("None");
-      setLeatherColorNote("");
-      setLeatherType("None");
-      setLeatherTypeNote("");
-      setInnerLining("None");
-      setInnerLiningNote("");
-      setHardwareColor("None");
-      setHardwareColorNote("");
-      setFurType("None");
-      setFurTypeNote("");
-      setFurColor("");
-      setFurPlacement([]);
-      setFurDensity("");
-      setFurRemovable(null);
-      setArtwork({});
-      setArtworkOtherNote("");
-      setAdditionalNotes("");
+      setLeatherColor("None"); setLeatherColorNote("");
+      setLeatherType("None"); setLeatherTypeNote("");
+      setInnerLining("None"); setInnerLiningNote("");
+      setHardwareColor("None"); setHardwareColorNote("");
+      setFurType("None"); setFurTypeNote(""); setFurColor("");
+      setFurPlacement([]); setFurDensity(""); setFurRemovable(null);
+      setArtwork({}); setArtworkOtherNote(""); setAdditionalNotes("");
     }
   }, [isOpen]);
 
   // Trap scroll
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const updateArtwork = (key, val) => setArtwork((prev) => ({ ...prev, [key]: val }));
+  const updateArtwork = (key, val) =>
+    setArtwork((prev) => ({ ...prev, [key]: val }));
 
   const handleSubmit = async () => {
     if (!customer.name.trim() || !customer.email.trim()) {
@@ -323,7 +310,10 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
           },
           artwork: {
             ...Object.fromEntries(ARTWORK_SLOTS.map((s) => [s.key, artwork[s.key] || null])),
-            ...(artwork.other ? { other: { ...artwork.other, note: artworkOtherNote } } : {}),
+            // Merge the other-placement note into the artwork.other object
+            ...(artwork.other
+              ? { other: { ...artwork.other, note: artworkOtherNote } }
+              : {}),
           },
         },
         additionalNotes,
@@ -350,51 +340,42 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center p-2 sm:p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px]" onClick={onClose} />
 
-      {/* Panel - Centered at all screen sizes */}
-      <div className="relative w-full max-w-[320px] xs:max-w-[400px] sm:max-w-xl lg:max-w-2xl xl:max-w-3xl max-h-[95dvh] sm:max-h-[92dvh] bg-gray-50 rounded-2xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden animate-slideUp border-2 border-gray-200">
+      {/* Panel */}
+      <div className="relative w-full max-w-[290px] xs:max-w-[360px] sm:max-w-xl max-h-[90dvh] sm:max-h-[92dvh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-slideUp border-2 border-black">
+
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b-2 border-gray-300 shrink-0 bg-white">
-          <div className="min-w-0">
-            <p className="text-xs sm:text-sm lg:text-base font-bold uppercase tracking-widest text-gray-900">
-              Customize Product
-            </p>
-            <p className="text-[10px] sm:text-xs lg:text-sm text-gray-700 uppercase tracking-[0.1em] font-semibold mt-0.5">
-              Bespoke Design Inquiry
-            </p>
+        <div className="flex items-center justify-between px-4 py-3.5 border-b-2 border-black shrink-0">
+          <div>
+            <p className="text-[12px] sm:text-[14px] font-black uppercase tracking-widest text-black">Customize Product</p>
+            <p className="text-[9px] sm:text-[10px] text-black uppercase tracking-[0.1em] font-bold mt-0.5">Bespoke Design Inquiry</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors ml-2"
-          >
-            <X className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
+          <button onClick={onClose} className="p-1.5 hover:bg-black/5 rounded-full transition-colors text-black">
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {step === "success" ? (
           /* ─── Success State ─── */
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 sm:gap-6 px-4 sm:px-6 py-8 sm:py-12 text-center bg-white">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-green-100 rounded-full flex items-center justify-center border-2 border-green-300">
-              <Check className="w-6 h-6 sm:w-7 sm:h-7 text-green-700" strokeWidth={3} />
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-12 text-center bg-white">
+            <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100">
+              <Check className="w-5 h-5 text-emerald-600" strokeWidth={2.5} />
             </div>
             <div>
-              <h3 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900 uppercase tracking-wider">
-                Inquiry Received
-              </h3>
-              <p className="text-xs sm:text-sm lg:text-base text-gray-800 leading-relaxed max-w-xs sm:max-w-sm mt-2 font-medium">
-                We&apos;ve received your customization request for{" "}
-                <strong className="text-gray-900">{product?.name}</strong>.
+              <h3 className="text-sm font-black text-black uppercase tracking-wider">Inquiry Received</h3>
+              <p className="text-[11px] text-black leading-relaxed max-w-xs mt-1.5 font-bold">
+                We&apos;ve received your customization request for <strong>{product?.name}</strong>.
                 Our design team will review your specs and contact you within 24 hours.
               </p>
             </div>
-            <p className="text-[10px] sm:text-xs lg:text-sm text-gray-600 uppercase tracking-widest font-semibold">
+            <p className="text-[9px] text-black uppercase tracking-widest font-black">
               Confirmation sent to {customer.email}
             </p>
             <button
               type="button"
               onClick={onClose}
-              className="h-10 sm:h-12 px-6 sm:px-8 bg-gray-900 text-white rounded-lg text-xs sm:text-sm font-bold uppercase tracking-widest hover:bg-gray-800 transition-all shadow-lg"
+              className="h-11 px-6 bg-black text-white border-2 border-black rounded-[4px] text-[10px] font-black uppercase tracking-widest hover:bg-neutral-900 transition-all"
             >
               Done
             </button>
@@ -402,52 +383,49 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
         ) : (
           /* ─── Form State ─── */
           <>
-            <div className="flex-1 overflow-y-auto px-3 sm:px-5 lg:px-6 py-3 sm:py-4 space-y-3 sm:space-y-4 min-h-0 bg-gray-50">
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0 bg-white">
+
               {/* Product Reference */}
               {product && (
-                <div className="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3.5 bg-white border-2 border-gray-300 rounded-lg shadow-sm">
+                <div className="flex items-center gap-2.5 p-2.5 border-2 border-black rounded-[4px]">
                   {(product.images?.[0] || product.image) && (
                     <img
                       src={product.images?.[0] || product.image}
                       alt={product.name}
-                      className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 object-cover rounded-lg border-2 border-gray-300 shrink-0"
+                      className="w-9 h-9 object-cover rounded-[1px] border border-black shrink-0"
                     />
                   )}
-                  <div className="min-w-0">
-                    <p className="text-xs sm:text-sm lg:text-base font-bold text-gray-900 truncate max-w-[200px] sm:max-w-[280px] lg:max-w-[400px]">
-                      {product.name}
-                    </p>
-                    <p className="text-[10px] sm:text-xs lg:text-sm text-gray-700 uppercase tracking-wider font-semibold">
-                      Configure Custom Parameters
-                    </p>
+                  <div>
+                    <p className="text-[11px] font-black text-black truncate max-w-[280px]">{product.name}</p>
+                    <p className="text-[9px] text-black uppercase tracking-wider font-bold">Configure Custom Parameters</p>
                   </div>
                 </div>
               )}
 
               {/* Customer Info */}
-              <div className="space-y-2 sm:space-y-3">
-                <p className="text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-widest text-gray-900 border-b-2 border-gray-300 pb-1.5">
+              <div className="space-y-2">
+                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-black border-b-2 border-black pb-1">
                   Your Details
                 </p>
                 {[
-                  { key: "name", icon: User, type: "text", placeholder: "Full Name" },
-                  { key: "email", icon: Mail, type: "email", placeholder: "your@email.com" },
-                  { key: "phone", icon: Phone, type: "tel", placeholder: "Phone Number (Optional)" },
+                  { key: "name",  icon: User,  type: "text",  placeholder: "Full Name" },
+                  { key: "email", icon: Mail,  type: "email", placeholder: "your@email.com" },
+                  { key: "phone", icon: Phone, type: "tel",   placeholder: "Phone Number (Optional)" },
                 ].map((f) => (
                   <div key={f.key} className="relative">
-                    <f.icon className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-700" />
+                    <f.icon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-black" />
                     <input
                       type={f.type}
                       placeholder={f.placeholder}
                       value={customer[f.key]}
                       onChange={(e) => setCustomer((p) => ({ ...p, [f.key]: e.target.value }))}
-                      className={`${inputCls} pl-9 sm:pl-11`}
+                      className={`${inputCls} pl-8`}
                     />
                   </div>
                 ))}
               </div>
 
-              <p className="text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-widest text-gray-900 border-b-2 border-gray-300 pb-1.5 pt-1">
+              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-black border-b-2 border-black pb-1 pt-1">
                 Design Preferences
               </p>
 
@@ -460,7 +438,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                     placeholder="Describe your custom leather color..."
                     value={leatherColorNote}
                     onChange={(e) => setLeatherColorNote(e.target.value)}
-                    className={`${inputCls} mt-2`}
+                    className={`${inputCls} mt-1.5`}
                   />
                 )}
               </Section>
@@ -474,7 +452,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                     placeholder="Describe your custom leather type..."
                     value={leatherTypeNote}
                     onChange={(e) => setLeatherTypeNote(e.target.value)}
-                    className={`${inputCls} mt-2`}
+                    className={`${inputCls} mt-1.5`}
                   />
                 )}
               </Section>
@@ -488,7 +466,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                     placeholder="Describe your custom lining..."
                     value={innerLiningNote}
                     onChange={(e) => setInnerLiningNote(e.target.value)}
-                    className={`${inputCls} mt-2`}
+                    className={`${inputCls} mt-1.5`}
                   />
                 )}
               </Section>
@@ -502,18 +480,16 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                     placeholder="Describe your custom hardware finish..."
                     value={hardwareColorNote}
                     onChange={(e) => setHardwareColorNote(e.target.value)}
-                    className={`${inputCls} mt-2`}
+                    className={`${inputCls} mt-1.5`}
                   />
                 )}
               </Section>
 
               {/* Fur Customization */}
               <Section icon={Feather} title="Fur Accent (Optional)">
-                <div className="space-y-3 sm:space-y-4">
+                <div className="space-y-3">
                   <div>
-                    <p className="text-[10px] sm:text-xs font-bold text-gray-900 mb-1.5 sm:mb-2 uppercase tracking-wide">
-                      Fur Type
-                    </p>
+                    <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Fur Type</p>
                     <PillSelect options={FUR_TYPES} value={furType} onChange={setFurType} />
                     {furType === "Other" && (
                       <input
@@ -521,38 +497,26 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                         placeholder="Describe your custom fur type..."
                         value={furTypeNote}
                         onChange={(e) => setFurTypeNote(e.target.value)}
-                        className={`${inputCls} mt-2`}
+                        className={`${inputCls} mt-1.5`}
                       />
                     )}
                   </div>
                   {furType !== "None" && (
                     <>
                       <div>
-                        <p className="text-[10px] sm:text-xs font-bold text-gray-900 mb-1.5 sm:mb-2 uppercase tracking-wide">
-                          Fur Color
-                        </p>
+                        <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Fur Color</p>
                         <PillSelect options={FUR_COLORS} value={furColor} onChange={setFurColor} />
                       </div>
                       <div>
-                        <p className="text-[10px] sm:text-xs font-bold text-gray-900 mb-1.5 sm:mb-2 uppercase tracking-wide">
-                          Fur Placement
-                        </p>
-                        <MultiPillSelect
-                          options={FUR_PLACEMENTS}
-                          values={furPlacement}
-                          onChange={setFurPlacement}
-                        />
+                        <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Fur Placement</p>
+                        <MultiPillSelect options={FUR_PLACEMENTS} values={furPlacement} onChange={setFurPlacement} />
                       </div>
                       <div>
-                        <p className="text-[10px] sm:text-xs font-bold text-gray-900 mb-1.5 sm:mb-2 uppercase tracking-wide">
-                          Fur Density
-                        </p>
+                        <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Fur Density</p>
                         <PillSelect options={FUR_DENSITIES} value={furDensity} onChange={setFurDensity} />
                       </div>
                       <div>
-                        <p className="text-[10px] sm:text-xs font-bold text-gray-900 mb-1.5 sm:mb-2 uppercase tracking-wide">
-                          Removable Fur?
-                        </p>
+                        <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Removable Fur?</p>
                         <PillSelect
                           options={["Yes", "No"]}
                           value={furRemovable === true ? "Yes" : furRemovable === false ? "No" : ""}
@@ -566,12 +530,12 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
 
               {/* Artwork / Logo */}
               <Section icon={ImageIcon} title="Artwork / Branding Logos">
-                <div className="space-y-2 sm:space-y-3">
-                  <p className="text-[10px] sm:text-xs text-gray-800 leading-relaxed uppercase tracking-wide font-semibold bg-gray-100 p-2.5 sm:p-3 rounded-lg border-2 border-gray-300">
+                <div className="space-y-2">
+                  <p className="text-[9px] text-black leading-relaxed uppercase tracking-wide font-black">
                     PNG, JPG, SVG, PDF, AI, EPS — Max 10 MB per file.
                   </p>
                   {ARTWORK_SLOTS.map((slot) => (
-                    <div key={slot.key} className="space-y-1.5">
+                    <div key={slot.key} className="space-y-1">
                       <ArtworkSlot
                         slot={slot}
                         artwork={artwork[slot.key]}
@@ -583,7 +547,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                           placeholder="Describe the exact placement for this artwork..."
                           value={artworkOtherNote}
                           onChange={(e) => setArtworkOtherNote(e.target.value)}
-                          className={`${inputCls} text-[10px] sm:text-xs`}
+                          className={`${inputCls} text-[10px]`}
                         />
                       )}
                     </div>
@@ -592,8 +556,8 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
               </Section>
 
               {/* Additional Notes */}
-              <div className="space-y-1.5 sm:space-y-2">
-                <p className="text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-[0.15em] text-gray-900">
+              <div className="space-y-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-black">
                   Special Instructions / Design Vision
                 </p>
                 <textarea
@@ -607,20 +571,19 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
             </div>
 
             {/* Footer */}
-            <div className="px-3 sm:px-5 lg:px-6 py-3 sm:py-4 border-t-2 border-gray-300 bg-white shrink-0">
+            <div className="px-4 py-4 border-t-2 border-black bg-white shrink-0">
               {/* Disclaimer */}
-              <div className="flex items-start gap-2 sm:gap-3 mb-3 sm:mb-4 p-2.5 sm:p-3.5 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
-                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-yellow-600 mt-1.5 sm:mt-2 shrink-0" />
-                <p className="text-[10px] sm:text-xs lg:text-sm text-yellow-900 leading-relaxed font-medium">
-                  Design inquiries do not initiate any charges. We will review your request and send a formal
-                  invoice upon approval.
+              <div className="flex items-start gap-2 mb-3.5 p-2.5 bg-amber-50 border-2 border-amber-400 rounded-[4px]">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-600 mt-1.5 shrink-0" />
+                <p className="text-[10px] text-amber-900 leading-relaxed font-bold">
+                  Design inquiries do not initiate any charges. We will review your request and send a formal invoice upon approval.
                 </p>
               </div>
 
               {/* Inline error */}
               {submitError && (
-                <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 text-xs sm:text-sm text-red-800 bg-red-50 border-2 border-red-300 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 font-medium">
-                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                <div className="flex items-center gap-1.5 mb-3 text-[10px] text-red-650 bg-red-50 border-2 border-red-400 rounded-[4px] px-2.5 py-2 font-bold">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   {submitError}
                 </div>
               )}
@@ -629,11 +592,11 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full h-10 sm:h-12 lg:h-14 rounded-lg font-bold uppercase tracking-[0.15em] text-xs sm:text-sm lg:text-base flex items-center justify-center gap-2 sm:gap-3 bg-gray-900 text-white hover:bg-gray-800 transition-all duration-300 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                className="w-full h-11 rounded-[4px] font-black uppercase tracking-[0.15em] text-[11px] sm:text-[12px] flex items-center justify-center gap-2 bg-black text-white hover:bg-neutral-900 border-2 border-black transition-all duration-300 active:scale-[0.99] disabled:opacity-60"
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     Submitting Inquiry...
                   </>
                 ) : (
@@ -647,41 +610,10 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
 
       <style>{`
         @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(28px) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
+          from { opacity: 0; transform: translateY(28px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        .animate-slideUp {
-          animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-        }
-
-        @media (max-width: 640px) {
-          @keyframes slideUpMobile {
-            from {
-              opacity: 0;
-              transform: translateY(100%) scale(0.95);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-          .animate-slideUp {
-            animation: slideUpMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-          }
-        }
-
-        /* Extra small screens (300px+) */
-        @media (min-width: 300px) and (max-width: 399px) {
-          .xs\\:max-w-\\[400px\\] {
-            max-width: calc(100vw - 16px);
-          }
-        }
+        .animate-slideUp { animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
       `}</style>
     </div>
   );

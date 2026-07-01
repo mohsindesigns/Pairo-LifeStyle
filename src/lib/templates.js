@@ -64,7 +64,8 @@ export const TEMPLATE_REGISTRY = {
       "feature_marquee",
       "banner_feature",
       "blog_grid",
-      "testimonials"
+      "testimonials",
+      "rich_text"
     ],
     defaultSections: []
   }

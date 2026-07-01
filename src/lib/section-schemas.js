@@ -214,5 +214,13 @@ export const SECTION_SCHEMAS = {
       { name: "subjects", label: "Form Subjects (Comma separated)", type: "text" },
       { name: "buttonText", label: "Submit Button Text", type: "text" }
     ]
+  },
+  rich_text: {
+    name: "Rich Text Content",
+    icon: "FileText",
+    fields: [
+      { name: "title", label: "Heading", type: "text" },
+      { name: "content", label: "Page Content (Text/Markdown)", type: "textarea" }
+    ]
   }
 };

@@ -213,86 +213,81 @@ export default function ClientProductActions({ product, onVariantChange }) {
         </div>
 
         {/* Quantity + ATC */}
-        <div className="space-y-3 sm:space-y-4">
-          <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
+        <div className="space-y-3.5">
+          <div className="flex flex-col sm:flex-row gap-3">
             {/* Quantity Selector */}
-            <div className="flex items-center justify-between sm:justify-center bg-white border-2 border-gray-300 rounded-lg px-3 sm:px-4 h-11 sm:h-12 shrink-0 hover:border-gray-400 transition-colors">
+            <div className="flex items-center justify-between sm:justify-center bg-white border-2 border-black rounded-lg px-4 gap-4 h-12 shrink-0">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="text-gray-700 hover:text-gray-900 transition-colors p-1"
+                className="text-black/50 hover:text-black transition-colors p-1"
                 aria-label="Decrease quantity"
               >
-                <Minus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Minus className="w-4 h-4" />
               </button>
-              <span className="font-bold text-sm sm:text-base w-8 sm:w-10 text-center text-gray-900 select-none">
-                {quantity}
-              </span>
+              <span className="font-bold text-sm w-6 text-center text-black select-none">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="text-gray-700 hover:text-gray-900 transition-colors p-1"
+                className="text-black/50 hover:text-black transition-colors p-1"
                 aria-label="Increase quantity"
               >
-                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Plus className="w-4 h-4" />
               </button>
             </div>
 
             {/* Add to Cart Button */}
             <button
               onClick={handleAddToCart}
-              disabled={addedFeedback}
-              className={`flex-1 h-11 sm:h-12 rounded-lg font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[11px] sm:text-xs md:text-sm flex items-center justify-center gap-2 sm:gap-2.5 transition-all duration-300 shadow-lg hover:shadow-xl ${addedFeedback
-                ? "bg-green-600 text-white border-2 border-green-600"
-                : "bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 hover:border-gray-800 active:scale-[0.98]"
-                } disabled:opacity-90 disabled:cursor-not-allowed`}
+              className={`flex-1 h-12 rounded-lg font-bold uppercase tracking-[0.2em] text-[11px] sm:text-xs md:text-[13px] flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.98] border-2 ${
+                addedFeedback
+                  ? "bg-emerald-600 border-emerald-600 text-white"
+                  : "bg-black border-black text-white hover:bg-black/90 hover:border-black/90"
+              }`}
             >
               {addedFeedback ? (
                 <>
-                  <Check className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={3} />
-                  <span>Added to Bag!</span>
+                  <Check className="w-4 h-4" strokeWidth={2.5} />
+                  Added!
                 </>
               ) : (
                 <>
-                  <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span>Add to Bag</span>
+                  <ShoppingBag className="w-4 h-4" />
+                  Add to Bag
                 </>
               )}
             </button>
           </div>
 
-          {/* Secure Checkout Button */}
+          {/* Secure Checkout */}
           <button
             onClick={handleSecureCheckout}
-            className="w-full h-11 sm:h-12 rounded-lg font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] text-[11px] sm:text-xs md:text-sm flex items-center justify-center gap-2 sm:gap-2.5 bg-white text-gray-900 border-2 border-gray-300 hover:border-gray-900 hover:text-gray-900 hover:bg-gray-50 transition-all duration-300 shadow-sm hover:shadow-md active:scale-[0.98]"
+            className="w-full h-12 bg-white text-black border-2 border-black rounded-lg font-bold uppercase tracking-[0.2em] text-[11px] sm:text-xs md:text-[13px] flex items-center justify-center gap-2.5 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
           >
-            <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span>Secure Checkout</span>
+            <Shield className="w-4 h-4" />
+            Secure Checkout
           </button>
 
           {/* ─── Premium Feature Buttons ──────────────────────────── */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2.5 sm:gap-3 pt-1">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 pt-0.5">
             {/* Made to Measure */}
             <button
               type="button"
               onClick={() => setM2mOpen(true)}
-              className="h-11 sm:h-12 rounded-lg font-bold uppercase tracking-[0.1em] sm:tracking-[0.15em] text-[10px] sm:text-xs flex items-center justify-center gap-2 px-3 sm:px-4 bg-white text-gray-900 border-2 border-gray-300 hover:border-gray-900 hover:bg-gray-50 hover:shadow-md transition-all duration-300 active:scale-[0.98] group"
+              className="w-full h-12 bg-white text-black border-2 border-black rounded-lg font-bold uppercase tracking-[0.15em] text-[10px] sm:text-[11px] flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
             >
-              <Ruler className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 group-hover:text-gray-900 transition-colors" />
-              <span className="whitespace-nowrap">Made to Measure</span>
-              <span className="text-[9px] sm:text-[10px] text-green-600 font-bold whitespace-nowrap">+$25</span>
+              <Ruler className="w-3.5 h-3.5" />
+              <span>Measure (+$25)</span>
             </button>
 
             {/* Customize Product */}
             <button
               type="button"
               onClick={() => setCustomizeOpen(true)}
-              className="h-11 sm:h-12 rounded-lg font-bold uppercase tracking-[0.1em] sm:tracking-[0.15em] text-[10px] sm:text-xs flex items-center justify-center gap-2 px-3 sm:px-4 bg-white text-gray-900 border-2 border-gray-300 hover:border-gray-900 hover:bg-gray-50 hover:shadow-md transition-all duration-300 active:scale-[0.98] group"
+              className="w-full h-12 bg-white text-black border-2 border-black rounded-lg font-bold uppercase tracking-[0.15em] text-[10px] sm:text-[11px] flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
             >
-              <Settings className="w-3 h-3 sm:w-4 sm:h-4 text-gray-600 group-hover:text-gray-900 transition-colors" />
-              <span className="whitespace-nowrap">Customize Product</span>
+              <Settings className="w-3.5 h-3.5" />
+              <span>Customize</span>
             </button>
           </div>
-
-
         </div>
       </div>
 
