@@ -29,6 +29,34 @@ const OrderSchema = new mongoose.Schema({
       unit: { type: String, enum: ['inches', 'cm'], default: 'inches' },
       measurements: { type: mongoose.Schema.Types.Mixed }, // all 12 fields
       notes: { type: String }
+    },
+    // Customize Product bespoke request data
+    customization: {
+      enabled: { type: Boolean, default: false },
+      leatherColor: { type: String },
+      leatherColorNote: { type: String },
+      leatherType: { type: String },
+      leatherTypeNote: { type: String },
+      innerLining: { type: String },
+      innerLiningNote: { type: String },
+      hardwareColor: { type: String },
+      hardwareColorNote: { type: String },
+      fur: {
+        type: { type: String },
+        typeNote: { type: String },
+        color: { type: String },
+        placement: [{ type: String }],
+        density: { type: String },
+        removable: { type: Boolean }
+      },
+      artwork: {
+        leftChest:  { url: String, name: String },
+        rightChest: { url: String, name: String },
+        leftArm:    { url: String, name: String },
+        rightArm:   { url: String, name: String },
+        back:       { url: String, name: String },
+        other:      { url: String, name: String, note: String }
+      }
     }
   }],
 

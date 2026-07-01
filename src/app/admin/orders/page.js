@@ -196,11 +196,17 @@ export default function AdminOrdersPage() {
                        <Link href={`/admin/orders/${order._id}`} className="text-[#2271b1] font-bold text-[14px] hover:underline block mb-1">
                           #{order.orderNumber} {order.shippingAddress?.fullName ? `by ${order.shippingAddress.fullName}` : (order.customer?.email ? `by ${order.customer.email}` : "by Guest")}
                        </Link>
-                       {order.affiliateReferralCode && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200 mt-1 mr-2">
-                          Referred: {order.affiliateReferralCode}
-                        </span>
-                      )}
+                        {order.affiliateReferralCode && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200 mt-1 mr-2">
+                            Referred: {order.affiliateReferralCode}
+                          </span>
+                        )}
+                        {order.items?.some(item => item.customization?.enabled) && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-200 mt-1 mr-2 animate-pulse">
+                            Custom Order
+                          </span>
+                        )}
+
                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
                           <Link href={`/admin/orders/${order._id}`} className="hover:text-[#135e96]">View</Link>
                           <span className="text-[#c3c4c7]">|</span>

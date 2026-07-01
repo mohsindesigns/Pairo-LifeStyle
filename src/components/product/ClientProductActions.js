@@ -266,29 +266,20 @@ export default function ClientProductActions({ product, onVariantChange }) {
           <button
             type="button"
             onClick={() => setM2mOpen(true)}
-            className="group relative h-12 flex items-center justify-center gap-2 border-2 border-primary/20 rounded-[var(--radius,0px)] text-primary/70 font-bold text-[11px] uppercase tracking-[0.15em] hover:border-primary hover:text-primary hover:bg-primary/[0.04] transition-all duration-250 overflow-hidden"
+            className="h-12 border border-primary/20 hover:border-primary text-primary font-bold uppercase tracking-[0.2em] text-[10px] sm:text-[11px] hover:bg-primary hover:text-white transition-all duration-350 active:scale-[0.98] rounded-[var(--radius,0px)] flex flex-col items-center justify-center gap-0.5 leading-tight"
           >
-            {/* shimmer */}
-            <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
-            <Ruler className="w-3.5 h-3.5 shrink-0" />
-            <span className="leading-tight text-center">
-              Made to Measure
-              <span className="block text-[9px] font-semibold text-emerald-600 normal-case tracking-normal">+$25.00</span>
-            </span>
+            <span>Made to Measure</span>
+            <span className="text-[8px] font-medium tracking-normal normal-case opacity-75">+$25.00 Surcharge</span>
           </button>
 
           {/* Customize Product */}
           <button
             type="button"
             onClick={() => setCustomizeOpen(true)}
-            className="group relative h-12 flex items-center justify-center gap-2 border-2 border-primary/20 rounded-[var(--radius,0px)] text-primary/70 font-bold text-[11px] uppercase tracking-[0.15em] hover:border-primary hover:text-primary hover:bg-primary/[0.04] transition-all duration-250 overflow-hidden"
+            className="h-12 border border-primary/20 hover:border-primary text-primary font-bold uppercase tracking-[0.2em] text-[10px] sm:text-[11px] hover:bg-primary hover:text-white transition-all duration-350 active:scale-[0.98] rounded-[var(--radius,0px)] flex flex-col items-center justify-center gap-0.5 leading-tight"
           >
-            <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
-            <Palette className="w-3.5 h-3.5 shrink-0" />
-            <span className="leading-tight text-center">
-              Customize
-              <span className="block text-[9px] font-semibold text-primary/40 normal-case tracking-normal">Design Request</span>
-            </span>
+            <span>Customize Product</span>
+            <span className="text-[8px] font-medium tracking-normal normal-case opacity-60">Design Inquiry</span>
           </button>
         </div>
       </div>

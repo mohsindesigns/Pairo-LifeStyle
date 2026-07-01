@@ -472,3 +472,175 @@ export async function sendAffiliatePasswordReset(toEmail, name, resetUrl) {
     throw err;
   }
 }
+
+/**
+ * Send Custom Order / Bespoke Design Request Confirmation Email to Customer
+ */
+export async function sendCustomOrderConfirmation(order) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log(`[Email Simulation] Custom Order Confirmation → ${order.customer?.email}`);
+    return;
+  }
+
+  const item = order.items?.[0] || {};
+  const c = item.customization || {};
+
+  let customizationsHtml = '';
+  if (c.leatherColor && c.leatherColor !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Leather Color:</strong> ${c.leatherColor} ${c.leatherColorNote ? `(${c.leatherColorNote})` : ''}</p>`;
+  }
+  if (c.leatherType && c.leatherType !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Leather Type:</strong> ${c.leatherType} ${c.leatherTypeNote ? `(${c.leatherTypeNote})` : ''}</p>`;
+  }
+  if (c.innerLining && c.innerLining !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Inner Lining:</strong> ${c.innerLining} ${c.innerLiningNote ? `(${c.innerLiningNote})` : ''}</p>`;
+  }
+  if (c.hardwareColor && c.hardwareColor !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Hardware Color:</strong> ${c.hardwareColor} ${c.hardwareColorNote ? `(${c.hardwareColorNote})` : ''}</p>`;
+  }
+  if (c.fur?.type && c.fur.type !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Fur Type:</strong> ${c.fur.type} ${c.fur.typeNote ? `(${c.fur.typeNote})` : ''}</p>`;
+    if (c.fur.color) customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Fur Color:</strong> ${c.fur.color}</p>`;
+    if (c.fur.placement?.length) customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Fur Placement:</strong> ${c.fur.placement.join(', ')}</p>`;
+    if (c.fur.density) customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Fur Density:</strong> ${c.fur.density}</p>`;
+    if (c.fur.removable !== null) customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Removable Fur:</strong> ${c.fur.removable ? 'Yes' : 'No'}</p>`;
+  }
+
+  let artworkHtml = '';
+  if (c.artwork && Object.values(c.artwork).some(Boolean)) {
+    artworkHtml += '<h4 style="margin:15px 0 5px; font-size:12px; text-transform:uppercase; color:#666; letter-spacing:0.5px;">Uploaded Artwork</h4>';
+    Object.entries(c.artwork).forEach(([key, art]) => {
+      if (art && art.url) {
+        artworkHtml += `<p style="margin:4px 0; font-size:13px;"><strong>${key.replace(/([A-Z])/g, ' $1')}:</strong> <a href="${art.url}" style="color:#2271b1; text-decoration:underline;">${art.name || 'View File'}</a></p>`;
+      }
+    });
+  }
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a;">
+      <div style="background: #1a1a1a; padding: 30px; text-align: center;">
+        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 24px;">PAIRO LIFESTYLE</h1>
+      </div>
+      <div style="padding: 40px 30px; background: #fff; border: 1px solid #eee; border-top: none;">
+        <h2 style="font-size: 18px; margin-top:0; margin-bottom: 12px; color:#1a1a1a; font-weight:700;">Bespoke Design Request Received</h2>
+        <p style="color: #555; margin-bottom: 24px; font-size:14px; line-height:1.6;">
+          Hi ${order.shippingAddress?.fullName?.split(' ')[0] || 'there'}, thank you for your custom design request.<br/>
+          We have received your customization parameters for the product <strong>${item.name || ''}</strong>. Your Design Request ID is <strong>#${order.orderNumber}</strong>, submitted on ${new Date(order.createdAt).toLocaleDateString()}.
+        </p>
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 3px; margin-bottom: 24px; border: 1px solid #eee;">
+          <h3 style="margin-top: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color:#333; border-bottom:1px solid #eee; padding-bottom:8px;">Custom Selections</h3>
+          ${customizationsHtml}
+          ${artworkHtml}
+          ${order.customerNote ? `<p style="margin:10px 0 0; font-size:13px; border-top:1px dashed #ddd; padding-top:8px;"><strong>Additional Notes:</strong> <em>${order.customerNote}</em></p>` : ''}
+        </div>
+        <p style="color: #555; font-size:14px; line-height:1.6;">
+          Our master artisans and design team are already reviewing your customization. We will contact you via email or phone shortly to discuss pricing, options, and timeline.
+        </p>
+      </div>
+      <div style="background: #f9f9f9; border-top:1px solid #eee; padding: 20px 30px; text-align: center;">
+        <p style="font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
+          Pairo Concierge • Bespoke Artisanal Tailoring & Heritage
+        </p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"PAIRO Custom Design" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      to: order.customer?.email,
+      subject: `PAIRO Bespoke Design Request Received: #${order.orderNumber}`,
+      html,
+    });
+    console.log(`[Email] ✅ Custom confirmation sent to ${order.customer?.email} | MsgID: ${info.messageId}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send custom confirmation email:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Send Admin Notification for Custom Order Design Request
+ */
+export async function sendAdminCustomOrderNotification(order) {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.log(`[Email Simulation] Admin notified of Custom Order ${order.orderNumber}`);
+    return;
+  }
+
+  let adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) {
+    try {
+        await dbConnect();
+        const superAdminRole = await Role.findOne({ slug: 'super-admin' });
+        if (superAdminRole) {
+            const superAdmin = await Staff.findOne({ roleId: superAdminRole._id });
+            if (superAdmin) adminEmail = superAdmin.email;
+        }
+    } catch (e) {
+        console.error("Failed to fetch super admin for email fallback:", e.message);
+    }
+  }
+
+  if (!adminEmail) {
+    console.warn('[Email] ADMIN_EMAIL and Super Admin not found — skipping admin custom notification.');
+    return;
+  }
+
+  const item = order.items?.[0] || {};
+  const c = item.customization || {};
+
+  let customizationsHtml = '';
+  if (c.leatherColor && c.leatherColor !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Leather Color:</strong> ${c.leatherColor} ${c.leatherColorNote ? `(${c.leatherColorNote})` : ''}</p>`;
+  }
+  if (c.leatherType && c.leatherType !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Leather Type:</strong> ${c.leatherType} ${c.leatherTypeNote ? `(${c.leatherTypeNote})` : ''}</p>`;
+  }
+  if (c.innerLining && c.innerLining !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Inner Lining:</strong> ${c.innerLining} ${c.innerLiningNote ? `(${c.innerLiningNote})` : ''}</p>`;
+  }
+  if (c.hardwareColor && c.hardwareColor !== 'None') {
+    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Hardware Color:</strong> ${c.hardwareColor} ${c.hardwareColorNote ? `(${c.hardwareColorNote})` : ''}</p>`;
+  }
+
+  const html = `
+    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 500px; margin: auto; color: #1a1a1a;">
+      <div style="background: #8b5cf6; padding: 20px 30px;">
+        <h2 style="color: #fff; margin: 0; font-size: 18px;">✨ New Custom Order Request</h2>
+      </div>
+      <div style="padding: 30px; background: #f9f9f9; border: 1px solid #eee; border-top: none;">
+        <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+          <tr><td style="padding: 6px 0; color: #666;">Request Number</td><td style="padding: 6px 0; font-weight: 700;">#${order.orderNumber}</td></tr>
+          <tr><td style="padding: 6px 0; color: #666;">Customer</td><td style="padding: 6px 0;">${order.shippingAddress?.fullName || 'N/A'}</td></tr>
+          <tr><td style="padding: 6px 0; color: #666;">Email</td><td style="padding: 6px 0;">${order.customer?.email || 'N/A'}</td></tr>
+          <tr><td style="padding: 6px 0; color: #666;">Phone</td><td style="padding: 6px 0;">${order.shippingAddress?.phone || 'N/A'}</td></tr>
+          <tr><td style="padding: 6px 0; color: #666;">Product</td><td style="padding: 6px 0; font-weight:700;">${item.name || 'N/A'}</td></tr>
+        </table>
+        <div style="margin-top: 20px; background: #fff; padding: 15px; border: 1px solid #eee; border-radius:3px;">
+          <h4 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; color:#888;">Design Specifications</h4>
+          ${customizationsHtml}
+        </div>
+        <div style="margin-top: 24px;">
+          <a href="${process.env.NEXTAUTH_URL}/admin/orders/${order._id}"
+             style="display:inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: 700; text-transform:uppercase; letter-spacing:1px;">
+            View Order & Specifications →
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"PAIRO System" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      to: adminEmail,
+      subject: `✨ New Custom Order: #${order.orderNumber} by ${order.shippingAddress?.fullName || 'Guest'}`,
+      html,
+    });
+    console.log(`[Email] ✅ Admin notified of custom order (${adminEmail}) | MsgID: ${info.messageId}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send admin custom notification:', err.message);
+  }
+}
+
