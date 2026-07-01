@@ -4,19 +4,19 @@ import { useState, useEffect } from "react";
 import { X, Info, Check } from "lucide-react";
 
 const UPPER_BODY_FIELDS = [
-  { key: "chest", label: "Chest", hint: "Measure around the fullest part of your chest, keeping the tape horizontal." },
-  { key: "neck", label: "Neck", hint: "Measure around the base of your neck where the collar sits." },
-  { key: "shoulder", label: "Shoulder", hint: "Measure from one shoulder point to the other across the back." },
-  { key: "sleeveLength", label: "Sleeve Length", hint: "From shoulder point to the end of your wrist, with arm slightly bent." },
-  { key: "bicep", label: "Bicep", hint: "Measure around the fullest part of your upper arm." },
-  { key: "wrist", label: "Wrist", hint: "Measure around your wrist just below the wrist bone." },
+  { key: "chest",       label: "Chest",        hint: "Measure around the fullest part of your chest, keeping the tape horizontal." },
+  { key: "neck",        label: "Neck",          hint: "Measure around the base of your neck where the collar sits." },
+  { key: "shoulder",    label: "Shoulder",      hint: "Measure from one shoulder point to the other across the back." },
+  { key: "sleeveLength",label: "Sleeve Length", hint: "From shoulder point to the end of your wrist, with arm slightly bent." },
+  { key: "bicep",       label: "Bicep",         hint: "Measure around the fullest part of your upper arm." },
+  { key: "wrist",       label: "Wrist",         hint: "Measure around your wrist just below the wrist bone." },
 ];
 
 const LOWER_BODY_FIELDS = [
-  { key: "waist", label: "Waist", hint: "Measure around your natural waistline, the narrowest part of your torso." },
-  { key: "lowerWaist", label: "Lower Waist", hint: "Measure around your hips at the widest point, about 8\" below your natural waist." },
-  { key: "hips", label: "Hips", hint: "Measure around the fullest part of your hips." },
-  { key: "jacketLength", label: "Jacket Length", hint: "From the back of your neck down to where you want the jacket to end." },
+  { key: "waist",       label: "Waist",         hint: "Measure around your natural waistline, the narrowest part of your torso." },
+  { key: "lowerWaist",  label: "Lower Waist",   hint: "Measure around your hips at the widest point, about 8\" below your natural waist." },
+  { key: "hips",        label: "Hips",          hint: "Measure around the fullest part of your hips." },
+  { key: "jacketLength",label: "Jacket Length", hint: "From the back of your neck down to where you want the jacket to end." },
 ];
 
 const PHYSICAL_PROFILE_FIELDS = [
@@ -27,12 +27,12 @@ const PHYSICAL_PROFILE_FIELDS = [
 const M2M_SURCHARGE = 25;
 
 export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCart }) {
-  const [unit, setUnit] = useState("inches");
-  const [measurements, setMeasurements] = useState({});
-  const [notes, setNotes] = useState("");
+  const [unit,          setUnit]          = useState("inches");
+  const [measurements,  setMeasurements]  = useState({});
+  const [notes,         setNotes]         = useState("");
   const [activeTooltip, setActiveTooltip] = useState(null);
-  const [adding, setAdding] = useState(false);
-  const [added, setAdded] = useState(false);
+  const [adding,        setAdding]        = useState(false);
+  const [added,         setAdded]         = useState(false);
 
   // Reset on open
   useEffect(() => {
@@ -46,19 +46,14 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
   // Trap scroll
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleChange = (key, val) => {
-    setMeasurements(prev => ({ ...prev, [key]: val }));
-  };
+  const handleChange = (key, val) =>
+    setMeasurements((prev) => ({ ...prev, [key]: val }));
 
   const handleAdd = () => {
     setAdding(true);
@@ -66,20 +61,12 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
     onAddToCart({
       ...product,
       price: surchargedPrice,
-      madeToMeasure: {
-        enabled: true,
-        surcharge: M2M_SURCHARGE,
-        unit,
-        measurements,
-        notes
-      }
+      madeToMeasure: { enabled: true, surcharge: M2M_SURCHARGE, unit, measurements, notes },
     });
     setTimeout(() => {
       setAdding(false);
       setAdded(true);
-      setTimeout(() => {
-        onClose();
-      }, 800);
+      setTimeout(() => { onClose(); }, 800);
     }, 500);
   };
 
@@ -87,10 +74,11 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
   const renderField = (field) => (
     <div key={field.key} className="relative">
-      <label className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-primary/65 mb-1">
+      {/* Label */}
+      <label className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-black mb-1">
         {field.label}
         <span
-          className="text-primary/30 hover:text-primary/60 cursor-pointer transition-colors"
+          className="text-black/30 hover:text-black/60 cursor-pointer transition-colors"
           onMouseEnter={() => setActiveTooltip(field.key)}
           onMouseLeave={() => setActiveTooltip(null)}
           onClick={() => setActiveTooltip(activeTooltip === field.key ? null : field.key)}
@@ -101,12 +89,13 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
       {/* Tooltip */}
       {activeTooltip === field.key && (
-        <div className="absolute left-0 -top-1.5 z-10 translate-y-[-100%] bg-primary text-white text-[9px] leading-relaxed p-2 rounded-[2px] shadow-lg w-48 pointer-events-none">
+        <div className="absolute left-0 -top-1.5 z-10 translate-y-[-100%] bg-black text-white text-[9px] leading-relaxed p-2 rounded-[2px] shadow-lg w-48 pointer-events-none">
           {field.hint}
-          <div className="absolute left-2.5 bottom-0 translate-y-full border-[3px] border-transparent border-t-primary" />
+          <div className="absolute left-2.5 bottom-0 translate-y-full border-[3px] border-transparent border-t-black" />
         </div>
       )}
 
+      {/* Input */}
       <div className="relative">
         <input
           type="number"
@@ -114,10 +103,10 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
           step="0.5"
           placeholder="0"
           value={measurements[field.key] || ""}
-          onChange={e => handleChange(field.key, e.target.value)}
-          className="w-full border border-black/8 rounded-[2px] px-2 py-1.5 pr-8 text-[11px] text-primary outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/10 transition-all bg-white placeholder-primary/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          onChange={(e) => handleChange(field.key, e.target.value)}
+          className="w-full border border-black/12 rounded-[2px] px-2 py-1.5 pr-8 text-[11px] text-black outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/10 transition-all bg-white placeholder-black/25 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-bold text-primary/35 uppercase">
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-bold text-black/50 uppercase">
           {unitLabel}
         </span>
       </div>
@@ -130,31 +119,35 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
       <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full sm:max-w-xl max-h-[92dvh] bg-white rounded-t-[16px] sm:rounded-[3px] shadow-xl flex flex-col overflow-hidden animate-slideUp">
+      <div className="relative w-full sm:max-w-xl max-h-[92dvh] bg-white rounded-t-[14px] sm:rounded-[3px] shadow-2xl flex flex-col overflow-hidden animate-slideUp">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-black/5 shrink-0">
-          <div className="flex items-center gap-2">
-            <div>
-              <p className="text-[12px] font-bold uppercase tracking-widest text-primary">Made to Measure</p>
-              <p className="text-[9px] text-primary/50 uppercase tracking-[0.12em] font-medium mt-0.5">Bespoke Fit Configuration — +${M2M_SURCHARGE}</p>
-            </div>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-black/8 shrink-0">
+          <div>
+            <p className="text-[12px] font-bold uppercase tracking-widest text-black">Made to Measure</p>
+            <p className="text-[9px] text-black/55 uppercase tracking-[0.1em] font-semibold mt-0.5">
+              Bespoke Fit Configuration — +${M2M_SURCHARGE} Surcharge
+            </p>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-black/5 rounded-full transition-colors">
-            <X className="w-3.5 h-3.5 text-primary/60" />
+            <X className="w-3.5 h-3.5 text-black/60" />
           </button>
         </div>
 
         {/* Unit Selector */}
-        <div className="px-5 pt-3 pb-2 shrink-0 flex items-center justify-between border-b border-black/[0.03]">
-          <span className="text-[9px] font-bold uppercase tracking-widest text-primary/40">Select Measurement Unit</span>
-          <div className="flex rounded-[2px] border border-black/10 overflow-hidden text-[9px] font-bold">
-            {["inches", "cm"].map(u => (
+        <div className="px-5 pt-3 pb-2.5 shrink-0 flex items-center justify-between border-b border-black/[0.04]">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-black">
+            Measurement Unit
+          </span>
+          <div className="flex rounded-[2px] border border-black/12 overflow-hidden text-[9px] font-bold">
+            {["inches", "cm"].map((u) => (
               <button
                 key={u}
                 type="button"
                 onClick={() => setUnit(u)}
-                className={`px-2.5 py-1 transition-colors uppercase tracking-wider ${unit === u ? "bg-primary text-white" : "bg-white text-primary/50 hover:text-primary"}`}
+                className={`px-3 py-1 transition-colors uppercase tracking-wider ${
+                  unit === u ? "bg-primary text-white" : "bg-white text-black hover:bg-black/5"
+                }`}
               >
                 {u}
               </button>
@@ -164,9 +157,12 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
         {/* Form Body — scrollable */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 min-h-0">
+
           {/* Upper Body */}
           <div className="space-y-2">
-            <h4 className="text-[9px] font-bold uppercase tracking-[0.15em] text-primary/45 border-b border-black/5 pb-1">Upper Body Specs</h4>
+            <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-black border-b border-black/8 pb-1">
+              Upper Body Specs
+            </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {UPPER_BODY_FIELDS.map(renderField)}
             </div>
@@ -174,15 +170,19 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
           {/* Lower Body */}
           <div className="space-y-2">
-            <h4 className="text-[9px] font-bold uppercase tracking-[0.15em] text-primary/45 border-b border-black/5 pb-1">Lower Body & Length</h4>
-            <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+            <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-black border-b border-black/8 pb-1">
+              Lower Body &amp; Length
+            </p>
+            <div className="grid grid-cols-2 gap-3">
               {LOWER_BODY_FIELDS.map(renderField)}
             </div>
           </div>
 
           {/* Physical Profile */}
           <div className="space-y-2">
-            <h4 className="text-[9px] font-bold uppercase tracking-[0.15em] text-primary/45 border-b border-black/5 pb-1">Physical Profile</h4>
+            <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-black border-b border-black/8 pb-1">
+              Physical Profile
+            </p>
             <div className="grid grid-cols-2 gap-3">
               {PHYSICAL_PROFILE_FIELDS.map(renderField)}
             </div>
@@ -190,32 +190,32 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
           {/* Additional Notes */}
           <div className="space-y-1">
-            <label className="block text-[9px] font-bold uppercase tracking-[0.15em] text-primary/65">
+            <label className="block text-[9px] font-bold uppercase tracking-[0.15em] text-black">
               Fitting Notes / Requests (Optional)
             </label>
             <textarea
               rows={2}
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="Posture detail, shoulder pads request, custom fit preferences..."
-              className="w-full border border-black/8 rounded-[2px] px-2 py-1.5 text-[11px] text-primary outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/10 transition-all bg-white placeholder-primary/20 resize-none"
+              className="w-full border border-black/12 rounded-[2px] px-2 py-1.5 text-[11px] text-black placeholder-black/25 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/10 transition-all bg-white resize-none"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-black/5 bg-white shrink-0">
+        <div className="px-5 py-4 border-t border-black/8 bg-white shrink-0">
           {/* Price Calculations */}
-          <div className="flex items-center justify-between text-[11px] mb-2 px-1">
-            <span className="text-primary/65">Base Product Price</span>
-            <span className="font-semibold text-primary">${product?.price?.toFixed(2)}</span>
+          <div className="flex items-center justify-between text-[11px] mb-1.5 px-1">
+            <span className="text-black font-medium">Base Product Price</span>
+            <span className="font-bold text-black">${product?.price?.toFixed(2)}</span>
           </div>
           <div className="flex items-center justify-between text-[11px] mb-3 px-1">
-            <span className="text-primary/65">Made to Measure Upgrade</span>
-            <span className="font-semibold text-emerald-600">+${M2M_SURCHARGE}.00</span>
+            <span className="text-black font-medium">Made to Measure Upgrade</span>
+            <span className="font-bold text-emerald-600">+${M2M_SURCHARGE}.00</span>
           </div>
           <div className="flex items-center justify-between mb-4 py-2.5 px-3 bg-primary text-white rounded-[2px]">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Authoritative Total</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Total</span>
             <span className="text-[13px] font-bold">${((product?.price || 0) + M2M_SURCHARGE).toFixed(2)}</span>
           </div>
 
@@ -223,17 +223,21 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
             type="button"
             onClick={handleAdd}
             disabled={adding || added}
-            className={`w-full h-10 rounded-[2px] font-bold uppercase tracking-[0.15em] text-[11px] flex items-center justify-center gap-2 transition-all duration-300 ${added
-              ? "bg-emerald-600 text-white"
-              : "bg-primary text-white hover:bg-primary/95 active:scale-[0.99]"
-              }`}
+            className={`w-full h-10 rounded-[2px] font-bold uppercase tracking-[0.15em] text-[11px] flex items-center justify-center gap-2 transition-all duration-300 ${
+              added
+                ? "bg-emerald-600 text-white"
+                : "bg-primary text-white hover:bg-primary/95 active:scale-[0.99]"
+            }`}
           >
             {added ? (
-              <>Added to Cart!</>
+              <>
+                <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                Added to Cart!
+              </>
             ) : adding ? (
-              <>Adding...</>
+              "Adding..."
             ) : (
-              <>Confirm & Add to Cart</>
+              "Confirm & Add to Cart"
             )}
           </button>
         </div>
@@ -241,10 +245,10 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
       <style>{`
         @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px); }
+          from { opacity: 0; transform: translateY(28px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        .animate-slideUp { animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1) both; }
+        .animate-slideUp { animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
       `}</style>
     </div>
   );
