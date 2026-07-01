@@ -121,12 +121,12 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
   );
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border border-black animate-m2m-up rounded-[var(--radius,0px)]">
+      <div className="relative w-full h-full max-w-none max-h-none bg-white flex flex-col overflow-hidden shadow-2xl border border-black animate-m2m-up rounded-[var(--radius,0px)]">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black shrink-0">

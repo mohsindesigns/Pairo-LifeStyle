@@ -94,15 +94,15 @@ export default function SearchModal({ isOpen, onClose }) {
             className="border-b border-black/5 bg-white shrink-0"
           >
             <div className="container mx-auto px-4 sm:px-6 md:px-16 py-4 md:py-5 flex items-center justify-between gap-4 md:gap-6">
-              <div className="flex items-center gap-3 flex-1 bg-black/5 border border-black/5 rounded-full px-5 py-2.5 md:py-3 transition-all duration-300 focus-within:border-black/20 focus-within:bg-black/[0.07]">
-                <Search className="w-4 h-4 md:w-5 md:h-5 text-black/40 flex-shrink-0" />
+              <div className="flex items-center gap-4 flex-1 bg-white border border-black rounded-[var(--radius,0px)] px-6 py-3 md:py-3.5 transition-all duration-300 focus-within:ring-1 focus-within:ring-black">
+                <Search className="w-4 h-4 md:w-5 md:h-5 text-black flex-shrink-0" />
                 <input
                   ref={inputRef}
                   type="text"
-                  placeholder={search.placeholder}
+                  placeholder={search.placeholder || "Search Pairo..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent text-base md:text-lg font-medium outline-none placeholder:text-black/40 uppercase tracking-wider text-black"
+                  className="w-full bg-transparent text-base md:text-lg font-semibold outline-none placeholder:text-black/30 uppercase tracking-[0.15em] text-black"
                 />
               </div>
               <button
@@ -183,15 +183,20 @@ export default function SearchModal({ isOpen, onClose }) {
                             onClick={onClose}
                             className="group"
                           >
-                            <div className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden bg-black/5 mb-2 md:mb-2.5">
-                              <Image 
-                                src={product.image || "/placeholder.jpg"} 
-                                alt={product.name} 
-                                fill 
-                                sizes="(max-width: 768px) 50vw, 33vw" 
-                                className="object-cover group-hover:scale-105 transition-transform duration-700" 
-                                unoptimized={product.image ? (!product.image.startsWith("http") && !product.image.includes("cloudinary.com")) : false}
-                              />
+                            <div className="relative aspect-[3/4] rounded-[var(--radius,0px)] overflow-hidden bg-black/5 mb-2 md:mb-2.5">
+                              {(() => {
+                                const productImg = product.images?.[0] || product.image || "/placeholder.jpg";
+                                return (
+                                  <Image 
+                                    src={productImg} 
+                                    alt={product.name} 
+                                    fill 
+                                    sizes="(max-width: 768px) 50vw, 33vw" 
+                                    className="object-cover group-hover:scale-105 transition-transform duration-700" 
+                                    unoptimized={productImg ? (!productImg.startsWith("http") && !productImg.includes("cloudinary.com")) : false}
+                                  />
+                                );
+                              })()}
                             </div>
                             <div className="space-y-0.5 md:space-y-1">
                                <p className="text-[7px] md:text-[8px] font-bold text-black/30 uppercase tracking-widest">{product.category}</p>
@@ -202,53 +207,21 @@ export default function SearchModal({ isOpen, onClose }) {
                         ))}
                       </div>
                     ) : (
-                      <div className="py-8 md:py-12 text-center bg-black/5 rounded-2xl md:rounded-3xl border border-dashed border-black/10">
+                      <div className="py-8 md:py-12 text-center bg-black/5 rounded-[var(--radius,0px)] border border-dashed border-black/10">
                         <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-black/30 italic px-4">{search.noProductsFound} &quot;{searchQuery}&quot;</p>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
-                /* Dynamic State */
+                /* Dynamic State (Initially Empty) */
                 <div 
                   onClick={(e) => e.stopPropagation()}
-                  className="max-w-5xl mx-auto py-2 md:py-4"
+                  className="flex flex-col items-center justify-center py-20 text-center select-none"
                 >
-                  <div className="flex flex-col md:grid md:grid-cols-3 gap-6 md:gap-8">
-                      <div className="space-y-4 md:space-y-6">
-                        <h4 className="text-[8px] md:text-[10px] font-bold text-black/30 uppercase tracking-[0.4em]">{search.popularCategories}</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-1 gap-3 md:gap-4">
-                            {dbCategories.map((cat) => (
-                              <Link key={cat.slug} href={getCategoryUrl(cat)} onClick={onClose} className="group block text-lg md:text-2xl font-bold heading-font uppercase tracking-tighter text-black/60 hover:text-black transition-colors">
-                                {cat.name}
-                              </Link>
-                            ))}
-                        </div>
-                      </div>
-                      
-                      <div className="md:col-span-2">
-                        <h4 className="text-[8px] md:text-[10px] font-bold text-black/30 uppercase tracking-[0.4em] mb-3 md:mb-4">{search.featuredCollection}</h4>
-                        {dbCategories.length > 0 ? (
-                          (() => {
-                            const featuredCat = dbCategories[1] || dbCategories[0];
-                            return (
-                              <Link href={getCategoryUrl(featuredCat)} onClick={onClose} className="group relative aspect-[16/9] md:aspect-[16/7] block rounded-2xl md:rounded-3xl overflow-hidden bg-black/5">
-                                  <Image src={featuredCat.image || "/placeholder.jpg"} alt={featuredCat.name} fill sizes="(max-width: 768px) 100vw, 66vw" className="object-cover group-hover:scale-105 transition-transform duration-1000" />
-                                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex flex-col justify-end p-4 md:p-6">
-                                     <h3 className="text-xl md:text-2xl font-bold text-white uppercase tracking-tighter heading-font">{featuredCat.name} Collection</h3>
-                                     <div className="flex items-center gap-2 text-white/60 group-hover:text-white transition-colors mt-2">
-                                         <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-widest">{search.shopCollection}</span>
-                                         <ArrowRight className="w-3 h-3 md:w-4 md:h-4" />
-                                       </div>
-                                  </div>
-                              </Link>
-                            );
-                          })()
-                        ) : (
-                          <div className="aspect-[16/9] md:aspect-[16/7] rounded-3xl border border-dashed border-black/10 flex items-center justify-center text-black/20 font-bold uppercase tracking-widest text-[10px]">No collection available</div>
-                        )}
-                      </div>
-                  </div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-black/30">
+                    Type to search our collection
+                  </p>
                 </div>
               )}
             </div>
