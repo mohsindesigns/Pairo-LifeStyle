@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Minus, ShoppingBag, Check, Ruler, Palette } from "lucide-react";
+import { Plus, Minus, ShoppingBag, Check, Ruler, Palette, Shield, Settings } from "lucide-react";
+
 import { useCart } from "@/context/CartContext";
 import { useRouter } from "next/navigation";
 import SwatchBubble from "@/components/common/SwatchBubble";
