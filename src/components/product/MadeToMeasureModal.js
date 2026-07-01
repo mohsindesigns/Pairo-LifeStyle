@@ -86,7 +86,7 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
       </label>
 
       {activeTooltip === field.key && (
-        <div className="absolute left-0 -top-2 z-20 translate-y-[-100%] bg-black text-white text-[10px] leading-relaxed p-3 rounded shadow-xl w-52 pointer-events-none font-medium">
+        <div className="absolute left-0 -top-2 z-20 translate-y-[-100%] bg-black text-white text-[10px] leading-relaxed p-3 rounded-[var(--radius,0px)] shadow-xl w-52 pointer-events-none font-medium">
           {field.hint}
           <div className="absolute left-3 bottom-0 translate-y-full border-[5px] border-transparent border-t-black" />
         </div>
@@ -100,9 +100,9 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
           placeholder="0"
           value={measurements[field.key] || ""}
           onChange={(e) => handleChange(field.key, e.target.value)}
-          className="w-full border-2 border-black rounded px-3 py-2 pr-9 text-[12px] font-bold text-black bg-white outline-none focus:ring-2 focus:ring-black transition-all placeholder-black/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-full border border-black rounded-[var(--radius,0px)] px-3 py-2 pr-9 text-[12px] font-bold text-black bg-white outline-none focus:ring-1 focus:ring-black transition-all placeholder-black/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-black uppercase tracking-wider">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-semibold text-black uppercase tracking-wider">
           {unitLabel}
         </span>
       </div>
@@ -111,7 +111,7 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
   const renderGroup = (title, fields, cols = "grid-cols-2 sm:grid-cols-3") => (
     <div>
-      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black mb-3 pb-2 border-b-2 border-black">
+      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black mb-3 pb-2 border-b border-black">
         {title}
       </p>
       <div className={`grid ${cols} gap-3`}>
