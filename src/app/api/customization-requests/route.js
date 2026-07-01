@@ -38,6 +38,13 @@ export async function POST(req) {
     const count = await Order.countDocuments({ tenantId });
     const orderNumber = `PAI-${1000 + count + 1}`;
 
+    // ── Generate unique idempotencyKey to avoid duplicate-index conflicts ─
+    // The Order schema has a compound unique index { tenantId, idempotencyKey }.
+    // If idempotencyKey is null and tenantId is the same, subsequent custom
+    // orders throw E11000. A per-request UUID eliminates this completely.
+    const idempotencyKey = `custom-${crypto.randomUUID()}`;
+
+
     // ── Safe productId handling ───────────────────────────────────────
     // product.id may be a valid ObjectId string or undefined — handle both
     let productId = undefined;
@@ -115,6 +122,7 @@ export async function POST(req) {
         phone:    customer.phone || "",
       },
       customerNote: additionalNotes || "",
+      idempotencyKey,
     });
 
     // ── Emails (errors are non-fatal) ─────────────────────────────────

@@ -242,7 +242,7 @@ export default function SuccessPage() {
                       </p>
                     )}
                     <p className="text-[12px] font-bold text-black font-mono mt-1">
-                      Rs. {item.priceAtPurchase.toLocaleString()}
+                      ${item.priceAtPurchase.toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -255,33 +255,33 @@ export default function SuccessPage() {
             <div className="space-y-3 pt-6 border-t border-neutral-200/85 text-[13px] text-neutral-600">
               <div className="flex justify-between items-center">
                 <span>Subtotal</span>
-                <span className="text-black font-semibold font-mono">Rs. {order.financials.subtotal.toLocaleString()}</span>
+                <span className="text-black font-semibold font-mono">${order.financials.subtotal.toLocaleString()}</span>
               </div>
               
               {order.financials.discountTotal > 0 && (
                 <div className="flex justify-between items-center text-emerald-700 font-semibold">
                   <span>Discount</span>
-                  <span className="font-mono">-Rs. {order.financials.discountTotal.toLocaleString()}</span>
+                  <span className="font-mono">-${order.financials.discountTotal.toLocaleString()}</span>
                 </div>
               )}
 
               {order.financials.affiliateDiscountAmount > 0 && (
                 <div className="flex justify-between items-center text-emerald-700 font-semibold">
                   <span>Referral Discount</span>
-                  <span className="font-mono">-Rs. {order.financials.affiliateDiscountAmount.toLocaleString()}</span>
+                  <span className="font-mono">-${order.financials.affiliateDiscountAmount.toLocaleString()}</span>
                 </div>
               )}
 
               <div className="flex justify-between items-center">
                 <span>Shipping</span>
                 <span className="text-black font-semibold font-mono">
-                  {order.financials.shippingCost === 0 ? "Free" : `Rs. ${order.financials.shippingCost.toLocaleString()}`}
+                  {order.financials.shippingCost === 0 ? "Free" : `$${order.financials.shippingCost.toLocaleString()}`}
                 </span>
               </div>
 
               <div className="pt-6 flex justify-between items-end border-t border-neutral-200/85">
                 <span className="text-sm font-bold uppercase tracking-wider text-black">Total Paid</span>
-                <span className="text-2xl font-black text-black font-mono">Rs. {order.financials.total.toLocaleString()}</span>
+                <span className="text-2xl font-black text-black font-mono">${order.financials.total.toLocaleString()}</span>
               </div>
             </div>
           )}

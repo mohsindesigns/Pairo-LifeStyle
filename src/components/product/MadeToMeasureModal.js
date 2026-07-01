@@ -4,19 +4,19 @@ import { useState, useEffect } from "react";
 import { X, Info, Check } from "lucide-react";
 
 const UPPER_BODY_FIELDS = [
-  { key: "chest",       label: "Chest",        hint: "Measure around the fullest part of your chest, keeping the tape horizontal." },
-  { key: "neck",        label: "Neck",          hint: "Measure around the base of your neck where the collar sits." },
-  { key: "shoulder",    label: "Shoulder",      hint: "Measure from one shoulder point to the other across the back." },
-  { key: "sleeveLength",label: "Sleeve Length", hint: "From shoulder point to the end of your wrist, with arm slightly bent." },
-  { key: "bicep",       label: "Bicep",         hint: "Measure around the fullest part of your upper arm." },
-  { key: "wrist",       label: "Wrist",         hint: "Measure around your wrist just below the wrist bone." },
+  { key: "chest", label: "Chest", hint: "Measure around the fullest part of your chest, keeping the tape horizontal." },
+  { key: "neck", label: "Neck", hint: "Measure around the base of your neck where the collar sits." },
+  { key: "shoulder", label: "Shoulder", hint: "Measure from one shoulder point to the other across the back." },
+  { key: "sleeveLength", label: "Sleeve Length", hint: "From shoulder point to the end of your wrist, with arm slightly bent." },
+  { key: "bicep", label: "Bicep", hint: "Measure around the fullest part of your upper arm." },
+  { key: "wrist", label: "Wrist", hint: "Measure around your wrist just below the wrist bone." },
 ];
 
 const LOWER_BODY_FIELDS = [
-  { key: "waist",       label: "Waist",         hint: "Measure around your natural waistline, the narrowest part of your torso." },
-  { key: "lowerWaist",  label: "Lower Waist",   hint: "Measure around your hips at the widest point, about 8\" below your natural waist." },
-  { key: "hips",        label: "Hips",          hint: "Measure around the fullest part of your hips." },
-  { key: "jacketLength",label: "Jacket Length", hint: "From the back of your neck down to where you want the jacket to end." },
+  { key: "waist", label: "Waist", hint: "Measure around your natural waistline, the narrowest part of your torso." },
+  { key: "lowerWaist", label: "Lower Waist", hint: "Measure around your hips at the widest point, about 8\" below your natural waist." },
+  { key: "hips", label: "Hips", hint: "Measure around the fullest part of your hips." },
+  { key: "jacketLength", label: "Jacket Length", hint: "From the back of your neck down to where you want the jacket to end." },
 ];
 
 const PHYSICAL_PROFILE_FIELDS = [
@@ -27,12 +27,12 @@ const PHYSICAL_PROFILE_FIELDS = [
 const M2M_SURCHARGE = 25;
 
 export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCart }) {
-  const [unit,          setUnit]          = useState("inches");
-  const [measurements,  setMeasurements]  = useState({});
-  const [notes,         setNotes]         = useState("");
+  const [unit, setUnit] = useState("inches");
+  const [measurements, setMeasurements] = useState({});
+  const [notes, setNotes] = useState("");
   const [activeTooltip, setActiveTooltip] = useState(null);
-  const [adding,        setAdding]        = useState(false);
-  const [added,         setAdded]         = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
 
   // Reset on open
   useEffect(() => {
@@ -145,9 +145,8 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
                 key={u}
                 type="button"
                 onClick={() => setUnit(u)}
-                className={`px-3 py-1 transition-colors uppercase tracking-wider ${
-                  unit === u ? "bg-primary text-white" : "bg-white text-black hover:bg-black/5"
-                }`}
+                className={`px-3 py-1 transition-colors uppercase tracking-wider ${unit === u ? "bg-primary text-white" : "bg-white text-black hover:bg-black/5"
+                  }`}
               >
                 {u}
               </button>
@@ -223,11 +222,10 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
             type="button"
             onClick={handleAdd}
             disabled={adding || added}
-            className={`w-full h-10 rounded-[2px] font-bold uppercase tracking-[0.15em] text-[11px] flex items-center justify-center gap-2 transition-all duration-300 ${
-              added
-                ? "bg-emerald-600 text-white"
-                : "bg-primary text-white hover:bg-primary/95 active:scale-[0.99]"
-            }`}
+            className={`w-full h-10 rounded-[2px] font-bold uppercase tracking-[0.15em] text-[11px] flex items-center justify-center gap-2 transition-all duration-300 ${added
+              ? "bg-emerald-600 text-white"
+              : "bg-primary text-white hover:bg-primary/95 active:scale-[0.99]"
+              }`}
           >
             {added ? (
               <>

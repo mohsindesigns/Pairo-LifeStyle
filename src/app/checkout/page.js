@@ -408,7 +408,7 @@ export default function CheckoutPage() {
                         </div>
                       </div>
                       <span className="text-[13px] font-bold text-black font-mono">
-                        {rate.cost === 0 ? "Free" : `Rs. ${rate.cost.toLocaleString()}`}
+                        {rate.cost === 0 ? "Free" : `$${rate.cost.toLocaleString()}`}
                       </span>
                     </label>
                   ))}
@@ -471,7 +471,7 @@ export default function CheckoutPage() {
                     {item.madeToMeasure?.enabled && (
                       <div className="mt-1">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wide">
-                          ✦ Made to Measure
+                          âœ¦ Made to Measure
                         </span>
                         <details className="mt-1">
                           <summary className="text-[10px] text-neutral-400 cursor-pointer hover:text-neutral-600 transition-colors select-none">View measurements</summary>
@@ -485,7 +485,7 @@ export default function CheckoutPage() {
                       </div>
                     )}
                     <p className="text-[12px] font-bold text-black font-mono mt-1">
-                      Rs. {(item.price * item.quantity).toLocaleString()}
+                      ${(item.price * item.quantity).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -534,20 +534,20 @@ export default function CheckoutPage() {
           <div className="space-y-3 pt-6 border-t border-neutral-200/85 text-[13px] text-neutral-600">
             <div className="flex justify-between items-center">
               <span>Subtotal</span>
-              <span className="text-black font-semibold font-mono">Rs. {(cartSubtotal || 0).toLocaleString()}</span>
+              <span className="text-black font-semibold font-mono">${(cartSubtotal || 0).toLocaleString()}</span>
             </div>
 
             {discountTotal > 0 && (
               <div className="flex justify-between items-center text-emerald-700 font-semibold">
                 <span>Discount</span>
-                <span className="font-mono">-Rs. {discountTotal.toLocaleString()}</span>
+                <span className="font-mono">-${discountTotal.toLocaleString()}</span>
               </div>
             )}
 
             {affiliateDiscount?.type !== "None" && affiliateDiscountAmount > 0 && (
               <div className="flex justify-between items-center text-emerald-700 font-semibold">
                 <span>Referral Discount</span>
-                <span className="font-mono">-Rs. {affiliateDiscountAmount.toLocaleString()}</span>
+                <span className="font-mono">-${affiliateDiscountAmount.toLocaleString()}</span>
               </div>
             )}
 
@@ -555,14 +555,14 @@ export default function CheckoutPage() {
               <span>Shipping</span>
               <span className="text-black font-semibold font-mono">
                 {selectedShipping
-                  ? (shippingCost === 0 ? "Free" : `Rs. ${shippingCost.toLocaleString()}`)
+                  ? (shippingCost === 0 ? "Free" : `$${shippingCost.toLocaleString()}`)
                   : "Calculated at next step"}
               </span>
             </div>
 
             <div className="pt-6 flex justify-between items-end border-t border-neutral-200/85">
               <span className="text-sm font-bold uppercase tracking-wider text-black">Total</span>
-              <span className="text-2xl font-black text-black font-mono">Rs. {cartTotal.toLocaleString()}</span>
+              <span className="text-2xl font-black text-black font-mono">${cartTotal.toLocaleString()}</span>
             </div>
           </div>
 
@@ -579,7 +579,7 @@ export default function CheckoutPage() {
               <Truck className="w-5 h-5 shrink-0 text-black" />
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-black">Reliable Home Delivery</p>
-                <p className="text-[10px] text-neutral-400">Orders are packed with care and shipped via trusted couriers.</p>
+                <p className="text-[10px] text-neutral-400">Orders are packed with care and shipped via trusted courie$</p>
               </div>
             </div>
           </div>
@@ -589,3 +589,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
