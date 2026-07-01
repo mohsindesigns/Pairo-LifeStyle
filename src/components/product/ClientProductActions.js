@@ -286,7 +286,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
               onClick={() => setCustomizeOpen(true)}
               className="h-11 sm:h-12 rounded-lg font-bold uppercase tracking-[0.1em] sm:tracking-[0.15em] text-[10px] sm:text-xs flex items-center justify-center gap-2 px-3 sm:px-4 bg-white text-gray-900 border-2 border-gray-300 hover:border-gray-900 hover:bg-gray-50 hover:shadow-md transition-all duration-300 active:scale-[0.98] group"
             >
-              <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 group-hover:text-gray-900 transition-colors" />
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 text-gray-600 group-hover:text-gray-900 transition-colors" />
               <span className="whitespace-nowrap">Customize Product</span>
             </button>
           </div>
