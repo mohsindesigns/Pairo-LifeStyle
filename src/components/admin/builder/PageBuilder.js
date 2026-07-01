@@ -18,6 +18,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import * as LucideIcons from "lucide-react";
+import dynamic from "next/dynamic";
+
+const QuillEditor = dynamic(() => import("@/components/admin/QuillEditor"), { ssr: false });
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -349,6 +352,8 @@ export default function PageBuilder({ initialPage }) {
             <button onClick={() => onChange([...items, {}])} className="w-full py-2 bg-white border border-[#2271b1] text-[#2271b1] text-[10px] font-black uppercase tracking-widest hover:bg-[#2271b1] hover:text-white transition-all rounded-sm">+ Add Item</button>
           </div>
         );
+      case "quill":
+        return <QuillEditor value={value || ""} onChange={onChange} />;
       default: return null;
     }
   };

@@ -16,6 +16,57 @@ function readFileContent(filename) {
   }
 }
 
+// Convert plain text file content to clean Quill-compatible HTML
+function textToHtml(text) {
+  const lines = text.split(/\r?\n/);
+  let html = "";
+  let inList = false;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+
+    // Divider line
+    if (line.startsWith("___") || line.includes("_____")) {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += "<hr/>";
+      continue;
+    }
+
+    // Bullet item
+    if (line.startsWith("●") || line.startsWith("•") || (line.startsWith("-") && line.length > 2)) {
+      const item = line.replace(/^[●•-]\s*/, "").trim();
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += `<li>${item}</li>`;
+      continue;
+    }
+
+    // Flush list
+    if (inList) { html += "</ul>"; inList = false; }
+
+    // Empty line → skip
+    if (!line) continue;
+
+    // Numbered section heading: "1. Something" or "12. Something"
+    if (/^\d+\.\s+\S/.test(line)) {
+      html += `<h2>${line}</h2>`;
+      continue;
+    }
+
+    // Short standalone title line (no punctuation at end, < 60 chars) → h2
+    const looksLikeHeading = line.length < 65 && !line.endsWith(".") && !line.endsWith(",") && !line.endsWith(")") && !/^[a-z]/.test(line);
+    if (looksLikeHeading && line.split(" ").length <= 8) {
+      html += `<h2>${line}</h2>`;
+      continue;
+    }
+
+    // Normal paragraph
+    html += `<p>${line}</p>`;
+  }
+
+  if (inList) html += "</ul>";
+  return html;
+}
+
 async function seedLegalPages() {
   try {
     console.log("Connecting to MongoDB...");
@@ -57,6 +108,7 @@ async function seedLegalPages() {
 
       console.log(`Processing page: ${def.title} (slug: ${def.slug})...`);
 
+      const htmlContent = textToHtml(content);
       const sectionId = `legal-${def.slug}-${Math.random().toString(36).substring(2, 11)}`;
 
       const pageData = {
@@ -75,7 +127,7 @@ async function seedLegalPages() {
             order: 0,
             config: {
               title: def.title,
-              content: content
+              content: htmlContent
             },
             overrides: {
               padding: "py-0",

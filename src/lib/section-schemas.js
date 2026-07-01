@@ -219,8 +219,8 @@ export const SECTION_SCHEMAS = {
     name: "Rich Text Content",
     icon: "FileText",
     fields: [
-      { name: "title", label: "Heading", type: "text" },
-      { name: "content", label: "Page Content (Text/Markdown)", type: "textarea" }
+      { name: "title", label: "Page Heading", type: "text" },
+      { name: "content", label: "Page Content", type: "quill" }
     ]
   }
 };

@@ -1,102 +1,99 @@
 "use client";
 
-import React from "react";
-
 export default function RichTextSection({ title = "", content = "" }) {
-  if (!content) return null;
-
-  // Simple text parser to format layout dynamically
-  const lines = content.split(/\r?\n/);
-  const formattedElements = [];
-  let currentList = [];
-
-  const flushList = (key) => {
-    if (currentList.length > 0) {
-      formattedElements.push(
-        <ul key={`list-${key}`} className="list-disc pl-6 mb-6 space-y-2 text-black text-sm md:text-base font-medium">
-          {currentList.map((item, idx) => (
-            <li key={idx} className="leading-relaxed">{item}</li>
-          ))}
-        </ul>
-      );
-      currentList = [];
-    }
-  };
-
-  lines.forEach((line, index) => {
-    const trimmed = line.trim();
-
-    // 1. Horizontal divider
-    if (trimmed.startsWith("___") || trimmed.includes("_____")) {
-      flushList(index);
-      formattedElements.push(
-        <hr key={`hr-${index}`} className="my-8 border-t border-black/20" />
-      );
-      return;
-    }
-
-    // 2. Bullet lists
-    if (trimmed.startsWith("●") || trimmed.startsWith("•") || trimmed.startsWith("-")) {
-      // Remove the bullet character
-      const itemText = trimmed.replace(/^[●•-]\s*/, "");
-      currentList.push(itemText);
-      return;
-    }
-
-    // If it's not a bullet point, flush any pending list items
-    flushList(index);
-
-    if (!trimmed) {
-      // Empty line
-      return;
-    }
-
-    // 3. Headings: numbered sections (e.g. "1. About Pairo" or short lines that look like heading titles)
-    const isHeading =
-      /^\d+\.\s+/.test(trimmed) || 
-      trimmed.endsWith("Window") ||
-      trimmed.startsWith("What Is Eligible") ||
-      trimmed.startsWith("Custom & Made-to-Order") ||
-      trimmed.startsWith("How to Request") ||
-      trimmed.startsWith("Refunds") ||
-      trimmed.startsWith("Return Shipping Costs") ||
-      trimmed.startsWith("Questions?") ||
-      trimmed.startsWith("Processing & Delivery Time") ||
-      trimmed.startsWith("Order Tracking") ||
-      trimmed.startsWith("International Orders") ||
-      trimmed.startsWith("Questions About Your Order");
-
-    if (isHeading) {
-      formattedElements.push(
-        <h2 key={`h2-${index}`} className="text-[14px] sm:text-[16px] font-black uppercase tracking-wider text-black mt-10 mb-4">
-          {trimmed}
-        </h2>
-      );
-    } else {
-      // 4. Regular Paragraph
-      formattedElements.push(
-        <p key={`p-${index}`} className="text-[12px] sm:text-[14px] leading-relaxed text-black font-medium mb-5">
-          {trimmed}
-        </p>
-      );
-    }
-  });
-
-  // Flush any list remaining at the end
-  flushList("end");
+  if (!content && !title) return null;
 
   return (
-    <section className="py-16 md:py-24 bg-white text-black min-h-[50vh]">
-      <div className="max-w-3xl mx-auto px-5 sm:px-8">
-        {title && (
-          <h1 className="text-[24px] sm:text-[32px] md:text-[40px] font-black tracking-tight uppercase text-black mb-12 border-b-2 border-black pb-4">
-            {title}
-          </h1>
-        )}
-        <div className="prose prose-neutral max-w-none">
-          {formattedElements}
+    <>
+      {/* Quill Snow rendered HTML styles scoped to this section */}
+      <style>{`
+        .rich-text-body h1 {
+          font-size: 20px;
+          font-weight: 900;
+          color: #000;
+          margin: 28px 0 12px;
+          line-height: 1.3;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+        }
+        .rich-text-body h2 {
+          font-size: 15px;
+          font-weight: 900;
+          color: #000;
+          margin: 24px 0 10px;
+          line-height: 1.4;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .rich-text-body h3 {
+          font-size: 13px;
+          font-weight: 800;
+          color: #000;
+          margin: 18px 0 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .rich-text-body p {
+          font-size: 13px;
+          font-weight: 400;
+          color: #000;
+          line-height: 1.8;
+          margin-bottom: 12px;
+        }
+        .rich-text-body ul,
+        .rich-text-body ol {
+          padding-left: 22px;
+          margin-bottom: 14px;
+          color: #000;
+        }
+        .rich-text-body li {
+          font-size: 13px;
+          font-weight: 400;
+          color: #000;
+          line-height: 1.8;
+          margin-bottom: 5px;
+        }
+        .rich-text-body ul li { list-style-type: disc; }
+        .rich-text-body ol li { list-style-type: decimal; }
+        .rich-text-body blockquote {
+          border-left: 3px solid #000;
+          padding: 10px 16px;
+          margin: 18px 0;
+          background: #f8f8f8;
+          font-size: 13px;
+          color: #000;
+          font-style: italic;
+        }
+        .rich-text-body a {
+          color: #000;
+          text-decoration: underline;
+          font-weight: 600;
+        }
+        .rich-text-body strong { font-weight: 700; color: #000; }
+        .rich-text-body em { font-style: italic; color: #000; }
+        .rich-text-body u { text-decoration: underline; color: #000; }
+        .rich-text-body hr {
+          border: none;
+          border-top: 1px solid #e0e0e0;
+          margin: 24px 0;
+        }
+      `}</style>
+
+      <section className="py-12 md:py-20 bg-white min-h-[50vh]">
+        <div className="max-w-2xl mx-auto px-5 sm:px-8">
+          {title && (
+            <h1 className="text-[16px] sm:text-[20px] font-black uppercase tracking-[0.06em] text-black mb-8 pb-4 border-b-2 border-black">
+              {title}
+            </h1>
+          )}
+          {content && (
+            <div
+              className="rich-text-body"
+              dangerouslySetInnerHTML={{ __html: content }}
+            />
+          )}
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

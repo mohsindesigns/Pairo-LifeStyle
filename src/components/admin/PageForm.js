@@ -53,12 +53,15 @@ import { CSS } from "@dnd-kit/utilities";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 
+import dynamic from "next/dynamic";
 import { SECTION_SCHEMAS } from "@/lib/section-schemas";
 import { TEMPLATE_REGISTRY } from "@/lib/templates";
 import MediaPickerModal from "./MediaPickerModal";
 import AdminPageLayout from "./AdminPageLayout";
 import SEOConfigPanel from "./SEOConfigPanel";
 import * as LucideIcons from "lucide-react";
+
+const QuillEditor = dynamic(() => import("@/components/admin/QuillEditor"), { ssr: false });
 
 /**
  * PRODUCTION-GRADE UUID GENERATOR
@@ -456,6 +459,8 @@ export default function PageForm({ pageId }) {
                   <button type="button" onClick={() => onChange([...items, {}])} className="w-full py-2 bg-white border border-[#c3c4c7] text-[#2271b1] text-[11px] font-bold uppercase hover:bg-[#f6f7f7] transition-all">+ Add Item</button>
                </div>
             );
+         case "quill":
+            return <QuillEditor value={value || ""} onChange={onChange} />;
          default: return null;
       }
    };

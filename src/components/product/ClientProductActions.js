@@ -129,11 +129,11 @@ export default function ClientProductActions({ product, onVariantChange }) {
           return (
             <div key={attr.name} className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] md:text-[12px] font-bold text-primary/80 uppercase tracking-[0.25em]">
+                <p className="text-[11px] md:text-[12px] font-black text-black uppercase tracking-[0.25em]">
                   {attr.name}
                 </p>
                 {selectedOptions[attr.name] && (
-                  <span className="text-[12px] md:text-[13px] font-bold text-primary uppercase tracking-wider">
+                  <span className="text-[12px] md:text-[13px] font-black text-black uppercase tracking-wider">
                     {selectedOptions[attr.name]}
                   </span>
                 )}
@@ -160,9 +160,9 @@ export default function ClientProductActions({ product, onVariantChange }) {
                       key={option.label}
                       type="button"
                       onClick={() => handleOptionSelect(attr.name, option)}
-                      className={`h-10 px-5 rounded-[var(--radius,0px)] text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.2em] transition-all duration-200 border ${isSelected
-                        ? "bg-primary text-white border-primary"
-                        : "bg-transparent text-primary/70 border-border hover:border-primary hover:text-primary"
+                      className={`h-10 px-5 rounded text-[12px] md:text-[13px] font-black uppercase tracking-[0.2em] transition-all duration-200 border-2 ${isSelected
+                        ? "bg-black text-white border-black"
+                        : "bg-white text-black border-black/30 hover:border-black"
                         }`}
                     >
                       {option.label}
@@ -216,7 +216,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
         <div className="space-y-3.5">
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Quantity Selector */}
-            <div className="flex items-center justify-between sm:justify-center bg-white border-2 border-black rounded-lg px-4 gap-4 h-12 shrink-0">
+            <div className="flex items-center justify-between sm:justify-center bg-white border-2 border-black rounded px-4 gap-4 h-12 shrink-0">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="text-black/50 hover:text-black transition-colors p-1"
@@ -237,10 +237,10 @@ export default function ClientProductActions({ product, onVariantChange }) {
             {/* Add to Cart Button */}
             <button
               onClick={handleAddToCart}
-              className={`flex-1 h-12 rounded-lg font-bold uppercase tracking-[0.2em] text-[11px] sm:text-xs md:text-[13px] flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.98] border-2 ${
+              className={`flex-1 h-12 rounded font-black uppercase tracking-[0.2em] text-[11px] sm:text-xs md:text-[13px] flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.98] border-2 ${
                 addedFeedback
                   ? "bg-emerald-600 border-emerald-600 text-white"
-                  : "bg-black border-black text-white hover:bg-black/90 hover:border-black/90"
+                  : "bg-black border-black text-white hover:bg-neutral-800"
               }`}
             >
               {addedFeedback ? (
@@ -260,7 +260,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
           {/* Secure Checkout */}
           <button
             onClick={handleSecureCheckout}
-            className="w-full h-12 bg-white text-black border-2 border-black rounded-lg font-bold uppercase tracking-[0.2em] text-[11px] sm:text-xs md:text-[13px] flex items-center justify-center gap-2.5 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
+            className="w-full h-12 bg-white text-black border-2 border-black rounded font-black uppercase tracking-[0.2em] text-[11px] sm:text-xs md:text-[13px] flex items-center justify-center gap-2.5 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
           >
             <Shield className="w-4 h-4" />
             Secure Checkout
@@ -272,7 +272,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
             <button
               type="button"
               onClick={() => setM2mOpen(true)}
-              className="w-full h-12 bg-white text-black border-2 border-black rounded-lg font-bold uppercase tracking-[0.15em] text-[10px] sm:text-[11px] flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
+              className="w-full h-12 bg-white text-black border-2 border-black rounded font-black uppercase tracking-[0.15em] text-[10px] sm:text-[11px] flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
             >
               <Ruler className="w-3.5 h-3.5" />
               <span>Measure (+$25)</span>
@@ -282,7 +282,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
             <button
               type="button"
               onClick={() => setCustomizeOpen(true)}
-              className="w-full h-12 bg-white text-black border-2 border-black rounded-lg font-bold uppercase tracking-[0.15em] text-[10px] sm:text-[11px] flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
+              className="w-full h-12 bg-white text-black border-2 border-black rounded font-black uppercase tracking-[0.15em] text-[10px] sm:text-[11px] flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
             >
               <Settings className="w-3.5 h-3.5" />
               <span>Customize</span>

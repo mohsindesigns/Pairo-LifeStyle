@@ -2,34 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  X,
-  Upload,
-  ChevronDown,
-  Palette,
-  Layers,
-  Settings,
-  Feather,
-  Image as ImageIcon,
-  FileText,
-  Check,
-  Loader2,
-  User,
-  Mail,
-  Phone,
-  AlertCircle,
+  X, Upload, ChevronDown, Palette, Layers, Settings,
+  Feather, Image as ImageIcon, FileText, Check,
+  Loader2, User, Mail, Phone, AlertCircle, Scissors,
 } from "lucide-react";
 
-/* ─── Option definitions ─────────────────────────────────────────────── */
 const LEATHER_COLORS  = ["None", "Black", "Brown", "Blue", "Other"];
 const LEATHER_TYPES   = ["None", "Sheepskin", "Goatskin", "Cowhide", "Calfhide", "Other"];
-const INNER_LININGS   = [
-  "None",
-  "Non Quilted (Polyester)",
-  "Change Color (Quilted)",
-  "Change Color (Non-Quilted)",
-  "Synthetic Fur",
-  "Other",
-];
+const INNER_LININGS   = ["None", "Non Quilted (Polyester)", "Change Color (Quilted)", "Change Color (Non-Quilted)", "Synthetic Fur", "Other"];
 const HARDWARE_COLORS = ["None", "Silver", "Brass", "Black", "Other"];
 const FUR_TYPES       = ["None", "Faux Fur", "Shearling", "Rabbit", "Fox", "Mink", "Wool", "Other"];
 const FUR_COLORS      = ["White", "Black", "Brown", "Grey", "Cream", "Beige", "Custom"];
@@ -45,34 +25,10 @@ const ARTWORK_SLOTS   = [
 ];
 const ACCEPTED_FORMATS = ".png,.jpg,.jpeg,.svg,.pdf,.ai,.eps,.webp";
 
-/* ─── Section accordion ──────────────────────────────────────────────── */
-function Section({ icon: Icon, title, children, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="border-2 border-black rounded-[4px] overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-black/5 transition-colors text-left"
-      >
-        <div className="flex items-center gap-2">
-          <Icon className="w-3.5 h-3.5 text-black" />
-          <span className="text-[10px] font-black uppercase tracking-wider text-black">{title}</span>
-        </div>
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-black transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      {open && (
-        <div className="px-4 pb-4 pt-3 space-y-3 border-t-2 border-black bg-white">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
+/* ─── Shared input class ── */
+const inputCls = "w-full border-2 border-black rounded px-3 py-2.5 text-[12px] font-medium text-black bg-white outline-none focus:ring-2 focus:ring-black transition-all placeholder-black/30";
 
-/* ─── Pill select ────────────────────────────────────────────────────── */
+/* ─── Pill Select ── */
 function PillSelect({ options, value, onChange }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -81,10 +37,10 @@ function PillSelect({ options, value, onChange }) {
           key={opt}
           type="button"
           onClick={() => onChange(opt)}
-          className={`px-2.5 py-1 rounded-[4px] text-[9px] font-black uppercase tracking-wider border-2 transition-all ${
+          className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider border-2 transition-all ${
             value === opt
               ? "bg-black text-white border-black"
-              : "bg-white text-black border-black/30 hover:border-black hover:bg-black/5"
+              : "bg-white text-black border-black/20 hover:border-black"
           }`}
         >
           {opt}
@@ -94,12 +50,10 @@ function PillSelect({ options, value, onChange }) {
   );
 }
 
-/* ─── Multi-select pills ─────────────────────────────────────────────── */
+/* ─── Multi Pill Select ── */
 function MultiPillSelect({ options, values, onChange }) {
-  const toggle = (v) => {
-    if (values.includes(v)) onChange(values.filter((x) => x !== v));
-    else onChange([...values, v]);
-  };
+  const toggle = (v) =>
+    values.includes(v) ? onChange(values.filter((x) => x !== v)) : onChange([...values, v]);
   return (
     <div className="flex flex-wrap gap-1.5">
       {options.map((opt) => (
@@ -107,13 +61,13 @@ function MultiPillSelect({ options, values, onChange }) {
           key={opt}
           type="button"
           onClick={() => toggle(opt)}
-          className={`px-2.5 py-1 rounded-[4px] text-[9px] font-black uppercase tracking-wider border-2 transition-all flex items-center gap-1 ${
+          className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider border-2 transition-all flex items-center gap-1 ${
             values.includes(opt)
               ? "bg-black text-white border-black"
-              : "bg-white text-black border-black/30 hover:border-black hover:bg-black/5"
+              : "bg-white text-black border-black/20 hover:border-black"
           }`}
         >
-          {values.includes(opt) && <Check className="w-2.5 h-2.5" strokeWidth={2.5} />}
+          {values.includes(opt) && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
           {opt}
         </button>
       ))}
@@ -121,11 +75,32 @@ function MultiPillSelect({ options, values, onChange }) {
   );
 }
 
-/* ─── Text input shared style ────────────────────────────────────────── */
-const inputCls =
-  "w-full border-2 border-black rounded-[4px] px-2.5 py-2 text-[11px] text-black placeholder-neutral-600 font-bold outline-none focus:border-black focus:ring-1 focus:ring-black transition-all bg-white";
+/* ─── Accordion Section ── */
+function Section({ icon: Icon, title, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-2 border-black rounded overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-black/[0.03] transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <Icon className="w-3.5 h-3.5 text-black" />
+          <span className="text-[11px] font-black uppercase tracking-[0.18em] text-black">{title}</span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-black transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-3.5 space-y-3.5 border-t-2 border-black bg-white">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
-/* ─── Artwork upload slot ────────────────────────────────────────────── */
+/* ─── Artwork Upload ── */
 function ArtworkSlot({ slot, artwork, onChange }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -154,14 +129,12 @@ function ArtworkSlot({ slot, artwork, onChange }) {
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2.5 p-2.5 border-2 border-black rounded-[4px] bg-white">
-        <div className="shrink-0 w-24">
-          <p className="text-[9px] font-black uppercase tracking-wider text-black">{slot.label}</p>
-        </div>
-        <div className="flex-1 flex items-center gap-2">
+      <div className="flex items-center gap-3 p-3 border-2 border-black rounded bg-white">
+        <p className="text-[10px] font-black uppercase tracking-wider text-black w-24 shrink-0">{slot.label}</p>
+        <div className="flex-1 flex items-center gap-2 min-w-0">
           {artwork?.url ? (
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="w-7 h-7 rounded-[1px] border border-black overflow-hidden shrink-0">
+              <div className="w-8 h-8 rounded border-2 border-black overflow-hidden shrink-0">
                 {artwork.url.match(/\.(png|jpg|jpeg|svg|webp)$/i) ? (
                   <img src={artwork.url} alt={artwork.name} className="w-full h-full object-cover" />
                 ) : (
@@ -170,11 +143,11 @@ function ArtworkSlot({ slot, artwork, onChange }) {
                   </div>
                 )}
               </div>
-              <span className="text-[9px] text-black font-bold truncate flex-1">{artwork.name}</span>
+              <span className="text-[10px] text-black font-bold truncate flex-1">{artwork.name}</span>
               <button
                 type="button"
                 onClick={() => { onChange(null); setUploadError(null); }}
-                className="text-black hover:text-red-650 transition-colors shrink-0"
+                className="text-black hover:text-red-600 transition-colors shrink-0"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -184,27 +157,17 @@ function ArtworkSlot({ slot, artwork, onChange }) {
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-black border-2 border-dashed border-black/40 hover:border-black px-2.5 py-1.5 rounded-[4px] transition-all bg-white disabled:opacity-60"
+              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-black border-2 border-dashed border-black/40 hover:border-black px-3 py-1.5 rounded transition-all bg-white disabled:opacity-50"
             >
-              {uploading ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <Upload className="w-3 h-3" />
-              )}
+              {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
               {uploading ? "Uploading..." : "Upload File"}
             </button>
           )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPTED_FORMATS}
-            className="hidden"
-            onChange={(e) => handleFile(e.target.files?.[0])}
-          />
+          <input ref={inputRef} type="file" accept={ACCEPTED_FORMATS} className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
         </div>
       </div>
       {uploadError && (
-        <div className="flex items-center gap-1.5 text-[9px] text-red-600 font-bold">
+        <div className="flex items-center gap-1.5 text-[10px] text-red-600 font-bold">
           <AlertCircle className="w-3 h-3 shrink-0" />
           {uploadError}
         </div>
@@ -213,16 +176,18 @@ function ArtworkSlot({ slot, artwork, onChange }) {
   );
 }
 
-/* ─── Main Modal ─────────────────────────────────────────────────────── */
+/* ─── Sub-label ── */
+const SubLabel = ({ children }) => (
+  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-black mb-2">{children}</p>
+);
+
+/* ─── Main Modal ── */
 export default function CustomizeProductModal({ product, isOpen, onClose }) {
   const [step, setStep] = useState("form");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  // Customer info
   const [customer, setCustomer] = useState({ name: "", email: "", phone: "" });
-
-  // Customization state
   const [leatherColor, setLeatherColor] = useState("None");
   const [leatherColorNote, setLeatherColorNote] = useState("");
   const [leatherType, setLeatherType] = useState("None");
@@ -231,27 +196,19 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
   const [innerLiningNote, setInnerLiningNote] = useState("");
   const [hardwareColor, setHardwareColor] = useState("None");
   const [hardwareColorNote, setHardwareColorNote] = useState("");
-
-  // Fur
   const [furType, setFurType] = useState("None");
   const [furTypeNote, setFurTypeNote] = useState("");
   const [furColor, setFurColor] = useState("");
   const [furPlacement, setFurPlacement] = useState([]);
   const [furDensity, setFurDensity] = useState("");
   const [furRemovable, setFurRemovable] = useState(null);
-
-  // Artwork
   const [artwork, setArtwork] = useState({});
   const [artworkOtherNote, setArtworkOtherNote] = useState("");
-
-  // Additional notes
   const [additionalNotes, setAdditionalNotes] = useState("");
 
-  // Reset on open
   useEffect(() => {
     if (isOpen) {
-      setStep("form");
-      setSubmitError(null);
+      setStep("form"); setSubmitError(null);
       setCustomer({ name: "", email: "", phone: "" });
       setLeatherColor("None"); setLeatherColorNote("");
       setLeatherType("None"); setLeatherTypeNote("");
@@ -263,7 +220,6 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  // Trap scroll
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -271,8 +227,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  const updateArtwork = (key, val) =>
-    setArtwork((prev) => ({ ...prev, [key]: val }));
+  const updateArtwork = (key, val) => setArtwork((prev) => ({ ...prev, [key]: val }));
 
   const handleSubmit = async () => {
     if (!customer.name.trim() || !customer.email.trim()) {
@@ -292,33 +247,16 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
           price: product.price,
         },
         customizations: {
-          leatherColor,
-          leatherColorNote,
-          leatherType,
-          leatherTypeNote,
-          innerLining,
-          innerLiningNote,
-          hardwareColor,
-          hardwareColorNote,
-          fur: {
-            type: furType,
-            typeNote: furTypeNote,
-            color: furColor,
-            placement: furPlacement,
-            density: furDensity,
-            removable: furRemovable,
-          },
+          leatherColor, leatherColorNote, leatherType, leatherTypeNote,
+          innerLining, innerLiningNote, hardwareColor, hardwareColorNote,
+          fur: { type: furType, typeNote: furTypeNote, color: furColor, placement: furPlacement, density: furDensity, removable: furRemovable },
           artwork: {
             ...Object.fromEntries(ARTWORK_SLOTS.map((s) => [s.key, artwork[s.key] || null])),
-            // Merge the other-placement note into the artwork.other object
-            ...(artwork.other
-              ? { other: { ...artwork.other, note: artworkOtherNote } }
-              : {}),
+            ...(artwork.other ? { other: { ...artwork.other, note: artworkOtherNote } } : {}),
           },
         },
         additionalNotes,
       };
-
       const res = await fetch("/api/customization-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -338,185 +276,156 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center p-2 sm:p-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-[290px] xs:max-w-[360px] sm:max-w-xl max-h-[90dvh] sm:max-h-[92dvh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden animate-slideUp border-2 border-black">
+      <div className="relative w-full max-w-[300px] xs:max-w-sm sm:max-w-lg md:max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border-2 border-black animate-cp-up">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b-2 border-black shrink-0">
-          <div>
-            <p className="text-[12px] sm:text-[14px] font-black uppercase tracking-widest text-black">Customize Product</p>
-            <p className="text-[9px] sm:text-[10px] text-black uppercase tracking-[0.1em] font-bold mt-0.5">Bespoke Design Inquiry</p>
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-black rounded flex items-center justify-center shrink-0">
+              <Scissors className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-[13px] sm:text-[15px] font-black uppercase tracking-widest text-black leading-none">
+                Customize Product
+              </p>
+              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.15em] text-black/60 mt-0.5">
+                Bespoke Design Inquiry
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-black/5 rounded-full transition-colors text-black">
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center border-2 border-black rounded hover:bg-black hover:text-white transition-all text-black"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
+        {/* ── Success ── */}
         {step === "success" ? (
-          /* ─── Success State ─── */
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-12 text-center bg-white">
-            <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100">
-              <Check className="w-5 h-5 text-emerald-600" strokeWidth={2.5} />
+          <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 py-12 text-center bg-white">
+            <div className="w-14 h-14 bg-black rounded-full flex items-center justify-center">
+              <Check className="w-6 h-6 text-white" strokeWidth={2.5} />
             </div>
             <div>
-              <h3 className="text-sm font-black text-black uppercase tracking-wider">Inquiry Received</h3>
-              <p className="text-[11px] text-black leading-relaxed max-w-xs mt-1.5 font-bold">
+              <h3 className="text-[14px] font-black text-black uppercase tracking-widest mb-2">Inquiry Received</h3>
+              <p className="text-[12px] text-black leading-relaxed max-w-xs font-medium">
                 We&apos;ve received your customization request for <strong>{product?.name}</strong>.
                 Our design team will review your specs and contact you within 24 hours.
               </p>
             </div>
-            <p className="text-[9px] text-black uppercase tracking-widest font-black">
+            <p className="text-[10px] text-black/60 uppercase tracking-widest font-bold">
               Confirmation sent to {customer.email}
             </p>
             <button
               type="button"
               onClick={onClose}
-              className="h-11 px-6 bg-black text-white border-2 border-black rounded-[4px] text-[10px] font-black uppercase tracking-widest hover:bg-neutral-900 transition-all"
+              className="h-11 px-8 bg-black text-white border-2 border-black rounded text-[11px] font-black uppercase tracking-widest hover:bg-neutral-800 transition-all"
             >
               Done
             </button>
           </div>
         ) : (
-          /* ─── Form State ─── */
           <>
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0 bg-white">
+            {/* ── Scrollable Body ── */}
+            <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4 min-h-0 bg-white">
 
-              {/* Product Reference */}
+              {/* Product badge */}
               {product && (
-                <div className="flex items-center gap-2.5 p-2.5 border-2 border-black rounded-[4px]">
+                <div className="flex items-center gap-3 p-3 border-2 border-black rounded bg-black/[0.02]">
                   {(product.images?.[0] || product.image) && (
                     <img
                       src={product.images?.[0] || product.image}
                       alt={product.name}
-                      className="w-9 h-9 object-cover rounded-[1px] border border-black shrink-0"
+                      className="w-10 h-10 object-cover rounded border-2 border-black shrink-0"
                     />
                   )}
                   <div>
-                    <p className="text-[11px] font-black text-black truncate max-w-[280px]">{product.name}</p>
-                    <p className="text-[9px] text-black uppercase tracking-wider font-bold">Configure Custom Parameters</p>
+                    <p className="text-[12px] font-black text-black leading-snug">{product.name}</p>
+                    <p className="text-[9px] text-black/60 font-bold uppercase tracking-wider">Bespoke Configuration</p>
                   </div>
                 </div>
               )}
 
-              {/* Customer Info */}
-              <div className="space-y-2">
-                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-black border-b-2 border-black pb-1">
+              {/* ─ Your Details ─ */}
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black mb-3 pb-2 border-b-2 border-black">
                   Your Details
                 </p>
-                {[
-                  { key: "name",  icon: User,  type: "text",  placeholder: "Full Name" },
-                  { key: "email", icon: Mail,  type: "email", placeholder: "your@email.com" },
-                  { key: "phone", icon: Phone, type: "tel",   placeholder: "Phone Number (Optional)" },
-                ].map((f) => (
-                  <div key={f.key} className="relative">
-                    <f.icon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-black" />
-                    <input
-                      type={f.type}
-                      placeholder={f.placeholder}
-                      value={customer[f.key]}
-                      onChange={(e) => setCustomer((p) => ({ ...p, [f.key]: e.target.value }))}
-                      className={`${inputCls} pl-8`}
-                    />
-                  </div>
-                ))}
+                <div className="space-y-2.5">
+                  {[
+                    { key: "name",  icon: User,  type: "text",  placeholder: "Full Name" },
+                    { key: "email", icon: Mail,  type: "email", placeholder: "your@email.com" },
+                    { key: "phone", icon: Phone, type: "tel",   placeholder: "Phone Number (Optional)" },
+                  ].map((f) => (
+                    <div key={f.key} className="relative">
+                      <f.icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-black/50" />
+                      <input
+                        type={f.type}
+                        placeholder={f.placeholder}
+                        value={customer[f.key]}
+                        onChange={(e) => setCustomer((p) => ({ ...p, [f.key]: e.target.value }))}
+                        className={`${inputCls} pl-9`}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-black border-b-2 border-black pb-1 pt-1">
+              {/* ─ Design Preferences ─ */}
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black pb-2 border-b-2 border-black">
                 Design Preferences
               </p>
 
-              {/* Leather Color */}
               <Section icon={Palette} title="Leather Color">
                 <PillSelect options={LEATHER_COLORS} value={leatherColor} onChange={setLeatherColor} />
                 {leatherColor === "Other" && (
-                  <input
-                    type="text"
-                    placeholder="Describe your custom leather color..."
-                    value={leatherColorNote}
-                    onChange={(e) => setLeatherColorNote(e.target.value)}
-                    className={`${inputCls} mt-1.5`}
-                  />
+                  <input type="text" placeholder="Describe your custom leather color..." value={leatherColorNote} onChange={(e) => setLeatherColorNote(e.target.value)} className={`${inputCls} mt-1`} />
                 )}
               </Section>
 
-              {/* Leather Type */}
               <Section icon={Layers} title="Leather Type">
                 <PillSelect options={LEATHER_TYPES} value={leatherType} onChange={setLeatherType} />
                 {leatherType === "Other" && (
-                  <input
-                    type="text"
-                    placeholder="Describe your custom leather type..."
-                    value={leatherTypeNote}
-                    onChange={(e) => setLeatherTypeNote(e.target.value)}
-                    className={`${inputCls} mt-1.5`}
-                  />
+                  <input type="text" placeholder="Describe your custom leather type..." value={leatherTypeNote} onChange={(e) => setLeatherTypeNote(e.target.value)} className={`${inputCls} mt-1`} />
                 )}
               </Section>
 
-              {/* Inner Lining */}
               <Section icon={Layers} title="Inner Lining">
                 <PillSelect options={INNER_LININGS} value={innerLining} onChange={setInnerLining} />
                 {innerLining === "Other" && (
-                  <input
-                    type="text"
-                    placeholder="Describe your custom lining..."
-                    value={innerLiningNote}
-                    onChange={(e) => setInnerLiningNote(e.target.value)}
-                    className={`${inputCls} mt-1.5`}
-                  />
+                  <input type="text" placeholder="Describe your custom lining..." value={innerLiningNote} onChange={(e) => setInnerLiningNote(e.target.value)} className={`${inputCls} mt-1`} />
                 )}
               </Section>
 
-              {/* Hardware Color */}
               <Section icon={Settings} title="Hardware Tone">
                 <PillSelect options={HARDWARE_COLORS} value={hardwareColor} onChange={setHardwareColor} />
                 {hardwareColor === "Other" && (
-                  <input
-                    type="text"
-                    placeholder="Describe your custom hardware finish..."
-                    value={hardwareColorNote}
-                    onChange={(e) => setHardwareColorNote(e.target.value)}
-                    className={`${inputCls} mt-1.5`}
-                  />
+                  <input type="text" placeholder="Describe your custom hardware finish..." value={hardwareColorNote} onChange={(e) => setHardwareColorNote(e.target.value)} className={`${inputCls} mt-1`} />
                 )}
               </Section>
 
-              {/* Fur Customization */}
               <Section icon={Feather} title="Fur Accent (Optional)">
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   <div>
-                    <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Fur Type</p>
+                    <SubLabel>Fur Type</SubLabel>
                     <PillSelect options={FUR_TYPES} value={furType} onChange={setFurType} />
                     {furType === "Other" && (
-                      <input
-                        type="text"
-                        placeholder="Describe your custom fur type..."
-                        value={furTypeNote}
-                        onChange={(e) => setFurTypeNote(e.target.value)}
-                        className={`${inputCls} mt-1.5`}
-                      />
+                      <input type="text" placeholder="Describe your custom fur type..." value={furTypeNote} onChange={(e) => setFurTypeNote(e.target.value)} className={`${inputCls} mt-2`} />
                     )}
                   </div>
                   {furType !== "None" && (
                     <>
+                      <div><SubLabel>Fur Color</SubLabel><PillSelect options={FUR_COLORS} value={furColor} onChange={setFurColor} /></div>
+                      <div><SubLabel>Fur Placement</SubLabel><MultiPillSelect options={FUR_PLACEMENTS} values={furPlacement} onChange={setFurPlacement} /></div>
+                      <div><SubLabel>Fur Density</SubLabel><PillSelect options={FUR_DENSITIES} value={furDensity} onChange={setFurDensity} /></div>
                       <div>
-                        <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Fur Color</p>
-                        <PillSelect options={FUR_COLORS} value={furColor} onChange={setFurColor} />
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Fur Placement</p>
-                        <MultiPillSelect options={FUR_PLACEMENTS} values={furPlacement} onChange={setFurPlacement} />
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Fur Density</p>
-                        <PillSelect options={FUR_DENSITIES} value={furDensity} onChange={setFurDensity} />
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-black mb-1.5 uppercase tracking-wide">Removable Fur?</p>
+                        <SubLabel>Removable Fur?</SubLabel>
                         <PillSelect
                           options={["Yes", "No"]}
                           value={furRemovable === true ? "Yes" : furRemovable === false ? "No" : ""}
@@ -528,61 +437,47 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                 </div>
               </Section>
 
-              {/* Artwork / Logo */}
               <Section icon={ImageIcon} title="Artwork / Branding Logos">
                 <div className="space-y-2">
-                  <p className="text-[9px] text-black leading-relaxed uppercase tracking-wide font-black">
-                    PNG, JPG, SVG, PDF, AI, EPS — Max 10 MB per file.
+                  <p className="text-[10px] font-bold text-black uppercase tracking-wide">
+                    PNG, JPG, SVG, PDF, AI, EPS — Max 10 MB per file
                   </p>
                   {ARTWORK_SLOTS.map((slot) => (
                     <div key={slot.key} className="space-y-1">
-                      <ArtworkSlot
-                        slot={slot}
-                        artwork={artwork[slot.key]}
-                        onChange={(v) => updateArtwork(slot.key, v)}
-                      />
+                      <ArtworkSlot slot={slot} artwork={artwork[slot.key]} onChange={(v) => updateArtwork(slot.key, v)} />
                       {slot.key === "other" && artwork.other && (
-                        <input
-                          type="text"
-                          placeholder="Describe the exact placement for this artwork..."
-                          value={artworkOtherNote}
-                          onChange={(e) => setArtworkOtherNote(e.target.value)}
-                          className={`${inputCls} text-[10px]`}
-                        />
+                        <input type="text" placeholder="Describe the exact placement for this artwork..." value={artworkOtherNote} onChange={(e) => setArtworkOtherNote(e.target.value)} className={inputCls} />
                       )}
                     </div>
                   ))}
                 </div>
               </Section>
 
-              {/* Additional Notes */}
-              <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-black">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black mb-2">
                   Special Instructions / Design Vision
                 </p>
                 <textarea
                   rows={3}
                   value={additionalNotes}
                   onChange={(e) => setAdditionalNotes(e.target.value)}
-                  placeholder="Describe your design vision in detail (e.g. stitching style, custom pockets, lining patterns, any special requests)..."
+                  placeholder="Describe your design vision in detail — stitching style, custom pockets, lining patterns, any special requests..."
                   className={`${inputCls} resize-none`}
                 />
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-4 py-4 border-t-2 border-black bg-white shrink-0">
-              {/* Disclaimer */}
-              <div className="flex items-start gap-2 mb-3.5 p-2.5 bg-amber-50 border-2 border-amber-400 rounded-[4px]">
+            {/* ── Footer ── */}
+            <div className="px-5 py-4 border-t-2 border-black bg-white shrink-0">
+              <div className="flex items-start gap-2.5 mb-4 p-3 bg-amber-50 border-2 border-amber-400 rounded">
                 <div className="w-1.5 h-1.5 rounded-full bg-amber-600 mt-1.5 shrink-0" />
-                <p className="text-[10px] text-amber-900 leading-relaxed font-bold">
+                <p className="text-[11px] text-black leading-relaxed font-medium">
                   Design inquiries do not initiate any charges. We will review your request and send a formal invoice upon approval.
                 </p>
               </div>
 
-              {/* Inline error */}
               {submitError && (
-                <div className="flex items-center gap-1.5 mb-3 text-[10px] text-red-650 bg-red-50 border-2 border-red-400 rounded-[4px] px-2.5 py-2 font-bold">
+                <div className="flex items-center gap-2 mb-3 text-[11px] text-red-600 bg-red-50 border-2 border-red-300 rounded px-3 py-2.5 font-bold">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   {submitError}
                 </div>
@@ -592,13 +487,10 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full h-11 rounded-[4px] font-black uppercase tracking-[0.15em] text-[11px] sm:text-[12px] flex items-center justify-center gap-2 bg-black text-white hover:bg-neutral-900 border-2 border-black transition-all duration-300 active:scale-[0.99] disabled:opacity-60"
+                className="w-full h-12 rounded font-black uppercase tracking-[0.2em] text-[11px] sm:text-[12px] flex items-center justify-center gap-2.5 bg-black text-white hover:bg-neutral-800 border-2 border-black transition-all duration-300 active:scale-[0.98] disabled:opacity-60"
               >
                 {submitting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Submitting Inquiry...
-                  </>
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Submitting Inquiry...</>
                 ) : (
                   "Submit Custom Design Request"
                 )}
@@ -609,11 +501,11 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
       </div>
 
       <style>{`
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(28px); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes cpUp {
+          from { opacity: 0; scale: 0.95; transform: translateY(16px); }
+          to   { opacity: 1; scale: 1; transform: translateY(0); }
         }
-        .animate-slideUp { animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .animate-cp-up { animation: cpUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
       `}</style>
     </div>
   );
