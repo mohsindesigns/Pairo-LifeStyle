@@ -309,7 +309,6 @@ export default function ClientProductActions({ product, onVariantChange }) {
               onClick={() => setM2mOpen(true)}
               className="w-full h-12 border border-black rounded-[var(--radius,0px)] text-black font-bold uppercase tracking-[0.25em] text-[12px] md:text-[13px] hover:bg-black hover:text-white transition-all duration-200 active:scale-[0.98]"
             >
-              <Ruler className="w-3.5 h-3.5" />
               <span>Measure (+$25)</span>
             </button>
 
@@ -319,7 +318,6 @@ export default function ClientProductActions({ product, onVariantChange }) {
               onClick={() => setCustomizeOpen(true)}
               className="w-full h-12 border border-black rounded-[var(--radius,0px)] text-black font-bold uppercase tracking-[0.25em] text-[12px] md:text-[13px] hover:bg-black hover:text-white transition-all duration-200 active:scale-[0.98]"
             >
-              <Settings className="w-3.5 h-3.5" />
               <span>Customize</span>
             </button>
           </div>

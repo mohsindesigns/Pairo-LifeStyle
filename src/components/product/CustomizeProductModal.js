@@ -285,18 +285,13 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-black rounded-[var(--radius,0px)] flex items-center justify-center shrink-0">
-              <Scissors className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-[13px] sm:text-[15px] font-bold uppercase tracking-widest text-black leading-none">
-                Customize Product
-              </p>
-              <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] text-black/60 mt-0.5">
-                Bespoke Design Inquiry
-              </p>
-            </div>
+          <div>
+            <p className="text-[13px] sm:text-[15px] font-bold uppercase tracking-widest text-black">
+              Customize Product
+            </p>
+            <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] text-black/80 mt-0.5">
+              Bespoke Design Inquiry
+            </p>
           </div>
           <button
             onClick={onClose}
