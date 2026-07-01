@@ -34,7 +34,16 @@ const ProductSchema = new mongoose.Schema({
     type: { type: String, enum: ['color', 'size', 'custom'], default: 'custom' },
     values: [{
       label: String, // Display label
+      // Color mode determines how many color stops are used
+      colorMode: { type: String, enum: ['single','dual','triple','quad'], default: 'single' },
+      // Primary color (always required)
       hex: String, // For color swatches (used when swatchType === "color")
+      // Optional additional colors for multi‑color swatches
+      hex2: String, // 2nd color for dual/triple/quad swatches
+      hex3: String, // 3rd color for triple/quad swatches
+      hex4: String, // 4th color for quad swatches
+      // Optional texture identifier (e.g. "leather-smooth")
+      texture: String,
       image: String, // Swatch image — pattern / texture (used when swatchType === "image")
       swatchType: { type: String, enum: ['color', 'image'], default: 'color' }, // Admin-configured swatch mode
       value: String, // Actual value (e.g. "S", "M")
