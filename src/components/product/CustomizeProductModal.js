@@ -26,7 +26,7 @@ const ARTWORK_SLOTS   = [
 const ACCEPTED_FORMATS = ".png,.jpg,.jpeg,.svg,.pdf,.ai,.eps,.webp";
 
 /* ─── Shared input class ── */
-const inputCls = "w-full border-2 border-black rounded px-3 py-2.5 text-[12px] font-medium text-black bg-white outline-none focus:ring-2 focus:ring-black transition-all placeholder-black/30";
+const inputCls = "w-full border border-black rounded-[var(--radius,0px)] px-3 py-2.5 text-[12px] font-medium text-black bg-white outline-none focus:ring-1 focus:ring-black transition-all placeholder-black/30";
 
 /* ─── Pill Select ── */
 function PillSelect({ options, value, onChange }) {
@@ -37,10 +37,10 @@ function PillSelect({ options, value, onChange }) {
           key={opt}
           type="button"
           onClick={() => onChange(opt)}
-          className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider border-2 transition-all ${
+          className={`px-3 py-1.5 rounded-[var(--radius,0px)] text-[10px] font-semibold uppercase tracking-wider border transition-all ${
             value === opt
               ? "bg-black text-white border-black"
-              : "bg-white text-black border-black/20 hover:border-black"
+              : "bg-white text-black border-black/30 hover:border-black"
           }`}
         >
           {opt}
@@ -61,10 +61,10 @@ function MultiPillSelect({ options, values, onChange }) {
           key={opt}
           type="button"
           onClick={() => toggle(opt)}
-          className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-wider border-2 transition-all flex items-center gap-1 ${
+          className={`px-3 py-1.5 rounded-[var(--radius,0px)] text-[10px] font-semibold uppercase tracking-wider border transition-all flex items-center gap-1 ${
             values.includes(opt)
               ? "bg-black text-white border-black"
-              : "bg-white text-black border-black/20 hover:border-black"
+              : "bg-white text-black border-black/30 hover:border-black"
           }`}
         >
           {values.includes(opt) && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
@@ -79,7 +79,7 @@ function MultiPillSelect({ options, values, onChange }) {
 function Section({ icon: Icon, title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-2 border-black rounded overflow-hidden">
+    <div className="border border-black rounded-[var(--radius,0px)] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -87,12 +87,12 @@ function Section({ icon: Icon, title, children, defaultOpen = false }) {
       >
         <div className="flex items-center gap-2.5">
           <Icon className="w-3.5 h-3.5 text-black" />
-          <span className="text-[11px] font-black uppercase tracking-[0.18em] text-black">{title}</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-black">{title}</span>
         </div>
         <ChevronDown className={`w-4 h-4 text-black transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="px-4 pb-4 pt-3.5 space-y-3.5 border-t-2 border-black bg-white">
+        <div className="px-4 pb-4 pt-3.5 space-y-3.5 border-t border-black bg-white">
           {children}
         </div>
       )}
@@ -129,12 +129,12 @@ function ArtworkSlot({ slot, artwork, onChange }) {
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-3 p-3 border-2 border-black rounded bg-white">
-        <p className="text-[10px] font-black uppercase tracking-wider text-black w-24 shrink-0">{slot.label}</p>
+      <div className="flex items-center gap-3 p-3 border border-black rounded-[var(--radius,0px)] bg-white">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-black w-24 shrink-0">{slot.label}</p>
         <div className="flex-1 flex items-center gap-2 min-w-0">
           {artwork?.url ? (
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="w-8 h-8 rounded border-2 border-black overflow-hidden shrink-0">
+              <div className="w-8 h-8 rounded-[var(--radius,0px)] border border-black overflow-hidden shrink-0">
                 {artwork.url.match(/\.(png|jpg|jpeg|svg|webp)$/i) ? (
                   <img src={artwork.url} alt={artwork.name} className="w-full h-full object-cover" />
                 ) : (
@@ -157,7 +157,7 @@ function ArtworkSlot({ slot, artwork, onChange }) {
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-black border-2 border-dashed border-black/40 hover:border-black px-3 py-1.5 rounded transition-all bg-white disabled:opacity-50"
+              className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-black border border-dashed border-black/40 hover:border-black px-3 py-1.5 rounded-[var(--radius,0px)] transition-all bg-white disabled:opacity-50"
             >
               {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
               {uploading ? "Uploading..." : "Upload File"}
@@ -281,26 +281,26 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-[300px] xs:max-w-sm sm:max-w-lg md:max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border-2 border-black animate-cp-up">
+      <div className="relative w-full max-w-[300px] xs:max-w-sm sm:max-w-lg md:max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border border-black animate-cp-up rounded-[var(--radius,0px)]">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-black shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-black rounded flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 bg-black rounded-[var(--radius,0px)] flex items-center justify-center shrink-0">
               <Scissors className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-[13px] sm:text-[15px] font-black uppercase tracking-widest text-black leading-none">
+              <p className="text-[13px] sm:text-[15px] font-bold uppercase tracking-widest text-black leading-none">
                 Customize Product
               </p>
-              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.15em] text-black/60 mt-0.5">
+              <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] text-black/60 mt-0.5">
                 Bespoke Design Inquiry
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center border-2 border-black rounded hover:bg-black hover:text-white transition-all text-black"
+            className="w-8 h-8 flex items-center justify-center border border-black rounded-[var(--radius,0px)] hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98] text-black"
           >
             <X className="w-4 h-4" />
           </button>
@@ -313,7 +313,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
               <Check className="w-6 h-6 text-white" strokeWidth={2.5} />
             </div>
             <div>
-              <h3 className="text-[14px] font-black text-black uppercase tracking-widest mb-2">Inquiry Received</h3>
+              <h3 className="text-[14px] font-bold text-black uppercase tracking-widest mb-2">Inquiry Received</h3>
               <p className="text-[12px] text-black leading-relaxed max-w-xs font-medium">
                 We&apos;ve received your customization request for <strong>{product?.name}</strong>.
                 Our design team will review your specs and contact you within 24 hours.
@@ -325,7 +325,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="h-11 px-8 bg-black text-white border-2 border-black rounded text-[11px] font-black uppercase tracking-widest hover:bg-neutral-800 transition-all"
+              className="h-11 px-8 bg-black text-white border border-black rounded-[var(--radius,0px)] text-[12px] md:text-[13px] font-bold uppercase tracking-widest hover:bg-black/90 transition-all active:scale-[0.98]"
             >
               Done
             </button>
@@ -337,24 +337,24 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
 
               {/* Product badge */}
               {product && (
-                <div className="flex items-center gap-3 p-3 border-2 border-black rounded bg-black/[0.02]">
+                <div className="flex items-center gap-3 p-3 border border-black rounded-[var(--radius,0px)] bg-black/[0.02]">
                   {(product.images?.[0] || product.image) && (
                     <img
                       src={product.images?.[0] || product.image}
                       alt={product.name}
-                      className="w-10 h-10 object-cover rounded border-2 border-black shrink-0"
+                      className="w-10 h-10 object-cover rounded-[var(--radius,0px)] border border-black shrink-0"
                     />
                   )}
                   <div>
-                    <p className="text-[12px] font-black text-black leading-snug">{product.name}</p>
-                    <p className="text-[9px] text-black/60 font-bold uppercase tracking-wider">Bespoke Configuration</p>
+                    <p className="text-[12px] font-bold text-black leading-snug">{product.name}</p>
+                    <p className="text-[9px] text-black/60 font-semibold uppercase tracking-wider">Bespoke Configuration</p>
                   </div>
                 </div>
               )}
 
               {/* ─ Your Details ─ */}
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black mb-3 pb-2 border-b-2 border-black">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black mb-3 pb-2 border-b border-black">
                   Your Details
                 </p>
                 <div className="space-y-2.5">
@@ -378,7 +378,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
               </div>
 
               {/* ─ Design Preferences ─ */}
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black pb-2 border-b-2 border-black">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black pb-2 border-b border-black">
                 Design Preferences
               </p>
 
@@ -454,7 +454,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
               </Section>
 
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-black mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black mb-2">
                   Special Instructions / Design Vision
                 </p>
                 <textarea
@@ -468,8 +468,8 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
             </div>
 
             {/* ── Footer ── */}
-            <div className="px-5 py-4 border-t-2 border-black bg-white shrink-0">
-              <div className="flex items-start gap-2.5 mb-4 p-3 bg-amber-50 border-2 border-amber-400 rounded">
+            <div className="px-5 py-4 border-t border-black bg-white shrink-0">
+              <div className="flex items-start gap-2.5 mb-4 p-3 bg-amber-50 border border-amber-400 rounded-[var(--radius,0px)]">
                 <div className="w-1.5 h-1.5 rounded-full bg-amber-600 mt-1.5 shrink-0" />
                 <p className="text-[11px] text-black leading-relaxed font-medium">
                   Design inquiries do not initiate any charges. We will review your request and send a formal invoice upon approval.
@@ -477,7 +477,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
               </div>
 
               {submitError && (
-                <div className="flex items-center gap-2 mb-3 text-[11px] text-red-600 bg-red-50 border-2 border-red-300 rounded px-3 py-2.5 font-bold">
+                <div className="flex items-center gap-2 mb-3 text-[11px] text-red-600 bg-red-50 border border-red-300 rounded-[var(--radius,0px)] px-3 py-2.5 font-bold">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   {submitError}
                 </div>
@@ -487,7 +487,7 @@ export default function CustomizeProductModal({ product, isOpen, onClose }) {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full h-12 rounded font-black uppercase tracking-[0.2em] text-[11px] sm:text-[12px] flex items-center justify-center gap-2.5 bg-black text-white hover:bg-neutral-800 border-2 border-black transition-all duration-300 active:scale-[0.98] disabled:opacity-60"
+                className="w-full h-12 rounded-[var(--radius,0px)] font-bold uppercase tracking-[0.2em] text-[12px] md:text-[13px] flex items-center justify-center gap-2.5 bg-black text-white hover:bg-black/90 border border-black transition-all duration-300 active:scale-[0.98] disabled:opacity-60"
               >
                 {submitting ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Submitting Inquiry...</>

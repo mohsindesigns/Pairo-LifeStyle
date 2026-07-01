@@ -126,26 +126,26 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-[300px] xs:max-w-sm sm:max-w-lg md:max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border-2 border-black animate-m2m-up">
+      <div className="relative w-full max-w-[300px] xs:max-w-sm sm:max-w-lg md:max-w-xl max-h-[92dvh] bg-white flex flex-col overflow-hidden shadow-2xl border border-black animate-m2m-up rounded-[var(--radius,0px)]">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-black shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-black rounded flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 bg-black rounded-[var(--radius,0px)] flex items-center justify-center shrink-0">
               <Ruler className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-[13px] sm:text-[15px] font-black uppercase tracking-widest text-black leading-none">
+              <p className="text-[13px] sm:text-[15px] font-bold uppercase tracking-widest text-black leading-none">
                 Made to Measure
               </p>
-              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.15em] text-black/60 mt-0.5">
+              <p className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] text-black/60 mt-0.5">
                 Bespoke Fit — +${M2M_SURCHARGE} Surcharge
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center border-2 border-black rounded hover:bg-black hover:text-white transition-all text-black"
+            className="w-8 h-8 flex items-center justify-center border border-black rounded-[var(--radius,0px)] hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98] text-black"
           >
             <X className="w-4 h-4" />
           </button>
@@ -153,17 +153,19 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
         {/* ── Unit Toggle ── */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/20 bg-black/[0.02] shrink-0">
-          <span className="text-[10px] font-black uppercase tracking-widest text-black">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-black">
             Measurement Unit
           </span>
-          <div className="flex border-2 border-black rounded overflow-hidden">
+          <div className="flex gap-1.5">
             {["inches", "cm"].map((u) => (
               <button
                 key={u}
                 type="button"
                 onClick={() => setUnit(u)}
-                className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-wider transition-colors ${
-                  unit === u ? "bg-black text-white" : "bg-white text-black hover:bg-black/5"
+                className={`h-8 px-4 rounded-[var(--radius,0px)] text-[10px] font-semibold uppercase tracking-wider transition-all duration-200 border ${
+                  unit === u
+                    ? "bg-black text-white border-black"
+                    : "bg-white text-black border-black/30 hover:border-black"
                 }`}
               >
                 {u}
@@ -180,7 +182,7 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
 
           {/* Notes */}
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-black mb-2 pb-2 border-b-2 border-black">
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-black mb-2 pb-2 border-b border-black">
               Fitting Notes / Special Requests
             </label>
             <textarea
@@ -188,34 +190,34 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Posture details, shoulder pads, custom fit preferences..."
-              className="w-full border-2 border-black rounded px-3 py-2.5 text-[12px] font-medium text-black bg-white outline-none focus:ring-2 focus:ring-black transition-all placeholder-black/30 resize-none"
+              className="w-full border border-black rounded-[var(--radius,0px)] px-3 py-2.5 text-[12px] font-medium text-black bg-white outline-none focus:ring-1 focus:ring-black transition-all placeholder-black/30 resize-none"
             />
           </div>
         </div>
 
         {/* ── Footer ── */}
-        <div className="px-5 py-4 border-t-2 border-black bg-white shrink-0">
+        <div className="px-5 py-4 border-t border-black bg-white shrink-0">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-bold text-black">Base Price</span>
-            <span className="text-[11px] font-bold text-black">${product?.price?.toFixed(2)}</span>
+            <span className="text-[11px] font-medium text-black">Base Price</span>
+            <span className="text-[11px] font-medium text-black">${product?.price?.toFixed(2)}</span>
           </div>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] font-bold text-black">Made to Measure Upgrade</span>
-            <span className="text-[11px] font-black text-black">+${M2M_SURCHARGE}.00</span>
+            <span className="text-[11px] font-medium text-black">Made to Measure Upgrade</span>
+            <span className="text-[11px] font-bold text-black">+${M2M_SURCHARGE}.00</span>
           </div>
-          <div className="flex items-center justify-between bg-black text-white rounded px-4 py-3 mb-4">
-            <span className="text-[11px] font-black uppercase tracking-wider">Total</span>
-            <span className="text-[15px] font-black">${((product?.price || 0) + M2M_SURCHARGE).toFixed(2)}</span>
+          <div className="flex items-center justify-between bg-black text-white rounded-[var(--radius,0px)] px-4 py-3 mb-4">
+            <span className="text-[11px] font-bold uppercase tracking-wider">Total</span>
+            <span className="text-[15px] font-bold">${((product?.price || 0) + M2M_SURCHARGE).toFixed(2)}</span>
           </div>
 
           <button
             type="button"
             onClick={handleAdd}
             disabled={adding || added}
-            className={`w-full h-12 rounded font-black uppercase tracking-[0.2em] text-[11px] sm:text-[12px] flex items-center justify-center gap-2.5 transition-all duration-300 border-2 ${
+            className={`w-full h-12 rounded-[var(--radius,0px)] font-bold uppercase tracking-[0.2em] text-[12px] md:text-[13px] flex items-center justify-center gap-2.5 transition-all duration-300 border ${
               added
                 ? "bg-emerald-600 border-emerald-600 text-white"
-                : "bg-black border-black text-white hover:bg-neutral-800 active:scale-[0.98] disabled:opacity-60"
+                : "bg-black border-black text-white hover:bg-black/90 active:scale-[0.98] disabled:opacity-60"
             }`}
           >
             {added ? (

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import SwatchBubble from "@/components/common/SwatchBubble";
 import MadeToMeasureModal from "@/components/product/MadeToMeasureModal";
 import CustomizeProductModal from "@/components/product/CustomizeProductModal";
+import SizeGuideModal from "@/components/product/SizeGuideModal";
 
 export default function ClientProductActions({ product, onVariantChange }) {
   const [selectedOptions, setSelectedOptions] = useState({});
@@ -15,6 +16,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
   const [addedFeedback, setAddedFeedback] = useState(false);
   const [m2mOpen, setM2mOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const { addToCart } = useCart();
   const router = useRouter();
 
@@ -129,13 +131,24 @@ export default function ClientProductActions({ product, onVariantChange }) {
           return (
             <div key={attr.name} className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <p className="text-[11px] md:text-[12px] font-black text-black uppercase tracking-[0.25em]">
-                  {attr.name}
-                </p>
-                {selectedOptions[attr.name] && (
-                  <span className="text-[12px] md:text-[13px] font-black text-black uppercase tracking-wider">
-                    {selectedOptions[attr.name]}
-                  </span>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[11px] md:text-[12px] font-bold text-black uppercase tracking-[0.25em]">
+                    {attr.name}
+                  </p>
+                  {selectedOptions[attr.name] && (
+                    <span className="text-[12px] md:text-[13px] font-bold text-black uppercase tracking-wider">
+                      — {selectedOptions[attr.name]}
+                    </span>
+                  )}
+                </div>
+                {attr.name.toLowerCase() === "size" && (
+                  <button
+                    type="button"
+                    onClick={() => setSizeGuideOpen(true)}
+                    className="text-[11px] font-bold text-black underline uppercase tracking-wider hover:text-black/80 transition-colors"
+                  >
+                    Size guide
+                  </button>
                 )}
               </div>
 
@@ -145,13 +158,38 @@ export default function ClientProductActions({ product, onVariantChange }) {
 
                   if (isColor) {
                     return (
-                      <SwatchBubble
+                      <button
                         key={option.label}
-                        value={option}
-                        selected={isSelected}
+                        type="button"
                         onClick={() => handleOptionSelect(attr.name, option)}
-                        size="w-9 h-9 md:w-10 md:h-10"
-                      />
+                        title={option.label}
+                        className={`relative w-9 h-9 md:w-10 md:h-10 rounded-full transition-all duration-200 flex items-center justify-center ${
+                          isSelected
+                            ? "ring-1 ring-offset-2 ring-black scale-105"
+                            : "ring-1 ring-black/10 hover:ring-black/30 hover:scale-105"
+                        }`}
+                        style={{
+                          backgroundColor: option.hex || "#ddd",
+                          backgroundImage: option.image
+                            ? `url(${option.image})`
+                            : "none",
+                          backgroundSize: "cover",
+                        }}
+                      >
+                        {isSelected && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/10">
+                            <Check
+                              className={`w-3 h-3 ${
+                                option.hex === "#FFFFFF" ||
+                                option.hex === "#ffffff"
+                                  ? "text-black"
+                                  : "text-white"
+                              }`}
+                              strokeWidth={3}
+                            />
+                          </div>
+                        )}
+                      </button>
                     );
                   }
 
@@ -160,10 +198,11 @@ export default function ClientProductActions({ product, onVariantChange }) {
                       key={option.label}
                       type="button"
                       onClick={() => handleOptionSelect(attr.name, option)}
-                      className={`h-10 px-5 rounded text-[12px] md:text-[13px] font-black uppercase tracking-[0.2em] transition-all duration-200 border-2 ${isSelected
-                        ? "bg-black text-white border-black"
-                        : "bg-white text-black border-black/30 hover:border-black"
-                        }`}
+                      className={`h-10 px-5 rounded-[var(--radius,0px)] text-[12px] md:text-[13px] font-semibold uppercase tracking-[0.2em] transition-all duration-200 border ${
+                        isSelected
+                          ? "bg-black text-white border-black"
+                          : "bg-transparent text-black border-black/30 hover:border-black"
+                      }`}
                     >
                       {option.label}
                     </button>
@@ -213,34 +252,32 @@ export default function ClientProductActions({ product, onVariantChange }) {
         </div>
 
         {/* Quantity + ATC */}
-        <div className="space-y-3.5">
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* Quantity Selector */}
-            <div className="flex items-center justify-between sm:justify-center bg-white border-2 border-black rounded px-4 gap-4 h-12 shrink-0">
+        <div className="space-y-3">
+          <div className="flex gap-3">
+            <div className="flex items-center bg-transparent rounded-[var(--radius,0px)] border border-black px-4 gap-4 h-12 shrink-0">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="text-black/50 hover:text-black transition-colors p-1"
+                className="text-black hover:text-black/80 transition-colors p-1"
                 aria-label="Decrease quantity"
               >
                 <Minus className="w-4 h-4" />
               </button>
-              <span className="font-bold text-sm w-6 text-center text-black select-none">{quantity}</span>
+              <span className="font-bold text-sm w-5 text-center text-black select-none">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
-                className="text-black/50 hover:text-black transition-colors p-1"
+                className="text-black hover:text-black/80 transition-colors p-1"
                 aria-label="Increase quantity"
               >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Add to Cart Button */}
             <button
               onClick={handleAddToCart}
-              className={`flex-1 h-12 rounded font-black uppercase tracking-[0.2em] text-[11px] sm:text-xs md:text-[13px] flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.98] border-2 ${
+              className={`flex-1 h-12 rounded-[var(--radius,0px)] font-bold uppercase tracking-[0.2em] text-[12px] md:text-[13px] flex items-center justify-center gap-2.5 transition-all duration-300 active:scale-[0.98] ${
                 addedFeedback
-                  ? "bg-emerald-600 border-emerald-600 text-white"
-                  : "bg-black border-black text-white hover:bg-neutral-800"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-black text-white hover:bg-black/90"
               }`}
             >
               {addedFeedback ? (
@@ -257,12 +294,10 @@ export default function ClientProductActions({ product, onVariantChange }) {
             </button>
           </div>
 
-          {/* Secure Checkout */}
           <button
             onClick={handleSecureCheckout}
-            className="w-full h-12 bg-white text-black border-2 border-black rounded font-black uppercase tracking-[0.2em] text-[11px] sm:text-xs md:text-[13px] flex items-center justify-center gap-2.5 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
+            className="w-full h-12 border border-black rounded-[var(--radius,0px)] text-black font-bold uppercase tracking-[0.25em] text-[12px] md:text-[13px] hover:bg-black hover:text-white transition-all duration-200 active:scale-[0.98]"
           >
-            <Shield className="w-4 h-4" />
             Secure Checkout
           </button>
 
@@ -272,7 +307,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
             <button
               type="button"
               onClick={() => setM2mOpen(true)}
-              className="w-full h-12 bg-white text-black border-2 border-black rounded font-black uppercase tracking-[0.15em] text-[10px] sm:text-[11px] flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
+              className="w-full h-12 border border-black rounded-[var(--radius,0px)] text-black font-bold uppercase tracking-[0.25em] text-[12px] md:text-[13px] hover:bg-black hover:text-white transition-all duration-200 active:scale-[0.98]"
             >
               <Ruler className="w-3.5 h-3.5" />
               <span>Measure (+$25)</span>
@@ -282,7 +317,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
             <button
               type="button"
               onClick={() => setCustomizeOpen(true)}
-              className="w-full h-12 bg-white text-black border-2 border-black rounded font-black uppercase tracking-[0.15em] text-[10px] sm:text-[11px] flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all duration-300 active:scale-[0.98]"
+              className="w-full h-12 border border-black rounded-[var(--radius,0px)] text-black font-bold uppercase tracking-[0.25em] text-[12px] md:text-[13px] hover:bg-black hover:text-white transition-all duration-200 active:scale-[0.98]"
             >
               <Settings className="w-3.5 h-3.5" />
               <span>Customize</span>
@@ -304,6 +339,10 @@ export default function ClientProductActions({ product, onVariantChange }) {
         product={product}
         isOpen={customizeOpen}
         onClose={() => setCustomizeOpen(false)}
+      />
+      <SizeGuideModal
+        isOpen={sizeGuideOpen}
+        onClose={() => setSizeGuideOpen(false)}
       />
     </>
   );
