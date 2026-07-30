@@ -55,6 +55,12 @@ export async function POST(req) {
         tenantId: data.tenantId || "DEFAULT_STORE"
     };
 
+    // Strip empty-string ObjectId fields — Mongoose cannot cast "" to ObjectId
+    if (!productData.primaryCategory) delete productData.primaryCategory;
+    if (Array.isArray(productData.categories)) {
+      productData.categories = productData.categories.filter(Boolean);
+    }
+
     // Generate slug cleanly
     let slug = productData.slug;
     if (!slug && productData.name) {
@@ -122,6 +128,12 @@ export async function PUT(req) {
     const { id, tenantId, _id, __v, createdAt, updatedAt, ...data } = rawBody;
     
     console.log("[Products PUT] Updating product:", id, "with seo:", data.seo);
+
+    // Strip empty-string ObjectId fields — Mongoose cannot cast "" to ObjectId
+    if (!data.primaryCategory) delete data.primaryCategory;
+    if (Array.isArray(data.categories)) {
+      data.categories = data.categories.filter(Boolean);
+    }
     
     // Find by _id only (tenantId may not be present on legacy products)
     const oldProduct = await Product.findById(id);

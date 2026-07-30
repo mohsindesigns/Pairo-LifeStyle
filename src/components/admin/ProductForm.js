@@ -322,7 +322,10 @@ export default function ProductForm({ productId = null }) {
          ...formData, 
          slug: finalSlug,
          slugManuallyEdited,
-         variantCombinations: updatedCombinations
+         variantCombinations: updatedCombinations,
+         // Never send an empty string for ObjectId fields — Mongoose will reject it
+         primaryCategory: formData.primaryCategory || undefined,
+         categories: (formData.categories || []).filter(Boolean),
       };
       try {
          const payload = productId ? { ...normalizedData, id: productId } : normalizedData;
