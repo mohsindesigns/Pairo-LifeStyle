@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 
-export default function BlogNewsletterForm() {
+export default function BlogNewsletterForm({ dark = false }) {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,19 +33,27 @@ export default function BlogNewsletterForm() {
 
   return (
     <form onSubmit={handleSubscribe} className="flex flex-col md:flex-row gap-3 justify-center w-full max-w-md mx-auto">
-       <input 
-          type="email" 
+       <input
+          type="email"
           required
-          placeholder="ENTER YOUR EMAIL" 
+          placeholder="ENTER YOUR EMAIL"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={submitting}
-          className="bg-white border border-black/15 text-black px-5 py-3.5 rounded-[4px] w-full text-[10px] font-bold tracking-widest focus:outline-none focus:border-black transition-colors placeholder-black/30 disabled:opacity-50 uppercase"
+          className={`border px-5 py-3.5 rounded-[4px] w-full text-[10px] font-bold tracking-widest focus:outline-none transition-colors disabled:opacity-50 uppercase ${
+            dark
+              ? "bg-white/5 border-white/15 text-white placeholder-white/40 focus:border-white/50"
+              : "bg-white border-black/15 text-black placeholder-black/30 focus:border-black"
+          }`}
        />
-       <button 
+       <button
           type="submit"
           disabled={submitting}
-          className="bg-black text-white px-8 py-3.5 rounded-[4px] font-black text-[10px] uppercase tracking-[0.2em] hover:bg-neutral-900 transition-all disabled:opacity-50 whitespace-nowrap"
+          className={`px-8 py-3.5 rounded-[4px] font-black text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-50 whitespace-nowrap ${
+            dark
+              ? "bg-white text-black hover:bg-neutral-100"
+              : "bg-black text-white hover:bg-neutral-900"
+          }`}
        >
           {submitting ? "Joining..." : "Join Archive"}
        </button>

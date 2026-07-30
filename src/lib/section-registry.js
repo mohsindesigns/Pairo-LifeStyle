@@ -26,6 +26,8 @@ export const SECTION_REGISTRY = {
   // Size Chart Page
   size_chart_hero: dynamic(() => import("@/components/sections/SizeChartHero")),
   size_chart_display: dynamic(() => import("@/components/sections/SizeChartDisplay")),
+  // Blog Page
+  blog_hero: dynamic(() => import("@/components/sections/BlogHero")),
 };
 
 export const getSectionComponent = (type) => {

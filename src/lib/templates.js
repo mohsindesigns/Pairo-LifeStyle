@@ -68,7 +68,8 @@ export const TEMPLATE_REGISTRY = {
       "banner_feature",
       "blog_grid",
       "testimonials",
-      "rich_text"
+      "rich_text",
+      "blog_hero"
     ],
     defaultSections: []
   },

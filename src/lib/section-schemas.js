@@ -362,5 +362,17 @@ export const SECTION_SCHEMAS = {
         { name: "image", label: "Chart Image", type: "image" }
       ]}
     ]
+  },
+
+  // ─── BLOG PAGE SECTIONS ─────────────────────────────────────
+  blog_hero: {
+    name: "Blog Hero",
+    icon: "BookOpen",
+    fields: [
+      { name: "badge", label: "Badge Text (above heading)", type: "text" },
+      { name: "heading", label: "Main Heading", type: "text" },
+      { name: "subheading", label: "Subheading / Description", type: "textarea" },
+      { name: "editionLabel", label: "Edition Label (top right)", type: "text" }
+    ]
   }
 };
