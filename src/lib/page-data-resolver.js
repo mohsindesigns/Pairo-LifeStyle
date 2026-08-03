@@ -94,7 +94,7 @@ export async function resolvePageSections(sections) {
       if (section.type === 'banner_feature') {
          if (config.productId) {
             const mongoose = require('mongoose');
-            const query = { isDeleted: false };
+            const query = { isDeleted: false, status: 'Published' };
             if (mongoose.Types.ObjectId.isValid(config.productId)) {
                query._id = config.productId;
             } else {

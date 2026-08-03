@@ -57,6 +57,7 @@ const FooterColumnSchema = new mongoose.Schema({
 
 const SiteConfigSchema = new mongoose.Schema({
   key: { type: String, default: 'main' },
+  disableSearchEngineIndexing: { type: Boolean, default: false },
 
   // ─── General / Brand ──────────────────────────────────────
   brand: {

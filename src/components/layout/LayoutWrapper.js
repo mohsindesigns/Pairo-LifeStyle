@@ -12,14 +12,14 @@ export default function LayoutWrapper({ children }) {
 
   if (isIsolatedRoute) {
     return (
-      <div className="relative w-full overflow-x-hidden min-h-screen flex flex-col">
+      <div className="relative w-full overflow-x-clip min-h-screen flex flex-col">
         <main className="flex-1 flex flex-col">{children}</main>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full overflow-x-hidden min-h-screen flex flex-col">
+    <div className="relative w-full overflow-x-clip min-h-screen flex flex-col">
       <Navbar />
       <ReferralDiscountPopup />
       <CartDrawer />

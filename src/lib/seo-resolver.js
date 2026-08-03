@@ -930,8 +930,9 @@ export async function resolveSEOMetadata(options = {}) {
   // Next.js App Router metadata format
   // Use a plain string for robots — object format causes duplicate tags in Next.js.
   // String is passed directly as meta content: zero risk of duplication or key conflicts.
-  const robotsString = noIndex
-    ? `noindex, ${noFollow ? "nofollow" : "follow"}`
+  const isGlobalNoIndex = siteConfig?.disableSearchEngineIndexing === true;
+  const robotsString = (noIndex || isGlobalNoIndex)
+    ? `noindex, nofollow`
     : `index, follow, max-video-preview:-1, max-image-preview:large, max-snippet:-1`;
 
   const metadata = {

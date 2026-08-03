@@ -56,7 +56,9 @@ export default async function BlogDetail({ params }) {
       $or: [
         { _id: mongoose.isValidObjectId(post.featuredProductId) ? post.featuredProductId : null },
         { slug: post.featuredProductId }
-      ]
+      ],
+      status: "Published",
+      isDeleted: { $ne: true }
     }).lean();
 
     if (dbProduct) {

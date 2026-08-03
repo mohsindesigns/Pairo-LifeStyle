@@ -1,11 +1,23 @@
 import { NextResponse } from "next/server";
+import dbConnect from "@/lib/db";
+import SiteConfig from "@/models/SiteConfig";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  await dbConnect();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com";
 
-  const robots = `User-agent: *
+  const siteConfig = await SiteConfig.findOne({ key: 'main' }).lean();
+  const isGlobalNoIndex = siteConfig?.disableSearchEngineIndexing === true;
+
+  let robots = "";
+  if (isGlobalNoIndex) {
+    robots = `User-agent: *
+Disallow: /
+`;
+  } else {
+    robots = `User-agent: *
 Disallow: /admin
 Disallow: /feed
 Disallow: /cart
@@ -16,13 +28,14 @@ Disallow: /profile
 Disallow: /?*
 Disallow: /*?add-to-cart=
 
-Sitemap: https://pairolifestyle.com/sitemap.xml
+Sitemap: ${siteUrl}/sitemap.xml
 `;
+  }
 
   return new NextResponse(robots, {
     headers: {
       "Content-Type": "text/plain",
-      "Cache-Control": "public, max-age=86400, stale-while-revalidate=3600"
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate"
     }
   });
 }

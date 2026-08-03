@@ -109,6 +109,20 @@ function GeneralTab({ config, onChange }) {
       <TextRow label="Terms of Service URL" value={b.termsUrl} onChange={v => set('termsUrl', v)} placeholder="/terms" />
       <TextRow label="WhatsApp Number" value={b.whatsappNumber} onChange={v => set('whatsappNumber', v)} placeholder="+1234567890" description="Atelier WhatsApp contact number with country code." />
       <TextRow label="WhatsApp Chat URL" value={b.whatsappUrl} onChange={v => set('whatsappUrl', v)} placeholder="https://wa.me/..." description="Direct WhatsApp chat link." />
+      <tr className="border-b border-[#f0f0f1]">
+        <th className="text-left px-3 py-4 align-top w-52">
+          <label className={labelClass}>Disable Search Indexing</label>
+          <p className={descClass}>Discourage search engines from indexing this site (applies noindex, nofollow globally).</p>
+        </th>
+        <td className="px-3 py-4">
+          <input
+            type="checkbox"
+            checked={!!config.disableSearchEngineIndexing}
+            onChange={e => onChange({ ...config, disableSearchEngineIndexing: e.target.checked })}
+            className="w-4 h-4 accent-[#2271b1] cursor-pointer"
+          />
+        </td>
+      </tr>
     </tbody></table>
   );
 }

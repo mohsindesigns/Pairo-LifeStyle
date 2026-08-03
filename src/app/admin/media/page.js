@@ -372,11 +372,17 @@ export default function AdminMedia() {
                     </button>
                   </>
                 ) : (
-                  <button onClick={() => softDelete(detailItem._id)} className="w-full flex items-center justify-center gap-2 bg-white border border-[#d63638] text-[#d63638] py-2 text-[13px] font-bold hover:bg-red-50 transition-all rounded-[3px] shadow-sm">
-                    <Trash2 className="w-4 h-4" /> Move to Trash
-                  </button>
+                  <>
+                    <button onClick={() => softDelete(detailItem._id)} className="w-full flex items-center justify-center gap-2 bg-white border border-[#ccd0d4] text-[#2c3338] py-2 text-[13px] font-bold hover:bg-[#f6f7f7] transition-all rounded-[3px] shadow-sm">
+                      <Trash2 className="w-4 h-4" /> Move to Trash
+                    </button>
+                    <button onClick={() => setDeleteConfirm(detailItem._id)} className="w-full flex items-center justify-center gap-2 bg-white border border-[#d63638] text-[#d63638] py-2 text-[13px] font-bold hover:bg-red-50 transition-all rounded-[3px] shadow-sm">
+                      <Trash2 className="w-4 h-4" /> Delete Permanently
+                    </button>
+                  </>
                 )}
               </div>
+
             </div>
           </div>
         )}

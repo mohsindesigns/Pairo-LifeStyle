@@ -23,43 +23,52 @@ export async function generateMetadata() {
 export default async function SitemapPage() {
   await dbConnect();
 
-  // 1. Fetch categories (Published, not deleted, product type)
+  // 1. Fetch categories (Published, not deleted, product type, not noIndexed)
   const categories = await Category.find({
     status: "Published",
     isDeleted: { $in: [false, null] },
-    type: "product"
+    type: "product",
+    "seo.noIndex": { $ne: true }
   })
     .sort({ name: 1 })
     .lean();
 
-  // 2. Fetch products (Published, not deleted)
+  // 2. Fetch products (Published, not deleted, not noIndexed)
   const products = await Product.find({
     status: "Published",
-    isDeleted: { $ne: true }
+    isDeleted: { $ne: true },
+    "seo.noIndex": { $ne: true }
   })
     .sort({ name: 1 })
     .lean();
 
-  // 3. Fetch blogs (Published, not deleted)
+  // 3. Fetch blogs (Published, not deleted, not noIndexed)
   const blogs = await Blog.find({
     status: "Published",
-    isDeleted: { $ne: true }
+    isDeleted: { $ne: true },
+    "seo.noIndex": { $ne: true }
   })
     .sort({ createdAt: -1 })
     .lean();
 
-  // 4. Fetch dynamic CMS pages (Published)
+  // 4. Fetch dynamic CMS pages (Published, not deleted, not noIndexed)
   const cmsPages = await Page.find({
     status: "Published",
-    tenantId: "DEFAULT_STORE"
+    tenantId: "DEFAULT_STORE",
+    isDeleted: { $ne: true },
+    "seo.noIndex": { $ne: true }
   })
     .sort({ title: 1 })
     .lean();
 
-  // Filter CMS pages to avoid duplicates with static core routes
+  // Filter CMS pages to avoid duplicates with static core routes and test pages
   const filteredCmsPages = cmsPages.filter(
-    (p) => p.slug && !["home", "shop", "blog", "collections", "sitemap"].includes(p.slug.toLowerCase())
+    (p) => p.slug && 
+           !["home", "shop", "blog", "collections", "sitemap", "test", "temp"].includes(p.slug.toLowerCase().trim()) &&
+           !p.slug.toLowerCase().includes("test") &&
+           !p.slug.toLowerCase().includes("temp")
   );
+
 
   // Generate dynamic Schema structured data
   const seoRes = await resolveSEOMetadata({

@@ -75,3 +75,48 @@ export async function GET(req) {
     return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
   }
 }
+
+export async function DELETE(req) {
+  try {
+    await dbConnect();
+    const session = await getServerSession(authOptions);
+    const { can } = await import("@/lib/rbac");
+
+    // Security Check
+    if (!session || !session.user.isStaff) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!can(session.user, "orders.update") && !can(session.user, "orders.edit") && !can(session.user, "orders.delete")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
+    }
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // Cancel associated commissions first
+    try {
+      const { CommissionEngine } = await import("@/lib/affiliate/CommissionEngine");
+      await CommissionEngine.cancelCommission(order._id);
+    } catch (e) {
+      console.error("[Order Delete Affiliate Trigger Error]", e);
+    }
+
+    await Order.findByIdAndDelete(id);
+
+    return NextResponse.json({ success: true, message: "Order deleted successfully" });
+  } catch (error) {
+    console.error("Admin Order Delete Error:", error);
+    return NextResponse.json({ error: "Delete failed: " + error.message }, { status: 500 });
+  }
+}
+

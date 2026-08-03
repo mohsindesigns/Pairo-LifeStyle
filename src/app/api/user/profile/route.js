@@ -13,8 +13,51 @@ export async function GET() {
     await dbConnect();
     
     // Fetch Customer
-    const customer = await Customer.findById(session.user.id).select("-password").lean();
-    if (!customer) return NextResponse.json({ message: "Customer not found" }, { status: 404 });
+    let customer = await Customer.findById(session.user.id).select("-password").lean();
+    if (!customer) {
+      if (session.user.isStaff) {
+        const Staff = (await import("@/models/Staff")).default;
+        const staff = await Staff.findById(session.user.id).select("-password").lean();
+        if (staff) {
+          const profileData = {
+            _id: staff._id.toString(),
+            name: staff.name,
+            email: staff.email,
+            role: staff.role?.slug?.toUpperCase() || "STAFF",
+            createdAt: staff.createdAt,
+            addresses: [],
+            orderHistory: []
+          };
+          const orders = await Order.find({
+            "customer.email": staff.email,
+            tenantId: 'DEFAULT_STORE'
+          }).sort({ createdAt: -1 }).lean();
+          if (orders.length > 0) {
+            const productIds = orders.flatMap(o => (o.items || []).map(item => item.productId)).filter(Boolean);
+            const dbProducts = await Product.find({ _id: { $in: productIds } }).select("images image").lean();
+            const productImageMap = {};
+            dbProducts.forEach(p => {
+              productImageMap[p._id.toString()] = p.images?.[0] || p.image || "";
+            });
+            profileData.orderHistory = orders.map(o => ({
+              id: o._id.toString(),
+              orderNumber: o.orderNumber,
+              trackingId: o.idempotencyKey ? o.idempotencyKey.replace('pai_', '').toUpperCase() : o._id.toString().slice(-12).toUpperCase(),
+              total: o.financials.total,
+              date: o.createdAt,
+              status: o.status,
+              items: (o.items || []).map(item => ({
+                ...item,
+                image: item.image || (item.productId ? productImageMap[item.productId.toString()] : "") || ""
+              })),
+              shippingAddress: o.shippingAddress
+            }));
+          }
+          return NextResponse.json(profileData);
+        }
+      }
+      return NextResponse.json({ message: "Customer not found" }, { status: 404 });
+    }
 
     // Fetch Orders from Order collection (Live data)
     const orders = await Order.find({ 
@@ -61,8 +104,29 @@ export async function POST(req) {
     const body = await req.json();
     const { action, data } = body;
     await dbConnect();
-    const customer = await Customer.findById(session.user.id);
-    if (!customer) return NextResponse.json({ message: "Customer not found" }, { status: 404 });
+    let customer = await Customer.findById(session.user.id);
+    if (!customer) {
+      if (session.user.isStaff) {
+        const Staff = (await import("@/models/Staff")).default;
+        const staff = await Staff.findById(session.user.id);
+        if (staff) {
+          if (action === "updateInfo") {
+            staff.name = data.name || staff.name;
+            const newEmail = data.email?.trim().toLowerCase();
+            if (newEmail && newEmail !== staff.email) {
+              const emailExists = await Staff.findOne({ email: newEmail, _id: { $ne: staff._id } });
+              if (emailExists) {
+                return NextResponse.json({ message: "Email is already in use by another staff account." }, { status: 400 });
+              }
+              staff.email = newEmail;
+            }
+            await staff.save();
+            return NextResponse.json({ message: "Profile updated successfully.", user: staff });
+          }
+        }
+      }
+      return NextResponse.json({ message: "Customer not found" }, { status: 404 });
+    }
     switch (action) {
       case "updateInfo": {
         customer.name = data.name || customer.name;

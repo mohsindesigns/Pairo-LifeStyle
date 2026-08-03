@@ -192,7 +192,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
       if (p.sizes && Array.isArray(p.sizes)) {
         p.sizes.forEach(s => {
           if (s && typeof s === 'string') {
-            sizesSet.add(s.trim());
+            sizesSet.add(s.trim().toUpperCase());
           }
         });
       }
@@ -200,7 +200,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
         p.attributes.forEach(attr => {
           if (attr.name && (attr.name.toLowerCase() === 'size' || attr.name.toLowerCase() === 'sizes')) {
             attr.values?.forEach(v => {
-              if (v.label) sizesSet.add(v.label.trim());
+              if (v.label) sizesSet.add(v.label.trim().toUpperCase());
             });
           }
         });
@@ -208,8 +208,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     });
     const order = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
     return Array.from(sizesSet).sort((a, b) => {
-      const idxA = order.indexOf(a.toUpperCase());
-      const idxB = order.indexOf(b.toUpperCase());
+      const idxA = order.indexOf(a);
+      const idxB = order.indexOf(b);
       if (idxA !== -1 && idxB !== -1) return idxA - idxB;
       if (idxA !== -1) return -1;
       if (idxB !== -1) return 1;
@@ -387,10 +387,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     // Size filter
     if (selectedSizes.length > 0) {
       result = result.filter(p => {
-        const hasLegacySize = p.sizes?.some(s => selectedSizes.includes(s));
+        const hasLegacySize = p.sizes?.some(s => s && selectedSizes.includes(s.trim().toUpperCase()));
         const hasAttrSize = p.attributes?.some(attr =>
           (attr.name?.toLowerCase() === 'size' || attr.name?.toLowerCase() === 'sizes') &&
-          attr.values?.some(v => v.label && selectedSizes.includes(v.label.trim()))
+          attr.values?.some(v => v.label && selectedSizes.includes(v.label.trim().toUpperCase()))
         );
         return hasLegacySize || hasAttrSize;
       });

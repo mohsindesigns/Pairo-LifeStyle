@@ -128,6 +128,29 @@ export default function ProfilePage() {
     });
   }, [status, router, fetchUserData]);
 
+  useEffect(() => {
+    if (userData && userData.orderHistory && userData.orderHistory.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("action") === "write-review") {
+        // Find the latest order and the first item in it to review
+        const latestOrder = userData.orderHistory[0];
+        const latestItem = latestOrder.items?.[0];
+        if (latestItem) {
+          const reviewId = `${latestOrder.id}-${latestItem.productId}`;
+          setExpandedOrderId(latestOrder.id);
+          setActiveReviewId(reviewId);
+          // Gently scroll to the order
+          setTimeout(() => {
+            const el = document.getElementById(`order-row-${latestOrder.id}`);
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }, 300);
+        }
+      }
+    }
+  }, [userData]);
+
   const handleAction = async (action, data) => {
     setLoading(true);
     setFeedback(null);
@@ -496,6 +519,7 @@ export default function ProfilePage() {
                     return (
                       <div
                         key={order.id}
+                        id={`order-row-${order.id}`}
                         className={`border rounded-[4px] bg-white transition-all overflow-hidden ${
                           isExpanded ? 'border-neutral-200' : 'border-neutral-100 hover:border-neutral-200'
                         }`}

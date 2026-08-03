@@ -53,6 +53,22 @@ export async function generateMetadata({ params, searchParams }) {
 
   if (!product) return { title: "Product Not Found" };
 
+  const { getServerSession } = await import("next-auth");
+  const { authOptions } = await import("@/app/api/auth/[...nextauth]/route");
+  const session = await getServerSession(authOptions);
+
+  if (product.status === "Draft") {
+    if (!session || !session.user?.isStaff) {
+      return {
+        title: "Product Not Found",
+        robots: {
+          index: false,
+          follow: false
+        }
+      };
+    }
+  }
+
   if (product.slug !== paramId) {
     const paramsQuery = new URLSearchParams(resolvedSearchParams);
     const queryString = paramsQuery.toString();
@@ -116,6 +132,16 @@ export default async function ProductDetailPage({ params, searchParams }) {
     notFound();
   }
 
+  const { getServerSession } = await import("next-auth");
+  const { authOptions } = await import("@/app/api/auth/[...nextauth]/route");
+  const session = await getServerSession(authOptions);
+
+  if (product.status === "Draft") {
+    if (!session || !session.user?.isStaff) {
+      notFound();
+    }
+  }
+
   if (product.slug !== paramId) {
     const paramsQuery = new URLSearchParams(resolvedSearchParams);
     const queryString = paramsQuery.toString();
@@ -176,7 +202,7 @@ export default async function ProductDetailPage({ params, searchParams }) {
   });
 
   return (
-    <div className="bg-white min-h-screen font-sans overflow-x-hidden">
+    <div className="bg-white min-h-screen font-sans overflow-x-clip">
       {structuredData && (
         <script
           type="application/ld+json"

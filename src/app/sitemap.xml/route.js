@@ -4,107 +4,155 @@ import Product from "@/models/Product";
 import Blog from "@/models/Blog";
 import Category from "@/models/Category";
 import Page from "@/models/Page";
+import SiteConfig from "@/models/SiteConfig";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600; // Cache on Next.js side for 1 hour
+export const revalidate = 0; // Disable caching on Next.js side so it is always live
+
+function normalizeSitemapUrl(domain, type, slug) {
+  let cleanSlug = slug ? slug.trim().replace(/^\/+|\/+$/g, "") : "";
+
+  if (type === "product" && cleanSlug.startsWith("product/")) {
+    cleanSlug = cleanSlug.replace(/^product\//, "");
+  }
+  if (type === "blog" && cleanSlug.startsWith("blog/")) {
+    cleanSlug = cleanSlug.replace(/^blog\//, "");
+  }
+  if (type === "collections" && (cleanSlug.startsWith("collections/") || cleanSlug.startsWith("category/"))) {
+    cleanSlug = cleanSlug.replace(/^(collections|category)\//, "");
+  }
+  if (type === "shop" && cleanSlug.startsWith("shop/")) {
+    cleanSlug = cleanSlug.replace(/^shop\//, "");
+  }
+
+  const parts = cleanSlug.split("/");
+  if (parts.length === 2 && parts[0] === parts[1]) {
+    cleanSlug = parts[0];
+  }
+
+  let path = "";
+  if (type === "product") {
+    path = `/product/${cleanSlug}`;
+  } else if (type === "blog") {
+    path = `/blog/${cleanSlug}`;
+  } else if (type === "collections") {
+    path = `/collections/${cleanSlug}`;
+  } else if (type === "shop") {
+    path = `/shop/${cleanSlug}`;
+  } else if (type === "static") {
+    path = cleanSlug ? `/${cleanSlug}` : "";
+  } else {
+    path = `/${cleanSlug}`;
+  }
+
+  const absoluteUrl = `${domain}${path}`;
+
+  try {
+    const urlObj = new URL(absoluteUrl);
+    let pathname = urlObj.pathname.replace(/\/+/g, "/");
+    if (pathname.endsWith("/") && pathname.length > 1) {
+      pathname = pathname.slice(0, -1);
+    }
+    return `${urlObj.protocol}//${urlObj.host}${pathname}`;
+  } catch (e) {
+    return absoluteUrl;
+  }
+}
 
 export async function GET() {
   await dbConnect();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com";
 
   try {
-    // 1. Fetch products (Published, not deleted, not noIndexed)
-    const products = await Product.find(
-      { isDeleted: { $ne: true }, status: "Published", "seo.noIndex": { $ne: true } },
-      "slug updatedAt primaryCategory categories"
-    ).populate('categories').populate('primaryCategory').lean();
-
-    // 2. Fetch blogs
-    const blogs = await Blog.find(
-      { isDeleted: { $ne: true }, status: "Published", "seo.noIndex": { $ne: true } },
-      "slug updatedAt"
-    ).lean();
-
-    // 3. Fetch categories
-    const categories = await Category.find(
-      { isDeleted: { $ne: true }, status: "Published", "seo.noIndex": { $ne: true }, type: "product" },
-      "slug updatedAt"
-    ).lean();
-
-    // 4. Fetch dynamic CMS pages
-    const pages = await Page.find(
-      { tenantId: "DEFAULT_STORE", status: "Published", "seo.noIndex": { $ne: true } },
-      "slug updatedAt"
-    ).lean();
-
-    // Static pages
-    const staticPages = [
-      { path: "", changefreq: "daily", priority: 1.0 },
-      { path: "/shop", changefreq: "daily", priority: 0.9 },
-      { path: "/blog", changefreq: "weekly", priority: 0.7 }
-    ];
+    // Check global indexing toggle
+    const siteConfig = await SiteConfig.findOne({ key: 'main' }).lean();
+    const isGlobalNoIndex = siteConfig?.disableSearchEngineIndexing === true;
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>`;
     xml += `\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
 
-    // Add static pages
-    for (const page of staticPages) {
-      xml += `
-  <url>
-    <loc>${siteUrl}${page.path}</loc>
-    <changefreq>${page.changefreq}</changefreq>
-    <priority>${page.priority}</priority>
-  </url>`;
-    }
+    if (!isGlobalNoIndex) {
+      // 1. Fetch products (Published, not deleted, not noIndexed)
+      const products = await Product.find(
+        { isDeleted: { $ne: true }, status: "Published", "seo.noIndex": { $ne: true } },
+        "slug updatedAt"
+      ).lean();
 
-    // Add products
-    for (const prod of products) {
-      if (prod.slug) {
-        xml += `
-  <url>
-    <loc>${siteUrl}/product/${prod.slug}</loc>
-    <lastmod>${prod.updatedAt ? new Date(prod.updatedAt).toISOString() : new Date().toISOString()}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`;
+      // 2. Fetch blogs (Published, not deleted, not noIndexed)
+      const blogs = await Blog.find(
+        { isDeleted: { $ne: true }, status: "Published", "seo.noIndex": { $ne: true } },
+        "slug updatedAt"
+      ).lean();
+
+      // 3. Fetch categories (Published, not deleted, not noIndexed)
+      const categories = await Category.find(
+        { isDeleted: { $ne: true }, status: "Published", "seo.noIndex": { $ne: true }, type: "product" },
+        "slug updatedAt"
+      ).lean();
+
+      // 4. Fetch dynamic CMS pages (Published, not deleted, not noIndexed)
+      const pages = await Page.find(
+        { tenantId: "DEFAULT_STORE", status: "Published", isDeleted: { $ne: true }, "seo.noIndex": { $ne: true } },
+        "slug updatedAt"
+      ).lean();
+
+      const urlMap = new Map();
+
+      // Helper to add unique URLs
+      function addUrl(type, slug, lastmod = null, changefreq = "weekly", priority = 0.5) {
+        if (!slug && type !== "static") return;
+        const normalized = normalizeSitemapUrl(siteUrl, type, slug);
+        if (!urlMap.has(normalized)) {
+          urlMap.set(normalized, {
+            loc: normalized,
+            lastmod: lastmod ? new Date(lastmod).toISOString() : new Date().toISOString(),
+            changefreq,
+            priority
+          });
+        }
       }
-    }
 
-    // Add categories
-    for (const cat of categories) {
-      if (cat.slug) {
-        xml += `
-  <url>
-    <loc>${siteUrl}/collections/${cat.slug}</loc>
-    <lastmod>${cat.updatedAt ? new Date(cat.updatedAt).toISOString() : new Date().toISOString()}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>`;
+      // Add static pages
+      addUrl("static", "", null, "daily", 1.0);
+      addUrl("static", "shop", null, "daily", 0.9);
+      addUrl("static", "blog", null, "weekly", 0.7);
+
+      // Add products
+      for (const prod of products) {
+        addUrl("product", prod.slug, prod.updatedAt, "weekly", 0.8);
       }
-    }
 
-    // Add blogs
-    for (const post of blogs) {
-      if (post.slug) {
-        xml += `
-  <url>
-    <loc>${siteUrl}/blog/${post.slug}</loc>
-    <lastmod>${post.updatedAt ? new Date(post.updatedAt).toISOString() : new Date().toISOString()}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>`;
+      // Add categories
+      for (const cat of categories) {
+        addUrl("collections", cat.slug, cat.updatedAt, "weekly", 0.7);
       }
-    }
 
-    // Add CMS pages
-    for (const page of pages) {
-      if (page.slug && page.slug !== "home") {
+      // Add blogs
+      for (const post of blogs) {
+        addUrl("blog", post.slug, post.updatedAt, "monthly", 0.6);
+      }
+
+      // Add CMS pages (excluding core reservation paths and test pages)
+      for (const page of pages) {
+        const cleanSlug = page.slug ? page.slug.toLowerCase().trim() : "";
+        if (
+          cleanSlug &&
+          !["home", "shop", "blog", "collections", "sitemap", "test", "temp"].includes(cleanSlug) &&
+          !cleanSlug.includes("test") &&
+          !cleanSlug.includes("temp")
+        ) {
+          addUrl("page", page.slug, page.updatedAt, "monthly", 0.5);
+        }
+      }
+
+      // Append XML tags
+      for (const item of urlMap.values()) {
         xml += `
   <url>
-    <loc>${siteUrl}/${page.slug}</loc>
-    <lastmod>${page.updatedAt ? new Date(page.updatedAt).toISOString() : new Date().toISOString()}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <loc>${item.loc}</loc>
+    <lastmod>${item.lastmod}</lastmod>
+    <changefreq>${item.changefreq}</changefreq>
+    <priority>${item.priority}</priority>
   </url>`;
       }
     }
@@ -114,7 +162,7 @@ export async function GET() {
     return new NextResponse(xml, {
       headers: {
         "Content-Type": "application/xml",
-        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=60"
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate"
       }
     });
   } catch (error) {
@@ -122,3 +170,4 @@ export async function GET() {
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
+

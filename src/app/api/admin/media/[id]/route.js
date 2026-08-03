@@ -46,6 +46,118 @@ export async function PATCH(req, { params }) {
   return NextResponse.json({ success: true, media });
 }
 
+async function cleanMediaReferences(media) {
+  const url = media.url;
+  if (!media.usageRefs || media.usageRefs.length === 0) return;
+
+  try {
+    const Product = (await import("@/models/Product")).default;
+    const Category = (await import("@/models/Category")).default;
+    const Blog = (await import("@/models/Blog")).default;
+    const Page = (await import("@/models/Page")).default;
+    const SiteConfig = (await import("@/models/SiteConfig")).default;
+
+    for (const ref of media.usageRefs) {
+      try {
+        const { entityType, entityId, fieldName } = ref;
+        if (!entityId) continue;
+
+        if (entityType === "Product") {
+          const prod = await Product.findById(entityId);
+          if (prod) {
+            let modified = false;
+            if (fieldName === "images" && Array.isArray(prod.images)) {
+              const beforeLen = prod.images.length;
+              prod.images = prod.images.filter(img => img !== url);
+              if (prod.images.length !== beforeLen) modified = true;
+            } else if (fieldName === "image") {
+              prod.image = "";
+              modified = true;
+            } else if (fieldName.startsWith("seo.")) {
+              const seoField = fieldName.split(".")[1];
+              if (prod.seo) {
+                prod.seo[seoField] = "";
+                modified = true;
+              }
+            }
+            if (modified) await prod.save();
+          }
+        } else if (entityType === "Category") {
+          const cat = await Category.findById(entityId);
+          if (cat) {
+            let modified = false;
+            if (fieldName === "image") {
+              cat.image = "";
+              modified = true;
+            } else if (fieldName.startsWith("seo.")) {
+              const seoField = fieldName.split(".")[1];
+              if (cat.seo) {
+                cat.seo[seoField] = "";
+                modified = true;
+              }
+            }
+            if (modified) await cat.save();
+          }
+        } else if (entityType === "Blog") {
+          const blog = await Blog.findById(entityId);
+          if (blog) {
+            let modified = false;
+            if (fieldName === "image") {
+              blog.image = "";
+              modified = true;
+            } else if (fieldName === "featuredProductData.image") {
+              if (blog.featuredProductData) {
+                blog.featuredProductData.image = "";
+                modified = true;
+              }
+            } else if (fieldName.startsWith("seo.")) {
+              const seoField = fieldName.split(".")[1];
+              if (blog.seo) {
+                blog.seo[seoField] = "";
+                modified = true;
+              }
+            }
+            if (modified) await blog.save();
+          }
+        } else if (entityType === "Page") {
+          const page = await Page.findById(entityId);
+          if (page) {
+            let modified = false;
+            if (fieldName === "image") {
+              page.image = "";
+              modified = true;
+            } else if (fieldName.startsWith("seo.")) {
+              const seoField = fieldName.split(".")[1];
+              if (page.seo) {
+                page.seo[seoField] = "";
+                modified = true;
+              }
+            }
+            if (modified) await page.save();
+          }
+        } else if (entityType === "SiteConfig") {
+          const siteConfig = await SiteConfig.findById(entityId);
+          if (siteConfig) {
+            let modified = false;
+            if (fieldName === "headerConfig.logoUrl") {
+              siteConfig.headerConfig.logoUrl = "";
+              modified = true;
+            } else if (fieldName === "footerConfig.logoUrl") {
+              siteConfig.footerConfig.logoUrl = "";
+              modified = true;
+            }
+            if (modified) await siteConfig.save();
+          }
+        }
+      } catch (e) {
+        console.error(`[Media Cleanup Error] Failed to clean reference for ${ref.entityType} ${ref.entityId}:`, e);
+      }
+    }
+  } catch (err) {
+    console.error("[Media Cleanup Import Error]", err);
+  }
+}
+
 // DELETE /api/admin/media/[id] — Soft delete, or permanent if ?permanent=true
 export async function DELETE(req, { params }) {
   const session = await getServerSession(authOptions);
@@ -61,14 +173,9 @@ export async function DELETE(req, { params }) {
   if (!media) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (permanent) {
-    // Warn if still in use
-    if (media.usageCount > 0) {
-      return NextResponse.json({
-        error: "Image is still in use",
-        usageCount: media.usageCount,
-        usageRefs: media.usageRefs,
-      }, { status: 409 });
-    }
+    // Perform references cleanup so pages referencing it do not break
+    await cleanMediaReferences(media);
+
     // Delete from Cloudinary / local filesystem
     if (media.publicId) {
       await deleteFromStorage(media.publicId);
@@ -84,3 +191,4 @@ export async function DELETE(req, { params }) {
   });
   return NextResponse.json({ success: true, trashed: true });
 }
+
