@@ -48,7 +48,7 @@ export default function ProductSection({
     <section className="py-4 md:py-6 bg-background">
       <div className="container mx-auto px-2 sm:px-4 md:px-8 py-12 md:py-20 overflow-hidden">
         {/* Header Section */}
-        <div className="flex items-end justify-between mb-8 md:mb-14 gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-8 md:mb-14 gap-6">
           <div className="space-y-3 md:space-y-4 flex-1 min-w-0">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -72,7 +72,7 @@ export default function ProductSection({
             </MotionHeading>
           </div>
 
-          <div className="flex items-center shrink-0">
+          <div className="flex items-center justify-between lg:justify-end gap-4 md:gap-8 shrink-0 w-full lg:w-auto">
             {/* CTA Button */}
             <Link
               href="/shop"
