@@ -7,10 +7,7 @@ import AffiliatesManagerClient from "@/components/admin/AffiliatesManagerClient"
 
 export const metadata = {
   title: "Affiliate Management — Pairo Admin",
-  robots: {
-    index: false,
-    follow: false
-  }
+  robots: "noindex, nofollow"
 };
 
 export default async function AdminAffiliatesPage() {

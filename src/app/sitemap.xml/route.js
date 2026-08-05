@@ -148,6 +148,10 @@ export async function GET() {
       // Ensure root URL / home page is always included (derived dynamically)
       addUrl("static", "", siteConfig?.updatedAt || null, "daily", 1.0);
 
+      // Ensure shop and blog pages are always explicitly included (de-duplicated automatically)
+      addUrl("static", "shop", siteConfig?.updatedAt || null, "daily", 0.9);
+      addUrl("static", "blog", siteConfig?.updatedAt || null, "weekly", 0.7);
+
       // Add products
       for (const prod of products) {
         addUrl("product", prod.slug, prod.updatedAt, "weekly", 0.8);

@@ -937,17 +937,10 @@ export async function resolveSEOMetadata(options = {}) {
   // String is passed directly as meta content: zero risk of duplication or key conflicts.
 
   const isGlobalNoIndex = siteConfig?.disableSearchEngineIndexing === true;
-  const robots = {
-    index: !(noIndex || isGlobalNoIndex),
-    follow: !(noFollow || isGlobalNoIndex),
-    googleBot: {
-      index: !(noIndex || isGlobalNoIndex),
-      follow: !(noFollow || isGlobalNoIndex),
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1
-    }
-  };
+  const isNoIndex = noIndex || noFollow || isGlobalNoIndex;
+  const robots = isNoIndex
+    ? "noindex, nofollow"
+    : "index, follow, max-video-preview:-1, max-image-preview:large, max-snippet:-1";
 
   const metadata = {
     title: metaTitle,

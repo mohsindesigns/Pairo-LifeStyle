@@ -6,10 +6,7 @@ import { Shield, Target, Award, ArrowLeft, ArrowUpRight } from "lucide-react";
 export const metadata = {
   title: "Pairo Studio — Become an Affiliate Partner",
   description: "Join the Pairo Lifestyle Affiliate Program. Partner with us, promote premium handcrafted shearling jackets, and earn high commissions.",
-  robots: {
-    index: true,
-    follow: true
-  }
+  robots: "index, follow, max-video-preview:-1, max-image-preview:large, max-snippet:-1"
 };
 
 export default async function BecomeAnAffiliatePage() {

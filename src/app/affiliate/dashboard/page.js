@@ -6,10 +6,7 @@ import AffiliateDashboardClient from "@/components/affiliate/AffiliateDashboardC
 
 export const metadata = {
   title: "Affiliate Portal — Pairo Studio",
-  robots: {
-    index: false,
-    follow: false
-  }
+  robots: "noindex, nofollow"
 };
 
 export default async function AffiliateDashboardPage() {
