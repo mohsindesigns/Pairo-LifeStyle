@@ -2,6 +2,8 @@ import Loader from './Loader.js';
 import ConditionEvaluator from './ConditionEvaluator.js';
 import ActionExecutor from './ActionExecutor.js';
 import ConflictResolver from './ConflictResolver.js';
+import dbConnect from '../db.js';
+import Product from '../../models/Product.js';
 
 /**
  * The main entry point for the Promotion Engine.
@@ -43,6 +45,36 @@ export default class Engine {
     const { couponCodes = [], tenantId = 'DEFAULT_STORE' } = context;
     console.log(`[Engine:Main] Starting evaluation for cart: { subtotal: ${cart.subtotal}, itemsCount: ${cart.items?.length || 0} }`);
 
+    // 0. Enrich Cart Phase (SaaS price and target loading safety)
+    const productIds = cart.items?.map(item => item.productId?.toString() || item.id?.toString() || item._id?.toString()).filter(Boolean) || [];
+    let productsMap = new Map();
+    if (productIds.length > 0) {
+      try {
+        await dbConnect();
+        const products = await Product.find({ _id: { $in: productIds } }).lean();
+        productsMap = new Map(products.map(p => [p._id.toString(), p]));
+      } catch (err) {
+        console.error("[Engine:Main] Error loading products for enrichment:", err);
+      }
+    }
+
+    const enrichedItems = cart.items?.map(item => {
+      const dbProduct = productsMap.get(item.productId?.toString() || item.id?.toString() || item._id?.toString());
+      const basePrice = dbProduct ? dbProduct.price : item.price;
+      return {
+        ...item,
+        price: basePrice,
+        categories: dbProduct ? dbProduct.categories?.map(c => c.toString()) : (item.categories || []),
+        collections: dbProduct ? dbProduct.collections?.map(c => c.toString()) : (item.collections || [])
+      };
+    }) || [];
+
+    const enrichedCart = {
+      ...cart,
+      subtotal: enrichedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+      items: enrichedItems
+    };
+
     // 1. Loader Phase
     let promotions = [];
     if (context.activePromotions) {
@@ -58,7 +90,6 @@ export default class Engine {
     const evaluationCache = new Map(); // Memoization cache for this evaluation cycle
     
     for (const promo of promotions) {
-      // Memoization hit check
       let evaluation;
       const promoKey = (promo._id || promo.title || Math.random()).toString();
       
@@ -66,12 +97,12 @@ export default class Engine {
         console.log(`[Engine:Main] Memoization HIT for: ${promo.title}`);
         evaluation = evaluationCache.get(promoKey);
       } else {
-        evaluation = ConditionEvaluator.evaluate(promo, cart, context);
+        evaluation = ConditionEvaluator.evaluate(promo, enrichedCart, context);
         evaluationCache.set(promoKey, evaluation);
       }
       
       if (evaluation.isEligible) {
-        const execution = ActionExecutor.execute(promo, cart);
+        const execution = ActionExecutor.execute(promo, enrichedCart);
         eligiblePromotions.push({
           promotion: promo,
           evaluation,
@@ -88,7 +119,7 @@ export default class Engine {
       appliedPromotions: [],
       discountTotal: 0,
       freeShipping: false,
-      cartTotal: cart.subtotal,
+      cartTotal: enrichedCart.subtotal,
       breakdown: [] // Detailed explanation for UI
     };
 
@@ -103,7 +134,11 @@ export default class Engine {
         explanation: evaluation.explanation,
         stackable: promotion.stackable,
         exclusive: promotion.exclusive,
-        rulesSnapshot: promotion.conditions
+        isAutomatic: promotion.isAutomatic,
+        rulesSnapshot: {
+          conditions: promotion.conditions,
+          actions: promotion.actions
+        }
       });
 
       results.discountTotal += execution.discountAmount;
@@ -111,7 +146,7 @@ export default class Engine {
     }
 
     results.discountTotal = parseFloat(results.discountTotal.toFixed(2));
-    results.cartTotal = Math.max(0, cart.subtotal - results.discountTotal);
+    results.cartTotal = Math.max(0, enrichedCart.subtotal - results.discountTotal);
     
     console.log(`[Engine:Main] Evaluation complete. Total Discount: $${results.discountTotal}`);
     return results;

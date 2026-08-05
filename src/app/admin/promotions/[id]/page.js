@@ -24,8 +24,9 @@ import Validator from "@/lib/promotionEngine/Validator";
 
 import RevisionHistory from "@/components/admin/promotions/History/RevisionHistory";
 
-export default function PromotionEditor() {
-  const { id } = useParams();
+export default function PromotionEditor({ isNew = false } = {}) {
+  const params = useParams();
+  const id = isNew ? "new" : (params?.id || "new");
   const router = useRouter();
   const { 
     formData, setFormData, updateField, updateCondition, 
@@ -49,7 +50,12 @@ export default function PromotionEditor() {
           setFormData(data);
           setLoading(false);
         })
-        .catch(err => console.error("Load failed:", err));
+        .catch(err => {
+          console.error("Load failed:", err);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
     }
   }, [id, setFormData]);
 

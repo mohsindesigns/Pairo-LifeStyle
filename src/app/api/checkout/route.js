@@ -52,12 +52,38 @@ export async function POST(req) {
         let checkoutResult = null;
 
         await session.withTransaction(async () => {
+            // Resolve customerType
+            let customerType = 'guest';
+            const checkoutEmail = (customerEmail || authSession?.user?.email || "").trim().toLowerCase();
+            const orderUserId = authSession?.user?.id || null;
+            if (orderUserId) {
+              customerType = 'logged_in';
+            }
+
+            const checkoutOrConditions = [];
+            if (orderUserId) checkoutOrConditions.push({ "customer.userId": orderUserId });
+            if (checkoutEmail) checkoutOrConditions.push({ "customer.email": checkoutEmail });
+
+            if (checkoutOrConditions.length > 0) {
+              const orderCount = await Order.countDocuments({
+                $or: checkoutOrConditions,
+                status: { $nin: ['Cancelled', 'Refunded'] }
+              }).session(session);
+              if (orderCount > 0) {
+                customerType = 'returning';
+              } else {
+                customerType = orderUserId ? 'logged_in' : 'new';
+              }
+            }
+
             // 2. Evaluate Engine
             const engineResults = await Engine.evaluate(
                 { subtotal: financials.subtotal, items }, 
                 { 
                     couponCodes: financials.promoCode ? [financials.promoCode] : [],
-                    userId: authSession?.user?.id,
+                    userId: orderUserId,
+                    email: checkoutEmail,
+                    customerType,
                     tenantId 
                 }
             );
@@ -302,7 +328,6 @@ export async function POST(req) {
             }], { session });
 
             let guestAccountInfo = null;
-            const checkoutEmail = (customerEmail || authSession?.user?.email || "").trim().toLowerCase();
             const checkoutName = shippingAddress?.fullName || authSession?.user?.name || checkoutEmail.split("@")[0] || "Customer";
 
             if (!authSession?.user?.id && checkoutEmail) {

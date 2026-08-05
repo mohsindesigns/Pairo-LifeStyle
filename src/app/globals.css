@@ -450,3 +450,54 @@ img {
   }
 }
 
+/* Tiptap Text Align & Colors & Lists in Rich Editorial Content */
+.editorial-content-rich p {
+  margin-bottom: 0.75rem;
+}
+.editorial-content-rich .text-left {
+  text-align: left !important;
+}
+.editorial-content-rich .text-center {
+  text-align: center !important;
+}
+.editorial-content-rich .text-right {
+  text-align: right !important;
+}
+.editorial-content-rich .text-justify {
+  text-align: justify !important;
+}
+.editorial-content-rich ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+.editorial-content-rich ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+.editorial-content-rich blockquote {
+  border-left: 3px solid var(--border) !important;
+  padding-left: 1.25rem !important;
+  font-style: italic;
+  color: var(--foreground);
+  opacity: 0.8;
+  margin: 1.5rem 0 !important;
+}
+.editorial-content-rich a {
+  color: #2271b1;
+  text-decoration: underline;
+}
+.editorial-content-rich a:hover {
+  color: #135e96;
+}
+.editorial-content-rich h1 { font-size: 2rem !important; font-weight: 800 !important; margin-top: 2rem !important; }
+.editorial-content-rich h2 { font-size: 1.6rem !important; font-weight: 700 !important; margin-top: 1.75rem !important; }
+.editorial-content-rich h3 { font-size: 1.35rem !important; font-weight: 700 !important; margin-top: 1.5rem !important; }
+.editorial-content-rich h4 { font-size: 1.15rem !important; font-weight: 700 !important; margin-top: 1.25rem !important; }
+.editorial-content-rich h5 { font-size: 1rem !important; font-weight: 700 !important; margin-top: 1.25rem !important; }
+.editorial-content-rich h6 { font-size: 0.875rem !important; font-weight: 700 !important; margin-top: 1.25rem !important; }
+
+

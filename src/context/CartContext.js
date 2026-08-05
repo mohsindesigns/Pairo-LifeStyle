@@ -187,32 +187,42 @@ export function CartProvider({ children }) {
 
   const cartCount    = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartSubtotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  const shippingCost = selectedShipping ? (selectedShipping.cost ?? 0) : 0;
+  const shippingCost = (selectedShipping && !appliedPromo?.freeShipping) ? (selectedShipping.cost ?? 0) : 0;
 
-  // Re-validate coupon code automatically when cart items or subtotal changes
+  // Re-validate coupon code and evaluate automatic promotions automatically when cart items or subtotal changes
   useEffect(() => {
-    if (appliedPromo && cartItems.length > 0) {
-      const revalidatePromo = async () => {
+    if (cartItems.length > 0) {
+      const evaluatePromotions = async () => {
         try {
           const res = await fetch("/api/coupons/validate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code: appliedPromo.code, cartSubtotal, items: cartItems })
+            body: JSON.stringify({ 
+              code: (appliedPromo && !appliedPromo.isAutomatic && !appliedPromo.appliedPromotions?.[0]?.isAutomatic) ? appliedPromo.code : "", 
+              cartSubtotal, 
+              items: cartItems,
+              email: session?.user?.email || null
+            })
           });
           const data = await res.json();
           if (data.success) {
-            setAppliedPromo(data);
+            if (data.appliedPromotions && data.appliedPromotions.length > 0) {
+              setAppliedPromo(data);
+            } else {
+              setAppliedPromo(null);
+            }
           } else {
-            // If it becomes invalid (e.g. minSpend not met), clear the promo
             setAppliedPromo(null);
           }
         } catch (err) {
-          console.error("Failed to re-validate promo on cart change", err);
+          console.error("Failed to evaluate promotions on cart change", err);
         }
       };
-      revalidatePromo();
+      evaluatePromotions();
+    } else {
+      setAppliedPromo(null);
     }
-  }, [cartItems, cartSubtotal]);
+  }, [cartItems, cartSubtotal, session]);
 
   // Dynamic promo discount calculation
   const discountTotal = (() => {

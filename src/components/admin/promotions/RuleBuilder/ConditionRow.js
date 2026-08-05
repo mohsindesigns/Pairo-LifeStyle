@@ -7,7 +7,9 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove }) 
     { value: 'items_count', label: 'Items Count' },
     { value: 'product_id', label: 'Product ID' },
     { value: 'category_id', label: 'Category ID' },
+    { value: 'collection_id', label: 'Collection ID' },
     { value: 'user_id', label: 'User ID' },
+    { value: 'customer_type', label: 'Customer Type' },
   ];
 
   const operators = [
@@ -42,13 +44,26 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove }) 
         {operators.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
 
-      <input 
-        type="text" 
-        value={rule.value} 
-        onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value)}
-        placeholder="Value"
-        className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
-      />
+      {rule.field === 'customer_type' ? (
+        <select
+          value={rule.value || 'guest'}
+          onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value)}
+          className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+        >
+          <option value="guest">Guest Customers</option>
+          <option value="logged_in">Logged-in Customers</option>
+          <option value="new">New Customers (0 past orders)</option>
+          <option value="returning">Returning Customers</option>
+        </select>
+      ) : (
+        <input 
+          type="text" 
+          value={rule.value} 
+          onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value)}
+          placeholder="Value"
+          className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+        />
+      )}
 
       <button 
         onClick={() => onRemove(path, index)}

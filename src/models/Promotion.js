@@ -29,19 +29,40 @@ const PromotionSchema = new mongoose.Schema({
   actions: [{
     type: { 
       type: String, 
-      enum: ['percentage_discount', 'fixed_discount', 'free_shipping', 'bxgy'], 
+      enum: ['percentage_discount', 'fixed_discount', 'free_shipping', 'bxgy', 'fixed_product_price', 'quantity_tier', 'bundle'], 
       required: true 
     },
-    target: { type: String, enum: ['cart', 'product', 'category', 'shipping'], default: 'cart' },
+    target: { type: String, enum: ['cart', 'product', 'category', 'collection', 'shipping'], default: 'cart' },
     value: Number,
-    targetIds: [String], // Specific products/categories
+    targetIds: [String], // Specific products/categories/collections
     bxgyConfig: {
+      // Legacy compatibility
       buyX: String,
-      buyQty: Number,
       getY: String,
-      getQty: Number,
-      discountValue: Number, // 100 for free, 50 for half price, etc.
-      useCheapest: { type: Boolean, default: false }
+      // Advanced BOGO
+      buyType: { type: String, enum: ['product', 'category', 'collection', 'all'], default: 'product' },
+      buyTargetIds: [String],
+      buyQty: { type: Number, default: 1 },
+      getType: { type: String, enum: ['product', 'category', 'collection', 'all'], default: 'product' },
+      getTargetIds: [String],
+      getQty: { type: Number, default: 1 },
+      discountType: { type: String, enum: ['percentage', 'fixed', 'free'], default: 'free' },
+      discountValue: { type: Number, default: 100 },
+      mustBeSameProduct: { type: Boolean, default: false },
+      useCheapest: { type: Boolean, default: true }
+    },
+    quantityTiers: [{
+      quantity: Number,
+      priceType: { type: String, enum: ['total', 'per_unit', 'percentage', 'fixed_discount'] },
+      value: Number
+    }],
+    bundleConfig: {
+      products: [{
+        productId: String,
+        quantity: { type: Number, default: 1 }
+      }],
+      priceType: { type: String, enum: ['fixed_price', 'discount_percentage', 'discount_fixed'] },
+      value: Number
     }
   }],
 
@@ -70,8 +91,14 @@ const PromotionSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Composite Index for SaaS Uniqueness
-PromotionSchema.index({ tenantId: 1, code: 1 }, { unique: true, sparse: true });
+// Composite Index for SaaS Uniqueness (allowing multiple automatic promotions without codes)
+PromotionSchema.index(
+  { tenantId: 1, code: 1 }, 
+  { 
+    unique: true, 
+    partialFilterExpression: { code: { $type: "string" } } 
+  }
+);
 
 // Dynamic status calculation
 PromotionSchema.virtual('status').get(function() {

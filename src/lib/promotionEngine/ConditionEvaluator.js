@@ -74,7 +74,7 @@ export default class ConditionEvaluator {
       return {
         passed: !failed,
         explanation: failed ? failed.explanation : "All conditions met.",
-        debugMetadata: results
+        debugMetadata: { operator: 'AND', passed: !failed, results }
       };
     }
 
@@ -83,7 +83,7 @@ export default class ConditionEvaluator {
       return {
         passed: !!passed,
         explanation: passed ? "One of the required conditions met." : "None of the required conditions met.",
-        debugMetadata: results
+        debugMetadata: { operator: 'OR', passed: !!passed, results }
       };
     }
 
@@ -92,11 +92,11 @@ export default class ConditionEvaluator {
         return {
             passed: !passed,
             explanation: passed ? "Restricted condition matched." : "Exclusion criteria met.",
-            debugMetadata: results
+            debugMetadata: { operator: 'NOT', passed: !passed, results }
         };
     }
 
-    return { passed: false, explanation: `Unknown operator: ${operator}` };
+    return { passed: false, explanation: `Unknown operator: ${operator}`, debugMetadata: {} };
   }
 
   /**
@@ -117,11 +117,16 @@ export default class ConditionEvaluator {
         actualValue = cart.items?.map(i => i.productId?.toString() || i.id?.toString()) || [];
         break;
       case 'category_id':
-        // This requires the products in the cart to have categories pre-loaded or passed in
         actualValue = cart.items?.flatMap(i => i.categories || []) || [];
+        break;
+      case 'collection_id':
+        actualValue = cart.items?.flatMap(i => i.collections || []) || [];
         break;
       case 'user_id':
         actualValue = context.userId;
+        break;
+      case 'customer_type':
+        actualValue = context.customerType || 'guest';
         break;
       default:
         return { passed: false, explanation: `Invalid field: ${field}` };
