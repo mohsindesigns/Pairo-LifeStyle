@@ -172,6 +172,7 @@ export default function AdminSidebar() {
             <NavLink href="/admin/orders" exact isSubmenu>Orders</NavLink>
             <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>
             <NavLink href="/admin/discounts" exact isSubmenu>Coupons</NavLink>
+            <NavLink href="/admin/promotions" exact isSubmenu>Promotions & BOGO</NavLink>
           </AccordionMenu>
 
           {/* Affiliates — Dedicated Module */}

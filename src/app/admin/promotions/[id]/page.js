@@ -38,6 +38,27 @@ export default function PromotionEditor({ isNew = false } = {}) {
   const [validation, setValidation] = useState({ isValid: true, errors: [], warnings: [] });
   const [activeTab, setActiveTab] = useState("builder"); // builder, settings, simulation
 
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [collections, setCollections] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/admin/products")
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setProducts(data); })
+      .catch(err => console.error("Error loading products", err));
+
+    fetch("/api/admin/categories?type=product")
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setCategories(data); })
+      .catch(err => console.error("Error loading categories", err));
+
+    fetch("/api/admin/categories?type=collection")
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setCollections(data); })
+      .catch(err => console.error("Error loading collections", err));
+  }, []);
+
   const handleRollback = (updatedPromo) => {
     setFormData(updatedPromo);
   };
@@ -142,6 +163,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
                     onUpdate={updateCondition}
                     onAdd={addRule}
                     onRemove={removeRule}
+                    catalogData={{ products, categories, collections }}
                   />
                 </div>
               </section>
@@ -163,6 +185,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
                       index={idx} 
                       onUpdate={updateAction}
                       onRemove={removeAction}
+                      catalogData={{ products, categories, collections }}
                     />
                   ))}
                   {formData.actions.length === 0 && (

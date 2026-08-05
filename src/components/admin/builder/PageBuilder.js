@@ -228,9 +228,9 @@ export default function PageBuilder({ initialPage }) {
       try {
         console.log("[PageBuilder] Fetching dynamic options...");
         const [catsRes, prodsRes, blogsRes] = await Promise.all([
-          fetch("/api/admin/categories"),
-          fetch("/api/admin/products"),
-          fetch("/api/admin/blogs")
+          fetch("/api/admin/categories", { cache: "no-store" }),
+          fetch("/api/admin/products", { cache: "no-store" }),
+          fetch("/api/admin/blogs", { cache: "no-store" })
         ]);
         console.log("[PageBuilder] Responses received status:", catsRes.status, prodsRes.status, blogsRes.status);
         const [cats, prods, blogs] = await Promise.all([catsRes.json(), prodsRes.json(), blogsRes.json()]);
@@ -257,7 +257,9 @@ export default function PageBuilder({ initialPage }) {
         body: currentDataStr
       });
       if (res.ok) {
-        lastSavedRef.current = currentDataStr;
+        const savedData = await res.json();
+        setPage(savedData);
+        lastSavedRef.current = JSON.stringify(savedData);
         setLastSaved(new Date());
         toast.success("Changes Saved Automatically", { id: 'save-toast' });
       }

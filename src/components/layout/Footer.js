@@ -220,10 +220,16 @@ export default function Footer() {
   // ── Brand section ──
   const footerBrandName = brand?.footerBrandName || 'PAIRO';
   const copyrightText = 'PAIRO — ALL RIGHTS RESERVED © 2026.';
-  const cleanPrivacySlug = fc.privacyPageSlug ? fc.privacyPageSlug.replace(/^\/?pages\//, '').replace(/^\//, '') : (brand?.privacyUrl?.replace(/^\//, '') || 'privacy-policy');
-  const cleanTermsSlug = fc.termsPageSlug ? fc.termsPageSlug.replace(/^\/?pages\//, '').replace(/^\//, '') : (brand?.termsUrl?.replace(/^\//, '') || 'terms-and-conditions');
-  const privacyUrl = `/${cleanPrivacySlug}`;
-  const termsUrl = `/${cleanTermsSlug}`;
+  const hasPrivacyLink = !!fc.privacyPageSlug || (!!brand?.privacyUrl && brand.privacyUrl !== '#');
+  const hasTermsLink = !!fc.termsPageSlug || (!!brand?.termsUrl && brand.termsUrl !== '#');
+
+  const privacyUrl = fc.privacyPageSlug 
+    ? `/${fc.privacyPageSlug.replace(/^\/?pages\//, '').replace(/^\//, '')}`
+    : (brand?.privacyUrl || '');
+
+  const termsUrl = fc.termsPageSlug 
+    ? `/${fc.termsPageSlug.replace(/^\/?pages\//, '').replace(/^\//, '')}`
+    : (brand?.termsUrl || '');
 
   // ── Footer Logo ──
   const footerLogoUrl = fc.logoUrl;
@@ -439,8 +445,12 @@ export default function Footer() {
             {copyrightText} | Designed by <a href="https://mohsindesigns.com/" target="_blank" rel="noopener noreferrer" className="hover:text-white underline transition-colors">Mohsin Designs</a>
           </p>
           <div className="flex gap-10">
-            <Link href={privacyUrl} className="text-white/50 hover:text-white text-[9px] font-bold uppercase tracking-widest transition-colors">Privacy</Link>
-            <Link href={termsUrl} className="text-white/50 hover:text-white text-[9px] font-bold uppercase tracking-widest transition-colors">Terms</Link>
+            {hasPrivacyLink && (
+              <Link href={privacyUrl} className="text-white/50 hover:text-white text-[9px] font-bold uppercase tracking-widest transition-colors">Privacy</Link>
+            )}
+            {hasTermsLink && (
+              <Link href={termsUrl} className="text-white/50 hover:text-white text-[9px] font-bold uppercase tracking-widest transition-colors">Terms</Link>
+            )}
             <Link href="/sitemap" className="text-white/50 hover:text-white text-[9px] font-bold uppercase tracking-widest transition-colors">Sitemap</Link>
           </div>
         </div>

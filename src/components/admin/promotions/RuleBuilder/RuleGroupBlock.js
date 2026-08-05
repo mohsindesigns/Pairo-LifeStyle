@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, FolderPlus, FilePlus } from 'lucide-react';
 import ConditionRow from './ConditionRow';
 
-export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, onAdd, onRemove, depth = 0 }) {
+export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, onAdd, onRemove, depth = 0, catalogData }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const getConnectorColor = () => {
@@ -77,6 +77,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
                   onAdd={onAdd}
                   onRemove={onRemove}
                   depth={depth + 1}
+                  catalogData={catalogData}
                 />
               );
             } else {
@@ -89,6 +90,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
                   index={idx}
                   onUpdate={onUpdate}
                   onRemove={onRemove}
+                  catalogData={catalogData}
                 />
               );
             }

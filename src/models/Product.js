@@ -24,6 +24,11 @@ const ProductSchema = new mongoose.Schema({
   lowStockThreshold: { type: Number, default: 2 },
   availabilityStatus: { type: String, enum: ['In Stock', 'Out of Stock', 'On Backorder'], default: 'In Stock' },
 
+  // Google Merchant Center compatibility fields
+  color: { type: String, default: '' },
+  gender: { type: String, enum: ['unisex', 'male', 'female'], default: 'unisex' },
+  ageGroup: { type: String, enum: ['adult', 'kids', 'toddler', 'infant', 'newborn'], default: 'adult' },
+
   // Media
   images: [{ type: String }], // Array of image URLs/paths
   image: { type: String }, // Legacy Main Image

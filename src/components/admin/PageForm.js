@@ -227,6 +227,10 @@ export default function PageForm({ pageId }) {
       }
    }, []);
    const [page, setPage] = useState(null);
+   const pageRef = useRef(null);
+   useEffect(() => {
+      pageRef.current = page;
+   }, [page]);
    const [expandedSectionId, setExpandedSectionId] = useState(null);
    const [mediaPicker, setMediaPicker] = useState({ open: false, onSelect: null });
    const [dynamicOptions, setDynamicOptions] = useState({ categories: [], products: [], blogs: [] });
@@ -240,12 +244,12 @@ export default function PageForm({ pageId }) {
       const fetchData = async () => {
          try {
             const promises = [
-               fetch("/api/admin/categories"),
-               fetch("/api/admin/products"),
-               fetch("/api/admin/blogs")
+               fetch("/api/admin/categories", { cache: "no-store" }),
+               fetch("/api/admin/products", { cache: "no-store" }),
+               fetch("/api/admin/blogs", { cache: "no-store" })
             ];
             if (pageId && pageId !== "new") {
-               promises.unshift(fetch(`/api/admin/pages/${pageId}`));
+               promises.unshift(fetch(`/api/admin/pages/${pageId}`, { cache: "no-store" }));
             }
 
             const results = await Promise.all(promises);
@@ -317,8 +321,10 @@ export default function PageForm({ pageId }) {
       if (e) e.preventDefault();
       setSaving(true);
       try {
+         const currentPage = pageRef.current || page;
+         if (!currentPage) return;
          // Strip immutable Mongoose fields that cause _id update errors
-         const { _id, __v, createdAt, updatedAt, ...cleanPage } = page;
+         const { _id, __v, createdAt, updatedAt, ...cleanPage } = currentPage;
          console.log("[PageForm] Saving page seo:", cleanPage.seo);
 
          const isNew = pageId === "new" || !_id;
@@ -332,6 +338,7 @@ export default function PageForm({ pageId }) {
          });
          if (res.ok) {
             const savedData = await res.json();
+            setPage(savedData);
             toast.success(isNew ? "Page created successfully" : "Page updated successfully");
             if (isNew && savedData._id) {
                router.push(`/admin/pages/${savedData._id}`);

@@ -156,10 +156,7 @@ export default function Testimonials({
         </div>
 
         <div className="flex flex-col items-center">
-          <Link href="/profile" className="group relative overflow-hidden bg-black text-white px-8 md:px-12 py-3.5 md:py-4.5 rounded-full font-bold text-[9px] md:text-xs uppercase tracking-[0.3em] shadow-xl transition-all active:scale-95 inline-flex items-center">
-            <span className="relative z-10 flex items-center gap-3 transition-colors duration-500">{testimonialsConfig.buttonText}<ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" /></span>
-          </Link>
-          <div className="mt-10 md:mt-14 flex gap-3">
+          <div className="mt-4 md:mt-6 flex gap-3">
             {reviews.map((_, i) => (
               <button key={i} onClick={() => setCurrentIndex(i)} className={`h-1 transition-all duration-700 rounded-full ${i === currentIndex ? 'w-14 bg-black' : 'w-3 bg-black/5'}`} />
             ))}

@@ -7,6 +7,7 @@ import { can } from "@/lib/rbac";
 import { logAction } from "@/lib/audit";
 import { TEMPLATE_REGISTRY, validateTemplateSections } from "@/lib/templates";
 import { randomUUID } from "crypto";
+import { revalidatePath } from "next/cache";
 
 export async function GET(req) {
     const session = await getServerSession(authOptions);
@@ -88,6 +89,14 @@ export async function POST(req) {
             after: newPage,
             message: `Created new page: ${title}`
         });
+
+        // Trigger cache revalidation
+        if (newPage.slug === 'home') {
+            revalidatePath('/');
+        } else {
+            revalidatePath(`/${newPage.slug}`);
+        }
+        revalidatePath('/', 'layout');
 
         return NextResponse.json(newPage, { status: 201 });
     } catch (error) {

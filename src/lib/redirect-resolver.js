@@ -6,7 +6,6 @@ export const RESERVED_SLUGS = [
   "admin",
   "api",
   "product",
-  "blog",
   "shop",
   "checkout",
   "cart",

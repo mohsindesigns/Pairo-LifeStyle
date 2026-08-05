@@ -6,6 +6,7 @@ import Page from "@/models/Page";
 import { can } from "@/lib/rbac";
 import { logAction } from "@/lib/audit";
 import { validateTemplateSections } from "@/lib/templates";
+import { revalidatePath } from "next/cache";
 
 export async function GET(req, { params }) {
     const { id } = await params;
@@ -87,6 +88,14 @@ export async function PUT(req, { params }) {
             message: `Updated page: ${updated.title}`
         });
 
+        // Trigger cache revalidation
+        if (updated.slug === 'home') {
+            revalidatePath('/');
+        } else {
+            revalidatePath(`/${updated.slug}`);
+        }
+        revalidatePath('/', 'layout');
+
         return NextResponse.json(updated);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -115,6 +124,14 @@ export async function DELETE(req, { params }) {
             before: page,
             message: `Deleted page: ${page.title}`
         });
+
+        // Trigger cache revalidation
+        if (page.slug === 'home') {
+            revalidatePath('/');
+        } else {
+            revalidatePath(`/${page.slug}`);
+        }
+        revalidatePath('/', 'layout');
 
         return NextResponse.json({ message: "Page deleted" });
     } catch (error) {

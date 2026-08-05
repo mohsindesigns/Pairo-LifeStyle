@@ -143,6 +143,9 @@ export default function ProductForm({ productId = null }) {
       stock: "",
       manageStock: true,
       shippingType: "Express",
+      color: "",
+      gender: "unisex",
+      ageGroup: "adult",
       images: [],
       seo: {
          title: "",
@@ -210,6 +213,9 @@ export default function ProductForm({ productId = null }) {
                   primaryCategory: prodData.primaryCategory || "",
                   sizeChartSource: prodData.sizeChartSource || "category_default",
                   sizeChart: prodData.sizeChart || "",
+                  color: prodData.color || "",
+                  gender: prodData.gender || "unisex",
+                  ageGroup: prodData.ageGroup || "adult",
                   seo: {
                      title: "", description: "", keywords: [], focusKeyword: "",
                      canonicalUrl: "", noIndex: false, noFollow: false,
@@ -326,6 +332,7 @@ export default function ProductForm({ productId = null }) {
          // Never send an empty string for ObjectId fields — Mongoose will reject it
          primaryCategory: formData.primaryCategory || undefined,
          categories: (formData.categories || []).filter(Boolean),
+         images: (formData.images || []).filter(u => u && u.trim() !== ""),
       };
       try {
          const payload = productId ? { ...normalizedData, id: productId } : normalizedData;
@@ -713,6 +720,41 @@ export default function ProductForm({ productId = null }) {
                                           <option value="Standard">Standard Shipping</option>
                                           <option value="Free">Free Shipping</option>
                                           <option value="Priority">Priority Mail</option>
+                                       </select>
+                                    </div>
+                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Color</label>
+                                       <input 
+                                          className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
+                                          placeholder="e.g. Black, Navy Blue, Crimson" 
+                                          value={formData.color || ""} 
+                                          onChange={(e) => setFormData({ ...formData, color: e.target.value })} 
+                                       />
+                                    </div>
+                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Gender</label>
+                                       <select 
+                                          className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
+                                          value={formData.gender || "unisex"} 
+                                          onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                       >
+                                          <option value="unisex">Unisex</option>
+                                          <option value="male">Male</option>
+                                          <option value="female">Female</option>
+                                       </select>
+                                    </div>
+                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Age Group</label>
+                                       <select 
+                                          className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
+                                          value={formData.ageGroup || "adult"} 
+                                          onChange={(e) => setFormData({ ...formData, ageGroup: e.target.value })}
+                                       >
+                                          <option value="adult">Adult</option>
+                                          <option value="kids">Kids</option>
+                                          <option value="toddler">Toddler</option>
+                                          <option value="infant">Infant</option>
+                                          <option value="newborn">Newborn</option>
                                        </select>
                                     </div>
                                  </div>
@@ -1457,11 +1499,11 @@ export default function ProductForm({ productId = null }) {
                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Product Image</div>
                   <div className="p-4">
-                     <MediaPicker value={formData.images[0]} onChange={url => setFormData({ ...formData, images: [url] })} />
+                     <MediaPicker value={formData.images[0]} onChange={url => setFormData({ ...formData, images: [url, ...(formData.images?.slice(1) || [])] })} />
                   </div>
                   <div className="p-4 border-t border-gray-100">
                      <label className="text-[13px] font-bold block mb-2 text-gray-700">Product Gallery</label>
-                     <MediaPicker multiple value={formData.images.slice(1)} onChange={urls => setFormData({ ...formData, images: [formData.images[0], ...urls] })} />
+                     <MediaPicker multiple value={formData.images.slice(1)} onChange={urls => setFormData({ ...formData, images: [formData.images[0] || "", ...urls] })} />
                   </div>
                </div>
             </div>

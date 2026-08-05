@@ -1,7 +1,9 @@
 import React from 'react';
 import { Trash2, GripVertical } from 'lucide-react';
 
-export default function ConditionRow({ rule, path, index, onUpdate, onRemove }) {
+export default function ConditionRow({ rule, path, index, onUpdate, onRemove, catalogData }) {
+  const { products = [], categories = [], collections = [] } = catalogData || {};
+
   const fields = [
     { value: 'subtotal', label: 'Cart Subtotal' },
     { value: 'items_count', label: 'Items Count' },
@@ -54,6 +56,45 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove }) 
           <option value="logged_in">Logged-in Customers</option>
           <option value="new">New Customers (0 past orders)</option>
           <option value="returning">Returning Customers</option>
+        </select>
+      ) : rule.field === 'product_id' ? (
+        <select
+          value={rule.value || ''}
+          onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value)}
+          className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+        >
+          <option value="">-- Select Product --</option>
+          {products.map(p => (
+            <option key={p._id || p.id} value={p._id?.toString() || p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      ) : rule.field === 'category_id' ? (
+        <select
+          value={rule.value || ''}
+          onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value)}
+          className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+        >
+          <option value="">-- Select Category --</option>
+          {categories.map(c => (
+            <option key={c._id} value={c._id?.toString() || c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      ) : rule.field === 'collection_id' ? (
+        <select
+          value={rule.value || ''}
+          onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value)}
+          className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+        >
+          <option value="">-- Select Collection --</option>
+          {collections.map(c => (
+            <option key={c._id} value={c._id?.toString() || c.id}>
+              {c.name}
+            </option>
+          ))}
         </select>
       ) : (
         <input 

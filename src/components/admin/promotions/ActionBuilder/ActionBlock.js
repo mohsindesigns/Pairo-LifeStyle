@@ -1,7 +1,56 @@
 import React from 'react';
 import { Trash2, ShoppingCart, Tag, Percent, ArrowRight, Plus } from 'lucide-react';
 
-export default function ActionBlock({ action, index, onUpdate, onRemove }) {
+const MultiSelect = ({ selectedIds = [], options = [], onChange, placeholder = "Select item..." }) => {
+  const handleAdd = (id) => {
+    if (id && !selectedIds.includes(id)) {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const handleRemove = (id) => {
+    onChange(selectedIds.filter(selected => selected !== id));
+  };
+
+  return (
+    <div className="space-y-1.5 mt-1">
+      <select
+        value=""
+        onChange={(e) => handleAdd(e.target.value)}
+        className="w-full text-[12px] border border-gray-300 p-1.5 rounded-sm outline-none focus:border-[#2271b1] bg-white cursor-pointer"
+      >
+        <option value="">{placeholder}</option>
+        {options.map(opt => (
+          <option key={opt._id || opt.id} value={opt._id?.toString() || opt.id}>
+            {opt.name}
+          </option>
+        ))}
+      </select>
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 p-1.5 bg-gray-50 border border-gray-200 rounded-sm max-h-[120px] overflow-y-auto w-full">
+          {selectedIds.map(id => {
+            const option = options.find(opt => (opt._id?.toString() || opt.id) === id);
+            return (
+              <span key={id} className="inline-flex items-center gap-1 bg-white border border-gray-300 text-[11px] font-medium px-2 py-0.5 rounded-sm shadow-sm">
+                {option ? option.name : id}
+                <button
+                  type="button"
+                  onClick={() => handleRemove(id)}
+                  className="text-gray-400 hover:text-rose-600 font-bold ml-1"
+                >
+                  &times;
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default function ActionBlock({ action, index, onUpdate, onRemove, catalogData }) {
+  const { products = [], categories = [], collections = [] } = catalogData || {};
   const types = [
     { value: 'percentage_discount', label: 'Percentage Discount' },
     { value: 'fixed_discount', label: 'Fixed Amount Discount' },
@@ -145,13 +194,12 @@ export default function ActionBlock({ action, index, onUpdate, onRemove }) {
               </div>
               {action.bxgyConfig?.buyType !== 'all' && (
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Target IDs (Comma-separated)</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. prod_abc, category_xyz..."
-                    value={action.bxgyConfig?.buyTargetIds?.join(', ') || ''} 
-                    onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, buyTargetIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                    className="w-full border border-gray-300 p-1.5 rounded-sm text-[12px]" 
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Qualifying Buy Targets</label>
+                  <MultiSelect
+                    selectedIds={action.bxgyConfig?.buyTargetIds || []}
+                    options={action.bxgyConfig?.buyType === 'product' ? products : action.bxgyConfig?.buyType === 'category' ? categories : collections}
+                    onChange={(vals) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, buyTargetIds: vals })}
+                    placeholder={`Choose Buy ${action.bxgyConfig?.buyType === 'product' ? 'Products' : action.bxgyConfig?.buyType === 'category' ? 'Categories' : 'Collections'}...`}
                   />
                 </div>
               )}
@@ -183,13 +231,12 @@ export default function ActionBlock({ action, index, onUpdate, onRemove }) {
               </div>
               {action.bxgyConfig?.getType !== 'all' && (
                 <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Target IDs (Comma-separated)</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. prod_abc, category_xyz..."
-                    value={action.bxgyConfig?.getTargetIds?.join(', ') || ''} 
-                    onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, getTargetIds: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
-                    className="w-full border border-gray-300 p-1.5 rounded-sm text-[12px]" 
+                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Qualifying Get Targets</label>
+                  <MultiSelect
+                    selectedIds={action.bxgyConfig?.getTargetIds || []}
+                    options={action.bxgyConfig?.getType === 'product' ? products : action.bxgyConfig?.getType === 'category' ? categories : collections}
+                    onChange={(vals) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, getTargetIds: vals })}
+                    placeholder={`Choose Get ${action.bxgyConfig?.getType === 'product' ? 'Products' : action.bxgyConfig?.getType === 'category' ? 'Categories' : 'Collections'}...`}
                   />
                 </div>
               )}
@@ -314,13 +361,12 @@ export default function ActionBlock({ action, index, onUpdate, onRemove }) {
 
             {(action.target === 'product' || action.target === 'category' || action.target === 'collection') && (
               <div className="space-y-1 bg-white p-3 border border-blue-200 rounded-sm">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Qualifying target IDs (Comma separated)</label>
-                <input 
-                  type="text" 
-                  value={action.targetIds?.join(', ') || ''} 
-                  onChange={(e) => onUpdate(index, 'targetIds', e.target.value.split(',').map(s => s.trim()))}
-                  placeholder="ID1, ID2..."
-                  className="w-full text-[12px] border border-gray-300 p-1.5 rounded-sm outline-none focus:border-[#2271b1]"
+                <label className="text-[10px] font-bold text-gray-500 uppercase">Qualifying target {action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections'}</label>
+                <MultiSelect 
+                  selectedIds={action.targetIds || []} 
+                  options={action.target === 'product' ? products : action.target === 'category' ? categories : collections} 
+                  onChange={(vals) => onUpdate(index, 'targetIds', vals)}
+                  placeholder={`Choose qualifying ${action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections'}...`}
                 />
               </div>
             )}
@@ -345,14 +391,19 @@ export default function ActionBlock({ action, index, onUpdate, onRemove }) {
               {((action.bundleConfig || {}).products || []).map((prod, pIdx) => (
                 <div key={pIdx} className="grid grid-cols-12 gap-2 items-center bg-white border border-purple-200 p-2 rounded-sm shadow-inner">
                   <div className="col-span-8 space-y-0.5">
-                    <label className="text-[9px] text-gray-400 font-bold uppercase block">Product ID</label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. prod_abc"
+                    <label className="text-[9px] text-gray-400 font-bold uppercase block">Product</label>
+                    <select
                       value={prod.productId}
                       onChange={(e) => handleUpdateBundleProduct(pIdx, 'productId', e.target.value)}
-                      className="w-full border border-gray-300 rounded-sm p-1 text-[12px]"
-                    />
+                      className="w-full border border-gray-300 rounded-sm p-1.5 text-[12px] bg-white"
+                    >
+                      <option value="">-- Select Product --</option>
+                      {products.map(p => (
+                        <option key={p._id || p.id} value={p._id?.toString() || p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="col-span-3 space-y-0.5">
                     <label className="text-[9px] text-gray-400 font-bold uppercase block">Quantity</label>
@@ -427,13 +478,12 @@ export default function ActionBlock({ action, index, onUpdate, onRemove }) {
             </div>
             {(action.target === 'product' || action.target === 'category' || action.target === 'collection') && (
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-500 uppercase">Target IDs (Comma separated)</label>
-                <input 
-                  type="text" 
-                  value={action.targetIds?.join(', ') || ''} 
-                  onChange={(e) => onUpdate(index, 'targetIds', e.target.value.split(',').map(s => s.trim()))}
-                  placeholder="ID1, ID2..."
-                  className="w-full text-[13px] border border-gray-300 p-2 rounded-sm outline-none focus:border-[#2271b1]"
+                <label className="text-[11px] font-bold text-gray-500 uppercase">Target {action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections'}</label>
+                <MultiSelect
+                  selectedIds={action.targetIds || []}
+                  options={action.target === 'product' ? products : action.target === 'category' ? categories : collections}
+                  onChange={(vals) => onUpdate(index, 'targetIds', vals)}
+                  placeholder={`Choose target ${action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections'}...`}
                 />
               </div>
             )}

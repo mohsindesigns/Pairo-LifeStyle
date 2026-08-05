@@ -28,7 +28,7 @@ export default function PagesManagementPage() {
   const fetchPages = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/pages");
+      const res = await fetch("/api/admin/pages", { cache: "no-store" });
       const data = await res.json();
       if (res.ok) setPages(data);
     } catch (err) {
