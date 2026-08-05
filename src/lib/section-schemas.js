@@ -36,18 +36,8 @@ export const SECTION_SCHEMAS = {
         { label: "Specific Products", value: "products" }
       ]},
       { name: "collectionId", label: "Select Collection", type: "select", options: "categories", dependsOn: "showType", visibleIf: "collection" },
-      { name: "productIds", label: "Select Products", type: "multiselect", options: "products", dependsOn: "showType", visibleIf: "products" },
-      { name: "limit", label: "Product Limit (Collection only)", type: "number", default: 8, dependsOn: "showType", visibleIf: "collection" },
-      { name: "layoutType", label: "Layout Type", type: "select", default: "carousel", options: [
-        { label: "Horizontal Carousel", value: "carousel" },
-        { label: "Responsive Grid", value: "grid" }
-      ]},
-      { name: "gridColsDesktop", label: "Desktop Columns", type: "number", default: 4 },
-      { name: "gridRowsDesktop", label: "Desktop Rows", type: "number", default: 2 },
-      { name: "gridColsTablet", label: "Tablet Columns", type: "number", default: 3 },
-      { name: "gridRowsTablet", label: "Tablet Rows", type: "number", default: 2 },
-      { name: "gridColsMobile", label: "Mobile Columns", type: "number", default: 2 },
-      { name: "gridRowsMobile", label: "Mobile Rows", type: "number", default: 3 }
+      { name: "productIds", label: "Select Products (Max 16)", type: "multiselect", options: "products", dependsOn: "showType", visibleIf: "products" },
+      { name: "limit", label: "Product Limit (Collection only, Max 16)", type: "number", default: 16, dependsOn: "showType", visibleIf: "collection" }
     ]
   },
   feature_marquee: {

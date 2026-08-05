@@ -181,10 +181,6 @@ const SortableSection = ({
         <div className="p-4 bg-white border-t border-[#f0f0f1]">
           <div className="grid grid-cols-1 gap-6">
             {schema.fields.filter(field => {
-              // Skip grid config fields for product_grid — we render those manually below
-              if (section.type === 'product_grid' && ['gridColsDesktop','gridRowsDesktop','gridColsTablet','gridRowsTablet','gridColsMobile','gridRowsMobile'].includes(field.name)) {
-                return false;
-              }
               // New showWhen system
               if (field.showWhen) {
                 return config[field.showWhen.field] === field.showWhen.value;
@@ -200,53 +196,9 @@ const SortableSection = ({
             }).map((field) => (
               <div key={field.name} className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{field.label}</label>
-                {renderField(
-                  field,
-                  field.name === "layoutType" ? (config.layoutType || config.layout) : config[field.name],
-                  (val) => {
-                    if (field.name === "layoutType") {
-                      onUpdate(section.id, { layoutType: val, layout: val });
-                    } else {
-                      onUpdate(section.id, { [field.name]: val });
-                    }
-                  },
-                  onOpenMediaPicker
-                )}
+                {renderField(field, config[field.name], (val) => onUpdate(section.id, { [field.name]: val }), onOpenMediaPicker)}
               </div>
             ))}
-
-            {/* ── PRODUCT GRID: Explicit Grid Config Fields ── */}
-            {section.type === 'product_grid' && (config.layoutType || config.layout) === 'grid' && (
-              <div className="border border-[#e2e4e7] bg-[#f9f9f9] p-4 rounded space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#2271b1] border-b border-[#e2e4e7] pb-2">Grid Layout Settings</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Desktop Columns</label>
-                    <input type="number" min={1} max={12} value={config.gridColsDesktop ?? 4} onChange={(e) => onUpdate(section.id, { gridColsDesktop: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Desktop Rows</label>
-                    <input type="number" min={1} max={12} value={config.gridRowsDesktop ?? 2} onChange={(e) => onUpdate(section.id, { gridRowsDesktop: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Tablet Columns</label>
-                    <input type="number" min={1} max={12} value={config.gridColsTablet ?? 3} onChange={(e) => onUpdate(section.id, { gridColsTablet: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Tablet Rows</label>
-                    <input type="number" min={1} max={12} value={config.gridRowsTablet ?? 2} onChange={(e) => onUpdate(section.id, { gridRowsTablet: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Mobile Columns</label>
-                    <input type="number" min={1} max={12} value={config.gridColsMobile ?? 2} onChange={(e) => onUpdate(section.id, { gridColsMobile: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Mobile Rows</label>
-                    <input type="number" min={1} max={12} value={config.gridRowsMobile ?? 3} onChange={(e) => onUpdate(section.id, { gridRowsMobile: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
           <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-center opacity-40">
              <span className="text-[9px] font-mono tracking-tighter">TYPE: {section.type}</span>
