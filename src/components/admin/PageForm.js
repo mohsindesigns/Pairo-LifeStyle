@@ -304,7 +304,7 @@ export default function PageForm({ pageId }) {
             setPage(pageData);
             setDynamicOptions({
                categories: Array.isArray(cats) ? cats.filter(c => c.status === 'Published').map(c => ({ label: c.name, value: c._id })) : [],
-               products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p.slug || p._id })) : [],
+               products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p._id })) : [],
                blogs: Array.isArray(blogs) ? blogs.filter(b => b.status === 'Published').map(b => ({ label: b.title, value: b._id })) : []
             });
             setLoading(false);

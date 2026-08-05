@@ -19,7 +19,7 @@ Disallow: /
   } else {
     robots = `User-agent: *
 Disallow: /admin
-Disallow: /feed
+Allow: /feed.xml
 Disallow: /cart
 Disallow: /orders
 Disallow: /checkout

@@ -21,9 +21,9 @@ export const TEMPLATE_REGISTRY = {
     ],
     defaultSections: [
       { type: "hero_slider", config: {} },
-      { type: "product_grid", config: { title: "NEW ARRIVALS", limit: 8 } },
+      { type: "product_grid", config: { title: "NEW ARRIVALS", limit: 16 } },
       { type: "feature_marquee", config: {} },
-      { type: "product_grid", config: { title: "TOP SELLING", limit: 8 } },
+      { type: "product_grid", config: { title: "TOP SELLING", limit: 16 } },
       { type: "banner_feature", config: {} },
       { type: "category_showcase", config: {} },
       { type: "blog_grid", config: {} },

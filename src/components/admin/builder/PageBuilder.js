@@ -237,7 +237,7 @@ export default function PageBuilder({ initialPage }) {
         console.log("[PageBuilder] Data parsed:", Array.isArray(cats) ? cats.length : typeof cats, Array.isArray(prods) ? prods.length : typeof prods, Array.isArray(blogs) ? blogs.length : typeof blogs);
         setDynamicOptions({
           categories: Array.isArray(cats) ? cats.map(c => ({ label: c.name, value: c._id })) : [],
-          products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p.slug || p._id })) : [],
+          products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p._id })) : [],
           blogs: Array.isArray(blogs) ? blogs.map(b => ({ label: b.title, value: b._id })) : []
         });
       } catch (err) { console.error("[PageBuilder] Dynamic options fetch failed", err); }

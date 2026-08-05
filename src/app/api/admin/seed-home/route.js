@@ -40,7 +40,7 @@ export async function GET(req) {
             title: "NEW ARRIVALS",
             seriesLabel: siteConfig.products?.labels?.seriesLabel || "Collection",
             ctaLabel: "Explore Collection",
-            limit: 8,
+            limit: 16,
             layout: "carousel"
           }
         },
@@ -70,7 +70,7 @@ export async function GET(req) {
             title: "TOP SELLING",
             seriesLabel: siteConfig.products?.labels?.seriesLabel || "Collection",
             ctaLabel: "Shop Top Sellers",
-            limit: 8,
+            limit: 16,
             layout: "carousel"
           }
         },
