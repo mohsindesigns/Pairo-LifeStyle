@@ -22,7 +22,7 @@ const ZonalTaxRuleSchema = new mongoose.Schema({
 // ─── Tax Settings Schema ───────────────────────────────────────────────────────
 // One document per tenant (upserted by tenantId)
 const TaxSettingsSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, unique: true, index: true },
+  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', unique: true, index: true },
 
   // Master switch — if false, no tax is applied anywhere
   enabled: { type: Boolean, default: false },

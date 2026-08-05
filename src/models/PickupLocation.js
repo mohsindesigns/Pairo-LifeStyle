@@ -10,7 +10,7 @@ const OperatingHoursSchema = new mongoose.Schema({
 
 // ─── Pickup Location Schema ────────────────────────────────────────────────────
 const PickupLocationSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, index: true },
+  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
 
   name:         { type: String, required: true, trim: true }, // e.g. "Lahore Flagship Store"
   instructions: { type: String, default: '' },                // shown to customer at checkout

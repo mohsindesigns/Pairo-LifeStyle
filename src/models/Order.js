@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const OrderSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, index: true },
+  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
   orderNumber: { type: String, required: true, index: true },
   status: { 
     type: String, 

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const ProductSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, index: true },
+  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
   // Core Info
   name: { type: String, required: true },
   slug: { type: String, index: true },

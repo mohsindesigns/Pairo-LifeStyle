@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const PromotionSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, index: true }, // Mandatory SaaS Isolation
+  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true }, // Mandatory SaaS Isolation
   title: { type: String, required: true },
   description: String,
   code: { type: String, sparse: true, index: true },

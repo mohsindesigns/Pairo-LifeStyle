@@ -19,7 +19,7 @@ const ShippingConditionSchema = new mongoose.Schema({
 
 // ─── Shipping Method Schema ────────────────────────────────────────────────────
 const ShippingMethodSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, index: true },
+  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
   zoneId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ShippingZone', required: true, index: true },
 
   name:        { type: String, required: true, trim: true },

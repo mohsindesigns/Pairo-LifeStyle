@@ -14,7 +14,7 @@ const MatchRuleSchema = new mongoose.Schema({
 
 // ─── Shipping Zone Schema ──────────────────────────────────────────────────────
 const ShippingZoneSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, index: true },
+  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
 
   name:        { type: String, required: true, trim: true },
   description: { type: String, default: '' },
