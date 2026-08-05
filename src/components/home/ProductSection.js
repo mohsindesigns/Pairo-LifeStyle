@@ -13,7 +13,8 @@ export default function ProductSection({
   seriesLabel,
   ctaLabel,
   headingLevel = "h2",
-  layoutType = "carousel",
+  layout,
+  layoutType,
   gridColsDesktop = 4,
   gridRowsDesktop = 2,
   gridColsTablet = 3,
@@ -85,7 +86,8 @@ export default function ProductSection({
   }
 
   const MotionHeading = motion[headingLevel] || motion.h2;
-  const isGrid = layoutType === "grid";
+  const activeLayout = layoutType || layout || "carousel";
+  const isGrid = activeLayout === "grid";
 
   // For grid layout: compute max items per breakpoint and slice the products
   // NOTE: CSS variables cannot be used in nth-child() selectors, so we slice in JS

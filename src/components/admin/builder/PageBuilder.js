@@ -200,12 +200,23 @@ const SortableSection = ({
             }).map((field) => (
               <div key={field.name} className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{field.label}</label>
-                {renderField(field, config[field.name], (val) => onUpdate(section.id, { [field.name]: val }), onOpenMediaPicker)}
+                {renderField(
+                  field,
+                  field.name === "layoutType" ? (config.layoutType || config.layout) : config[field.name],
+                  (val) => {
+                    if (field.name === "layoutType") {
+                      onUpdate(section.id, { layoutType: val, layout: val });
+                    } else {
+                      onUpdate(section.id, { [field.name]: val });
+                    }
+                  },
+                  onOpenMediaPicker
+                )}
               </div>
             ))}
 
             {/* ── PRODUCT GRID: Explicit Grid Config Fields ── */}
-            {section.type === 'product_grid' && config.layoutType === 'grid' && (
+            {section.type === 'product_grid' && (config.layoutType || config.layout) === 'grid' && (
               <div className="border border-[#e2e4e7] bg-[#f9f9f9] p-4 rounded space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-[#2271b1] border-b border-[#e2e4e7] pb-2">Grid Layout Settings</p>
                 <div className="grid grid-cols-2 gap-4">
