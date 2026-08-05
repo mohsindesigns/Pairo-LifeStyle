@@ -181,10 +181,13 @@ const SortableSection = ({
         <div className="p-4 bg-white border-t border-[#f0f0f1]">
           <div className="grid grid-cols-1 gap-6">
             {schema.fields.filter(field => {
-              // New showWhen system — simple direct check
+              // Skip grid config fields for product_grid — we render those manually below
+              if (section.type === 'product_grid' && ['gridColsDesktop','gridRowsDesktop','gridColsTablet','gridRowsTablet','gridColsMobile','gridRowsMobile'].includes(field.name)) {
+                return false;
+              }
+              // New showWhen system
               if (field.showWhen) {
-                const currentVal = config[field.showWhen.field];
-                return currentVal === field.showWhen.value;
+                return config[field.showWhen.field] === field.showWhen.value;
               }
               // Legacy dependsOn system
               if (field.dependsOn) {
@@ -200,6 +203,39 @@ const SortableSection = ({
                 {renderField(field, config[field.name], (val) => onUpdate(section.id, { [field.name]: val }), onOpenMediaPicker)}
               </div>
             ))}
+
+            {/* ── PRODUCT GRID: Explicit Grid Config Fields ── */}
+            {section.type === 'product_grid' && config.layoutType === 'grid' && (
+              <div className="border border-[#e2e4e7] bg-[#f9f9f9] p-4 rounded space-y-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#2271b1] border-b border-[#e2e4e7] pb-2">Grid Layout Settings</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Desktop Columns</label>
+                    <input type="number" min={1} max={12} value={config.gridColsDesktop ?? 4} onChange={(e) => onUpdate(section.id, { gridColsDesktop: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Desktop Rows</label>
+                    <input type="number" min={1} max={12} value={config.gridRowsDesktop ?? 2} onChange={(e) => onUpdate(section.id, { gridRowsDesktop: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Tablet Columns</label>
+                    <input type="number" min={1} max={12} value={config.gridColsTablet ?? 3} onChange={(e) => onUpdate(section.id, { gridColsTablet: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Tablet Rows</label>
+                    <input type="number" min={1} max={12} value={config.gridRowsTablet ?? 2} onChange={(e) => onUpdate(section.id, { gridRowsTablet: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Mobile Columns</label>
+                    <input type="number" min={1} max={12} value={config.gridColsMobile ?? 2} onChange={(e) => onUpdate(section.id, { gridColsMobile: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Mobile Rows</label>
+                    <input type="number" min={1} max={12} value={config.gridRowsMobile ?? 3} onChange={(e) => onUpdate(section.id, { gridRowsMobile: Number(e.target.value) })} className="w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded-sm" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-center opacity-40">
              <span className="text-[9px] font-mono tracking-tighter">TYPE: {section.type}</span>
@@ -316,15 +352,9 @@ export default function PageBuilder({ initialPage }) {
         );
       case "icon":
         return <IconPicker value={value} onChange={onChange} />;
-      case "select": {
-        // If config has no value but field has a default, write the default into config immediately
-        const effectiveValue = (value !== undefined && value !== "") ? value : (field.default || "");
-        if (effectiveValue && (value === undefined || value === "") && field.default) {
-          // Schedule config write for next tick to avoid render-in-render
-          setTimeout(() => onChange(field.default), 0);
-        }
+      case "select":
         return (
-          <select value={effectiveValue} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+          <select value={value || field.default || ""} onChange={(e) => onChange(e.target.value)} className={inputClass}>
             <option value="">— Select —</option>
             {(field.options === 'categories' ? dynamicOptions.categories : 
               field.options === 'products' ? dynamicOptions.products :
@@ -334,7 +364,6 @@ export default function PageBuilder({ initialPage }) {
             ))}
           </select>
         );
-      }
       case "multiselect":
         const selected = Array.isArray(value) ? value : [];
         const opts = field.options === 'categories' ? dynamicOptions.categories : field.options === 'products' ? dynamicOptions.products : field.options === 'blogs' ? dynamicOptions.blogs : field.options || [];

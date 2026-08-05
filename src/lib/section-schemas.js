@@ -42,12 +42,12 @@ export const SECTION_SCHEMAS = {
         { label: "Horizontal Carousel", value: "carousel" },
         { label: "Responsive Grid", value: "grid" }
       ]},
-      { name: "gridColsDesktop", label: "Desktop Columns", type: "number", default: 4, showWhen: { field: "layoutType", value: "grid" } },
-      { name: "gridRowsDesktop", label: "Desktop Rows", type: "number", default: 2, showWhen: { field: "layoutType", value: "grid" } },
-      { name: "gridColsTablet", label: "Tablet Columns", type: "number", default: 3, showWhen: { field: "layoutType", value: "grid" } },
-      { name: "gridRowsTablet", label: "Tablet Rows", type: "number", default: 2, showWhen: { field: "layoutType", value: "grid" } },
-      { name: "gridColsMobile", label: "Mobile Columns", type: "number", default: 2, showWhen: { field: "layoutType", value: "grid" } },
-      { name: "gridRowsMobile", label: "Mobile Rows", type: "number", default: 3, showWhen: { field: "layoutType", value: "grid" } }
+      { name: "gridColsDesktop", label: "Desktop Columns", type: "number", default: 4 },
+      { name: "gridRowsDesktop", label: "Desktop Rows", type: "number", default: 2 },
+      { name: "gridColsTablet", label: "Tablet Columns", type: "number", default: 3 },
+      { name: "gridRowsTablet", label: "Tablet Rows", type: "number", default: 2 },
+      { name: "gridColsMobile", label: "Mobile Columns", type: "number", default: 2 },
+      { name: "gridRowsMobile", label: "Mobile Rows", type: "number", default: 3 }
     ]
   },
   feature_marquee: {
