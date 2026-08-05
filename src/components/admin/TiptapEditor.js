@@ -2,7 +2,7 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Bold, 
   Italic, 
@@ -16,11 +16,14 @@ import {
   Code,
   Link as LinkIcon,
   Link2Off,
-  ExternalLink
+  ExternalLink,
+  Image as ImageIcon
 } from 'lucide-react';
 import Link from '@tiptap/extension-link';
+import TiptapImage from '@tiptap/extension-image';
+import MediaPickerModal from './MediaPickerModal';
 
-const MenuBar = ({ editor }) => {
+const MenuBar = ({ editor, onInsertImage }) => {
   if (!editor) return null;
 
   const btnClass = (active) => `p-1.5 px-3 rounded-[2px] border border-transparent hover:border-[#c3c4c7] hover:bg-white transition-all ${active ? 'bg-white border-[#c3c4c7] shadow-sm' : ''}`;
@@ -97,6 +100,14 @@ const MenuBar = ({ editor }) => {
       >
         <Link2Off className="w-3.5 h-3.5" />
       </button>
+      <button
+        type="button"
+        onClick={onInsertImage}
+        className={btnClass(false)}
+        title="Insert Media Image"
+      >
+        <ImageIcon className="w-3.5 h-3.5" />
+      </button>
       <div className="w-[1px] h-4 bg-gray-300 mx-1 self-center" />
       <button
         type="button"
@@ -117,6 +128,8 @@ const MenuBar = ({ editor }) => {
 };
 
 export default function TiptapEditor({ content, onChange }) {
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -131,9 +144,14 @@ export default function TiptapEditor({ content, onChange }) {
           class: 'text-[#2271b1] underline font-medium cursor-pointer transition-colors hover:text-[#135e96]',
         },
       }),
+      TiptapImage.configure({
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'editorial-inserted-image rounded-lg max-w-full h-auto my-6 block mx-auto shadow-sm',
+        },
+      }),
     ],
     content: content || '',
-    immediatelyRender: false,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
@@ -155,11 +173,22 @@ export default function TiptapEditor({ content, onChange }) {
   }, [content, editor]);
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-inner overflow-hidden">
-      <MenuBar editor={editor} />
+    <div className="bg-white border border-[#c3c4c7] shadow-inner overflow-hidden relative">
+      <MenuBar editor={editor} onInsertImage={() => setMediaModalOpen(true)} />
       <div className="tiptap-wrapper">
          <EditorContent editor={editor} />
       </div>
+      <MediaPickerModal 
+        open={mediaModalOpen} 
+        onClose={() => setMediaModalOpen(false)} 
+        onSelect={(media) => {
+          if (media && media.url) {
+            editor.chain().focus().setImage({ src: media.url }).run();
+          }
+          setMediaModalOpen(false);
+        }}
+        title="Select Media to Insert"
+      />
       <style jsx global>{`
         .tiptap-wrapper .ProseMirror {
           min-height: 450px;
@@ -175,6 +204,7 @@ export default function TiptapEditor({ content, onChange }) {
         .tiptap-wrapper .ProseMirror li { margin-bottom: 0.15rem; }
         .tiptap-wrapper .ProseMirror li p { margin-bottom: 0 !important; }
         .tiptap-wrapper .ProseMirror blockquote { border-left: 3px solid #e5e7eb; padding-left: 1.25rem; font-style: italic; color: #4b5563; margin: 1.5rem 0; }
+        .tiptap-wrapper .ProseMirror img { max-width: 100%; height: auto; border-radius: 8px; margin: 1.5rem auto; display: block; }
         .tiptap-wrapper .ProseMirror *:first-child { margin-top: 0 !important; }
       `}</style>
     </div>

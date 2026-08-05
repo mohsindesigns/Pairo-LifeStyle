@@ -47,10 +47,10 @@ export default function ClientTabSystem({ product }) {
       <div className="py-4 md:py-8">
          <AnimatePresence mode="wait">
             {activeTab === "Product Details" && (
-               <motion.div key="details" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="max-w-4xl space-y-12">
+               <motion.div key="details" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full space-y-12">
                   <div>
                      <div 
-                         className="text-black text-base md:text-lg leading-loose font-normal prose-custom max-w-none"
+                         className="editorial-content-rich w-full max-w-none"
                          dangerouslySetInnerHTML={{ __html: product.description || "Detailed overview coming soon..." }}
                        />
                   </div>
@@ -70,23 +70,6 @@ export default function ClientTabSystem({ product }) {
             )}
          </AnimatePresence>
       </div>
-
-      <style jsx global>{`
-        .prose-custom > * { margin-top: 0; margin-bottom: 1.5rem; }
-        .prose-custom > *:last-child { margin-bottom: 0; }
-        .prose-custom h1 { font-size: 1.6rem; font-weight: 700; line-height: 1.25; margin-top: 2.5rem; color: var(--primary); opacity: 1; }
-        .prose-custom h2 { font-size: 1.3rem; font-weight: 700; line-height: 1.3; margin-top: 2rem; color: var(--primary); opacity: 1; }
-        .prose-custom h3 { font-size: 1.1rem; font-weight: 600; line-height: 1.4; margin-top: 1.5rem; color: var(--primary); opacity: 0.9; }
-        .prose-custom p { font-size: 1rem; margin-bottom: 1.25rem; line-height: 1.9; color: var(--primary); opacity: 0.85; }
-        .prose-custom ul { list-style-type: disc; padding-left: 1.75rem; margin-top: 0.75rem; margin-bottom: 1.25rem; }
-        .prose-custom ol { list-style-type: decimal; padding-left: 1.75rem; margin-top: 0.75rem; margin-bottom: 1.25rem; }
-        .prose-custom li { margin-bottom: 0.5rem; font-size: 1rem; line-height: 1.8; color: var(--primary); opacity: 0.85; }
-        .prose-custom li p { margin-bottom: 0 !important; margin-top: 0 !important; }
-        .prose-custom blockquote { border-left: 3px solid var(--primary); padding: 0.75rem 1.5rem; font-style: italic; color: var(--primary); opacity: 0.8; margin: 2rem 0; background: rgba(0,0,0,0.02); border-radius: 0 4px 4px 0; }
-        .prose-custom strong { font-weight: 700; color: var(--primary); opacity: 1; }
-        .prose-custom em { font-style: italic; color: var(--primary); opacity: 0.85; }
-        .prose-custom *:first-child { margin-top: 0 !important; }
-      `}</style>
     </div>
   );
 }

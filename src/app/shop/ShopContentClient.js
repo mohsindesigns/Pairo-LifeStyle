@@ -998,7 +998,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
         {/* Category Full Description (content) */}
         {currentDbCategory && currentDbCategory.content && (
-          <div className="mt-16 border-t border-border pt-12 prose max-w-none text-foreground/75 text-sm leading-relaxed">
+          <div className="mt-16 border-t border-border pt-12 editorial-content-rich w-full max-w-none">
             <div dangerouslySetInnerHTML={{ __html: currentDbCategory.content }} />
           </div>
         )}
@@ -1008,12 +1008,12 @@ export default function ShopContentClient({ initialCategory = null, initialType 
           <div className="mt-16 border-t border-border pt-12">
             <div className="w-full">
               <div className="text-left mb-8">
-                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-neutral-400 block mb-1">Q&A Session</span>
-                <h2 className="text-sm font-black heading-font tracking-widest text-foreground uppercase">
+                <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-neutral-400 block mb-2">Q&A Session</span>
+                <h2 className="text-lg md:text-xl font-bold heading-font tracking-tight text-foreground uppercase">
                   Frequently Asked Questions
                 </h2>
               </div>
-              <div className="divide-y divide-black/5 border-t border-b border-black/5">
+              <div className="divide-y divide-border border-t border-b border-border">
                 {currentDbCategory.faqs.map((faq, idx) => {
                   const isOpen = openCategoryFaqIndex === idx;
                   return (
@@ -1024,10 +1024,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                       <button
                         type="button"
                         onClick={() => setOpenCategoryFaqIndex(isOpen ? null : idx)}
-                        className="w-full flex items-center justify-between text-left py-4.5 hover:opacity-70 transition-opacity"
+                        className="w-full flex items-center justify-between text-left py-4.5 hover:opacity-75 transition-opacity"
                         aria-expanded={isOpen}
                       >
-                        <h3 className="text-xs sm:text-[13px] font-bold uppercase tracking-wider text-black leading-snug pr-4">
+                        <h3 className="text-[13px] sm:text-sm font-semibold text-foreground tracking-wide leading-snug pr-4">
                           {faq.question}
                         </h3>
                         <span className={`text-base font-light text-neutral-400 transform transition-transform duration-300 ${isOpen ? 'rotate-45' : ''}`}>
@@ -1042,7 +1042,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                             exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.25, ease: "easeInOut" }}
                           >
-                            <div className="pb-5 pt-1 text-xs sm:text-[13px] text-neutral-600 leading-relaxed font-medium">
+                            <div className="pb-5 pt-2 text-[13px] sm:text-[14px] text-foreground/80 leading-relaxed font-normal">
                               {faq.answer}
                             </div>
                           </motion.div>

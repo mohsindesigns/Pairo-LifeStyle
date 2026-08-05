@@ -38,6 +38,16 @@ export const SECTION_SCHEMAS = {
       { name: "collectionId", label: "Select Collection", type: "select", options: "categories", dependsOn: "showType", visibleIf: "collection" },
       { name: "productIds", label: "Select Products", type: "multiselect", options: "products", dependsOn: "showType", visibleIf: "products" },
       { name: "limit", label: "Product Limit (Collection only)", type: "number", default: 8, dependsOn: "showType", visibleIf: "collection" },
+      { name: "layoutType", label: "Layout Type", type: "select", default: "carousel", options: [
+        { label: "Horizontal Carousel", value: "carousel" },
+        { label: "Responsive Grid", value: "grid" }
+      ]},
+      { name: "gridColsDesktop", label: "Desktop Columns", type: "number", default: 4, dependsOn: "layoutType", visibleIf: "grid" },
+      { name: "gridRowsDesktop", label: "Desktop Rows", type: "number", default: 2, dependsOn: "layoutType", visibleIf: "grid" },
+      { name: "gridColsTablet", label: "Tablet Columns", type: "number", default: 3, dependsOn: "layoutType", visibleIf: "grid" },
+      { name: "gridRowsTablet", label: "Tablet Rows", type: "number", default: 2, dependsOn: "layoutType", visibleIf: "grid" },
+      { name: "gridColsMobile", label: "Mobile Columns", type: "number", default: 2, dependsOn: "layoutType", visibleIf: "grid" },
+      { name: "gridRowsMobile", label: "Mobile Rows", type: "number", default: 3, dependsOn: "layoutType", visibleIf: "grid" }
     ]
   },
   feature_marquee: {

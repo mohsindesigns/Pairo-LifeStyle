@@ -308,3 +308,142 @@ img {
 .short-description-prose a:hover {
   opacity: 0.7;
 }
+
+/* ─── Shared Editorial & Rich-Text Styling ────────────────────────── */
+.editorial-content-rich {
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: var(--primary) !important;
+}
+.editorial-content-rich p {
+  margin-bottom: 1.25rem !important;
+  color: var(--primary) !important;
+  opacity: 0.85;
+}
+.editorial-content-rich h1, 
+.editorial-content-rich h2, 
+.editorial-content-rich h3, 
+.editorial-content-rich h4 {
+  font-family: var(--brand-font, var(--font-poppins)), sans-serif;
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+  margin-top: 2rem !important;
+  margin-bottom: 1rem !important;
+  text-transform: uppercase;
+}
+.editorial-content-rich h1 {
+  font-size: 1.75rem !important;
+}
+.editorial-content-rich h2 {
+  font-size: 1.4rem !important;
+}
+.editorial-content-rich h3 {
+  font-size: 1.2rem !important;
+}
+.editorial-content-rich h4 {
+  font-size: 1.05rem !important;
+}
+.editorial-content-rich ul {
+  list-style-type: disc !important;
+  padding-left: 1.75rem !important;
+  margin-bottom: 1.25rem !important;
+}
+.editorial-content-rich ol {
+  list-style-type: decimal !important;
+  padding-left: 1.75rem !important;
+  margin-bottom: 1.25rem !important;
+}
+.editorial-content-rich li {
+  margin-bottom: 0.5rem !important;
+  color: var(--primary) !important;
+  opacity: 0.85;
+}
+.editorial-content-rich li p {
+  margin: 0 !important;
+}
+.editorial-content-rich strong,
+.editorial-content-rich b {
+  font-weight: 700 !important;
+  color: var(--primary) !important;
+}
+.editorial-content-rich em,
+.editorial-content-rich i {
+  font-style: italic !important;
+}
+.editorial-content-rich a {
+  color: inherit !important;
+  text-decoration: underline !important;
+  font-weight: 600 !important;
+  transition: opacity 0.2s ease-in-out !important;
+}
+.editorial-content-rich a:hover {
+  opacity: 0.75 !important;
+}
+/* Responsive Images inside Rich Text */
+.editorial-content-rich img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 2rem auto !important;
+  border-radius: 8px;
+}
+/* Responsive Tables inside Rich Text */
+.editorial-content-rich table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 2rem 0 !important;
+  font-size: 0.875rem !important;
+  display: block !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+.editorial-content-rich th,
+.editorial-content-rich td {
+  border: 1px solid var(--border) !important;
+  padding: 0.75rem 1rem !important;
+  text-align: left !important;
+}
+.editorial-content-rich th {
+  background-color: var(--secondary) !important;
+  font-weight: 700 !important;
+  color: var(--primary) !important;
+}
+
+/* ─── Dynamic Responsive Grid System ─────────────────────────────── */
+.dynamic-responsive-grid {
+  display: grid !important;
+  grid-template-columns: repeat(var(--cols-mobile, 2), minmax(0, 1fr)) !important;
+}
+.dynamic-responsive-grid > div {
+  display: block !important;
+}
+/* Mobile limit */
+.dynamic-responsive-grid > div:nth-child(n + var(--max-mobile-display, 999)) {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  .dynamic-responsive-grid {
+    grid-template-columns: repeat(var(--cols-tablet, 3), minmax(0, 1fr)) !important;
+  }
+  .dynamic-responsive-grid > div:nth-child(n + var(--max-mobile-display, 999)) {
+    display: block !important;
+  }
+  /* Tablet limit */
+  .dynamic-responsive-grid > div:nth-child(n + var(--max-tablet-display, 999)) {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dynamic-responsive-grid {
+    grid-template-columns: repeat(var(--cols-desktop, 4), minmax(0, 1fr)) !important;
+  }
+  .dynamic-responsive-grid > div:nth-child(n + var(--max-tablet-display, 999)) {
+    display: block !important;
+  }
+  /* Desktop limit */
+  .dynamic-responsive-grid > div:nth-child(n + var(--max-desktop-display, 999)) {
+    display: none !important;
+  }
+}

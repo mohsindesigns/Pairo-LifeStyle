@@ -12,7 +12,14 @@ export default function ProductSection({
   products = [],
   seriesLabel,
   ctaLabel,
-  headingLevel = "h2"
+  headingLevel = "h2",
+  layoutType = "carousel",
+  gridColsDesktop = 4,
+  gridRowsDesktop = 2,
+  gridColsTablet = 3,
+  gridRowsTablet = 2,
+  gridColsMobile = 2,
+  gridRowsMobile = 3
 }) {
   const siteData = useSiteData();
   const productLabels = {
@@ -78,6 +85,16 @@ export default function ProductSection({
   }
 
   const MotionHeading = motion[headingLevel] || motion.h2;
+  const isGrid = layoutType === "grid";
+
+  const gridStyles = isGrid ? {
+    '--cols-desktop': gridColsDesktop || 4,
+    '--cols-tablet': gridColsTablet || 3,
+    '--cols-mobile': gridColsMobile || 2,
+    '--max-desktop-display': ((gridColsDesktop || 4) * (gridRowsDesktop || 2)) + 1,
+    '--max-tablet-display': ((gridColsTablet || 3) * (gridRowsTablet || 2)) + 1,
+    '--max-mobile-display': ((gridColsMobile || 2) * (gridRowsMobile || 3)) + 1,
+  } : {};
 
   return (
     <section className="py-4 md:py-6 bg-background">
@@ -120,60 +137,87 @@ export default function ProductSection({
             </Link>
 
             {/* Carousel Buttons */}
-            <div className="flex gap-2 md:gap-3 lg:border-l border-border/80 lg:pl-8 shrink-0">
-              <button
-                onClick={() => scroll("left")}
-                aria-label="Scroll Left"
-                className={`w-9 h-9 md:w-11 md:h-11 rounded-full border border-border/80 flex items-center justify-center transition-all ${canScrollLeft
-                  ? "text-foreground bg-background hover:bg-primary hover:text-background hover:border-primary shadow-md scale-100 active:scale-90"
-                  : "text-foreground/20 cursor-default scale-95 opacity-55"
-                  }`}
-              >
-                <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
-              </button>
-              <button
-                onClick={() => scroll("right")}
-                aria-label="Scroll Right"
-                className={`w-9 h-9 md:w-11 md:h-11 rounded-full border border-border/80 flex items-center justify-center transition-all ${canScrollRight
-                  ? "text-foreground bg-background hover:bg-primary hover:text-background hover:border-primary shadow-md scale-100 active:scale-90"
-                  : "text-foreground/20 cursor-default scale-95 opacity-55"
-                  }`}
-              >
-                <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
-              </button>
-            </div>
+            {!isGrid && (
+              <div className="flex gap-2 md:gap-3 lg:border-l border-border/80 lg:pl-8 shrink-0">
+                <button
+                  onClick={() => scroll("left")}
+                  aria-label="Scroll Left"
+                  className={`w-9 h-9 md:w-11 md:h-11 rounded-full border border-border/80 flex items-center justify-center transition-all ${canScrollLeft
+                    ? "text-foreground bg-background hover:bg-primary hover:text-background hover:border-primary shadow-md scale-100 active:scale-90"
+                    : "text-foreground/20 cursor-default scale-95 opacity-55"
+                    }`}
+                >
+                  <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+                <button
+                  onClick={() => scroll("right")}
+                  aria-label="Scroll Right"
+                  className={`w-9 h-9 md:w-11 md:h-11 rounded-full border border-border/80 flex items-center justify-center transition-all ${canScrollRight
+                    ? "text-foreground bg-background hover:bg-primary hover:text-background hover:border-primary shadow-md scale-100 active:scale-90"
+                    : "text-foreground/20 cursor-default scale-95 opacity-55"
+                    }`}
+                >
+                  <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Carousel Grid Area - Bleed Edge responsive layout */}
         <div className="relative -mx-2 sm:-mx-4 md:-mx-8 px-2 sm:px-4 md:px-8">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.1 }}
-            variants={{
-              hidden: { opacity: 0 },
-              visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
-            }}
-            ref={carouselRef}
-            className="flex gap-4 sm:gap-6 md:gap-10 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-6"
-          >
-            {products.map((product) => (
-              <motion.div
-                key={product._id || product.id}
-                variants={{
-                  hidden: { opacity: 0, y: 35, scale: 0.96 },
-                  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } }
-                }}
-                className="w-[72vw] sm:w-[45vw] md:w-[35vw] lg:w-[23vw] shrink-0 snap-start"
-              >
-                <ProductCard product={product} />
-              </motion.div>
-            ))}
-          </motion.div>
+          {isGrid ? (
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.1 }}
+              variants={{
+                hidden: { opacity: 0 },
+                visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+              }}
+              style={gridStyles}
+              className="dynamic-responsive-grid gap-y-12 gap-x-6 md:gap-x-10"
+            >
+              {products.map((product) => (
+                <motion.div
+                  key={product._id || product.id}
+                  variants={{
+                    hidden: { opacity: 0, y: 35, scale: 0.96 },
+                    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } }
+                  }}
+                  className="w-full"
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))}
+            </motion.div>
+          ) : (
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.1 }}
+              variants={{
+                hidden: { opacity: 0 },
+                visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+              }}
+              ref={carouselRef}
+              className="flex gap-4 sm:gap-6 md:gap-10 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-6"
+            >
+              {products.map((product) => (
+                <motion.div
+                  key={product._id || product.id}
+                  variants={{
+                    hidden: { opacity: 0, y: 35, scale: 0.96 },
+                    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } }
+                  }}
+                  className="w-[72vw] sm:w-[45vw] md:w-[35vw] lg:w-[23vw] shrink-0 snap-start"
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
         </div>
-
-
 
       </div>
     </section>
