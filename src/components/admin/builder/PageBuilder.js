@@ -181,12 +181,19 @@ const SortableSection = ({
         <div className="p-4 bg-white border-t border-[#f0f0f1]">
           <div className="grid grid-cols-1 gap-6">
             {schema.fields.filter(field => {
-              if (!field.dependsOn) return true;
-              // Use saved config value, or fall back to the schema-defined default for the parent field
-              const parentField = schema.fields.find(f => f.name === field.dependsOn);
-              const fallbackVal = parentField?.default;
-              const val = config[field.dependsOn] !== undefined ? config[field.dependsOn] : fallbackVal;
-              return val === field.visibleIf;
+              // New showWhen system — simple direct check
+              if (field.showWhen) {
+                const currentVal = config[field.showWhen.field];
+                return currentVal === field.showWhen.value;
+              }
+              // Legacy dependsOn system
+              if (field.dependsOn) {
+                const parentField = schema.fields.find(f => f.name === field.dependsOn);
+                const fallbackVal = parentField?.default;
+                const val = config[field.dependsOn] !== undefined ? config[field.dependsOn] : fallbackVal;
+                return val === field.visibleIf;
+              }
+              return true;
             }).map((field) => (
               <div key={field.name} className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{field.label}</label>
@@ -309,9 +316,15 @@ export default function PageBuilder({ initialPage }) {
         );
       case "icon":
         return <IconPicker value={value} onChange={onChange} />;
-      case "select":
+      case "select": {
+        // If config has no value but field has a default, write the default into config immediately
+        const effectiveValue = (value !== undefined && value !== "") ? value : (field.default || "");
+        if (effectiveValue && (value === undefined || value === "") && field.default) {
+          // Schedule config write for next tick to avoid render-in-render
+          setTimeout(() => onChange(field.default), 0);
+        }
         return (
-          <select value={value !== undefined && value !== "" ? value : (field.default || "")} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+          <select value={effectiveValue} onChange={(e) => onChange(e.target.value)} className={inputClass}>
             <option value="">— Select —</option>
             {(field.options === 'categories' ? dynamicOptions.categories : 
               field.options === 'products' ? dynamicOptions.products :
@@ -321,6 +334,7 @@ export default function PageBuilder({ initialPage }) {
             ))}
           </select>
         );
+      }
       case "multiselect":
         const selected = Array.isArray(value) ? value : [];
         const opts = field.options === 'categories' ? dynamicOptions.categories : field.options === 'products' ? dynamicOptions.products : field.options === 'blogs' ? dynamicOptions.blogs : field.options || [];
