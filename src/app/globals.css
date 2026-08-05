@@ -410,15 +410,15 @@ img {
 }
 
 /* ─── Dynamic Responsive Grid System ─────────────────────────────── */
+/* Column count is driven by CSS custom properties set via inline style   */
+/* Row limiting is handled in JS (CSS vars cannot be used in nth-child)   */
 .dynamic-responsive-grid {
   display: grid !important;
   grid-template-columns: repeat(var(--cols-mobile, 2), minmax(0, 1fr)) !important;
 }
-.dynamic-responsive-grid > div {
-  display: block !important;
-}
-/* Mobile limit */
-.dynamic-responsive-grid > div:nth-child(n + var(--max-mobile-display, 999)) {
+
+/* Hide items that exceed the mobile row limit */
+.dynamic-responsive-grid > [data-hide-mobile="true"] {
   display: none !important;
 }
 
@@ -426,11 +426,12 @@ img {
   .dynamic-responsive-grid {
     grid-template-columns: repeat(var(--cols-tablet, 3), minmax(0, 1fr)) !important;
   }
-  .dynamic-responsive-grid > div:nth-child(n + var(--max-mobile-display, 999)) {
+  /* Un-hide items hidden for mobile if they are within tablet limit */
+  .dynamic-responsive-grid > [data-hide-mobile="true"]:not([data-hide-tablet="true"]) {
     display: block !important;
   }
-  /* Tablet limit */
-  .dynamic-responsive-grid > div:nth-child(n + var(--max-tablet-display, 999)) {
+  /* Hide items that exceed the tablet row limit */
+  .dynamic-responsive-grid > [data-hide-tablet="true"] {
     display: none !important;
   }
 }
@@ -439,11 +440,13 @@ img {
   .dynamic-responsive-grid {
     grid-template-columns: repeat(var(--cols-desktop, 4), minmax(0, 1fr)) !important;
   }
-  .dynamic-responsive-grid > div:nth-child(n + var(--max-tablet-display, 999)) {
+  /* Un-hide items hidden for tablet if they are within desktop limit */
+  .dynamic-responsive-grid > [data-hide-tablet="true"]:not([data-hide-desktop="true"]) {
     display: block !important;
   }
-  /* Desktop limit */
-  .dynamic-responsive-grid > div:nth-child(n + var(--max-desktop-display, 999)) {
+  /* Hide items that exceed the desktop row limit */
+  .dynamic-responsive-grid > [data-hide-desktop="true"] {
     display: none !important;
   }
 }
+

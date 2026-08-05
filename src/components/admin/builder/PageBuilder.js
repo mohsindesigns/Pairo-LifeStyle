@@ -182,7 +182,10 @@ const SortableSection = ({
           <div className="grid grid-cols-1 gap-6">
             {schema.fields.filter(field => {
               if (!field.dependsOn) return true;
-              const val = config[field.dependsOn] !== undefined ? config[field.dependsOn] : (field.dependsOn === 'showType' ? 'collection' : undefined);
+              // Use saved config value, or fall back to the schema-defined default for the parent field
+              const parentField = schema.fields.find(f => f.name === field.dependsOn);
+              const fallbackVal = parentField?.default;
+              const val = config[field.dependsOn] !== undefined ? config[field.dependsOn] : fallbackVal;
               return val === field.visibleIf;
             }).map((field) => (
               <div key={field.name} className="space-y-1.5">
@@ -293,7 +296,7 @@ export default function PageBuilder({ initialPage }) {
       case "textarea":
         return <textarea rows={3} value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} resize-none`} />;
       case "number":
-        return <input type="number" value={value || 0} onChange={(e) => onChange(Number(e.target.value))} className={inputClass} />;
+        return <input type="number" min={1} max={12} value={value !== undefined && value !== null ? value : (field.default ?? 1)} onChange={(e) => onChange(Number(e.target.value))} className={inputClass} />;
       case "image":
         return (
           <div className="flex flex-col gap-2">
@@ -308,7 +311,7 @@ export default function PageBuilder({ initialPage }) {
         return <IconPicker value={value} onChange={onChange} />;
       case "select":
         return (
-          <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+          <select value={value !== undefined && value !== "" ? value : (field.default || "")} onChange={(e) => onChange(e.target.value)} className={inputClass}>
             <option value="">— Select —</option>
             {(field.options === 'categories' ? dynamicOptions.categories : 
               field.options === 'products' ? dynamicOptions.products :

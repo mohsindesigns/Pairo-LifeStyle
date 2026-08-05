@@ -87,13 +87,22 @@ export default function ProductSection({
   const MotionHeading = motion[headingLevel] || motion.h2;
   const isGrid = layoutType === "grid";
 
+  // For grid layout: compute max items per breakpoint and slice the products
+  // NOTE: CSS variables cannot be used in nth-child() selectors, so we slice in JS
+  const maxDesktop = isGrid ? (gridColsDesktop || 4) * (gridRowsDesktop || 2) : Infinity;
+  const maxTablet  = isGrid ? (gridColsTablet  || 3) * (gridRowsTablet  || 2) : Infinity;
+  const maxMobile  = isGrid ? (gridColsMobile  || 2) * (gridRowsMobile  || 3) : Infinity;
+  // Use the largest of the three as the ceiling so server-rendered HTML contains enough items;
+  // hiding extra items at smaller viewports is handled via CSS with data-hide-* attributes.
+  const maxItems = isGrid ? Math.max(maxDesktop, maxTablet, maxMobile) : Infinity;
+  const displayProducts = isGrid
+    ? activeProducts.slice(0, maxItems)
+    : activeProducts;
+
   const gridStyles = isGrid ? {
     '--cols-desktop': gridColsDesktop || 4,
     '--cols-tablet': gridColsTablet || 3,
     '--cols-mobile': gridColsMobile || 2,
-    '--max-desktop-display': ((gridColsDesktop || 4) * (gridRowsDesktop || 2)) + 1,
-    '--max-tablet-display': ((gridColsTablet || 3) * (gridRowsTablet || 2)) + 1,
-    '--max-mobile-display': ((gridColsMobile || 2) * (gridRowsMobile || 3)) + 1,
   } : {};
 
   return (
@@ -178,7 +187,7 @@ export default function ProductSection({
               style={gridStyles}
               className="dynamic-responsive-grid gap-y-12 gap-x-6 md:gap-x-10"
             >
-              {products.map((product) => (
+              {displayProducts.map((product, index) => (
                 <motion.div
                   key={product._id || product.id}
                   variants={{
@@ -186,6 +195,14 @@ export default function ProductSection({
                     visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } }
                   }}
                   className="w-full"
+                  style={{
+                    // Hide items beyond the per-breakpoint limit using inline CSS vars
+                    '--item-index': index + 1,
+                  }}
+                  data-grid-index={index + 1}
+                  data-hide-desktop={index >= maxDesktop ? "true" : undefined}
+                  data-hide-tablet={index >= maxTablet ? "true" : undefined}
+                  data-hide-mobile={index >= maxMobile ? "true" : undefined}
                 >
                   <ProductCard product={product} />
                 </motion.div>
@@ -203,7 +220,7 @@ export default function ProductSection({
               ref={carouselRef}
               className="flex gap-4 sm:gap-6 md:gap-10 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-6"
             >
-              {products.map((product) => (
+              {activeProducts.map((product) => (
                 <motion.div
                   key={product._id || product.id}
                   variants={{
