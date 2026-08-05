@@ -431,7 +431,7 @@ export default function ProfilePage() {
                       No addresses saved yet.
                     </p>
                   ) : (
-                    userData.addresses.map((addr) => (
+                    (userData.addresses || []).map((addr) => (
                       <div key={addr._id} className="p-3.5 bg-neutral-50 border border-neutral-100 rounded-[4px] flex justify-between items-start">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-black truncate">{addr.fullName}</p>
@@ -663,9 +663,9 @@ export default function ProfilePage() {
                                             </div>
                                           </div>
                                           <div className="text-right shrink-0">
-                                             <p className="text-sm font-medium text-black">
-                                               {formatCurrency(order.financials?.currency)}{(item.priceAtPurchase * item.quantity).toLocaleString()}
-                                             </p>
+                                              <p className="text-sm font-medium text-black">
+                                                {formatCurrency(order.financials?.currency)}{((item.priceAtPurchase || 0) * (item.quantity || 0)).toLocaleString()}
+                                              </p>
                                              {isDelivered && (
                                                <button
                                                  onClick={() => {
@@ -751,7 +751,7 @@ export default function ProfilePage() {
                               <div className="flex justify-between items-center border-t border-neutral-200 pt-4">
                                 <span className="text-[10px] font-black uppercase tracking-[0.1em] text-black">Order Amount</span>
                                 <span className="text-[13px] font-black text-black font-mono">
-                                  {formatCurrency(order.financials?.currency)}{order.total?.toLocaleString()}
+                                  {formatCurrency(order.financials?.currency)}{(order.total ?? 0).toLocaleString()}
                                 </span>
                               </div>
 

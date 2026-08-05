@@ -30,6 +30,11 @@ const getSiteConfig = cache(async () => {
 export async function generateMetadata() {
   try {
     const config = await getSiteConfig();
+    const isGlobalNoIndex = config?.disableSearchEngineIndexing === true;
+    const robotsString = isGlobalNoIndex
+      ? "noindex, nofollow"
+      : "index, follow, max-video-preview:-1, max-image-preview:large, max-snippet:-1";
+
     if (config?.brand) {
       const name = config.brand.name || "Pairo";
       const tagline = config.brand.tagline || "Premium Shearling Jackets";
@@ -38,7 +43,7 @@ export async function generateMetadata() {
         title,
         description: config.brand.description || "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.",
         metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pairolifestyle.com"),
-        robots: "noindex, nofollow",
+        robots: robotsString,
       };
 
       if (config.brand.faviconUrl) {

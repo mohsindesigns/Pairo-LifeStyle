@@ -42,6 +42,9 @@ export async function resolvePageAndTemplate(slug, defaultTemplate = "default") 
   }
 
   if (!page) {
+    if (defaultTemplate === "default") {
+      return { page: null, templateInfo: null };
+    }
     // If not found in DB, construct a dynamic template-specific default instance
     const templateConfig = TEMPLATE_REGISTRY[defaultTemplate] || TEMPLATE_REGISTRY.default;
     

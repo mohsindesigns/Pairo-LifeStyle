@@ -20,6 +20,21 @@ export async function generateMetadata({ params }) {
   const post = await Blog.findOne({ slug, isDeleted: { $ne: true } }).lean();
   if (!post) return { title: 'Post Not Found' };
 
+  if (post.status === "Draft") {
+    const { getServerSession } = await import("next-auth");
+    const { authOptions } = await import("@/app/api/auth/[...nextauth]/route");
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isStaff) {
+      return {
+        title: "Post Not Found",
+        robots: {
+          index: false,
+          follow: false
+        }
+      };
+    }
+  }
+
   const { metadata } = await resolveSEOMetadata({
     entity: post,
     type: "blog",
@@ -41,6 +56,15 @@ export default async function BlogDetail({ params }) {
 
   if (!post) {
     notFound();
+  }
+
+  if (post.status === "Draft") {
+    const { getServerSession } = await import("next-auth");
+    const { authOptions } = await import("@/app/api/auth/[...nextauth]/route");
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isStaff) {
+      notFound();
+    }
   }
 
   const config = await SiteConfig.findOne({ key: 'main' }).lean();

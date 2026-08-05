@@ -26,6 +26,20 @@ const silentReplaceState = (newUrl) => {
   }
 };
 
+const normalizeSize = (sizeStr) => {
+  if (!sizeStr || typeof sizeStr !== 'string') return '';
+  const clean = sizeStr.trim().toUpperCase().replace(/\s+/g, '');
+  if (clean === 'SMALL' || clean === 'S') return 'S';
+  if (clean === 'MEDIUM' || clean === 'M') return 'M';
+  if (clean === 'LARGE' || clean === 'L') return 'L';
+  if (clean === 'XS' || clean === 'EXTRASMALL') return 'XS';
+  if (clean === 'XL' || clean === 'EXTRALARGE') return 'XL';
+  if (clean === 'XXL') return '2XL';
+  if (clean === 'XXXL') return '3XL';
+  if (clean === 'XXXXL') return '4XL';
+  return clean;
+};
+
 export default function ShopContentClient({ initialCategory = null, initialType = null, initialProducts = [], categoryData = null }) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -191,8 +205,8 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     products.forEach(p => {
       if (p.sizes && Array.isArray(p.sizes)) {
         p.sizes.forEach(s => {
-          if (s && typeof s === 'string') {
-            sizesSet.add(s.trim().toUpperCase());
+          if (s) {
+            sizesSet.add(normalizeSize(s));
           }
         });
       }
@@ -200,13 +214,13 @@ export default function ShopContentClient({ initialCategory = null, initialType 
         p.attributes.forEach(attr => {
           if (attr.name && (attr.name.toLowerCase() === 'size' || attr.name.toLowerCase() === 'sizes')) {
             attr.values?.forEach(v => {
-              if (v.label) sizesSet.add(v.label.trim().toUpperCase());
+              if (v.label) sizesSet.add(normalizeSize(v.label));
             });
           }
         });
       }
     });
-    const order = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+    const order = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"];
     return Array.from(sizesSet).sort((a, b) => {
       const idxA = order.indexOf(a);
       const idxB = order.indexOf(b);
@@ -387,10 +401,10 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     // Size filter
     if (selectedSizes.length > 0) {
       result = result.filter(p => {
-        const hasLegacySize = p.sizes?.some(s => s && selectedSizes.includes(s.trim().toUpperCase()));
+        const hasLegacySize = p.sizes?.some(s => s && selectedSizes.includes(normalizeSize(s)));
         const hasAttrSize = p.attributes?.some(attr =>
           (attr.name?.toLowerCase() === 'size' || attr.name?.toLowerCase() === 'sizes') &&
-          attr.values?.some(v => v.label && selectedSizes.includes(v.label.trim().toUpperCase()))
+          attr.values?.some(v => v.label && selectedSizes.includes(normalizeSize(v.label)))
         );
         return hasLegacySize || hasAttrSize;
       });

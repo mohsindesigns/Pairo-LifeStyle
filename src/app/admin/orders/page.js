@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 
 export default function AdminOrdersPage() {
   const router = useRouter();
@@ -48,14 +49,29 @@ export default function AdminOrdersPage() {
   }, [fetchOrders]);
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to move this order to trash?")) return;
-    try {
-      const res = await fetch(`/api/admin/orders?id=${id}`, { method: "DELETE" });
-      if (res.ok) fetchOrders(pagination.currentPage);
-    } catch (err) {
-      console.error(err);
-    }
+    if (!confirm("Are you sure you want to delete this order permanently?")) return;
+    const previousOrders = orders;
+    setOrders(prev => prev.filter(o => o._id !== id));
+    
+    const deletePromise = fetch(`/api/admin/orders?id=${id}`, { method: "DELETE" })
+      .then(async (res) => {
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to delete order.");
+        }
+        fetchOrders(pagination.currentPage);
+      });
+
+    toast.promise(deletePromise, {
+      loading: 'Deleting order...',
+      success: 'Order deleted successfully.',
+      error: (err) => {
+        setOrders(previousOrders);
+        return err.message || 'Failed to delete order.';
+      }
+    });
   };
+
 
   const handleDuplicate = async (order) => {
     try {

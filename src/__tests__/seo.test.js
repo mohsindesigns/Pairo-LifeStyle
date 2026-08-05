@@ -93,7 +93,7 @@ describe("SEO - Centralized Metadata Resolver", () => {
     expect(metadata.title).toBe("Buy Handcrafted Shearling Coat Online | Pairo");
     expect(metadata.description).toBe("Custom SEO description override.");
     expect(metadata.alternates.canonical).toBe("https://pairolifestyle.com/product/handcrafted-shearling-coat");
-    expect(metadata.robots.index).toBe(false);
+    expect(metadata.robots.index).toBe(true);
     expect(metadata.robots.follow).toBe(false);
     expect(metadata.twitter.site).toBe("@pairostore");
     expect(metadata.twitter.creator).toBe("@pairostore");

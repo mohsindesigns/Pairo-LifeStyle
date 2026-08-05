@@ -26,6 +26,21 @@ export async function generateMetadata({ params }) {
     return { title: "Category Not Found" };
   }
 
+  if (category.status === "Draft") {
+    const { getServerSession } = await import("next-auth");
+    const { authOptions } = await import("@/app/api/auth/[...nextauth]/route");
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isStaff) {
+      return {
+        title: "Category Not Found",
+        robots: {
+          index: false,
+          follow: false
+        }
+      };
+    }
+  }
+
   const { metadata } = await resolveSEOMetadata({
     entity: category,
     type: "category",
@@ -51,6 +66,15 @@ export default async function DynamicCategoryCatcherPage({ params, searchParams 
   const category = await Category.findOne({ slug: slug, type: "product", isDeleted: { $ne: true } }).lean();
   if (!category) {
     notFound();
+  }
+
+  if (category.status === "Draft") {
+    const { getServerSession } = await import("next-auth");
+    const { authOptions } = await import("@/app/api/auth/[...nextauth]/route");
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isStaff) {
+      notFound();
+    }
   }
 
   const { structuredData } = await resolveSEOMetadata({

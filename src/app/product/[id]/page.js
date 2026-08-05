@@ -202,7 +202,7 @@ export default async function ProductDetailPage({ params, searchParams }) {
   });
 
   return (
-    <div className="bg-white min-h-screen font-sans overflow-x-clip">
+    <div className="bg-white min-h-screen font-sans overflow-x-visible">
       {structuredData && (
         <script
           type="application/ld+json"

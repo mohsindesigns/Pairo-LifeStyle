@@ -49,7 +49,7 @@ const getAvatarColor = (name) => {
   return colors[index];
 };
 
-export default function ProductReviews({ productId, productName }) {
+export default function ProductReviews({ productId, productName, autoOpen = false }) {
   const { data: session } = useSession();
   
   // State variables
@@ -60,7 +60,7 @@ export default function ProductReviews({ productId, productName }) {
   const [loading, setLoading] = useState(true);
   
   // Review submission drawer state
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(autoOpen);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     rating: 5,
@@ -102,6 +102,13 @@ export default function ProductReviews({ productId, productName }) {
       });
     }
   }, [session]);
+ 
+  // Sync autoOpen prop changes
+  useEffect(() => {
+    if (autoOpen) {
+      setIsFormOpen(true);
+    }
+  }, [autoOpen]);
 
   // Fetch reviews from API
   const fetchReviews = useCallback(async (pageNumber = 1) => {

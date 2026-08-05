@@ -3,17 +3,27 @@
 import { useEffect, useState, use } from "react";
 import { ArrowLeft, User as UserIcon, Package, Calendar, Mail, MapPin, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 
 export default function CustomerDetail({ params }) {
   const { id } = use(params);
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchCustomer = async () => {
       try {
         const res = await fetch(`/api/admin/customers/${id}`);
+        if (res.status === 403) {
+          router.push("/admin?error=NoPermission");
+          return;
+        }
+        if (res.status === 401) {
+          router.push("/admin-login");
+          return;
+        }
         const data = await res.json();
         if (res.ok) setCustomer(data);
       } catch (err) {
@@ -23,7 +33,7 @@ export default function CustomerDetail({ params }) {
       }
     };
     fetchCustomer();
-  }, [id]);
+  }, [id, router]);
 
   if (loading) return <AdminPageLayout title="Loading Customer..."><div className="p-10 text-center italic text-gray-400">Loading details...</div></AdminPageLayout>;
   if (!customer) return <AdminPageLayout title="Error"><div className="p-10 text-center text-red-500 font-bold uppercase">Customer not found</div></AdminPageLayout>;
@@ -139,7 +149,7 @@ export default function CustomerDetail({ params }) {
                                        </span>
                                     </td>
                                     <td className="px-4 py-4 text-right font-bold text-[#1d2327]">
-                                       ${order.financials?.total.toLocaleString()}
+                                       ${(order.financials?.total ?? 0).toLocaleString()}
                                     </td>
                                     <td className="px-4 py-4 text-center">
                                        <Link href={`/admin/orders/${order.id}`} className="text-[#8c8f94] hover:text-[#2271b1]">
@@ -178,7 +188,7 @@ export default function CustomerDetail({ params }) {
                                           <p className="text-[11px] text-[#646970] mt-0.5">
                                              QTY: {item.quantity} | {item.selectedVariant?.title || 'Standard'}
                                           </p>
-                                          <p className="text-[12px] font-bold text-[#3c434a] mt-1">${(item.priceAtPurchase * item.quantity).toLocaleString()}</p>
+                                          <p className="text-[12px] font-bold text-[#3c434a] mt-1">${((item.priceAtPurchase || 0) * (item.quantity || 0)).toLocaleString()}</p>
                                        </div>
                                     </div>
                                  ))}

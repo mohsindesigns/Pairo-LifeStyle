@@ -6,6 +6,7 @@ import {
   X, Copy, Check, Loader2, Image as ImageIcon, AlertTriangle
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { toast } from "react-hot-toast";
 
 export default function AdminMedia() {
   const [items, setItems]           = useState([]);
@@ -100,31 +101,84 @@ export default function AdminMedia() {
   };
 
   const softDelete = async (id) => {
-    await fetch(`/api/admin/media/${id}`, { method: "DELETE" });
+    if (!confirm("Are you sure you want to move this file to trash?")) return;
+    const previousItems = items;
+    setItems(prev => prev.filter(item => item._id !== id));
     setDetailItem(null);
-    fetchMedia(search, page, tab);
+    
+    const promise = fetch(`/api/admin/media/${id}`, { method: "DELETE" })
+      .then(async (res) => {
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || "Failed to move file to trash.");
+        }
+        fetchMedia(search, page, tab);
+      });
+
+    toast.promise(promise, {
+      loading: 'Moving file to trash...',
+      success: 'File moved to trash.',
+      error: (err) => {
+        setItems(previousItems);
+        return err.message || 'Failed to move file to trash.';
+      }
+    });
   };
 
   const permanentDelete = async (id) => {
-    const res = await fetch(`/api/admin/media/${id}?permanent=true`, { method: "DELETE" });
-    const data = await res.json();
-    if (data.error === "Image is still in use") {
-      alert(`Cannot delete — image is used in ${data.usageCount} place(s).`);
-      return;
-    }
+    if (!confirm("Are you sure you want to delete this file permanently? This will break references on products and pages!")) return;
+    const previousItems = items;
+    setItems(prev => prev.filter(item => item._id !== id));
     setDetailItem(null);
     setDeleteConfirm(null);
-    fetchMedia(search, page, tab);
+
+    const promise = fetch(`/api/admin/media/${id}?permanent=true`, { method: "DELETE" })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to delete file permanently.");
+        }
+        if (data.error === "Image is still in use") {
+          throw new Error(`Cannot delete — image is used in ${data.usageCount} place(s).`);
+        }
+        fetchMedia(search, page, tab);
+      });
+
+    toast.promise(promise, {
+      loading: 'Deleting file permanently...',
+      success: 'File deleted permanently.',
+      error: (err) => {
+        setItems(previousItems);
+        return err.message || 'Failed to delete file.';
+      }
+    });
   };
 
   const restore = async (id) => {
-    await fetch(`/api/admin/media/${id}`, {
+    const previousItems = items;
+    setItems(prev => prev.filter(item => item._id !== id));
+    setDetailItem(null);
+    
+    const promise = fetch(`/api/admin/media/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ restore: true }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to restore file.");
+      }
+      fetchMedia(search, page, tab);
     });
-    setDetailItem(null);
-    fetchMedia(search, page, tab);
+
+    toast.promise(promise, {
+      loading: 'Restoring file...',
+      success: 'File restored successfully.',
+      error: (err) => {
+        setItems(previousItems);
+        return err.message || 'Failed to restore file.';
+      }
+    });
   };
 
   const bulkSoftDelete = async () => {

@@ -100,7 +100,7 @@ export async function GET() {
 
       // Helper to add unique URLs
       function addUrl(type, slug, lastmod = null, changefreq = "weekly", priority = 0.5) {
-        if (!slug && type !== "static") return;
+        if (slug === undefined || slug === null) return;
         const normalized = normalizeSitemapUrl(siteUrl, type, slug);
         if (!urlMap.has(normalized)) {
           urlMap.set(normalized, {
@@ -112,10 +112,41 @@ export async function GET() {
         }
       }
 
-      // Add static pages
-      addUrl("static", "", null, "daily", 1.0);
-      addUrl("static", "shop", null, "daily", 0.9);
-      addUrl("static", "blog", null, "weekly", 0.7);
+      // Add URLs dynamically from SiteConfig headerConfig navItems (no hardcoded links!)
+      if (siteConfig?.headerConfig?.navItems) {
+        siteConfig.headerConfig.navItems.forEach(item => {
+          if (item.enabled !== false) {
+            const pathValue = item.href || item.value;
+            if (pathValue && !pathValue.startsWith('http') && !pathValue.startsWith('#') && !pathValue.includes(':')) {
+              const cleanSlug = pathValue.replace(/^\/+|\/+$/g, "");
+              let priority = 0.5;
+              let changefreq = "weekly";
+              if (cleanSlug === "") {
+                priority = 1.0;
+                changefreq = "daily";
+              } else if (cleanSlug === "shop") {
+                priority = 0.9;
+                changefreq = "daily";
+              } else if (cleanSlug === "blog") {
+                priority = 0.7;
+                changefreq = "weekly";
+              }
+              // Skip dynamic sub-resources which are loaded below
+              if (
+                !cleanSlug.startsWith("product/") &&
+                !cleanSlug.startsWith("collections/") &&
+                !cleanSlug.startsWith("category/") &&
+                !cleanSlug.startsWith("blog/")
+              ) {
+                addUrl("static", cleanSlug, siteConfig.updatedAt || null, changefreq, priority);
+              }
+            }
+          }
+        });
+      }
+
+      // Ensure root URL / home page is always included (derived dynamically)
+      addUrl("static", "", siteConfig?.updatedAt || null, "daily", 1.0);
 
       // Add products
       for (const prod of products) {
@@ -132,7 +163,7 @@ export async function GET() {
         addUrl("blog", post.slug, post.updatedAt, "monthly", 0.6);
       }
 
-      // Add CMS pages (excluding core reservation paths and test pages)
+      // Add CMS pages (excluding core paths and test pages)
       for (const page of pages) {
         const cleanSlug = page.slug ? page.slug.toLowerCase().trim() : "";
         if (
