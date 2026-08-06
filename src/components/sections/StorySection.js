@@ -43,15 +43,15 @@ export default function StorySection({
             className="space-y-10"
           >
             <motion.div variants={itemVariants} className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-foreground" />
-                <span className="text-[9px] md:text-[11px] font-bold tracking-[0.3em] text-foreground/80 uppercase">{label}</span>
+              <div className="flex items-center gap-3">
+                <div className="h-[1.5px] w-8 bg-foreground/30" />
+                <span className="text-foreground/90 text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase">{label}</span>
               </div>
-              <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold heading-font tracking-tighter text-foreground uppercase leading-[0.9]">
+              <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold heading-font tracking-tighter text-foreground uppercase leading-[1.05] max-w-[15ch] md:max-w-none">
                 {title}
               </h2>
             </motion.div>
-            <motion.p variants={itemVariants} className="text-lg md:text-xl text-foreground/85 leading-relaxed max-w-xl">
+            <motion.p variants={itemVariants} className="text-foreground/90 text-xs md:text-base lg:text-lg max-w-xl leading-relaxed font-sans">
               {description}
             </motion.p>
             <motion.div variants={itemVariants} className="grid sm:grid-cols-2 gap-8 pt-6">

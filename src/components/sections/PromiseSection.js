@@ -28,12 +28,15 @@ export default function PromiseSection({
           <div className="relative z-10 w-full p-8 md:p-20">
             <div className="max-w-2xl space-y-12">
               <div className="space-y-4">
-                <span className="text-[9px] md:text-[11px] font-bold tracking-[0.4em] text-white/80 uppercase">{label}</span>
-                <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold heading-font text-white uppercase leading-[0.9] tracking-tighter">
+                <div className="flex items-center gap-3">
+                  <div className="h-[1.5px] w-8 bg-white/30" />
+                  <span className="text-white/90 text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase">{label}</span>
+                </div>
+                <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold heading-font text-white uppercase leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none">
                   {title}
                 </h2>
               </div>
-              <p className="text-lg md:text-2xl text-white/85 leading-relaxed font-light">
+              <p className="text-white/90 text-xs md:text-base lg:text-lg max-w-xl leading-relaxed font-sans">
                 {description}
               </p>
               <div className="grid sm:grid-cols-2 gap-12 pt-12 border-t border-white/20">

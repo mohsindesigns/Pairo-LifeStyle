@@ -50,22 +50,20 @@ export default function FeaturedBanner({
         {/* Content Area - Responsive Fitting */}
         <div className="w-full relative z-10 px-6 md:px-16 py-10 md:py-12 lg:py-16">
           <div className="max-w-full md:max-w-lg lg:max-w-xl space-y-6 md:space-y-8">
-            {/* Minimalist Badges */}
-            <div className="flex flex-wrap gap-2">
-              <p className="bg-white/10 backdrop-blur-md text-white text-[9px] md:text-[11px] font-bold px-3 py-1.5 rounded-full tracking-[0.1em] md:tracking-[0.2em] uppercase border border-white/10">
-                {bannerData.badge1}
-              </p>
-              <p className="bg-primary text-background text-[9px] md:text-[11px] font-bold px-3 py-1.5 rounded-full tracking-[0.1em] md:tracking-[0.2em] uppercase">
-                {bannerData.badge2}
-              </p>
+            {/* Tagline style matching Hero */}
+            <div className="flex items-center gap-3">
+              <div className="h-[1.5px] w-8 bg-white/30" />
+              <span className="text-white/90 text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase">
+                {[bannerData.badge1, bannerData.badge2].filter(Boolean).join(" • ")}
+              </span>
             </div>
 
-            {/* Scaled Typography */}
-            <div className="space-y-2 md:space-y-4">
-              <h2 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold heading-font text-white uppercase leading-none tracking-tighter">
+            {/* Typography matching Hero */}
+            <div className="space-y-4 md:space-y-6">
+              <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white heading-font leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none uppercase">
                 {bannerData.title}
               </h2>
-              <p className="text-white/80 text-[10px] md:text-sm lg:text-base font-light leading-relaxed max-w-sm md:max-w-md">
+              <p className="text-white/90 text-xs md:text-base lg:text-lg max-w-md leading-relaxed font-sans">
                 {bannerData.description}
               </p>
             </div>
@@ -101,15 +99,10 @@ export default function FeaturedBanner({
                     linkType === "collection" && collectionId ? getCategoryUrl(collectionId) :
                       "#"
                 }
-                className="inline-block"
+                className="group flex items-center justify-center gap-2 bg-white text-black px-6 sm:px-8 md:px-10 py-3 sm:py-3.5 md:py-4 rounded-full font-bold text-[10px] sm:text-xs md:text-sm tracking-widest uppercase transition-all duration-300 hover:bg-neutral-100 hover:scale-[1.03] active:scale-95 inline-flex shadow-xl cursor-pointer"
               >
-                <div className="group relative overflow-hidden bg-white text-black px-8 md:px-12 py-3 md:py-4 rounded-full font-bold text-[9px] md:text-xs uppercase tracking-[0.2em] shadow-2xl border border-black/20 transition-all active:scale-95 cursor-pointer">
-                  <span className="relative z-10 flex items-center gap-2 md:gap-3 group-hover:text-white transition-colors duration-500">
-                    {bannerData.ctaText}
-                    <ArrowRight className="w-4 h-4 md:w-5 md:h-5 transition-transform duration-500 group-hover:translate-x-1" />
-                  </span>
-                  <div className="absolute inset-0 bg-black translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-[0.22,1,0.36,1]" />
-                </div>
+                <span>{bannerData.ctaText}</span>
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-300 group-hover:translate-x-1" />
               </Link>
             </div>
           </div>
