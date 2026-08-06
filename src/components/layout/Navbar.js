@@ -320,16 +320,27 @@ export default function Navbar() {
                     className={`group h-24 flex items-center ${(item.type === 'mega_menu' || item.dropdownType === 'mega') ? '' : 'relative'}`}
                     onMouseLeave={() => hasDropdown && setActiveDropdownId(null)}
                   >
-                    <Link
-                      href={item.href}
-                      target={item.openInNewTab ? '_blank' : undefined}
-                      rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
-                      className="text-[14px] font-semibold uppercase tracking-[0.05em] text-black hover:text-black transition-colors flex items-center gap-2"
-                      onMouseEnter={() => hasDropdown && setActiveDropdownId(item.id || item.name)}
-                    >
-                      {item.name}
-                      {hasDropdown && <ChevronDown className="w-3 h-3" />}
-                    </Link>
+                    {(item.type === 'mega_menu' || item.dropdownType === 'mega') && item.labelHref ? (
+                      <Link
+                        href={item.labelHref}
+                        className="text-[14px] font-semibold uppercase tracking-[0.05em] text-black hover:text-black transition-colors flex items-center gap-2"
+                        onMouseEnter={() => hasDropdown && setActiveDropdownId(item.id || item.name)}
+                      >
+                        {item.name}
+                        {hasDropdown && <ChevronDown className="w-3 h-3" />}
+                      </Link>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        target={item.openInNewTab ? '_blank' : undefined}
+                        rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
+                        className="text-[14px] font-semibold uppercase tracking-[0.05em] text-black hover:text-black transition-colors flex items-center gap-2"
+                        onMouseEnter={() => hasDropdown && setActiveDropdownId(item.id || item.name)}
+                      >
+                        {item.name}
+                        {hasDropdown && <ChevronDown className="w-3 h-3" />}
+                      </Link>
+                    )}
 
                     {/* Simple Sub Items */}
                     {(item.type === 'dropdown_custom' || item.dropdownType === 'simple') && item.subItems?.length > 0 && (

@@ -15,6 +15,7 @@ const NavItemSchema = new mongoose.Schema({
   type: { type: String, enum: ['cms_page', 'page', 'product', 'product_category', 'custom_url', 'external_url', 'mega_menu', 'dropdown_category', 'dropdown_product', 'dropdown_custom'], default: 'custom_url' },
   value: { type: String, default: '' },
   href: { type: String, default: '' },
+  labelHref: { type: String, default: '' }, // optional link URL for mega menu / dropdown labels
   openInNewTab: { type: Boolean, default: false },
   enabled: { type: Boolean, default: true },
   hasMegaMenu: { type: Boolean, default: false }, // legacy field

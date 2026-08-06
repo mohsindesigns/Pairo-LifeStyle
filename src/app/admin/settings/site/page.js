@@ -295,6 +295,20 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
               {/* Mega Menu Sub-Items Builder */}
               {item.type === 'mega_menu' && (
                 <div className="border-t border-[#c3c4c7] bg-[#fbfbfc] p-4 pl-8 space-y-5">
+
+                  {/* Label Link */}
+                  <div>
+                    <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-1">Label Link URL</h4>
+                    <p className="text-[11px] text-[#646970] mb-2">Optional. Makes the mega menu label itself a clickable link (e.g. <code>/shop</code> or <code>/collections/all</code>).</p>
+                    <input
+                      type="text"
+                      value={item.labelHref || ''}
+                      onChange={e => updateNav(idx, { labelHref: e.target.value })}
+                      placeholder="e.g. /shop or /collections/all"
+                      className="w-full max-w-sm border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
+                    />
+                  </div>
+
                   {/* Category Selection */}
                   <div>
                     <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-3">Mega Menu — Featured Categories</h4>
