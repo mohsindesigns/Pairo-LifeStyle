@@ -18,9 +18,9 @@ Disallow: /
 `;
   } else {
     robots = `User-agent: *
+Allow: /feed.xml
 Disallow: /admin
 Disallow: /feed
-Allow: /feed.xml
 Disallow: /cart
 Disallow: /orders
 Disallow: /checkout
@@ -28,6 +28,51 @@ Disallow: /account
 Disallow: /profile
 Disallow: /?*
 Disallow: /*?add-to-cart=
+
+User-agent: AhrefsBot
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: Meta-ExternalFetcher
+Allow: /
 
 Sitemap: ${siteUrl}/sitemap.xml
 `;

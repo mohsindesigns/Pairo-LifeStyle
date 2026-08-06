@@ -98,16 +98,7 @@ export default function ProductSection({
             className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-y-12 gap-x-6 md:gap-x-10"
           >
             {displayProducts.map((product, index) => {
-              // Enforce:
-              // Laptop/Desktop (lg): max 2x4 = 8 products shown
-              // Tablet (md): max 4x3 = 12 products shown
-              // Mobile: max 8x2 = 16 products shown
               let responsiveClass = "w-full";
-              if (index >= 12) {
-                responsiveClass = "w-full md:hidden"; // Hides on md, lg
-              } else if (index >= 8) {
-                responsiveClass = "w-full lg:hidden"; // Hides on lg
-              }
 
               return (
                 <motion.div
