@@ -5,11 +5,15 @@ import Promotion from "@/models/Promotion";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
 import { cache } from "@/lib/cache";
+import { can } from "@/lib/rbac";
 
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.view")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -27,8 +31,11 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.manage")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -58,8 +65,11 @@ export async function PUT(req, { params }) {
 
 export async function PATCH(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.manage")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -82,8 +92,11 @@ export async function PATCH(req, { params }) {
 
 export async function DELETE(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.manage")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;

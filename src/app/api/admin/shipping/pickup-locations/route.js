@@ -6,7 +6,7 @@ import { authOptions }      from '@/app/api/auth/[...nextauth]/route';
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.role || !['admin', 'superadmin'].includes(session.user.role)) {
+  if (!session || !session.user.isStaff) {
     return null;
   }
   return session;

@@ -4,11 +4,15 @@ import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
+import { can } from "@/lib/rbac";
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.view")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   await dbConnect();
@@ -35,8 +39,11 @@ export async function GET(req) {
 
 export async function POST(req) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.manage")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   await dbConnect();
@@ -74,8 +81,11 @@ export async function POST(req) {
 // PATCH: toggle adminStatus of a single promotion (Active ↔ Draft)
 export async function PATCH(req) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.manage")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   await dbConnect();
   try {
@@ -93,8 +103,11 @@ export async function PATCH(req) {
 // DELETE: bulk-deactivate ALL active automatic promotions (fixes the surprise-discount bug)
 export async function DELETE(req) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.manage")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   await dbConnect();
   try {

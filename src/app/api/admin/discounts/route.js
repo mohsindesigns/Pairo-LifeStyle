@@ -4,10 +4,10 @@ import dbConnect from "@/lib/db";
 import Discount from "@/models/Discount";
 import { NextResponse } from "next/server";
 
-// Verify session is admin or staff
+// Verify session is staff
 async function checkAuth() {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user.role !== "admin" && !session.user.isStaff)) {
+  if (!session || !session.user.isStaff) {
     return null;
   }
   return session;

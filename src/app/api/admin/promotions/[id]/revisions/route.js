@@ -5,11 +5,15 @@ import Promotion from "@/models/Promotion";
 import PromotionRevision from "@/models/PromotionRevision";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
 import { NextResponse } from "next/server";
+import { can } from "@/lib/rbac";
 
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.view")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
@@ -24,8 +28,11 @@ export async function GET(req, { params }) {
 
 export async function POST(req, { params }) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "admin") {
+  if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "promotions.manage")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
