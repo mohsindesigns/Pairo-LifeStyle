@@ -1,9 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { ShoppingBag, Eye, Star } from "lucide-react";
-import { motion } from "framer-motion";
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { getProductUrl } from "@/lib/routes";
@@ -12,10 +10,17 @@ export default function ProductCard({ product }) {
   const [isHovered, setIsHovered] = useState(false);
   const { addToCart } = useCart();
 
-  // Safety fallbacks for images
-  const mainImage = product.images?.[0] || product.image || "/placeholder.jpg";
-  const hoverImage = product.images?.[1] || product.image2;
-  const productId = product.slug || product._id || product.id;
+  const getAbsoluteUrl = (url) => {
+    if (!url) return "/placeholder.jpg";
+    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+      return url;
+    }
+    const cleanUrl = url.startsWith("/") ? url : `/${url}`;
+    return `https://pairolifestyle.com${cleanUrl}`;
+  };
+
+  const mainImage = getAbsoluteUrl(product.images?.[0] || product.image);
+  const hoverImage = product.images?.[1] || product.image2 ? getAbsoluteUrl(product.images?.[1] || product.image2) : null;
 
   return (
     <div
@@ -23,50 +28,50 @@ export default function ProductCard({ product }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Product Image Container */}
-      <div className="relative aspect-square bg-[var(--secondary)] rounded-[16px] md:rounded-[24px] overflow-hidden border border-[var(--border)]">
-        <Link href={getProductUrl(product)} className="block h-full w-full">
+      {/* Product Image Container — padding-bottom hack ensures consistent square ratio in all browsers */}
+      <div className="relative w-full bg-[var(--secondary)] rounded-[16px] md:rounded-[24px] overflow-hidden border border-[var(--border)]" style={{ paddingBottom: '100%' }}>
+        <Link href={getProductUrl(product)} className="absolute inset-0 block">
+
           {/* Main Image */}
-          <motion.div
-            animate={{ opacity: isHovered && hoverImage ? 0 : 1, scale: isHovered ? 1.05 : 1 }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute inset-0"
-          >
-           {mainImage && (
-              <Image
-                src={mainImage}
-                alt={product.imageAlts?.[mainImage] || product.name || "Product"}
-                fill
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                className="object-cover"
-                loading="eager"
-                unoptimized
-              />
-            )}
-          </motion.div>
+          <img
+            src={mainImage}
+            alt={product.imageAlts?.[mainImage] || product.name || "Product"}
+            loading="eager"
+            decoding="async"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              opacity: isHovered && hoverImage ? 0 : 1,
+              transform: isHovered ? 'scale(1.05)' : 'scale(1)',
+              transition: 'opacity 0.6s ease, transform 0.6s ease',
+            }}
+          />
 
           {/* Hover Image */}
           {hoverImage && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: isHovered ? 1 : 0, scale: isHovered ? 1 : 1.1 }}
-              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0"
-            >
-              <Image
-                src={hoverImage}
-                alt={product.imageAlts?.[hoverImage] || product.name || "Product"}
-                fill
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                className="object-cover"
-                loading="lazy"
-                unoptimized
-              />
-            </motion.div>
+            <img
+              src={hoverImage}
+              alt={product.imageAlts?.[hoverImage] || product.name || "Product"}
+              loading="lazy"
+              decoding="async"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                opacity: isHovered ? 1 : 0,
+                transform: isHovered ? 'scale(1)' : 'scale(1.05)',
+                transition: 'opacity 0.6s ease, transform 0.6s ease',
+              }}
+            />
           )}
         </Link>
 
-        {/* Unified Premium Hover Actions */}
+        {/* Hover Actions */}
         <div className="absolute bottom-2 md:bottom-3 left-2 md:left-3 right-2 md:right-3 flex gap-2 z-20 pointer-events-none group-hover:pointer-events-auto">
           <button
             onClick={(e) => {
@@ -89,7 +94,7 @@ export default function ProductCard({ product }) {
 
       {/* Info Section */}
       <div className="mt-3 md:mt-4 space-y-1 md:space-y-2 px-1">
-        <h3 
+        <h3
           style={{ fontFamily: "var(--brand-font)" }}
           className="text-[11px] md:text-[13px] font-bold uppercase tracking-wider text-foreground/85 group-hover:text-foreground transition-colors truncate"
         >

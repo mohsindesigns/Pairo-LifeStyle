@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPicker from "@/components/admin/MediaPicker";
 import { useRouter } from "next/navigation";
-import TiptapEditor from "@/components/admin/TiptapEditor";
+import dynamic from 'next/dynamic';
+const TiptapEditor = dynamic(() => import('@/components/admin/TiptapEditor'), { ssr: false });
 import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
 import { Pencil, ExternalLink } from "lucide-react";
 
@@ -17,6 +18,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
 
   const [activeTab, setActiveTab] = useState("content");
   const [slugLocked, setSlugLocked] = useState(true);
+  const [editorMode, setEditorMode] = useState("visual");
 
   const [formData, setFormData] = useState({
     _id: null,
@@ -254,10 +256,35 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                   {/* Content Editor */}
                   <div className="bg-white border border-[#c3c4c7] shadow-sm">
                      <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between font-bold text-[13px] text-gray-700">
-                        Full Description
+                        <span>Full Description</span>
+                        <div className="flex gap-2 text-xs">
+                           <button
+                              type="button"
+                              onClick={() => setEditorMode("visual")}
+                              className={`px-3 py-1 font-semibold rounded ${editorMode === "visual" ? "bg-white border border-[#c3c4c7] text-[#2271b1]" : "text-gray-600 hover:text-black"}`}
+                           >
+                              Visual
+                           </button>
+                           <button
+                              type="button"
+                              onClick={() => setEditorMode("html")}
+                              className={`px-3 py-1 font-semibold rounded ${editorMode === "html" ? "bg-white border border-[#c3c4c7] text-[#2271b1]" : "text-gray-600 hover:text-black"}`}
+                           >
+                              HTML
+                           </button>
+                        </div>
                      </div>
                      <div className="p-0">
-                        <TiptapEditor content={formData.content} onChange={(html) => setFormData({...formData, content: html})} />
+                        {editorMode === "visual" ? (
+                           <TiptapEditor content={formData.content} onChange={(html) => setFormData({...formData, content: html})} />
+                        ) : (
+                           <textarea
+                              className="w-full p-4 font-mono text-[13px] outline-none border-none min-h-[350px] bg-[#fcfcfc] focus:bg-white transition-colors"
+                              placeholder="Type HTML content here..."
+                              value={formData.content}
+                              onChange={(e) => setFormData({...formData, content: e.target.value})}
+                           />
+                        )}
                      </div>
                   </div>
 
