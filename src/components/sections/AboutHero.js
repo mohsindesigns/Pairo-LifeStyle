@@ -7,15 +7,6 @@ import Image from "next/image";
 import Link from "next/link";
 import MarqueeSection from "@/components/home/MarqueeSection";
 
-function normalizeHeroLink(link) {
-  if (!link) return '#';
-  try {
-    const url = new URL(link);
-    return url.pathname + url.search + url.hash;
-  } catch {
-    return link;
-  }
-}
 
 export default function AboutHero({
   slides,
@@ -155,7 +146,7 @@ export default function AboutHero({
                     <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 sm:gap-4 pt-4 md:pt-6">
                       {current.link ? (
                         <Link
-                          href={normalizeHeroLink(current.link)}
+                          href={current.link}
                           className="group flex items-center justify-center gap-2 bg-white text-black px-6 sm:px-8 md:px-10 py-3 sm:py-3.5 md:py-4 rounded-full font-bold text-[10px] sm:text-xs md:text-sm tracking-widest uppercase transition-all duration-300 hover:bg-neutral-100 hover:scale-[1.03] active:scale-95 inline-flex shadow-xl relative z-20"
                         >
                           <span>{current.buttonText || buttonText}</span>

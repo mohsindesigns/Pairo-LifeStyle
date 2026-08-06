@@ -8,16 +8,6 @@ import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import MarqueeSection from "./MarqueeSection";
 import { useSiteData } from "@/context/SiteContext";
 
-// Convert absolute URLs to relative paths so Next.js Link handles them correctly
-function normalizeHeroLink(link) {
-  if (!link) return '#';
-  try {
-    const url = new URL(link);
-    return url.pathname + url.search + url.hash;
-  } catch {
-    return link;
-  }
-}
 
 export default function Hero({
   slides: propSlides,
@@ -109,7 +99,7 @@ export default function Hero({
                     <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 sm:gap-4 pt-4 md:pt-6">
                       {hero.slides[currentSlide].link ? (
                         <Link
-                          href={normalizeHeroLink(hero.slides[currentSlide].link)}
+                          href={hero.slides[currentSlide].link}
                           className="group flex items-center justify-center gap-2 bg-white text-black px-6 sm:px-8 md:px-10 py-3 sm:py-3.5 md:py-4 rounded-full font-bold text-[10px] sm:text-xs md:text-sm tracking-widest uppercase transition-all duration-300 hover:bg-neutral-100 hover:scale-[1.03] active:scale-95 inline-flex shadow-xl relative z-20"
                         >
                           <span>{hero.slides[currentSlide].buttonText}</span>
