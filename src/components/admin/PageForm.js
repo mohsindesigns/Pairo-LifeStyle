@@ -301,6 +301,18 @@ export default function PageForm({ pageId }) {
                blogsRes.json()
             ]);
 
+            // Normalize sections productIds from slugs to ObjectIds
+            if (pageData && pageData.sections) {
+               pageData.sections.forEach(s => {
+                  if (s.config && s.config.productIds && Array.isArray(s.config.productIds)) {
+                     s.config.productIds = s.config.productIds.map(idOrSlug => {
+                        const found = prods.find(p => p._id === idOrSlug || p.slug === idOrSlug);
+                        return found ? found._id : idOrSlug;
+                     });
+                  }
+               });
+            }
+
             setPage(pageData);
             setDynamicOptions({
                categories: Array.isArray(cats) ? cats.filter(c => c.status === 'Published').map(c => ({ label: c.name, value: c._id })) : [],
