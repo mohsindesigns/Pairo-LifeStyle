@@ -45,9 +45,10 @@ export async function resolvePageSections(sections) {
             .populate('primaryCategory')
             .lean();
 
-          // Order products exactly as they are arranged in the productIds array, capped at 16
           products = productIdsOrSlugs.slice(0, 16).map(id => {
-            return rawProducts.find(p => p._id.toString() === id || p.slug === id);
+            if (!id) return null;
+            const targetId = id.toString();
+            return rawProducts.find(p => p._id.toString() === targetId || p.slug === targetId);
           }).filter(Boolean);
         } else {
           if (config.collectionId) {
