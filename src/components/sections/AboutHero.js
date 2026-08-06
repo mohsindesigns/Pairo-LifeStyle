@@ -136,7 +136,7 @@ export default function AboutHero({
                     </div>
                     {React.createElement(
                       headingLevel,
-                      { className: "text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white heading-font leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none" },
+                      { className: "text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white heading-font leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none" },
                       current.title || title
                     )}
                     <p className="text-white/90 text-xs md:text-base lg:text-lg max-w-md leading-relaxed font-sans">

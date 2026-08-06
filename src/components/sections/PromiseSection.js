@@ -32,11 +32,11 @@ export default function PromiseSection({
                   <div className="h-[1.5px] w-8 bg-white/30" />
                   <span className="text-white/90 text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase">{label}</span>
                 </div>
-                <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold heading-font text-white uppercase leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none">
+                <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold heading-font text-white uppercase leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none">
                   {title}
                 </h2>
               </div>
-              <p className="text-white/90 text-xs md:text-base lg:text-lg max-w-xl leading-relaxed font-sans">
+              <p className="text-white/90 text-lg md:text-xl max-w-xl leading-relaxed font-sans">
                 {description}
               </p>
               <div className="grid sm:grid-cols-2 gap-12 pt-12 border-t border-white/20">
