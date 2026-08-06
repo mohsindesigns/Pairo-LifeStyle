@@ -28,6 +28,7 @@ export default function PromotionsDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [view, setView] = useState("all"); // all, running, paused, expired
   const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkAction, setBulkAction] = useState("Bulk actions");
 
   const fetchPromotions = useCallback(async () => {
     setLoading(true);
@@ -217,8 +218,8 @@ export default function PromotionsDashboard() {
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                 <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredPromotions.length} onChange={toggleSelectAll} /></th>
                 <th className="px-3 py-2 font-bold text-[#1d2327]">Discount Name & Coupon Code</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Targeting</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Status</th>
+                <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Targeting</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-48">Schedule</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Performance</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-28 text-center">Priority</th>
