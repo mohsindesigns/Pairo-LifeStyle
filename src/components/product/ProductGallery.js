@@ -2,8 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
-import { getOptimizedImage, getCloudinarySrcSet } from "@/lib/cloudinary";
+import { getOptimizedImage } from "@/lib/cloudinary";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function ProductGallery({ images = [], variantImage, productName = "", imageAlts = {} }) {
@@ -101,13 +100,17 @@ export default function ProductGallery({ images = [], variantImage, productName 
                 }`}
                 aria-label={`View image ${i + 1}`}
               >
-                <Image
+                <img
                   src={getOptimizedImage(img, "thumbnail")}
                   alt={imageAlts[img] || `${productName} thumbnail ${i + 1}`}
-                  fill
-                  className="object-cover"
-                  sizes="72px"
-                  unoptimized={!img.startsWith("http") && !img.includes("cloudinary.com")}
+                  loading="lazy"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
                 />
               </button>
             );
@@ -124,21 +127,22 @@ export default function ProductGallery({ images = [], variantImage, productName 
           onClick={openLightbox}
           style={{ cursor: isZoomed ? "zoom-in" : "zoom-in" }}
         >
-          <Image
+          <img
             key={displayImage}
             src={getOptimizedImage(displayImage, "gallery")}
-            srcSet={getCloudinarySrcSet(displayImage)}
             alt={imageAlts[displayImage] || productName}
-            fill
-            className="object-cover transition-transform duration-100 ease-out will-change-transform"
+            loading="eager"
+            decoding="async"
             style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
               transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`,
               transform: isZoomed ? "scale(2.2)" : "scale(1)",
+              transition: 'transform 0.1s ease-out',
             }}
-            priority
-            sizes="(max-width: 768px) 100vw, 50vw"
-            decoding="async"
-            unoptimized={!displayImage.startsWith("http") && !displayImage.includes("cloudinary.com")}
           />
           {/* Zoom hint (shown only on non-zoomed hover) */}
           {!isZoomed && (
@@ -193,15 +197,17 @@ export default function ProductGallery({ images = [], variantImage, productName 
             className="relative w-full max-w-2xl mx-14 aspect-[3/4] md:aspect-auto md:h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <Image
+            <img
               key={allImages[lightboxIndex]}
               src={getOptimizedImage(allImages[lightboxIndex], "gallery")}
               alt={imageAlts[allImages[lightboxIndex]] || productName}
-              fill
-              className="object-contain"
-              sizes="(max-width: 768px) 100vw, 720px"
-              priority
-              unoptimized={!allImages[lightboxIndex].startsWith("http") && !allImages[lightboxIndex].includes("cloudinary.com")}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain'
+              }}
             />
           </div>
 
