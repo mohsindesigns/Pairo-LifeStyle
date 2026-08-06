@@ -6,6 +6,8 @@ import Media from "@/models/Media";
 import { deleteFromStorage } from "@/lib/storage";
 import { can } from "@/lib/rbac";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/admin/media/[id] — Get single media item with usage refs
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);

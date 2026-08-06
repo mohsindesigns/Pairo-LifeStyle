@@ -5,6 +5,8 @@ import dbConnect from "@/lib/db";
 import Media from "@/models/Media";
 import { can } from "@/lib/rbac";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/admin/media — List media with search, filter, pagination
 export async function GET(req) {
   const session = await getServerSession(authOptions);

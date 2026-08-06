@@ -31,7 +31,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
   const fetchMedia = useCallback(async (searchVal, pg) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ search: searchVal || "", page: String(pg || 1), limit: "30" });
+      const params = new URLSearchParams({ search: searchVal || "", page: String(pg || 1), limit: "30", _t: String(Date.now()) });
       const res = await fetch(`/api/admin/media?${params}`);
       if (!res.ok) throw new Error("Failed to fetch media");
       const data = await res.json();

@@ -32,7 +32,7 @@ export default function AdminMedia() {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        search: q, page: pg, limit: 30, trash: t === "trash", type, sort: s
+        search: q, page: pg, limit: 30, trash: t === "trash", type, sort: s, _t: Date.now()
       });
       const res = await fetch(`/api/admin/media?${params}`);
       const data = await res.json();
