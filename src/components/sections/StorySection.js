@@ -47,7 +47,7 @@ export default function StorySection({
                 <div className="h-[1.5px] w-8 bg-foreground/30" />
                 <span className="text-foreground/90 text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase">{label}</span>
               </div>
-              <h2 className="text-2xl md:text-4xl lg:text-5xl font-bold heading-font tracking-tighter text-foreground uppercase leading-[1.05] max-w-[15ch] md:max-w-none">
+              <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold heading-font tracking-tighter text-foreground uppercase leading-[1.05] max-w-[15ch] md:max-w-none">
                 {title}
               </h2>
             </motion.div>

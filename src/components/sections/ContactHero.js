@@ -145,7 +145,7 @@ export default function ContactHero({
                     </div>
                     {React.createElement(
                       headingLevel,
-                      { className: "text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white heading-font leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none" },
+                      { className: "text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white heading-font leading-[1.05] tracking-tight max-w-[15ch] md:max-w-none" },
                       current.title || title
                     )}
                     <p className="text-white/90 text-xs md:text-base lg:text-lg max-w-md leading-relaxed font-sans">
