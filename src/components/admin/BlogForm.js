@@ -33,6 +33,7 @@ export default function BlogForm({ blogId }) {
       image: "",
       category: "",
       status: "Draft",
+      publishedAt: new Date().toISOString().split('T')[0],
       heritage: "",
       process: "",
       style: "",
@@ -95,6 +96,7 @@ export default function BlogForm({ blogId }) {
                    showSidebarIndex: data.showSidebarIndex !== false,
                    ...data,
                    category: data.category === "Uncategorized" ? "" : (data.category || ""),
+                   publishedAt: data.publishedAt ? new Date(data.publishedAt).toISOString().split('T')[0] : (data.createdAt ? new Date(data.createdAt).toISOString().split('T')[0] : prev.publishedAt),
                    seo: {
                      title: "", description: "", keywords: [], focusKeyword: "",
                      canonicalUrl: "", noIndex: false, noFollow: false,
@@ -471,6 +473,15 @@ export default function BlogForm({ blogId }) {
                                 <option value="Draft">Draft</option>
                                 <option value="Published">Published</option>
                             </select>
+                        </div>
+                        <div className="flex items-center justify-between pt-2">
+                            <p><span className="text-gray-400">Published Date:</span></p>
+                            <input 
+                                type="date"
+                                className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-[#2271b1] bg-white text-black"
+                                value={formData.publishedAt}
+                                onChange={(e) => setFormData({ ...formData, publishedAt: e.target.value })}
+                            />
                         </div>
                      </div>
                      <div className="flex items-center justify-between bg-[#f6f7f7] -mx-3 -mb-3 p-3 border-t border-[#ccd0d4]">

@@ -6,6 +6,25 @@ import { ArrowLeft, ArrowRight, Share2, ArrowUpRight, ChevronLeft, ChevronRight,
 import { motion, useScroll, useSpring, AnimatePresence } from "framer-motion";
 import { getProductUrl } from "@/lib/routes";
 
+function makeInternalLinksDofollow(html) {
+  if (!html) return "";
+  return html.replace(/<a\s+([^>]*href=["']([^"']*)["'][^>]*)>/gi, (match, body, href) => {
+    const isInternal = href.startsWith('/') || href.includes('pairolifestyle.com');
+    if (isInternal) {
+      if (/rel=["']([^"']*)["']/i.test(body)) {
+        return match.replace(/rel=["']([^"']*)["']/gi, (relMatch, relValue) => {
+          const cleanRel = relValue
+            .replace(/\bnofollow\b/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+          return cleanRel ? `rel="${cleanRel}"` : '';
+        });
+      }
+    }
+    return match;
+  });
+}
+
 const SectionHeader = ({ number, title }) => (
    <div className="flex items-end gap-3 mb-6 border-b border-black/10 pb-2">
       <span className="text-[10px] font-mono font-bold text-neutral-400">
@@ -18,41 +37,57 @@ const SectionHeader = ({ number, title }) => (
 );
 
 const BlogCard = ({ post }) => (
-   <Link href={`/blog/${post.slug}`} className="group cursor-pointer w-full block">
-      {/* Portrait Image Container - Premium Sharp Corners */}
-      <div className="relative aspect-[3/4] bg-neutral-50 overflow-hidden border border-black/5 rounded-[4px]">
-         <img
+  <Link href={`/blog/${post.slug}`} className="group block h-full">
+    <article className="h-full flex flex-col bg-white border border-neutral-100 overflow-hidden hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300">
+      {/* Thumbnail */}
+      <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100 shrink-0">
+        {post.image ? (
+          <img
             src={post.image}
             alt={post.title}
-            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-103"
+            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
             loading="lazy"
-         />
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-neutral-100 to-neutral-200" />
+        )}
       </div>
 
-      {/* Metadata Block */}
-      <div className="mt-3.5 space-y-1 px-0.5">
-         <div className="flex items-center gap-2">
-            {post.category && post.category.trim() !== "" && post.category.toLowerCase() !== "uncategorized" && (
-               <>
-                  <span className="text-[9px] font-black tracking-[0.2em] text-neutral-400 uppercase">
-                     {post.category}
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-black/10" />
-               </>
-            )}
-            <span className="text-[9px] font-bold text-neutral-400 tracking-wider">
-               {post.date}
-            </span>
-         </div>
+      {/* Body */}
+      <div className="flex flex-col flex-1 p-5 gap-3">
+        {/* Meta */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {post.category && post.category.trim() && post.category.toLowerCase() !== "uncategorized" && (
+            <>
+              <span className="text-[9px] font-black tracking-[0.22em] uppercase text-neutral-400">
+                {post.category}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-neutral-200 shrink-0" />
+            </>
+          )}
+          <span className="text-[9px] font-semibold tracking-wider text-neutral-400">
+            {post.date}
+          </span>
+        </div>
 
-         <h3
-            style={{ fontFamily: "var(--brand-font)" }}
-            className="text-[13px] font-black uppercase tracking-wide text-black transition-colors group-hover:underline decoration-1 underline-offset-4 leading-snug"
-         >
-            {post.title}
-         </h3>
+        {/* Title */}
+        <h3
+          style={{ fontFamily: "var(--brand-font)" }}
+          className="text-[15px] font-bold uppercase tracking-tight text-black leading-snug group-hover:text-neutral-600 transition-colors"
+        >
+          {post.title}
+        </h3>
+
+        {/* Spacer + Read more */}
+        <div className="mt-auto pt-4 border-t border-neutral-100 flex items-center justify-between">
+          <span className="text-[10px] font-bold tracking-[0.15em] text-black uppercase">
+            Read More
+          </span>
+          <ArrowUpRight className="w-4 h-4 text-black/30 group-hover:text-black group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-200" />
+        </div>
       </div>
-   </Link>
+    </article>
+  </Link>
 );
 
 import { useCart } from "@/context/CartContext";
@@ -217,15 +252,18 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
       <main className="bg-white min-h-screen selection:bg-black selection:text-white">
          <style dangerouslySetInnerHTML={{
             __html: `
-        .blog-content {
-          font-family: var(--body-font), sans-serif !important;
-          font-size: 14px !important;
-          line-height: 1.8 !important;
-          color: #262626 !important;
-        }
-        .blog-content p {
-          margin-bottom: 1.25rem !important;
-        }
+         .blog-content {
+           font-family: var(--body-font), sans-serif !important;
+           font-size: 14px !important;
+           line-height: 1.8 !important;
+         }
+         .blog-content p, .blog-content li {
+           color: #4a4a4a !important;
+           font-weight: 400 !important;
+         }
+         .blog-content p {
+           margin-bottom: 1.25rem !important;
+         }
         .blog-content h1, .blog-content h2, .blog-content h3, .blog-content h4 {
           font-family: var(--brand-font), sans-serif !important;
           text-transform: uppercase !important;
@@ -395,13 +433,14 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
                   <div className="w-full space-y-8 md:space-y-12">
                      {/* General Content */}
                      {post.content && (() => {
-                        const sanitizedContent = (post.content || "")
+                        let sanitizedContent = (post.content || "")
                            .replace(/<h1([^>]*)>/gi, "<h2$1>")
                            .replace(/<\/h1>/gi, "</h2>");
+                        sanitizedContent = makeInternalLinksDofollow(sanitizedContent);
                         return (
                            <section id="general" className="scroll-mt-32">
                               <div
-                                 className="text-sm md:text-base text-black leading-relaxed space-y-4 font-medium blog-content"
+                                 className="text-sm md:text-base leading-relaxed space-y-4 blog-content"
                                  dangerouslySetInnerHTML={{ __html: sanitizedContent }}
                               />
                            </section>

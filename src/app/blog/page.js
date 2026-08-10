@@ -84,7 +84,7 @@ export default async function BlogArchive() {
       status: "Published",
       isDeleted: { $ne: true },
       tenantId: "DEFAULT_STORE"
-    }).sort({ createdAt: -1 }).lean(),
+    }).sort({ publishedAt: -1, createdAt: -1 }).lean(),
     Page.findOne({ slug: "blog", status: "Published" }).lean()
   ]);
 
@@ -94,7 +94,7 @@ export default async function BlogArchive() {
     slug: b.slug,
     image: b.image,
     category: b.category,
-    date: new Date(b.createdAt).toLocaleDateString("en-US", {
+    date: new Date(b.publishedAt || b.createdAt).toLocaleDateString("en-US", {
       month: "long", day: "numeric", year: "numeric"
     })
   }));

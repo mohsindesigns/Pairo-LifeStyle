@@ -40,6 +40,7 @@ const BlogSchema = new mongoose.Schema({
     twitterImage: String,
     structuredData: String // JSON-LD
   },
+  publishedAt: { type: Date, default: Date.now },
   faqs: [{
     question: String,
     answer: String

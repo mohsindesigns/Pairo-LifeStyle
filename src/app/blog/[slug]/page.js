@@ -98,7 +98,7 @@ export default async function BlogDetail({ params }) {
     slug: { $ne: slug },
     status: 'Published',
     isDeleted: { $ne: true }
-  }).limit(6).sort({ createdAt: -1 }).lean();
+  }).limit(6).sort({ publishedAt: -1, createdAt: -1 }).lean();
 
   // Sanitize for client to ensure only plain objects are passed
   const { getAltTextMap } = await import("@/lib/mediaUsage");
@@ -110,10 +110,10 @@ export default async function BlogDetail({ params }) {
   const serializedPosts = JSON.parse(JSON.stringify(latestPosts)).map(p => ({
     ...p,
     id: p._id,
-    date: new Date(p.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    date: new Date(p.publishedAt || p.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   }));
 
-  const postDate = new Date(post.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const postDate = new Date(post.publishedAt || post.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
   const { structuredData } = await resolveSEOMetadata({
     entity: post,
