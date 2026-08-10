@@ -45,11 +45,11 @@ export async function resolvePageSections(sections) {
             .populate('primaryCategory')
             .lean();
 
-          products = productIdsOrSlugs.slice(0, 16).map(id => {
+          products = productIdsOrSlugs.map(id => {
             if (!id) return null;
             const targetId = id.toString();
             return rawProducts.find(p => p._id.toString() === targetId || p.slug === targetId);
-          }).filter(Boolean);
+          }).filter(Boolean).slice(0, 16);
         } else {
           if (config.collectionId) {
             const mongoose = require('mongoose');

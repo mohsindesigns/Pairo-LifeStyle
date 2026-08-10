@@ -28,25 +28,25 @@ export default function AdminMedia() {
   const fileInputRef = useRef(null);
   const searchTimeout = useRef(null);
 
-  const fetchMedia = useCallback(async (q = search, pg = page, t = tab, type = 'all', s = 'newest') => {
+  const fetchMedia = useCallback(async (q = "", pg = 1, t = "library", type = 'all', s = 'newest') => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        search: q, page: pg, limit: 30, trash: t === "trash", type, sort: s, _t: Date.now()
+        search: q, page: pg.toString(), limit: "30", trash: (t === "trash").toString(), type, sort: s, _t: Date.now().toString()
       });
       const res = await fetch(`/api/admin/media?${params}`);
       const data = await res.json();
       if (data.success) { setItems(data.items); setPagination(data.pagination); }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  }, [search, page, tab]);
+  }, []);
 
   useEffect(() => {
-    Promise.resolve().then(() => {
-      fetchMedia("", 1, tab);
-      setSelected(new Set());
-      setDetailItem(null);
-    });
+    setPage(1);
+    setSearch("");
+    fetchMedia("", 1, tab);
+    setSelected(new Set());
+    setDetailItem(null);
   }, [tab, fetchMedia]);
 
   const handleSearch = (val) => {
