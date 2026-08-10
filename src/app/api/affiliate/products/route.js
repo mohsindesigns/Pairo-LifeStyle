@@ -27,7 +27,7 @@ export async function GET(req) {
       status: "Published",
       isDeleted: { $ne: true }
     })
-      .select("name slug price images description")
+      .select("name slug price image images description")
       .sort({ createdAt: -1 })
       .lean();
 

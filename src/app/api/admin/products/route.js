@@ -31,7 +31,7 @@ export async function GET(req) {
     if (status) query.status = status;
     
     const products = await Product.find(query)
-      .select('name slug price status sku stock manageStock images categories createdAt isDeleted')
+      .select('name slug price status sku stock manageStock image images categories createdAt isDeleted')
       .sort({ createdAt: -1 })
       .lean();
     return NextResponse.json(products);

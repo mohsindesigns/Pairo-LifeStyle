@@ -10,7 +10,7 @@ export async function getProductsForShop() {
     status: 'Published',
     isDeleted: { $ne: true }
   })
-  .select('name slug price compareAtPrice images categories primaryCategory rating reviewCount isFeatured type status attributes variantCombinations')
+  .select('name slug price compareAtPrice image images categories primaryCategory rating reviewCount isFeatured type status attributes variantCombinations')
   .populate('categories')
   .populate('primaryCategory')
   .sort({ createdAt: -1 })

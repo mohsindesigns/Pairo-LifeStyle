@@ -112,7 +112,7 @@ export default function ProductMainSection({ product }) {
         {/* LEFT SIDE: STICKY GALLERY - 60% */}
         <div className="lg:col-span-3 lg:sticky lg:top-28 self-start w-full min-w-0">
           <ProductGallery
-            images={product.images}
+            images={product.images && product.images.length > 0 ? product.images : (product.image ? [product.image] : [])}
             variantImage={selectedVariantImage}
             productName={product.name}
             imageAlts={product.imageAlts}

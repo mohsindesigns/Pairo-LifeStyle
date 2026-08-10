@@ -24,7 +24,21 @@ export default function ProductGallery({ images = [], variantImage, productName 
     setMounted(true);
   }, []);
 
-  const displayImage = variantImage || mainImage;
+  const displayImage = mainImage;
+
+  useEffect(() => {
+    if (variantImage) {
+      setMainImage(variantImage);
+    } else {
+      setMainImage(allImages[0]);
+    }
+  }, [variantImage, allImages]);
+
+  useEffect(() => {
+    if (allImages.length > 0) {
+      setMainImage(allImages[0]);
+    }
+  }, [images]);
 
   const handleThumbClick = (img) => {
     setMainImage(img);

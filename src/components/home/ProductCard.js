@@ -15,8 +15,7 @@ export default function ProductCard({ product }) {
     if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
       return url;
     }
-    const cleanUrl = url.startsWith("/") ? url : `/${url}`;
-    return `https://pairolifestyle.com${cleanUrl}`;
+    return url.startsWith("/") ? url : `/${url}`;
   };
 
   const mainImage = getAbsoluteUrl(product.images?.[0] || product.image);

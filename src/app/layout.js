@@ -128,7 +128,7 @@ export default async function RootLayout({ children }) {
         status: { $ne: 'Draft' }, 
         isDeleted: { $ne: true } 
       })
-        .select('name slug price images primaryCategory categories')
+        .select('name slug price image images primaryCategory categories')
         .populate('categories')
         .populate('primaryCategory')
         .maxTimeMS(QUERY_TIMEOUT_MS)
