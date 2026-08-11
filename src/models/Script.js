@@ -17,7 +17,8 @@ const ScriptSchema = new mongoose.Schema({
   templateConfig: {
     trackingId: String, // For GA4, GTM, etc.
     pixelId: String,    // For FB, TikTok
-    verificationId: String // For Search Console
+    verificationId: String, // For Search Console
+    verificationProvider: String // For Google, Pinterest, Bing, Facebook
   },
 
   // Injection Location

@@ -21,23 +21,30 @@ import { useRouter } from "next/navigation";
 export default function ScriptEditor({ initialData = null, isEdit = false }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(initialData || {
-    name: "",
-    type: "custom",
-    location: "head",
-    loadStrategy: "afterInteractive",
-    priority: 10,
-    isActive: true,
-    code: "",
-    templateConfig: {
-      trackingId: "",
-      pixelId: "",
-      verificationId: ""
-    },
-    targeting: {
-      type: "all",
-      routes: []
+  const [formData, setFormData] = useState(() => {
+    const data = initialData ? JSON.parse(JSON.stringify(initialData)) : {
+      name: "",
+      type: "custom",
+      location: "head",
+      loadStrategy: "afterInteractive",
+      priority: 10,
+      isActive: true,
+      code: "",
+      templateConfig: {
+        trackingId: "",
+        pixelId: "",
+        verificationId: "",
+        verificationProvider: "google"
+      },
+      targeting: {
+        type: "all",
+        routes: []
+      }
+    };
+    if (data.templateConfig && !data.templateConfig.verificationProvider) {
+      data.templateConfig.verificationProvider = "google";
     }
+    return data;
   });
 
   const templates = {
@@ -63,9 +70,9 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
       field: "pixelId"
     },
     verification: {
-      title: "Meta Verification Tag",
-      description: "Adds a <meta> tag for site ownership verification.",
-      help: "Enter the verification string",
+      title: "Site Verification Meta Tag",
+      description: "Adds a <meta> tag for site ownership verification (Google, Pinterest, Bing, Facebook).",
+      help: "Enter the verification string / token",
       placeholder: "abc123xyz...",
       field: "verificationId"
     }
@@ -186,22 +193,43 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                                  <p className="text-[13px] text-[#646970] mt-1">{templates[formData.type].description}</p>
                               </div>
                            </div>
-                           <div className="bg-white p-4 border border-[#d1e4f3] rounded space-y-3 shadow-inner">
-                              <label className="text-[12px] font-bold text-[#1d2327] uppercase tracking-wider">{templates[formData.type].help}</label>
-                              <input 
-                                type="text"
-                                placeholder={templates[formData.type].placeholder}
-                                value={formData.templateConfig[templates[formData.type].field]}
-                                onChange={(e) => setFormData({
-                                  ...formData, 
-                                  templateConfig: {
-                                    ...formData.templateConfig, 
-                                    [templates[formData.type].field]: e.target.value
-                                  }
-                                })}
-                                className="w-full border border-[#8c8f94] px-4 py-3 text-[14px] outline-none focus:border-[#2271b1] rounded-[3px] font-mono"
-                              />
-                           </div>
+                            <div className="bg-white p-4 border border-[#d1e4f3] rounded space-y-3 shadow-inner">
+                               {formData.type === 'verification' && (
+                                 <div className="space-y-1.5 mb-3">
+                                    <label className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider">Verification Provider</label>
+                                    <select
+                                      value={formData.templateConfig.verificationProvider || 'google'}
+                                      onChange={(e) => setFormData({
+                                        ...formData,
+                                        templateConfig: {
+                                          ...formData.templateConfig,
+                                          verificationProvider: e.target.value
+                                        }
+                                      })}
+                                      className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] rounded-[3px] bg-white"
+                                    >
+                                      <option value="google">Google Search Console (google-site-verification)</option>
+                                      <option value="pinterest">Pinterest (p:domain_verify)</option>
+                                      <option value="bing">Bing Webmaster (msvalidate.01)</option>
+                                      <option value="facebook">Facebook Domain Verification (facebook-domain-verification)</option>
+                                    </select>
+                                 </div>
+                               )}
+                               <label className="text-[12px] font-bold text-[#1d2327] uppercase tracking-wider">{templates[formData.type].help}</label>
+                               <input 
+                                 type="text"
+                                 placeholder={templates[formData.type].placeholder}
+                                 value={formData.templateConfig[templates[formData.type].field] || ""}
+                                 onChange={(e) => setFormData({
+                                   ...formData, 
+                                   templateConfig: {
+                                     ...formData.templateConfig, 
+                                     [templates[formData.type].field]: e.target.value
+                                   }
+                                 })}
+                                 className="w-full border border-[#8c8f94] px-4 py-3 text-[14px] outline-none focus:border-[#2271b1] rounded-[3px] font-mono"
+                               />
+                            </div>
                         </div>
                       ) : (
                         <div className="text-center py-10 text-gray-500 italic">
