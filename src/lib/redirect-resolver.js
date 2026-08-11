@@ -189,8 +189,16 @@ export async function resolveRedirect(rawPath) {
 export async function registerRedirect(rawOldPath, rawNewPath, statusCode = 301) {
   await dbConnect();
   
+  let cleanOld = rawOldPath.trim();
+  if (cleanOld.startsWith("http://") || cleanOld.startsWith("https://")) {
+    try {
+      const parsed = new URL(cleanOld);
+      cleanOld = parsed.pathname;
+    } catch (e) {}
+  }
+  
   // Strip query string from old path to ensure exact path matching
-  const [oldPathWithoutQuery] = rawOldPath.split("?");
+  const [oldPathWithoutQuery] = cleanOld.split("?");
   const oldPath = normalizePath(oldPathWithoutQuery);
   
   // For newPath, normalize the path part but keep the query parameters if they exist

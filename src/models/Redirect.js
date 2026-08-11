@@ -24,7 +24,14 @@ const RedirectSchema = new mongoose.Schema({
 // Ensure clean format on retrieval
 RedirectSchema.pre('save', function (next) {
   if (this.oldPath) {
-    this.oldPath = this.oldPath.toLowerCase().trim();
+    let clean = this.oldPath.trim();
+    if (clean.startsWith("http://") || clean.startsWith("https://")) {
+      try {
+        const parsed = new URL(clean);
+        clean = parsed.pathname;
+      } catch (e) {}
+    }
+    this.oldPath = clean.toLowerCase().trim();
     if (!this.oldPath.startsWith('/')) {
       this.oldPath = '/' + this.oldPath;
     }
