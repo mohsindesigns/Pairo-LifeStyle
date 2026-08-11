@@ -6,7 +6,8 @@ import { toast } from "react-hot-toast";
 import {
   Save, Globe, Layout, AlignLeft, Share2,
   Plus, GripVertical, X, Eye, EyeOff,
-  Camera, MessageSquare, Link2, Users, ChevronDown, ChevronUp
+  Camera, MessageSquare, Link2, Users, ChevronDown, ChevronUp,
+  RefreshCw, Trash2, Search
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
@@ -779,6 +780,300 @@ function SocialLinksTab({ config, onChange }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   TAB: Redirect Manager
+   ═══════════════════════════════════════════════════════════════ */
+function RedirectsTab() {
+  const [redirects, setRedirects] = useState([]);
+  const [totalRedirects, setTotalRedirects] = useState(0);
+  const [redirectsPage, setRedirectsPage] = useState(1);
+  const [loadingRedirects, setLoadingRedirects] = useState(false);
+  const [redirectSearch, setRedirectSearch] = useState("");
+  
+  const [redirectForm, setRedirectForm] = useState({
+    _id: "",
+    sourceUrl: "",
+    targetUrl: "",
+    statusCode: 301
+  });
+  const [submittingRedirect, setSubmittingRedirect] = useState(false);
+  const [redirectError, setRedirectError] = useState("");
+
+  const fetchRedirects = async () => {
+    setLoadingRedirects(true);
+    try {
+      const params = new URLSearchParams();
+      if (redirectSearch) params.set("search", redirectSearch);
+      params.set("page", redirectsPage.toString());
+      params.set("limit", "10");
+
+      const res = await fetch(`/api/admin/redirects?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRedirects(data.items || []);
+        setTotalRedirects(data.total || 0);
+      }
+    } catch (err) {
+      toast.error("Failed to load redirects");
+    } finally {
+      setLoadingRedirects(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRedirects();
+  }, [redirectsPage, redirectSearch]);
+
+  const handleSaveRedirect = async (e) => {
+    e.preventDefault();
+    setSubmittingRedirect(true);
+    setRedirectError("");
+    try {
+      const isEdit = !!redirectForm._id;
+      const url = "/api/admin/redirects";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(redirectForm)
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setRedirectForm({
+          _id: "",
+          sourceUrl: "",
+          targetUrl: "",
+          statusCode: 301
+        });
+        toast.success(isEdit ? "Redirect updated successfully." : "Redirect added successfully.");
+        fetchRedirects();
+      } else {
+        setRedirectError(data.error || "An error occurred.");
+      }
+    } catch (err) {
+      setRedirectError("Failed to save redirect.");
+    } finally {
+      setSubmittingRedirect(false);
+    }
+  };
+
+  const handleDeleteRedirect = async (id) => {
+    if (!confirm("Are you sure you want to delete this redirect rule?")) return;
+    try {
+      const res = await fetch("/api/admin/redirects", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [id] })
+      });
+      if (res.ok) {
+        toast.success("Redirect deleted.");
+        fetchRedirects();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || "Failed to delete.");
+      }
+    } catch (err) {
+      toast.error("Delete error.");
+    }
+  };
+
+  const handleEditRedirect = (item) => {
+    setRedirectForm({
+      _id: item._id,
+      sourceUrl: item.sourceUrl,
+      targetUrl: item.targetUrl,
+      statusCode: item.statusCode || 301
+    });
+    setRedirectError("");
+  };
+
+  const totalPages = Math.ceil(totalRedirects / 10) || 1;
+
+  return (
+    <div className="space-y-8">
+      {/* Add / Edit Form */}
+      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
+        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">
+          {redirectForm._id ? "Edit Redirect Rule" : "Add New Redirect Rule"}
+        </h3>
+        <form onSubmit={handleSaveRedirect} className="p-4 space-y-4">
+          {redirectError && (
+            <div className="bg-[#fcf0f1] border-l-4 border-[#d63638] text-[#d63638] p-3 text-[13px] rounded-[3px]">
+              {redirectError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="block text-[12px] font-semibold text-[#1d2327]">Source Path (e.g. /old-url)</label>
+              <input
+                type="text"
+                required
+                placeholder="/old-page"
+                value={redirectForm.sourceUrl}
+                onChange={e => setRedirectForm({ ...redirectForm, sourceUrl: e.target.value })}
+                className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[12px] font-semibold text-[#1d2327]">Target Destination (e.g. /new-url)</label>
+              <input
+                type="text"
+                required
+                placeholder="/new-page"
+                value={redirectForm.targetUrl}
+                onChange={e => setRedirectForm({ ...redirectForm, targetUrl: e.target.value })}
+                className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[12px] font-semibold text-[#1d2327]">Redirect Type</label>
+              <select
+                value={redirectForm.statusCode}
+                onChange={e => setRedirectForm({ ...redirectForm, statusCode: parseInt(e.target.value, 10) })}
+                className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white h-[31px]"
+              >
+                <option value={301}>301 Permanent Redirect</option>
+                <option value={302}>302 Temporary Redirect</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={submittingRedirect}
+              className="bg-[#2271b1] text-white px-4 py-[6px] text-[12px] font-semibold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60"
+            >
+              {submittingRedirect ? "Saving..." : redirectForm._id ? "Update Redirect" : "Add Redirect"}
+            </button>
+            {redirectForm._id && (
+              <button
+                type="button"
+                onClick={() => setRedirectForm({ _id: "", sourceUrl: "", targetUrl: "", statusCode: 301 })}
+                className="border border-[#c3c4c7] text-[#1d2327] px-4 py-[6px] text-[12px] font-semibold rounded-[3px] hover:bg-[#f6f7f7]"
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* Redirects List Table */}
+      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
+        <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h3 className="text-[13px] font-bold text-[#1d2327] m-0">Active Redirect Rules ({totalRedirects})</h3>
+          
+          {/* Search bar */}
+          <div className="relative max-w-xs w-full">
+            <input
+              type="text"
+              placeholder="Search redirects..."
+              value={redirectSearch}
+              onChange={e => { setRedirectSearch(e.target.value); setRedirectsPage(1); }}
+              className="w-full border border-[#8c8f94] rounded-[3px] pl-8 pr-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+            />
+            <Search className="w-3.5 h-3.5 text-[#646970] absolute left-2.5 top-1/2 -translate-y-1/2" />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="wp-list-table w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[12px] font-semibold text-[#1d2327]">
+                <th className="px-4 py-3">Source URL Path</th>
+                <th className="px-4 py-3">Target Destination</th>
+                <th className="px-4 py-3 w-32">Status Code</th>
+                <th className="px-4 py-3 w-28 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="text-[13px] divide-y divide-[#f0f0f1]">
+              {loadingRedirects ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-[#646970] italic">
+                    Loading redirects...
+                  </td>
+                </tr>
+              ) : redirects.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-[#646970] italic">
+                    No redirect rules found.
+                  </td>
+                </tr>
+              ) : (
+                redirects.map((item) => (
+                  <tr key={item._id} className="hover:bg-[#f6f7f7]">
+                    <td className="px-4 py-3 font-mono text-[12px] text-[#1d2327] break-all">
+                      {item.sourceUrl}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[12px] text-[#2271b1] break-all">
+                      {item.targetUrl}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                        item.statusCode === 301 ? "bg-green-50 text-green-700 border border-green-200" : "bg-blue-50 text-blue-700 border border-blue-200"
+                      }`}>
+                        {item.statusCode}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditRedirect(item)}
+                          className="text-[#2271b1] hover:underline text-[12px]"
+                        >
+                          Edit
+                        </button>
+                        <span className="text-[#c3c4c7]">|</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRedirect(item._id)}
+                          className="text-[#d63638] hover:underline text-[12px]"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination footer */}
+        {totalPages > 1 && (
+          <div className="px-4 py-3 bg-[#f6f7f7] border-t border-[#c3c4c7] flex items-center justify-between text-[12px] text-[#646970]">
+            <span>Showing page {redirectsPage} of {totalPages}</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={redirectsPage === 1}
+                onClick={() => setRedirectsPage(prev => Math.max(1, prev - 1))}
+                className="px-2 py-1 border border-[#c3c4c7] rounded-[3px] bg-white disabled:opacity-50 hover:bg-[#f6f7f7]"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={redirectsPage === totalPages}
+                onClick={() => setRedirectsPage(prev => Math.min(totalPages, prev + 1))}
+                className="px-2 py-1 border border-[#c3c4c7] rounded-[3px] bg-white disabled:opacity-50 hover:bg-[#f6f7f7]"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    MAIN PAGE
    ═══════════════════════════════════════════════════════════════ */
 const TABS = [
@@ -786,6 +1081,7 @@ const TABS = [
   { key: 'header', label: 'Header', Icon: Layout },
   { key: 'footer', label: 'Footer', Icon: AlignLeft },
   { key: 'social', label: 'Social Links', Icon: Share2 },
+  { key: 'redirects', label: 'Redirects', Icon: RefreshCw },
 ];
 
 export default function SiteSettingsPage() {
@@ -866,21 +1162,24 @@ export default function SiteSettingsPage() {
         {tab === 'header' && <HeaderTab config={config} onChange={setConfig} dbPages={dbPages} dbCategories={dbCategories} dbProducts={dbProducts} />}
         {tab === 'footer' && <FooterTab config={config} onChange={setConfig} dbCategories={dbCategories} dbBlogs={dbBlogs} dbPages={dbPages} />}
         {tab === 'social' && <SocialLinksTab config={config} onChange={setConfig} />}
+        {tab === 'redirects' && <RedirectsTab />}
       </div>
 
       {/* WordPress-style sticky publish bar */}
-      <div className="fixed bottom-0 left-[160px] right-0 z-40 bg-white border-t border-[#c3c4c7] px-6 py-3 flex items-center justify-between">
-        <p className="text-[12px] text-[#646970]">Changes apply immediately after saving.</p>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-[#2271b1] text-white px-5 py-[6px] text-[13px] font-semibold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 flex items-center gap-2"
-        >
-          <Save className="w-4 h-4" />
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </div>
+      {tab !== 'redirects' && (
+        <div className="fixed bottom-0 left-[160px] right-0 z-40 bg-white border-t border-[#c3c4c7] px-6 py-3 flex items-center justify-between">
+          <p className="text-[12px] text-[#646970]">Changes apply immediately after saving.</p>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-[#2271b1] text-white px-5 py-[6px] text-[13px] font-semibold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      )}
     </AdminPageLayout>
   );
 }
