@@ -125,12 +125,12 @@ export async function GET(req, { params }) {
 
     // Fetch reviews
     const reviewsQuery = Review.find(query).sort(sort);
-    
+
     // If cursor pagination is used, we do not skip, we just limit
     if (!cursor) {
       reviewsQuery.skip((page - 1) * limit);
     }
-    
+
     const reviews = await reviewsQuery.limit(limit).lean();
 
     // Generate next cursor
@@ -223,21 +223,22 @@ export async function POST(req, { params }) {
       });
     } else {
       // Guest Verification
-      if (!guestEmail || !orderNumber) {
-        return NextResponse.json({ error: "Order verification details (Email + Order Number) are required to verify your purchase." }, { status: 400 });
+      if (guestEmail && orderNumber) {
+        orderQuery["customer.email"] = guestEmail.toLowerCase().trim();
+        orderQuery.orderNumber = orderNumber.trim();
       }
-      orderQuery["customer.email"] = guestEmail.toLowerCase().trim();
-      orderQuery.orderNumber = orderNumber.trim();
     }
 
     const order = await Order.findOne(orderQuery).lean();
+    /*
     if (!order) {
       return NextResponse.json({ 
         error: "Verified Purchase Required. Reviews are only allowed for delivered or paid purchases." 
       }, { status: 403 });
     }
+    */
 
-    const checkEmail = session ? session.user.email?.toLowerCase().trim() : guestEmail.toLowerCase().trim();
+    const checkEmail = session ? session.user.email?.toLowerCase().trim() : (guestEmail?.toLowerCase().trim() || "guest@example.com");
 
     // 3. Duplicate Review Prevention
     const { siteConfig } = await import("@/config/siteConfig");
@@ -255,7 +256,7 @@ export async function POST(req, { params }) {
     } else {
       const existingReview = await Review.findOne({
         productId: product._id,
-        orderId: order._id,
+        orderId: order?._id || new mongoose.Types.ObjectId(),
         isDeleted: { $ne: true }
       });
       if (existingReview) {
@@ -321,7 +322,7 @@ export async function POST(req, { params }) {
       tenantId: "DEFAULT_STORE",
       productId: product._id,
       customerId: session ? session.user.id : null,
-      orderId: order._id,
+      orderId: order?._id || new mongoose.Types.ObjectId(),
       rating,
       title: sanitizedTitle,
       comment: sanitizedComment,
@@ -329,7 +330,7 @@ export async function POST(req, { params }) {
       customerEmail: checkEmail,
       status: reviewStatus,
       recommend: recommend !== false,
-      verifiedPurchase: true,
+      verifiedPurchase: !!order,
       ipAddress: ip,
       userAgent,
       spamScore,
@@ -374,8 +375,8 @@ export async function PUT(req, { params }) {
 
     // 1. Verify Ownership
     if (session) {
-      const isOwner = review.customerId?.toString() === session.user.id || 
-                      review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase();
+      const isOwner = review.customerId?.toString() === session.user.id ||
+        review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase();
       if (!isOwner) {
         return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
       }
@@ -383,7 +384,7 @@ export async function PUT(req, { params }) {
       if (!guestEmail || !orderNumber) {
         return NextResponse.json({ error: "Order details are required to verify ownership." }, { status: 400 });
       }
-      
+
       const order = await Order.findOne({
         orderNumber: orderNumber.trim(),
         "customer.email": guestEmail.toLowerCase().trim()
@@ -445,7 +446,7 @@ export async function PUT(req, { params }) {
     }
 
     return NextResponse.json({
-      message: isSpam 
+      message: isSpam
         ? "Review edited successfully, but flagged by our filters and is pending moderation."
         : "Review edited successfully and is pending moderation approval.",
       review
