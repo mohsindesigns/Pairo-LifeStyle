@@ -2,17 +2,83 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, ArrowRight, Printer, PhoneCall, HelpCircle, Loader2, Calendar, MapPin, CreditCard, ShoppingBag, Truck, Mail, ChevronDown } from "lucide-react";
+import { Check, ArrowRight, Printer, PhoneCall, HelpCircle, Loader2, Calendar, MapPin, CreditCard, ShoppingBag, Truck, Mail, ChevronDown, AlertTriangle, Clock, ExternalLink } from "lucide-react";
+import { useCart } from "@/context/CartContext";
+import { IDEMPOTENCY_STORAGE_KEY } from "@/lib/checkoutStorage";
+
+const POLL_INTERVAL_MS = 1500;
+const POLL_MAX_ATTEMPTS = 20;
 
 export default function SuccessPage() {
+  const { clearCart } = useCart();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [orderNumber, setOrderNumber] = useState("");
   const [error, setError] = useState(null);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
+  const [pollStatus, setPollStatus] = useState(null); // null | "polling" | "failed" | "timeout"
+  const [pollError, setPollError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
+    const pollOrderStatus = async (idemKey) => {
+      for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt++) {
+        if (cancelled) return;
+        try {
+          const res = await fetch(`/api/checkout/status?idempotencyKey=${encodeURIComponent(idemKey)}`);
+          const data = await res.json();
+          if (cancelled) return;
+
+          if (data.success && data.status === "succeeded") {
+            try { sessionStorage.removeItem(IDEMPOTENCY_STORAGE_KEY); } catch (e) { }
+            clearCart();
+            if (data.orderNumber) setOrderNumber(data.orderNumber);
+
+            try {
+              const orderRes = await fetch(`/api/order-tracking/${data.orderId}`);
+              const orderData = await orderRes.json();
+              if (cancelled) return;
+              if (orderData.success && orderData.order) {
+                setOrder(orderData.order);
+              } else {
+                setError("Could not retrieve order details.");
+              }
+            } catch (err) {
+              console.error("Error fetching order:", err);
+              if (!cancelled) setError("Failed to fetch order details.");
+            }
+
+            if (!cancelled) {
+              setPollStatus(null);
+              setLoading(false);
+            }
+            return;
+          }
+
+          if (data.success && data.status === "failed") {
+            try { sessionStorage.removeItem(IDEMPOTENCY_STORAGE_KEY); } catch (e) { }
+            setPollStatus("failed");
+            setPollError(data.error || "Your payment could not be completed.");
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.error("Error polling checkout status:", err);
+        }
+
+        if (cancelled) return;
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
+
+      if (!cancelled) {
+        setPollStatus("timeout");
+        setLoading(false);
+      }
+    };
+
     Promise.resolve().then(async () => {
+      if (cancelled) return;
       const params = new URLSearchParams(window.location.search);
       const id = params.get("id");
       const orderNum = params.get("orderNumber");
@@ -27,6 +93,7 @@ export default function SuccessPage() {
         try {
           const res = await fetch(`/api/order-tracking/${lookupKey}`);
           const data = await res.json();
+          if (cancelled) return;
           if (data.success && data.order) {
             setOrder(data.order);
           } else {
@@ -34,15 +101,33 @@ export default function SuccessPage() {
           }
         } catch (err) {
           console.error("Error fetching order:", err);
-          setError("Failed to fetch order details.");
+          if (!cancelled) setError("Failed to fetch order details.");
         } finally {
-          setLoading(false);
+          if (!cancelled) setLoading(false);
         }
-      } else {
-        setLoading(false);
+        return;
       }
+
+      let idemKey = params.get("idempotencyKey");
+      if (!idemKey) {
+        try {
+          idemKey = sessionStorage.getItem(IDEMPOTENCY_STORAGE_KEY);
+        } catch (e) { }
+      }
+
+      if (idemKey) {
+        setPollStatus("polling");
+        pollOrderStatus(idemKey);
+        return;
+      }
+
+      setLoading(false);
     });
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clearCart]);
 
   const handlePrint = () => {
     window.print();
@@ -54,9 +139,62 @@ export default function SuccessPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-4">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-4 px-6 text-center">
         <Loader2 className="w-8 h-8 animate-spin text-black" />
-        <p className="text-[11px] uppercase tracking-widest font-bold text-black">Loading Order Details...</p>
+        <p className="text-[11px] uppercase tracking-widest font-bold text-black">
+          {pollStatus === "polling" ? "Finalizing Your Order…" : "Loading Order Details..."}
+        </p>
+        {pollStatus === "polling" && (
+          <p className="text-[12px] text-neutral-500 max-w-xs">
+            We&apos;re confirming your payment and creating your order. This should only take a few seconds.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (pollStatus === "failed") {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-5 px-6 text-center">
+        <div className="w-14 h-14 rounded-full bg-red-50 border border-red-200 flex items-center justify-center">
+          <AlertTriangle className="w-6 h-6 text-red-500" />
+        </div>
+        <div className="space-y-2 max-w-sm">
+          <h1 className="text-base font-bold uppercase tracking-wider text-black">We Couldn&apos;t Complete Your Order</h1>
+          <p className="text-[13px] text-neutral-600">{pollError}</p>
+          <p className="text-[11px] text-neutral-500">Any payment taken has been automatically refunded. Your cart has not been cleared.</p>
+        </div>
+        <Link
+          href="/checkout"
+          className="bg-black text-white hover:bg-neutral-900 px-6 py-3.5 rounded-[4px] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm"
+        >
+          <span>Return to Checkout</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+    );
+  }
+
+  if (pollStatus === "timeout") {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-5 px-6 text-center">
+        <div className="w-14 h-14 rounded-full bg-[#FAF9F6] border border-neutral-200 flex items-center justify-center">
+          <Clock className="w-6 h-6 text-black" />
+        </div>
+        <div className="space-y-2 max-w-sm">
+          <h1 className="text-base font-bold uppercase tracking-wider text-black">This Is Taking Longer Than Expected</h1>
+          <p className="text-[13px] text-neutral-600">
+            Your payment may still be processing. Please check your email for a confirmation, or contact support if you don&apos;t hear back shortly.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3 justify-center">
+          <Link href="/shop" className="border border-neutral-300 hover:border-black text-black px-6 py-3.5 rounded-[4px] text-xs font-bold uppercase tracking-wider bg-white transition-all">
+            Continue Shopping
+          </Link>
+          <Link href="/profile" className="bg-black text-white hover:bg-neutral-900 px-6 py-3.5 rounded-[4px] text-xs font-bold uppercase tracking-wider transition-all shadow-sm">
+            Check My Orders
+          </Link>
+        </div>
       </div>
     );
   }
@@ -248,6 +386,16 @@ export default function SuccessPage() {
                     <div className="text-[13px] text-black">
                       <p className="font-bold text-black">{order.payment?.method || "Cash on Delivery"}</p>
                       <p className="text-[11px] text-black mt-0.5 font-medium">Payment Status: <span className="font-bold uppercase tracking-wider text-black">{order.payment?.status || "Pending"}</span></p>
+                      {order.payment?.receiptUrl && (
+                        <a
+                          href={order.payment.receiptUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="no-print inline-flex items-center gap-1.5 mt-2 text-[11px] font-bold uppercase tracking-wider text-black underline hover:text-neutral-600 transition-colors"
+                        >
+                          View Stripe Receipt <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>

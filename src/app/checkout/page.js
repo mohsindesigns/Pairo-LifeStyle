@@ -3,10 +3,70 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CreditCard, Truck, ShieldCheck, ArrowRight, Loader2, ChevronDown, Search } from "lucide-react";
+import { Elements } from "@stripe/react-stripe-js";
 import { useCart } from "@/context/CartContext";
 import { useSiteData } from "@/context/SiteContext";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { stripePromise } from "@/lib/stripeClient";
+import StripePaymentForm from "@/components/checkout/StripePaymentForm";
+
+const STRIPE_APPEARANCE = {
+  theme: "flat",
+  variables: {
+    colorPrimary: "#000000",
+    colorBackground: "#ffffff",
+    colorText: "#000000",
+    colorTextSecondary: "#525252",
+    colorDanger: "#ef4444",
+    fontFamily: "inherit",
+    borderRadius: "4px",
+    fontSizeBase: "13px",
+    spacingUnit: "4px"
+  },
+  rules: {
+    ".Input": {
+      border: "1px solid #d4d4d4",
+      padding: "10px 14px",
+      boxShadow: "none"
+    },
+    ".Input:focus": {
+      border: "1px solid #000000",
+      boxShadow: "0 0 0 1px #000000"
+    },
+    ".Label": {
+      fontSize: "11px",
+      fontWeight: "700",
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+      color: "#525252"
+    },
+    ".Tab": {
+      border: "1px solid #d4d4d4",
+      borderRadius: "4px"
+    },
+    ".Tab--selected": {
+      border: "1px solid #000000",
+      boxShadow: "0 0 0 1px #000000"
+    }
+  }
+};
+
+function getReferralCode() {
+  try {
+    const cookieMatch = document.cookie.match(/(^|;)\s*pairo_ref\s*=\s*([^;]+)/);
+    if (cookieMatch) {
+      const parsed = JSON.parse(decodeURIComponent(cookieMatch[2]));
+      if (parsed && parsed.expiresAt > Date.now()) return parsed.code;
+    }
+    const stored = localStorage.getItem("pairo_ref");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && parsed.expiresAt > Date.now()) return parsed.code;
+    }
+  } catch (e) { }
+  return null;
+}
 
 function SearchableDropdown({
   label,
@@ -33,7 +93,9 @@ function SearchableDropdown({
   }, []);
 
   useEffect(() => {
-    setSearchTerm(value || "");
+    Promise.resolve().then(() => {
+      setSearchTerm(value || "");
+    });
   }, [value]);
 
   const filteredOptions = useMemo(() => {
@@ -144,6 +206,10 @@ export default function CheckoutPage() {
   const [applyingPromo, setApplyingPromo] = useState(false);
   const [promoError, setPromoError] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [clientSecret, setClientSecret] = useState("");
+  const [loadingClientSecret, setLoadingClientSecret] = useState(false);
+  const [paymentIntentError, setPaymentIntentError] = useState("");
   const router = useRouter();
 
   // Form State
@@ -191,42 +257,48 @@ export default function CheckoutPage() {
 
   // Load states when country changes
   useEffect(() => {
-    if (!formData.countryCode) { setStates([]); setCities([]); return; }
-    setLoadingStates(true);
-    setCities([]);
-    setFormData(prev => ({ ...prev, state: "", stateCode: "", city: "" }));
-    fetch(`/api/locations?countryCode=${formData.countryCode}`)
-      .then(r => r.json())
-      .then(d => { if (d.success) setStates(d.data); })
-      .catch(console.error)
-      .finally(() => setLoadingStates(false));
+    Promise.resolve().then(() => {
+      if (!formData.countryCode) { setStates([]); setCities([]); return; }
+      setLoadingStates(true);
+      setCities([]);
+      setFormData(prev => ({ ...prev, state: "", stateCode: "", city: "" }));
+      fetch(`/api/locations?countryCode=${formData.countryCode}`)
+        .then(r => r.json())
+        .then(d => { if (d.success) setStates(d.data); })
+        .catch(console.error)
+        .finally(() => setLoadingStates(false));
+    });
   }, [formData.countryCode]);
 
   // Load cities when state changes
   useEffect(() => {
-    if (!formData.countryCode || !formData.stateCode) { setCities([]); return; }
-    setLoadingCities(true);
-    setFormData(prev => ({ ...prev, city: "" }));
-    fetch(`/api/locations?countryCode=${formData.countryCode}&stateCode=${formData.stateCode}`)
-      .then(r => r.json())
-      .then(d => { if (d.success) setCities(d.data); })
-      .catch(console.error)
-      .finally(() => setLoadingCities(false));
+    Promise.resolve().then(() => {
+      if (!formData.countryCode || !formData.stateCode) { setCities([]); return; }
+      setLoadingCities(true);
+      setFormData(prev => ({ ...prev, city: "" }));
+      fetch(`/api/locations?countryCode=${formData.countryCode}&stateCode=${formData.stateCode}`)
+        .then(r => r.json())
+        .then(d => { if (d.success) setCities(d.data); })
+        .catch(console.error)
+        .finally(() => setLoadingCities(false));
+    });
   }, [formData.countryCode, formData.stateCode]);
 
   useEffect(() => {
     if (session) {
-      setLoadingProfile(true);
-      fetch("/api/user/profile")
-        .then(res => res.json())
-        .then(data => {
-          setProfile(data);
-          if (data.email) {
-            setFormData(prev => ({ ...prev, email: data.email }));
-          }
-        })
-        .catch(err => console.error("Error fetching profile at checkout:", err))
-        .finally(() => setLoadingProfile(false));
+      Promise.resolve().then(() => {
+        setLoadingProfile(true);
+        fetch("/api/user/profile")
+          .then(res => res.json())
+          .then(data => {
+            setProfile(data);
+            if (data.email) {
+              setFormData(prev => ({ ...prev, email: data.email }));
+            }
+          })
+          .catch(err => console.error("Error fetching profile at checkout:", err))
+          .finally(() => setLoadingProfile(false));
+      });
     }
   }, [session]);
 
@@ -457,7 +529,7 @@ export default function CheckoutPage() {
     setErrors(prev => ({ ...prev, [name]: error }));
   };
 
-  const handlePayment = async () => {
+  const validateForm = () => {
     const newErrors = {};
     Object.keys(formData).forEach(key => {
       if (key !== "customerNote" && key !== "stateCode" && key !== "countryCode" && key !== "firstName") {
@@ -476,8 +548,95 @@ export default function CheckoutPage() {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.focus();
       }
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const buildCheckoutPayload = () => ({
+    items: cartItems,
+    idempotencyKey,
+    customerEmail: formData.email,
+    customerNote: formData.customerNote,
+    shippingAddress: {
+      fullName: `${formData.firstName} ${formData.lastName}`,
+      street: formData.street,
+      city: formData.city,
+      state: formData.state,
+      zip: formData.zip,
+      phone: formData.phone,
+      country: formData.country
+    },
+    shippingSnapshot: selectedShipping ? {
+      version: 1,
+      zoneId: selectedShipping.zoneId,
+      zoneName: selectedShipping.zoneName,
+      methodId: selectedShipping.methodId,
+      methodName: selectedShipping.methodName,
+      provider: selectedShipping.provider,
+      cost: selectedShipping.cost,
+      currency: selectedShipping.currency,
+      settings: selectedShipping.settings,
+      conditions: selectedShipping.conditions,
+      capturedAt: new Date().toISOString()
+    } : null,
+    referralCode: getReferralCode(),
+    financials: {
+      subtotal: cartSubtotal,
+      shippingCost: shippingCost,
+      discountTotal: discountTotal || 0,
+      total: cartTotal,
+      promoCode: appliedPromo?.code || null
+    }
+  });
+
+  const buildCheckoutPayloadRef = useRef(buildCheckoutPayload);
+  useEffect(() => {
+    buildCheckoutPayloadRef.current = buildCheckoutPayload;
+  });
+
+  const fetchClientSecret = useCallback(async (payload) => {
+    setLoadingClientSecret(true);
+    setPaymentIntentError("");
+    try {
+      const res = await fetch("/api/checkout/create-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setClientSecret(data.clientSecret);
+      } else {
+        setClientSecret("");
+        setPaymentIntentError(data.error || "Unable to initialize payment. Please try again.");
+      }
+    } catch (err) {
+      setClientSecret("");
+      setPaymentIntentError("Unable to initialize payment. Please try again.");
+    } finally {
+      setLoadingClientSecret(false);
+    }
+  }, []);
+
+  // Debounce: (re)create the PaymentIntent when priced inputs change
+  useEffect(() => {
+    if (paymentMethod !== "card") return;
+    if (!idempotencyKey || !cartItems || cartItems.length === 0) return;
+
+    Promise.resolve().then(() => {
+      setClientSecret("");
+      setPaymentIntentError("");
+    });
+
+    const t = setTimeout(() => {
+      fetchClientSecret(buildCheckoutPayloadRef.current());
+    }, 600);
+    return () => clearTimeout(t);
+  }, [paymentMethod, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret]);
+
+  const handlePayment = async () => {
+    if (!validateForm()) return;
 
     setIsProcessing(true);
 
@@ -485,56 +644,7 @@ export default function CheckoutPage() {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: cartItems,
-          idempotencyKey,
-          customerEmail: formData.email,
-          customerNote: formData.customerNote,
-          shippingAddress: {
-            fullName: `${formData.firstName} ${formData.lastName}`,
-            street: formData.street,
-            city: formData.city,
-            state: formData.state,
-            zip: formData.zip,
-            phone: formData.phone,
-            country: formData.country
-          },
-          shippingSnapshot: selectedShipping ? {
-            version: 1,
-            zoneId: selectedShipping.zoneId,
-            zoneName: selectedShipping.zoneName,
-            methodId: selectedShipping.methodId,
-            methodName: selectedShipping.methodName,
-            provider: selectedShipping.provider,
-            cost: selectedShipping.cost,
-            currency: selectedShipping.currency,
-            settings: selectedShipping.settings,
-            conditions: selectedShipping.conditions,
-            capturedAt: new Date().toISOString()
-          } : null,
-          referralCode: (() => {
-            try {
-              const cookieMatch = document.cookie.match(/(^|;)\s*pairo_ref\s*=\s*([^;]+)/);
-              if (cookieMatch) {
-                const parsed = JSON.parse(decodeURIComponent(cookieMatch[2]));
-                if (parsed && parsed.expiresAt > Date.now()) return parsed.code;
-              }
-              const stored = localStorage.getItem("pairo_ref");
-              if (stored) {
-                const parsed = JSON.parse(stored);
-                if (parsed && parsed.expiresAt > Date.now()) return parsed.code;
-              }
-            } catch (e) { }
-            return null;
-          })(),
-          financials: {
-            subtotal: cartSubtotal,
-            shippingCost: shippingCost,
-            discountTotal: discountTotal || 0,
-            total: cartTotal,
-            promoCode: appliedPromo?.code || null
-          }
-        })
+        body: JSON.stringify(buildCheckoutPayloadRef.current())
       });
 
       const data = await response.json();
@@ -951,27 +1061,85 @@ export default function CheckoutPage() {
             {/* 4. Payment Method */}
             <section className="space-y-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-black">Payment</h2>
-              <div className="border border-neutral-200 rounded-[4px] p-4 bg-[#FAF9F6]/40 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-neutral-600" />
-                  <span className="text-[13px] font-semibold text-black">Cash on Delivery (COD)</span>
-                </div>
-                <div className="w-4 h-4 rounded-full border-4 border-black bg-white" />
+              <div className="border border-neutral-200 rounded-[4px] divide-y divide-neutral-200 overflow-hidden bg-white">
+                <label
+                  className={`flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50/50 transition-colors ${paymentMethod === "card" ? "bg-neutral-50/30" : ""}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      checked={paymentMethod === "card"}
+                      onChange={() => setPaymentMethod("card")}
+                      className="accent-black w-4 h-4"
+                    />
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-5 h-5 text-neutral-600" />
+                      <span className="text-[13px] font-semibold text-black">Credit / Debit Card</span>
+                    </div>
+                  </div>
+                </label>
+                <label
+                  className={`flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50/50 transition-colors ${paymentMethod === "cod" ? "bg-neutral-50/30" : ""}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      checked={paymentMethod === "cod"}
+                      onChange={() => setPaymentMethod("cod")}
+                      className="accent-black w-4 h-4"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-5 h-5 text-neutral-600" />
+                      <span className="text-[13px] font-semibold text-black">Cash on Delivery (COD)</span>
+                    </div>
+                  </div>
+                </label>
               </div>
+
+              {paymentMethod === "card" && (
+                <div className="pt-1">
+                  {loadingClientSecret && !clientSecret && (
+                    <div className="space-y-3 border border-neutral-200 rounded-[4px] p-4 bg-[#FAF9F6]/40">
+                      <div className="w-full h-10 bg-neutral-100 animate-pulse rounded-[4px]" />
+                      <div className="w-full h-10 bg-neutral-100 animate-pulse rounded-[4px]" />
+                      <div className="w-2/3 h-10 bg-neutral-100 animate-pulse rounded-[4px]" />
+                    </div>
+                  )}
+                  {!loadingClientSecret && paymentIntentError && (
+                    <p className="text-[11px] text-red-600 font-semibold border border-red-200 bg-red-50 rounded-[4px] p-3">
+                      {paymentIntentError}
+                    </p>
+                  )}
+                  {clientSecret && (
+                    <Elements stripe={stripePromise} options={{ clientSecret, appearance: STRIPE_APPEARANCE }}>
+                      <StripePaymentForm
+                        returnUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/checkout/success?idempotencyKey=${idempotencyKey}`}
+                        idempotencyKey={idempotencyKey}
+                        onValidate={validateForm}
+                        disabled={loadingClientSecret}
+                      />
+                    </Elements>
+                  )}
+                </div>
+              )}
             </section>
 
-            {/* Submit Action */}
-            <div className="pt-4">
-              <button
-                type="button"
-                onClick={handlePayment}
-                disabled={isProcessing || !cartItems || cartItems.length === 0}
-                className="w-full bg-black text-white hover:bg-neutral-900 py-4 rounded-[4px] text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-              >
-                <span>Complete Order</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            {/* Submit Action (Cash on Delivery only — Card has its own submit button above) */}
+            {paymentMethod === "cod" && (
+              <div className="pt-4">
+                <button
+                  type="button"
+                  onClick={handlePayment}
+                  disabled={isProcessing || !cartItems || cartItems.length === 0}
+                  className="w-full bg-black text-white hover:bg-neutral-900 py-4 rounded-[4px] text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                >
+                  <span>Complete Order</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Column: Order Summary (40% / 5 Cols) - STICKY */}

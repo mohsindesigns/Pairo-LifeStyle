@@ -12,6 +12,7 @@ import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
 
 export default function AdminOrdersPage() {
   const router = useRouter();
@@ -123,14 +124,14 @@ export default function AdminOrdersPage() {
 
   const getStatusBadge = (status) => {
     const styles = {
-      'Pending': 'bg-[#fcf3d7] text-[#856404] border-[#856404]/20',
-      'Confirmed': 'bg-[#d1ecf1] text-[#0c5460] border-[#0c5460]/20',
-      'Processing': 'bg-[#f8f9fa] text-[#383d41] border-[#383d41]/25',
-      'Shipped': 'bg-[#e2f0d9] text-[#2e7d32] border-[#2e7d32]/20',
-      'Delivered': 'bg-[#e2f0d9] text-[#2e7d32] border-[#2e7d32]/20',
-      'Cancelled': 'bg-[#f8d7da] text-[#721c24] border-[#721c24]/20',
+      'Pending': BADGE_COLORS.amber,
+      'Confirmed': BADGE_COLORS.blue,
+      'Processing': BADGE_COLORS.gray,
+      'Shipped': BADGE_COLORS.green,
+      'Delivered': BADGE_COLORS.green,
+      'Cancelled': BADGE_COLORS.red,
     };
-    return styles[status] || 'bg-gray-100 text-gray-700 border-gray-300';
+    return styles[status] || DEFAULT_BADGE_COLOR;
   };
 
   const displayedOrders = orders.filter(order => {

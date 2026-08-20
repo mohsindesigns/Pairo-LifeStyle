@@ -2,26 +2,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
-import Product from "@/models/Product";
-import Discount from "@/models/Discount";
-import Promotion from "@/models/Promotion";
-import Engine from "@/lib/promotionEngine/Engine";
-import pairoEvents from "@/lib/events";
-import mongoose from "mongoose";
-import logger, { getContextLogger, LogCategory } from "@/lib/logger";
+import { getContextLogger, LogCategory } from "@/lib/logger";
 import { NextResponse } from "next/server";
-import { validateLegacyDiscount, calculateEligibleSubtotal } from "@/lib/couponValidator";
-import Affiliate from "@/models/Affiliate";
-import Customer from "@/models/Customer";
-import bcrypt from "bcryptjs";
-import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
-import {
-  buildGuestCheckoutAccountPayload,
-  resolveGuestCheckoutCustomerAction,
-} from "@/lib/guestCheckoutAccount";
+import { createOrderFromCheckoutPayload } from "@/lib/checkoutFulfillment";
 
 export async function POST(req) {
-  let session = null;
   const correlationId = req.headers.get("x-correlation-id") || crypto.randomUUID();
   const tenantId = req.headers.get("x-tenant-id") || "DEFAULT_STORE";
   const log = getContextLogger(correlationId, { path: '/api/checkout', tenantId });
@@ -30,397 +15,51 @@ export async function POST(req) {
   let attempt = 0;
 
   const body = await req.json();
-  const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode } = body;
+  const { idempotencyKey } = body;
 
   while (attempt < MAX_RETRIES) {
     try {
-        log.info({ category: LogCategory.CHECKOUT_TRANSACTION, attempt: attempt + 1 }, "Processing checkout attempt");
-        await dbConnect();
-        session = await mongoose.startSession();
-        
-        const authSession = await getServerSession(authOptions);
+      log.info({ category: LogCategory.CHECKOUT_TRANSACTION, attempt: attempt + 1 }, "Processing checkout attempt");
+      await dbConnect();
 
-        // 1. Idempotency Check
-        if (idempotencyKey) {
-            const existingOrder = await Order.findOne({ idempotencyKey, tenantId });
-            if (existingOrder) {
-                log.warn({ idempotencyKey, orderNumber: existingOrder.orderNumber }, "Idempotency hit");
-                return NextResponse.json({ success: true, orderNumber: existingOrder.orderNumber });
-            }
+      const authSession = await getServerSession(authOptions);
+      const orderUserId = authSession?.user?.id || null;
+      const checkoutEmail = (body.customerEmail || authSession?.user?.email || "").trim().toLowerCase();
+
+      if (idempotencyKey) {
+        const existingOrder = await Order.findOne({ idempotencyKey, tenantId });
+        if (existingOrder) {
+          log.warn({ idempotencyKey, orderNumber: existingOrder.orderNumber }, "Idempotency hit");
+          return NextResponse.json({ success: true, orderNumber: existingOrder.orderNumber });
         }
+      }
 
-        let checkoutResult = null;
+      const checkoutResult = await createOrderFromCheckoutPayload(body, {
+        tenantId,
+        orderUserId,
+        checkoutEmail,
+        isGuestSession: !orderUserId,
+        ipAddress: req.headers.get("x-forwarded-for") || "unknown",
+      });
 
-        await session.withTransaction(async () => {
-            // Resolve customerType
-            let customerType = 'guest';
-            const checkoutEmail = (customerEmail || authSession?.user?.email || "").trim().toLowerCase();
-            const orderUserId = authSession?.user?.id || null;
-            if (orderUserId) {
-              customerType = 'logged_in';
-            }
-
-            const checkoutOrConditions = [];
-            if (orderUserId) checkoutOrConditions.push({ "customer.userId": orderUserId });
-            if (checkoutEmail) checkoutOrConditions.push({ "customer.email": checkoutEmail });
-
-            if (checkoutOrConditions.length > 0) {
-              const orderCount = await Order.countDocuments({
-                $or: checkoutOrConditions,
-                status: { $nin: ['Cancelled', 'Refunded'] }
-              }).session(session);
-              if (orderCount > 0) {
-                customerType = 'returning';
-              } else {
-                customerType = orderUserId ? 'logged_in' : 'new';
-              }
-            }
-
-            // 2. Evaluate Engine
-            const engineResults = await Engine.evaluate(
-                { subtotal: financials.subtotal, items }, 
-                { 
-                    couponCodes: financials.promoCode ? [financials.promoCode] : [],
-                    userId: orderUserId,
-                    email: checkoutEmail,
-                    customerType,
-                    tenantId 
-                }
-            );
-
-            let finalAppliedPromotions = engineResults.appliedPromotions || [];
-            let finalDiscountTotal = engineResults.discountTotal || 0;
-
-            // Fallback: Check for legacy discount if engine didn't find any match and a promo code was entered
-            if (finalAppliedPromotions.length === 0 && financials.promoCode) {
-                const legacyDiscount = await Discount.findOne({
-                    code: financials.promoCode.toUpperCase().trim(),
-                    isActive: true,
-                    isDeleted: false
-                }).session(session);
-
-                if (legacyDiscount) {
-                    const validation = await validateLegacyDiscount(legacyDiscount, {
-                        cartSubtotal: financials.subtotal,
-                        items,
-                        userId: authSession?.user?.id || null,
-                        email: customerEmail || authSession?.user?.email || null
-                    });
-
-                    if (!validation.valid) {
-                        throw new Error(validation.error);
-                    }
-
-                    const eligibleSubtotal = await calculateEligibleSubtotal(legacyDiscount, items);
-                    const amount = legacyDiscount.type === 'percentage'
-                        ? (eligibleSubtotal * legacyDiscount.value) / 100
-                        : legacyDiscount.value;
-
-                    finalDiscountTotal = Math.min(amount, eligibleSubtotal);
-                    
-                    // Increment legacy usageCount atomically
-                    if (legacyDiscount.usageLimit) {
-                        const updatedDiscount = await Discount.findOneAndUpdate(
-                            {
-                                _id: legacyDiscount._id,
-                                usageCount: { $lt: legacyDiscount.usageLimit }
-                            },
-                            { $inc: { usageCount: 1 } },
-                            { session, new: true }
-                        );
-                        if (!updatedDiscount) {
-                            throw new Error("Promo code usage limit has been reached.");
-                        }
-                    } else {
-                        await Discount.updateOne(
-                            { _id: legacyDiscount._id },
-                            { $inc: { usageCount: 1 } },
-                            { session }
-                        );
-                    }
-
-                    finalAppliedPromotions = [{
-                        promotionId: legacyDiscount._id,
-                        code: legacyDiscount.code,
-                        title: `Discount Code: ${legacyDiscount.code}`,
-                        type: legacyDiscount.type,
-                        value: legacyDiscount.value,
-                        discountAmount: finalDiscountTotal,
-                        explanation: `Legacy discount code ${legacyDiscount.code} applied`,
-                        isLegacy: true
-                    }];
-                } else {
-                    throw new Error("Promo code is invalid or no longer available.");
-                }
-            }
-
-            // 3. Reserve Promotions
-            for (const applied of finalAppliedPromotions) {
-                if (applied.isLegacy) continue;
-                const promoRes = await Promotion.findOneAndUpdate(
-                    { 
-                        _id: applied.promotionId,
-                        tenantId,
-                        adminStatus: 'Active',
-                        $or: [
-                            { 'usageLimits.maxTotalUses': null },
-                            { $expr: { $lt: ['$usageLimits.currentTotalUses', '$usageLimits.maxTotalUses'] } }
-                        ]
-                    }, 
-                    { 
-                        $inc: { 
-                            'usageLimits.currentTotalUses': 1,
-                            'analytics.timesUsed': 1,
-                            'analytics.discountDistributed': applied.discountAmount
-                        } 
-                    },
-                    { session, new: true }
-                );
-
-                if (!promoRes) throw new Error(`Promotion "${applied.title}" is no longer available.`);
-            }
-
-            // 4. Reserve Inventory
-            const orderItems = [];
-            for (const item of items) {
-                const product = await Product.findOne({ _id: item.id || item._id, tenantId }).session(session);
-                if (!product) throw new Error(`Product ${item.id} not found.`);
-
-                if (product.manageStock) {
-                    const invRes = await Product.findOneAndUpdate(
-                        { _id: product._id, tenantId, stock: { $gte: item.quantity } },
-                        { $inc: { stock: -item.quantity } },
-                        { session, new: true }
-                    );
-                    if (!invRes) throw new Error(`Insufficient stock for ${product.name}`);
-                }
-
-                orderItems.push({
-                    productId: product._id,
-                    name: product.name,
-                    sku: product.sku,
-                    image: item.image || product.images?.[0] || product.image,
-                    priceAtPurchase: item.price,
-                    quantity: item.quantity,
-                    // Persist Made to Measure data when present
-                    ...(item.madeToMeasure?.enabled ? { madeToMeasure: item.madeToMeasure } : {})
-                });
-            }
-
-            // 5. Create Order
-            // 5. Create Order
-            const count = await Order.countDocuments({ tenantId }, { session });
-            const orderNumber = `PAI-${1000 + count + 1}`;
-
-            // 5b. Validate shippingSnapshot cost matches financials.shippingCost (server-side guard)
-            if (shippingSnapshot && typeof shippingSnapshot.cost === 'number') {
-              const declaredShipping = Number(financials.shippingCost ?? 0);
-              if (Math.abs(shippingSnapshot.cost - declaredShipping) > 0.01) {
-                throw new Error(`Shipping cost mismatch: snapshot says ${shippingSnapshot.cost}, financials says ${declaredShipping}.`);
-              }
-            }
-
-            // Affiliate attribution lookup (Referral URL or Direct Coupon Code)
-            let affiliateId = null;
-            let affiliateReferralCode = null;
-            let activeAffiliate = null;
-
-            // 1. Resolve promo code (direct coupon) first to guarantee coupon override priority
-            const promoCodeToResolve = (financials.promoCode || "").toUpperCase().trim();
-            if (promoCodeToResolve) {
-                activeAffiliate = await Affiliate.findOne({
-                    $or: [
-                        { referralCode: promoCodeToResolve },
-                        { couponCode: promoCodeToResolve }
-                    ],
-                    status: 'Active'
-                }).session(session);
-            }
-
-            // 2. Fallback to browser referral cookie if no affiliate coupon was resolved
-            if (!activeAffiliate) {
-                const cookieCodeToResolve = (referralCode || "").toUpperCase().trim();
-                if (cookieCodeToResolve) {
-                    activeAffiliate = await Affiliate.findOne({
-                        $or: [
-                            { referralCode: cookieCodeToResolve },
-                            { couponCode: cookieCodeToResolve }
-                        ],
-                        status: 'Active'
-                    }).session(session);
-                }
-            }
-
-            if (activeAffiliate) {
-                // Prevent self-referrals
-                const buyerEmail = (customerEmail || authSession?.user?.email || "").toLowerCase().trim();
-                const affiliateEmail = (activeAffiliate.email || "").toLowerCase().trim();
-                
-                if (buyerEmail && buyerEmail === affiliateEmail) {
-                    log.warn({ buyerEmail }, "Attribution skipped: Self-referral detected.");
-                    activeAffiliate = null;
-                } else {
-                    affiliateId = activeAffiliate._id;
-                    affiliateReferralCode = activeAffiliate.referralCode;
-                }
-            }
-
-            // ─── Affiliate Customer Discount ─────────────────────────────────────────
-            // Calculated independently from affiliate commission. Commission engine uses
-            // the original subtotal; the customer discount reduces what the customer pays.
-            let affiliateDiscountType = 'None';
-            let affiliateDiscountValue = 0;
-            let affiliateDiscountAmount = 0;
-
-            if (activeAffiliate && affiliateId) {
-                affiliateDiscountType = activeAffiliate.customerDiscountType || 'None';
-                affiliateDiscountValue = activeAffiliate.customerDiscountValue || 0;
-
-                if (affiliateDiscountType === 'Percentage' && affiliateDiscountValue > 0) {
-                    affiliateDiscountAmount = Math.round((financials.subtotal * (affiliateDiscountValue / 100)) * 100) / 100;
-                } else if (affiliateDiscountType === 'Fixed' && affiliateDiscountValue > 0) {
-                    affiliateDiscountAmount = Math.min(affiliateDiscountValue, financials.subtotal);
-                }
-            }
-
-            // Recalculate authoritative total server-side (prevents client-side tampering)
-            const authoritativeTotal = Math.max(
-                0,
-                (financials.subtotal || 0) - finalDiscountTotal - affiliateDiscountAmount +
-                Number(financials.shippingCost || 0) + Number(financials.tax || 0)
-            );
-
-            const [newOrder] = await Order.create([{
-                tenantId,
-                orderNumber,
-                idempotencyKey,
-                status: "Pending",
-                timeline: [{
-                    status: "Pending",
-                    message: "Order placed successfully. Pending confirmation.",
-                    source: "System"
-                }],
-                items: orderItems,
-                affiliateId,
-                affiliateReferralCode,
-                financials: {
-                    subtotal:              financials.subtotal,
-                    shippingCost:          financials.shippingCost || 0,
-                    tax:                   financials.tax || 0,
-                    discountTotal:         finalDiscountTotal,
-                    affiliateDiscountType,
-                    affiliateDiscountValue,
-                    affiliateDiscountAmount,
-                    total:                 authoritativeTotal,
-                    currency:              financials.currency || 'USD',
-                    promoCode:             financials.promoCode || null,
-                    appliedPromotions:     finalAppliedPromotions
-                },
-                customer: {
-                    userId: authSession?.user?.id || null,
-                    email: customerEmail || authSession?.user?.email,
-                    isGuest: !authSession?.user?.id,
-                    ipAddress: req.headers.get("x-forwarded-for") || "unknown"
-                },
-                shippingAddress,
-                shippingSnapshot: shippingSnapshot ?? null,
-                customerNote
-            }], { session });
-
-            let guestAccountInfo = null;
-            const checkoutName = shippingAddress?.fullName || authSession?.user?.name || checkoutEmail.split("@")[0] || "Customer";
-
-            if (!authSession?.user?.id && checkoutEmail) {
-                const existingCustomer = await Customer.findOne({ email: checkoutEmail }).session(session);
-                const action = resolveGuestCheckoutCustomerAction({
-                    existingCustomer,
-                    customerEmail: checkoutEmail,
-                    shippingAddress,
-                    customerName: checkoutName,
-                });
-
-                if (action.shouldCreateAccount) {
-                    const accountPayload = buildGuestCheckoutAccountPayload({
-                        customerEmail: checkoutEmail,
-                        shippingAddress,
-                        customerName: checkoutName,
-                    });
-
-                    const [createdCustomer] = await Customer.create([{
-                        ...accountPayload,
-                        password: await bcrypt.hash(accountPayload.password, 12),
-                        emailVerified: true,
-                    }], { session });
-
-                    await Order.updateOne(
-                        { _id: newOrder._id },
-                        {
-                            $set: {
-                                "customer.userId": createdCustomer._id,
-                                "customer.isGuest": false,
-                            }
-                        },
-                        { session }
-                    );
-
-                    newOrder.customer.userId = createdCustomer._id;
-                    newOrder.customer.isGuest = false;
-                    guestAccountInfo = {
-                        created: true,
-                        loginEmail: createdCustomer.email,
-                        temporaryPassword: accountPayload.password,
-                        loginUrl: `${process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "https://yourdomain.com"}/login`,
-                    };
-                } else if (existingCustomer) {
-                    await Order.updateOne(
-                        { _id: newOrder._id },
-                        {
-                            $set: {
-                                "customer.userId": existingCustomer._id,
-                                "customer.isGuest": false,
-                            }
-                        },
-                        { session }
-                    );
-
-                    newOrder.customer.userId = existingCustomer._id;
-                    newOrder.customer.isGuest = false;
-                }
-            }
-
-            if (guestAccountInfo) {
-                newOrder.guestAccount = guestAccountInfo;
-            }
-
-            checkoutResult = newOrder;
-
-            // Generate affiliate commission pending record atomically inside transaction session
-            if (affiliateId && activeAffiliate) {
-                await CommissionEngine.calculateCommission(checkoutResult, activeAffiliate, session);
-            }
-        });
-
-        if (checkoutResult) {
-            log.info({ orderNumber: checkoutResult.orderNumber }, "Checkout success");
-            pairoEvents.dispatch('ORDER_CREATED', checkoutResult);
-            return NextResponse.json({ success: true, orderNumber: checkoutResult.orderNumber, orderId: checkoutResult._id });
-        }
+      if (checkoutResult) {
+        log.info({ orderNumber: checkoutResult.orderNumber }, "Checkout success");
+        return NextResponse.json({ success: true, orderNumber: checkoutResult.orderNumber, orderId: checkoutResult._id });
+      }
 
     } catch (error) {
-        attempt++;
-        const isTransient = error.name === 'MongoServerError' && error.code === 112; // WriteConflict/Transient
-        
-        if (isTransient && attempt < MAX_RETRIES) {
-            const delay = Math.pow(2, attempt) * 100;
-            log.warn({ attempt, delay }, "Write conflict detected. Retrying...");
-            await new Promise(resolve => setTimeout(resolve, delay));
-            continue;
-        }
+      attempt++;
+      const isTransient = error.name === 'MongoServerError' && error.code === 112;
 
-        log.error({ category: LogCategory.CHECKOUT_TRANSACTION, error: error.message }, "Checkout failed");
-        return NextResponse.json({ error: error.message }, { status: 400 });
-    } finally {
-        if (session) await session.endSession();
+      if (isTransient && attempt < MAX_RETRIES) {
+        const delay = Math.pow(2, attempt) * 100;
+        log.warn({ attempt, delay }, "Write conflict detected. Retrying...");
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      log.error({ category: LogCategory.CHECKOUT_TRANSACTION, error: error.message }, "Checkout failed");
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
   }
 

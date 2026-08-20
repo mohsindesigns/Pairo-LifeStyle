@@ -1,27 +1,38 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { 
-  ChevronLeft, 
-  User, 
-  MapPin, 
-  CreditCard, 
+import {
+  ChevronLeft,
+  User,
+  MapPin,
+  CreditCard,
   Clock,
   Package,
   Users,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { toast } from "react-hot-toast";
 import InvoiceTemplate from "@/components/admin/InvoiceTemplate";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { can } from "@/lib/rbac";
+import { formatCurrency } from "@/lib/currency";
+import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
 
 export default function OrderDetailPage() {
   const { id } = useParams();
+  const { data: session } = useSession();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
+  const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refunding, setRefunding] = useState(false);
+  const [refundError, setRefundError] = useState("");
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -79,6 +90,69 @@ export default function OrderDetailPage() {
       console.error(error);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const getPaymentStatusBadge = (status) => {
+    const styles = {
+      'Paid': BADGE_COLORS.green,
+      'Pending': BADGE_COLORS.amber,
+      'Failed': BADGE_COLORS.red,
+      'Refunded': BADGE_COLORS.gray,
+      'Partially Refunded': BADGE_COLORS.gray,
+    };
+    return styles[status] || DEFAULT_BADGE_COLOR;
+  };
+
+  const remainingRefundable = order
+    ? Math.max(0, (order.financials?.total || 0) - (order.payment?.refundedAmount || 0))
+    : 0;
+  const currencyCode = order?.financials?.currency || 'USD';
+  const canRefund = can(session?.user, "orders.refund");
+  const canShowRefundButton =
+    order?.payment?.provider === 'stripe' &&
+    (order.payment?.status === 'Paid' || order.payment?.status === 'Partially Refunded') &&
+    remainingRefundable > 0 &&
+    canRefund;
+
+  const openRefundForm = () => {
+    setRefundAmount(remainingRefundable.toFixed(2));
+    setRefundError("");
+    setShowRefundForm(true);
+  };
+
+  const cancelRefundForm = () => {
+    setShowRefundForm(false);
+    setRefundError("");
+  };
+
+  const submitRefund = async () => {
+    const amountNum = Number(refundAmount);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      setRefundError("Enter a valid refund amount.");
+      return;
+    }
+    setRefunding(true);
+    setRefundError("");
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amountNum }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setRefundError(data.error || "Refund failed.");
+        return;
+      }
+      setOrder(data.order);
+      setShowRefundForm(false);
+      toast.success(`Refund of ${formatCurrency(amountNum, currencyCode)} issued.`);
+    } catch (error) {
+      console.error(error);
+      setRefundError("Refund failed. Please try again.");
+    } finally {
+      setRefunding(false);
     }
   };
 
@@ -249,12 +323,32 @@ export default function OrderDetailPage() {
                     <CreditCard className="w-4 h-4 text-[#8c8f94]" /> Payment
                   </h3>
                   <div className="text-[13px] space-y-1">
-                    <p className="font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-100 inline-block text-[11px] uppercase tracking-wider">
+                    <span className={`inline-block px-2 py-0.5 rounded-[3px] text-[11px] font-bold uppercase tracking-wider border ${getPaymentStatusBadge(order.payment?.status)}`}>
                       {order.payment?.status || "Pending"}
-                    </p>
+                    </span>
                     <p className="text-[#646970] mt-1">
                       Method: {order.payment?.method || "Cash on Delivery"}
                     </p>
+                    {order.payment?.provider === 'stripe' && order.payment?.stripePaymentIntentId && (
+                      <a
+                        href={`https://dashboard.stripe.com/payments/${order.payment.stripePaymentIntentId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#2271b1] hover:underline inline-flex items-center gap-1 text-[12px] pt-1"
+                      >
+                        View in Stripe <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                    {order.payment?.paidAt && (
+                      <p className="text-[#646970] text-[12px]">
+                        Paid: {new Date(order.payment.paidAt).toLocaleString()}
+                      </p>
+                    )}
+                    {order.payment?.refundedAmount > 0 && (
+                      <p className="text-[#646970] text-[12px]">
+                        Refunded: {formatCurrency(order.payment.refundedAmount, currencyCode)}
+                      </p>
+                    )}
                     <p className="text-[10px] text-[#8c8f94] font-mono break-all pt-2">
                       ID: {order._id}
                     </p>
@@ -267,6 +361,62 @@ export default function OrderDetailPage() {
               {order.customerNote && (
                 <div className="mx-6 mb-6 p-4 bg-[#fcf3d7] border border-[#ffeeba] text-[13px] text-[#856404] italic rounded-[2px]">
                   <strong>Customer Note:</strong> &ldquo;{order.customerNote}&rdquo;
+                </div>
+              )}
+
+              {/* Refund Action */}
+              {canShowRefundButton && (
+                <div className="mx-6 mb-6 p-4 bg-white border border-[#ccd0d4] rounded-[2px]">
+                  {!showRefundForm ? (
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-[12px] text-[#646970]">
+                        Remaining refundable balance:{" "}
+                        <span className="font-bold text-[#1d2327]">
+                          {formatCurrency(remainingRefundable, currencyCode)}
+                        </span>
+                      </p>
+                      <button
+                        onClick={openRefundForm}
+                        className="border border-red-500 text-red-600 px-4 py-1.5 rounded-[3px] font-bold text-xs uppercase hover:bg-red-50 transition-colors"
+                      >
+                        Refund
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <label className="text-[12px] font-bold text-[#1d2327] block">
+                        Refund Amount ({currencyCode})
+                      </label>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          type="number"
+                          min="0.01"
+                          max={remainingRefundable}
+                          step="0.01"
+                          value={refundAmount}
+                          onChange={(e) => setRefundAmount(e.target.value)}
+                          className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] outline-none focus:border-[#2271b1] w-40"
+                        />
+                        <button
+                          onClick={submitRefund}
+                          disabled={refunding}
+                          className="bg-red-600 text-white px-4 py-1.5 rounded-[3px] font-bold text-xs uppercase hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {refunding ? "Processing..." : "Confirm Refund"}
+                        </button>
+                        <button
+                          onClick={cancelRefundForm}
+                          disabled={refunding}
+                          className="border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-xs font-bold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {refundError && (
+                        <p className="text-[12px] text-red-600 font-medium">{refundError}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

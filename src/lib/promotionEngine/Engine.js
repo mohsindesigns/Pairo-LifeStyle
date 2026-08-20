@@ -64,8 +64,8 @@ export default class Engine {
       return {
         ...item,
         price: basePrice,
-        categories: dbProduct ? dbProduct.categories?.map(c => c.toString()) : (item.categories || []),
-        collections: dbProduct ? dbProduct.collections?.map(c => c.toString()) : (item.collections || [])
+        categories: dbProduct ? (dbProduct.categories || []).filter(Boolean).map(c => c.toString()) : (item.categories || []),
+        collections: dbProduct ? (dbProduct.collections || []).filter(Boolean).map(c => c.toString()) : (item.collections || [])
       };
     }) || [];
 

@@ -121,7 +121,7 @@ export function CartProvider({ children }) {
     }
   }, [cartItems]);
 
-  const addToCart = (product, openDrawer = true) => {
+  const addToCart = useCallback((product, openDrawer = true) => {
     const normalizedProduct = {
       ...product,
       id: product.id || product._id,
@@ -160,18 +160,18 @@ export function CartProvider({ children }) {
     if (openDrawer) {
       setIsCartOpen(true);
     }
-  };
+  }, []);
 
-  const removeFromCart = (uniqueKey) => {
-    setCartItems((prevItems) => 
+  const removeFromCart = useCallback((uniqueKey) => {
+    setCartItems((prevItems) =>
       prevItems.filter((item) => {
         const itemKey = `${item.id}-${item.selectedSize}-${item.selectedColor}`;
         return itemKey !== uniqueKey;
       })
     );
-  };
+  }, []);
 
-  const updateQuantity = (uniqueKey, delta) => {
+  const updateQuantity = useCallback((uniqueKey, delta) => {
     setCartItems((prevItems) =>
       prevItems
         .map((item) => {
@@ -183,7 +183,7 @@ export function CartProvider({ children }) {
         })
         .filter((item) => item.quantity > 0)
     );
-  };
+  }, []);
 
   const cartCount    = cartItems.reduce((total, item) => total + item.quantity, 0);
   const cartSubtotal = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
@@ -254,7 +254,7 @@ export function CartProvider({ children }) {
   // Grand total = subtotal - promo discount - affiliate discount + shipping
   const cartTotal = Math.max(0, cartSubtotal - discountTotal - affiliateDiscountAmount + shippingCost);
 
-  const applyPromoCode = async (code, email = null) => {
+  const applyPromoCode = useCallback(async (code, email = null) => {
     if (!code) return { success: false, error: "No code provided" };
     try {
       const res = await fetch("/api/coupons/validate", {
@@ -272,17 +272,17 @@ export function CartProvider({ children }) {
     } catch (err) {
       return { success: false, error: "Connection error" };
     }
-  };
+  }, [cartSubtotal, cartItems]);
 
-  const removePromoCode = () => {
+  const removePromoCode = useCallback(() => {
     setAppliedPromo(null);
-  };
+  }, []);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCartItems([]);
     setAppliedPromo(null);
     setSelectedShipping(null);
-  };
+  }, []);
 
   return (
     <CartContext.Provider

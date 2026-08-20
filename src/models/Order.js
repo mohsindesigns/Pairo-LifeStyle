@@ -84,8 +84,14 @@ const OrderSchema = new mongoose.Schema({
   },
   
   payment: {
-    method: { type: String, default: 'Cash on Delivery' },
-    status: { type: String, default: 'Pending' },
+    method: { type: String, enum: ['Cash on Delivery', 'Card'], default: 'Cash on Delivery' },
+    status: { type: String, enum: ['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'], default: 'Pending' },
+    provider: { type: String, default: null },
+    stripePaymentIntentId: { type: String, index: true, sparse: true },
+    stripeChargeId: String,
+    receiptUrl: { type: String, default: null },
+    paidAt: Date,
+    refundedAmount: { type: Number, default: 0 },
     transactionId: String
   },
 
