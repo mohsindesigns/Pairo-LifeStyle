@@ -104,8 +104,8 @@ function GeneralTab({ config, onChange }) {
       <TextRow label="Site Title" value={b.name} onChange={v => set('name', v)} placeholder="Pairo" />
       <ImagePicker label="Favicon" description="Upload a square icon (e.g. 512x512) for the browser tab." value={b.faviconUrl} onChange={v => set('faviconUrl', v)} />
       <TextRow label="Tagline" value={b.tagline} onChange={v => set('tagline', v)} placeholder="Premium Shearling" description="In a few words, explain what this site is about." />
-      <TextRow label="Footer Brand Name" value={b.footerBrandName} onChange={v => set('footerBrandName', v)} placeholder="PAIRO" description="Large animated text shown at the bottom of the footer." />
-      <TextRow label="Copyright Text" value={b.copyrightText} onChange={v => set('copyrightText', v)} placeholder="PAIRO — ALL RIGHTS RESERVED © 2026" />
+      <TextRow label="Footer Brand Name" value={b.footerBrandName} onChange={v => set('footerBrandName', v)} placeholder="PAiRO" description="Large animated text shown at the bottom of the footer." />
+      <TextRow label="Copyright Text" value={b.copyrightText} onChange={v => set('copyrightText', v)} placeholder="PAiRO — ALL RIGHTS RESERVED © 2026." />
       <TextRow label="Privacy Policy URL" value={b.privacyUrl} onChange={v => set('privacyUrl', v)} placeholder="/privacy" />
       <TextRow label="Terms of Service URL" value={b.termsUrl} onChange={v => set('termsUrl', v)} placeholder="/terms" />
       <TextRow label="WhatsApp Number" value={b.whatsappNumber} onChange={v => set('whatsappNumber', v)} placeholder="+1234567890" description="Atelier WhatsApp contact number with country code." />
@@ -828,9 +828,9 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
               <td className="px-4 py-3 space-y-2">
                 <input
                   type="text"
-                  value={config.brand?.copyrightText ?? "PAIRO — ALL RIGHTS RESERVED © 2026."}
+                  value={config.brand?.copyrightText ?? "PAiRO — ALL RIGHTS RESERVED © 2026."}
                   onChange={e => onChange({ ...config, brand: { ...(config.brand || {}), copyrightText: e.target.value } })}
-                  placeholder="e.g. PAIRO — ALL RIGHTS RESERVED © 2026."
+                  placeholder="e.g. PAiRO — ALL RIGHTS RESERVED © 2026."
                   className="w-full max-w-xl border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white"
                 />
               </td>

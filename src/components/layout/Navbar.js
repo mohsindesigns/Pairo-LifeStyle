@@ -294,44 +294,49 @@ export default function Navbar() {
         <div 
           onMouseEnter={() => setIsOfferHovered(true)}
           onMouseLeave={() => setIsOfferHovered(false)}
-          className="relative bg-[#0a0a0a] text-white border-b border-white/[0.08] overflow-hidden select-none h-9 sm:h-10 flex items-center transition-all shadow-inner"
+          className="relative bg-[#09090b] text-white border-b border-white/[0.08] overflow-hidden select-none h-10 md:h-11 flex items-center transition-all shadow-[inset_0_-1px_0_rgba(255,255,255,0.05)]"
         >
-          {/* Subtle luminous ambient background */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent pointer-events-none" />
+          {/* Subtle luminous ambient gradient sweep */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent pointer-events-none" />
           
-          <div className="container mx-auto px-2 sm:px-4 md:px-8 relative flex items-center justify-between h-full">
+          <div className="container mx-auto px-3 sm:px-4 md:px-8 relative flex items-center justify-between h-full">
             {/* Left Nav Arrow (if multiple offers) */}
             {offers.length > 1 ? (
               <button
                 type="button"
                 onClick={handlePrevOffer}
                 aria-label="Previous announcement"
-                className="hidden sm:flex items-center justify-center w-6 h-6 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all cursor-pointer z-10"
+                className="hidden sm:flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/[0.05] hover:bg-white/[0.15] border border-white/[0.08] text-white/60 hover:text-white transition-all cursor-pointer z-10 shrink-0"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
-            ) : <div className="hidden sm:block w-6" />}
+            ) : <div className="hidden sm:block w-7" />}
 
             {/* Central Animated Announcement Content */}
-            <div className="relative flex-1 h-full overflow-hidden flex items-center justify-center">
+            <div className="relative flex-1 h-full overflow-hidden flex items-center justify-center px-2">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeOffer}
-                  initial={{ y: 14, opacity: 0 }}
+                  initial={{ y: 12, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -14, opacity: 0 }}
-                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex items-center justify-center gap-2 text-[10px] sm:text-[11px] md:text-[12px] font-bold tracking-[0.2em] uppercase text-center text-white/95 px-2"
+                  exit={{ y: -12, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  className="flex items-center justify-center gap-2 sm:gap-2.5 text-[10.5px] sm:text-[11.5px] md:text-[12px] font-semibold tracking-[0.16em] uppercase text-center text-white/90"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
-                  <span>{offers[activeOffer]}</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-300 text-[8.5px] sm:text-[9px] font-bold tracking-widest shrink-0 uppercase shadow-sm">
+                    <Sparkles className="w-2.5 h-2.5 fill-amber-300 text-amber-300 animate-pulse" />
+                    <span>OFFER</span>
+                  </span>
+                  <span className="truncate max-w-[280px] sm:max-w-md md:max-w-xl font-medium tracking-[0.14em]">
+                    {offers[activeOffer]}
+                  </span>
                 </motion.div>
               </AnimatePresence>
             </div>
 
             {/* Right Nav Arrow & Indicators (if multiple offers) */}
             {offers.length > 1 ? (
-              <div className="hidden sm:flex items-center gap-2 z-10">
+              <div className="hidden sm:flex items-center gap-2.5 z-10 shrink-0">
                 <div className="flex items-center gap-1 mr-1">
                   {offers.map((_, idx) => (
                     <button
@@ -340,7 +345,7 @@ export default function Navbar() {
                       onClick={() => setActiveOffer(idx)}
                       aria-label={`Go to announcement ${idx + 1}`}
                       className={`h-1 rounded-full transition-all duration-300 ${
-                        activeOffer === idx ? "w-3.5 bg-white" : "w-1 bg-white/25 hover:bg-white/60"
+                        activeOffer === idx ? "w-3.5 bg-amber-400" : "w-1 bg-white/20 hover:bg-white/50"
                       }`}
                     />
                   ))}
@@ -349,12 +354,12 @@ export default function Navbar() {
                   type="button"
                   onClick={handleNextOffer}
                   aria-label="Next announcement"
-                  className="flex items-center justify-center w-6 h-6 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                  className="flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/[0.05] hover:bg-white/[0.15] border border-white/[0.08] text-white/60 hover:text-white transition-all cursor-pointer"
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ) : <div className="hidden sm:block w-6" />}
+            ) : <div className="hidden sm:block w-7" />}
           </div>
         </div>
       )}

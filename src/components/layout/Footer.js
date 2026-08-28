@@ -220,7 +220,7 @@ export default function Footer() {
   // ── Brand & Bottom Links section ──
   const footerBrandName = brand?.footerBrandName || 'PAiRO';
   const copyrightText = brand?.copyrightText || fc?.copyrightText || 'PAIRO — ALL RIGHTS RESERVED © 2026.';
-  
+
   const privacyLabel = fc?.privacyLabel || 'Privacy';
   const privacyUrl = fc?.privacyUrl || (fc?.privacyPageSlug
     ? `/${fc.privacyPageSlug.replace(/^\/?pages\//, '').replace(/^\//, '')}`
@@ -300,18 +300,18 @@ export default function Footer() {
           <motion.div variants={itemVariants}>
             <Link href="/" className="flex-shrink-0 block">
               {footerLogoUrl ? (
-                <img 
-                  src={footerLogoUrl} 
-                  alt={brand?.name || "Pairo Logo"} 
-                  className="object-contain h-10 w-auto max-h-10" 
+                <img
+                  src={footerLogoUrl}
+                  alt={brand?.name || "Pairo Logo"}
+                  className="object-contain h-10 w-auto max-h-10"
                 />
               ) : (
-                <Image 
-                  src={logo} 
-                  alt={brand?.name || "Pairo Logo"} 
-                  width={110} 
-                  height={40} 
-                  className="object-contain h-10 w-auto" 
+                <Image
+                  src={logo}
+                  alt={brand?.name || "Pairo Logo"}
+                  width={110}
+                  height={40}
+                  className="object-contain h-10 w-auto"
                 />
               )}
             </Link>
@@ -451,7 +451,7 @@ export default function Footer() {
       {/* Animated Brand Name Section */}
       <div className="relative my-8 md:my-12">
         <div className="text-center px-4">
-          <div className="text-[25vw] font-bold heading-font leading-[0.75] uppercase tracking-tighter text-white inline-flex justify-center flex-wrap">
+          <div className="text-[25vw] font-bold heading-font leading-[0.75] normal-case tracking-tighter text-white inline-flex justify-center flex-wrap select-none">
             {footerBrandName.split("").map((letter, i) => (
               <motion.span key={i} custom={i} initial="hidden" whileInView="visible" viewport={{ once: false, amount: 0.1 }} variants={letterVariants} className="inline-block">{letter}</motion.span>
             ))}
@@ -461,8 +461,8 @@ export default function Footer() {
 
       <div className="container mx-auto px-2 sm:px-4 md:px-8 relative z-20">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-10 border-t border-white/10">
-          <p className="text-white/50 text-[9px] font-bold uppercase tracking-widest">
-            {copyrightText} | Designed by <a href="https://mohsindesigns.com/" target="_blank" rel="noopener noreferrer" className="hover:text-white underline transition-colors">Mohsin Designs</a>
+          <p className="text-white/50 text-[9px] font-bold tracking-widest">
+            <span className="normal-case">{copyrightText}</span> | Designed by <a href="https://mohsindesigns.com/" target="_blank" rel="noopener noreferrer" className="hover:text-white underline transition-colors">Mohsin Designs</a>
           </p>
           <div className="flex flex-wrap items-center gap-6 sm:gap-10">
             {showPrivacy && (

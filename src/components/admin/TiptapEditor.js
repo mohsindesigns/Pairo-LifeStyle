@@ -11,7 +11,7 @@ import { Link } from '@tiptap/extension-link';
 import { Image as TiptapImage } from '@tiptap/extension-image';
 import { Extension, Node } from '@tiptap/core';
 import { NodeSelection } from '@tiptap/pm/state';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { 
   Bold, 
   Italic, 
@@ -36,7 +36,9 @@ import {
   Trash2,
   RefreshCw,
   Sliders,
-  Check
+  Check,
+  X,
+  Sparkles
 } from 'lucide-react';
 import MediaPickerModal from './MediaPickerModal';
 
@@ -116,12 +118,11 @@ const Iframe = Node.create({
   },
 });
 
-const MenuBar = ({ editor, onInsertImage, onReplaceImage }) => {
+const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) => {
   if (!editor) return null;
 
   const btnClass = (active) => `p-2 rounded-[2px] border border-transparent hover:border-[#c3c4c7] hover:bg-white transition-all ${active ? 'bg-white border-[#c3c4c7] shadow-sm text-[#2271b1]' : 'text-gray-600'}`;
 
-  // Helper to determine the current heading level or paragraph
   const getHeadingValue = () => {
     if (editor.isActive('heading', { level: 1 })) return 'h1';
     if (editor.isActive('heading', { level: 2 })) return 'h2';
@@ -207,9 +208,6 @@ const MenuBar = ({ editor, onInsertImage, onReplaceImage }) => {
   const clearFormatting = () => {
     editor.chain().focus().unsetAllMarks().clearNodes().run();
   };
-
-  const isImageActive = editor.isActive('image');
-  const imageAttrs = isImageActive ? editor.getAttributes('image') : {};
 
   const selectClass = "text-[12px] border border-[#c3c4c7] bg-white px-2 py-1.5 rounded-[2px] outline-none hover:border-[#8c8f94] transition-all cursor-pointer font-medium text-gray-700 h-[32px] flex items-center";
 
@@ -358,12 +356,12 @@ const MenuBar = ({ editor, onInsertImage, onReplaceImage }) => {
 
         <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
 
-        {/* Lists & Blockquote */}
+        {/* Lists & Quotes */}
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={btnClass(editor.isActive('bulletList'))}
-          title="Unordered List"
+          title="Bullet List"
         >
           <List className="w-3.5 h-3.5" />
         </button>
@@ -371,7 +369,7 @@ const MenuBar = ({ editor, onInsertImage, onReplaceImage }) => {
           type="button"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={btnClass(editor.isActive('orderedList'))}
-          title="Ordered List"
+          title="Numbered List"
         >
           <ListOrdered className="w-3.5 h-3.5" />
         </button>
@@ -391,39 +389,50 @@ const MenuBar = ({ editor, onInsertImage, onReplaceImage }) => {
           type="button"
           onClick={insertLink}
           className={btnClass(editor.isActive('link'))}
-          title="Insert Link (Do-Follow by default)"
+          title="Insert Link"
         >
           <LinkIcon className="w-3.5 h-3.5" />
         </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().unsetLink().run()}
-          disabled={!editor.isActive('link')}
-          className={btnClass(false) + " disabled:opacity-30"}
-          title="Remove Link"
-        >
-          <Link2Off className="w-3.5 h-3.5" />
-        </button>
-
-        <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
+        {editor.isActive('link') && (
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().unsetLink().run()}
+            className={btnClass(false)}
+            title="Unlink"
+          >
+            <Link2Off className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         {/* Media Inserts */}
         <button
           type="button"
           onClick={onInsertImage}
-          className={btnClass(false)}
-          title="Insert Image"
+          className="flex items-center gap-1 bg-[#2271b1] text-white px-2.5 py-1 text-[12px] font-semibold rounded-[2px] hover:bg-[#135e96] transition-colors ml-1"
+          title="Add Media / Image from Library"
         >
-          <ImageIcon className="w-3.5 h-3.5" />
+          <ImageIcon className="w-3.5 h-3.5" /> Add Image
         </button>
+
         <button
           type="button"
           onClick={insertVideo}
-          className={btnClass(false)}
-          title="Embed Video"
+          className="flex items-center gap-1 bg-white border border-[#c3c4c7] text-gray-700 px-2 py-1 text-[12px] font-semibold rounded-[2px] hover:bg-gray-50 transition-colors"
+          title="Embed Video (YouTube / Vimeo)"
         >
-          <VideoIcon className="w-3.5 h-3.5" />
+          <VideoIcon className="w-3.5 h-3.5" /> Embed Video
         </button>
+
+        {selectedImage && (
+          <button
+            type="button"
+            onClick={onOpenImageEditor}
+            className="flex items-center gap-1 bg-amber-500 text-white px-2.5 py-1 text-[12px] font-bold rounded-[2px] hover:bg-amber-600 transition-colors animate-pulse"
+            title="Selected Image Options"
+          >
+            <Sliders className="w-3.5 h-3.5" /> Edit Image Size/Align
+          </button>
+        )}
 
         <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
 
@@ -457,117 +466,134 @@ const MenuBar = ({ editor, onInsertImage, onReplaceImage }) => {
           <Redo className="w-3.5 h-3.5" />
         </button>
       </div>
+    </div>
+  );
+};
 
-      {/* Comprehensive Image Settings Toolbar when image is clicked/selected */}
-      {isImageActive && (
-        <div className="w-full flex flex-wrap items-center gap-3 bg-blue-50 border border-blue-200 px-3 py-2 mt-2 rounded-[3px] shadow-sm animate-in fade-in duration-200">
-          <div className="flex items-center gap-1.5 font-bold text-blue-900 text-[11px] uppercase tracking-wider pr-2 border-r border-blue-200">
-            <Sliders className="w-3.5 h-3.5 text-blue-700" /> Image Settings:
+// --- IMAGE EDIT PANEL (ALWAYS VISIBLE & WORKING WHEN AN IMAGE IS CLICKED) ---
+const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose }) => {
+  if (!selectedImage) return null;
+
+  return (
+    <div className="w-full bg-[#f0f6fc] border-b border-[#2271b1]/30 p-3 shadow-md transition-all select-none animate-in fade-in slide-in-from-top-2 duration-150">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded bg-[#2271b1] text-white flex items-center justify-center font-bold">
+            <Sliders className="w-4 h-4" />
           </div>
+          <div>
+            <span className="text-[12px] font-bold text-[#1d2327] uppercase tracking-wider block">
+              Image Customization
+            </span>
+            <span className="text-[10px] text-gray-500 block truncate max-w-[200px]">
+              {selectedImage.alt || selectedImage.src?.split('/').pop() || 'Selected Image'}
+            </span>
+          </div>
+        </div>
 
+        {/* Controls Container */}
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Width Preset / Custom */}
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] text-blue-800 font-semibold">Width:</span>
+          <div className="flex items-center gap-1 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[2px]">
+            <span className="text-[11px] font-bold text-gray-700">Width:</span>
             <select
-              value={['auto', '25%', '33%', '50%', '75%', '100%'].includes(imageAttrs.width) ? imageAttrs.width : 'custom'}
+              value={['auto', '25%', '33%', '50%', '75%', '100%'].includes(selectedImage.width) ? selectedImage.width : 'custom'}
               onChange={(e) => {
                 const val = e.target.value;
                 if (val !== 'custom') {
-                  editor.chain().focus().updateAttributes('image', { width: val }).run();
+                  onUpdate({ width: val });
                 }
               }}
-              className="text-[11px] border border-blue-300 bg-white rounded-[2px] px-1.5 py-1 text-gray-800 outline-none focus:border-blue-500 font-medium"
+              className="text-[11px] bg-transparent outline-none font-semibold text-[#2271b1] cursor-pointer"
             >
-              <option value="auto">Auto (100% max)</option>
-              <option value="25%">25%</option>
-              <option value="33%">33% (1/3)</option>
-              <option value="50%">50% (Half)</option>
-              <option value="75%">75%</option>
-              <option value="100%">100% (Full)</option>
-              <option value="custom">Custom (px or %)</option>
+              <option value="auto">Auto (Original)</option>
+              <option value="25%">25% Width</option>
+              <option value="33%">33% Width (1/3)</option>
+              <option value="50%">50% Width (Half)</option>
+              <option value="75%">75% Width</option>
+              <option value="100%">100% Full Width</option>
+              <option value="custom">Custom (px/%)</option>
             </select>
             <input
               type="text"
-              placeholder="e.g. 350px"
-              value={imageAttrs.width || ''}
-              onChange={(e) => editor.chain().focus().updateAttributes('image', { width: e.target.value }).run()}
-              className="w-20 text-[11px] border border-blue-300 bg-white rounded-[2px] px-1.5 py-1 text-gray-800 outline-none focus:border-blue-500 font-medium"
-              title="Custom width (e.g. 400px or 60%)"
+              placeholder="e.g. 400px"
+              value={selectedImage.width || ''}
+              onChange={(e) => onUpdate({ width: e.target.value })}
+              className="w-16 text-[11px] border-l border-gray-200 pl-1.5 text-gray-800 outline-none font-medium bg-transparent"
+              title="Custom width (e.g. 350px or 60%)"
             />
           </div>
 
           {/* Height */}
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] text-blue-800 font-semibold">Height:</span>
+          <div className="flex items-center gap-1 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[2px]">
+            <span className="text-[11px] font-bold text-gray-700">Height:</span>
             <input
               type="text"
               placeholder="auto or px"
-              value={imageAttrs.height || ''}
-              onChange={(e) => editor.chain().focus().updateAttributes('image', { height: e.target.value }).run()}
-              className="w-20 text-[11px] border border-blue-300 bg-white rounded-[2px] px-1.5 py-1 text-gray-800 outline-none focus:border-blue-500 font-medium"
+              value={selectedImage.height || ''}
+              onChange={(e) => onUpdate({ height: e.target.value })}
+              className="w-16 text-[11px] text-gray-800 outline-none font-medium bg-transparent"
               title="Custom height (e.g. 250px or auto)"
             />
           </div>
 
           {/* Alignment & Text Wrap */}
-          <div className="flex items-center gap-1">
-            <span className="text-[11px] text-blue-800 font-semibold">Align & Wrap:</span>
+          <div className="flex items-center gap-1 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[2px]">
+            <span className="text-[11px] font-bold text-gray-700">Align:</span>
             <select
-              value={imageAttrs.align || 'center'}
-              onChange={(e) => editor.chain().focus().updateAttributes('image', { align: e.target.value }).run()}
-              className="text-[11px] border border-blue-300 bg-white rounded-[2px] px-1.5 py-1 text-gray-800 outline-none focus:border-blue-500 font-medium"
+              value={selectedImage.align || 'center'}
+              onChange={(e) => onUpdate({ align: e.target.value })}
+              className="text-[11px] bg-transparent outline-none font-semibold text-gray-800 cursor-pointer"
             >
               <option value="center">Center Block (No wrap)</option>
               <option value="left">Left Block (No wrap)</option>
               <option value="right">Right Block (No wrap)</option>
-              <option value="float-left">Wrap Left (Text flows right)</option>
-              <option value="float-right">Wrap Right (Text flows left)</option>
+              <option value="float-left">Wrap Left (Float)</option>
+              <option value="float-right">Wrap Right (Float)</option>
             </select>
           </div>
 
           {/* Alt Text */}
-          <div className="flex items-center gap-1 flex-1 min-w-[140px]">
-            <span className="text-[11px] text-blue-800 font-semibold">Alt:</span>
+          <div className="flex items-center gap-1 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[2px] min-w-[140px]">
+            <span className="text-[11px] font-bold text-gray-700">Alt:</span>
             <input
               type="text"
-              placeholder="SEO image alt description..."
-              value={imageAttrs.alt || ''}
-              onChange={(e) => editor.chain().focus().updateAttributes('image', { alt: e.target.value }).run()}
-              className="flex-1 text-[11px] border border-blue-300 bg-white rounded-[2px] px-2 py-1 text-gray-800 outline-none focus:border-blue-500 font-medium"
+              placeholder="SEO alt text..."
+              value={selectedImage.alt || ''}
+              onChange={(e) => onUpdate({ alt: e.target.value })}
+              className="w-28 text-[11px] text-gray-800 outline-none font-medium bg-transparent"
             />
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-1.5">
-            {onReplaceImage && (
-              <button 
-                type="button"
-                onClick={onReplaceImage} 
-                className="flex items-center gap-1 text-[11px] text-blue-700 bg-white border border-blue-300 px-2 py-1 rounded-[2px] hover:bg-blue-100 font-semibold transition-colors"
-                title="Replace with another image from media library"
-              >
-                <RefreshCw className="w-3 h-3" /> Replace
-              </button>
-            )}
-            <button 
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1">
+            <button
               type="button"
-              onClick={() => editor.chain().focus().deleteSelection().run()} 
-              className="flex items-center gap-1 text-[11px] text-red-600 bg-white border border-red-200 px-2 py-1 rounded-[2px] hover:bg-red-50 font-semibold transition-colors"
-              title="Remove image"
+              onClick={onReplace}
+              className="flex items-center gap-1 bg-[#2271b1] text-white px-2.5 py-1 text-[11px] font-bold rounded-[2px] hover:bg-[#135e96] transition-colors"
+              title="Replace image from media library"
             >
-              <Trash2 className="w-3 h-3" /> Remove
+              <RefreshCw className="w-3 h-3" /> Replace
             </button>
-            <button 
+            <button
               type="button"
-              onClick={() => editor.chain().focus().selectParentNode().run()} 
-              className="flex items-center gap-1 text-[11px] text-white bg-blue-600 px-2.5 py-1 rounded-[2px] hover:bg-blue-700 font-semibold transition-colors shadow-sm"
-              title="Done editing image"
+              onClick={onRemove}
+              className="flex items-center gap-1 bg-white border border-red-300 text-red-600 px-2 py-1 text-[11px] font-bold rounded-[2px] hover:bg-red-50 transition-colors"
+              title="Delete this image"
+            >
+              <Trash2 className="w-3 h-3" /> Delete
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1 bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-bold rounded-[2px] hover:bg-emerald-700 transition-colors shadow-sm"
+              title="Save & Close image toolbar"
             >
               <Check className="w-3 h-3" /> Done
             </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
@@ -575,6 +601,8 @@ const MenuBar = ({ editor, onInsertImage, onReplaceImage }) => {
 export default function TiptapEditor({ content, onChange }) {
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [isReplacingImage, setIsReplacingImage] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const editorContainerRef = useRef(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -672,22 +700,62 @@ export default function TiptapEditor({ content, onChange }) {
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
+    onSelectionUpdate: ({ editor }) => {
+      if (editor.isActive('image')) {
+        const attrs = editor.getAttributes('image');
+        setSelectedImage(prev => ({
+          ...(prev || {}),
+          ...attrs
+        }));
+      }
+    },
     editorProps: {
       attributes: {
         class: 'focus:outline-none min-h-[450px] p-8 text-[15px] leading-[1.6] max-w-none font-sans bg-white text-gray-800',
       },
       handleClick(view, pos, event) {
-        if (event.target && event.target.tagName === 'IMG') {
-          const nodePos = view.posAtDOM(event.target, 0);
-          if (typeof nodePos === 'number' && nodePos >= 0) {
-            try {
+        const target = event.target;
+        if (target && target.tagName === 'IMG') {
+          try {
+            const domPos = view.posAtDOM(target, 0);
+            if (typeof domPos === 'number' && domPos >= 0) {
+              const $pos = view.state.doc.resolve(domPos);
+              let nodePos = domPos;
+              if ($pos.nodeAfter && $pos.nodeAfter.type.name === 'image') {
+                nodePos = domPos;
+              } else if ($pos.nodeBefore && $pos.nodeBefore.type.name === 'image') {
+                nodePos = domPos - $pos.nodeBefore.nodeSize;
+              } else if ($pos.parent && $pos.parent.type.name === 'image') {
+                nodePos = $pos.before();
+              }
               const nodeSelection = NodeSelection.create(view.state.doc, nodePos);
               view.dispatch(view.state.tr.setSelection(nodeSelection));
+              
+              setSelectedImage({
+                src: target.getAttribute('src') || '',
+                alt: target.getAttribute('alt') || '',
+                title: target.getAttribute('title') || '',
+                width: target.getAttribute('width') || target.style?.width || 'auto',
+                height: target.getAttribute('height') || target.style?.height || 'auto',
+                align: target.getAttribute('data-align') || 'center',
+                pos: nodePos
+              });
               return true;
-            } catch (err) {
-              // ignore
             }
+          } catch (err) {
+            // fallback selection
           }
+
+          setSelectedImage({
+            src: target.getAttribute('src') || '',
+            alt: target.getAttribute('alt') || '',
+            title: target.getAttribute('title') || '',
+            width: target.getAttribute('width') || target.style?.width || 'auto',
+            height: target.getAttribute('height') || target.style?.height || 'auto',
+            align: target.getAttribute('data-align') || 'center',
+            pos: null
+          });
+          return true;
         }
         return false;
       },
@@ -704,9 +772,94 @@ export default function TiptapEditor({ content, onChange }) {
     }
   }, [content, editor]);
 
+  // Click listener directly on DOM images inside editor to guarantee image click detection
+  const handleWrapperClick = (e) => {
+    const img = e.target.closest('img');
+    if (img) {
+      const src = img.getAttribute('src') || '';
+      const alt = img.getAttribute('alt') || '';
+      const title = img.getAttribute('title') || '';
+      const width = img.getAttribute('width') || img.style?.width || 'auto';
+      const height = img.getAttribute('height') || img.style?.height || 'auto';
+      const align = img.getAttribute('data-align') || 'center';
+
+      let foundPos = null;
+      if (editor && editor.view) {
+        try {
+          const domPos = editor.view.posAtDOM(img, 0);
+          if (typeof domPos === 'number' && domPos >= 0) {
+            const $pos = editor.state.doc.resolve(domPos);
+            let nodePos = domPos;
+            if ($pos.nodeAfter && $pos.nodeAfter.type.name === 'image') {
+              nodePos = domPos;
+            } else if ($pos.nodeBefore && $pos.nodeBefore.type.name === 'image') {
+              nodePos = domPos - $pos.nodeBefore.nodeSize;
+            } else if ($pos.parent && $pos.parent.type.name === 'image') {
+              nodePos = $pos.before();
+            }
+            const nodeSelection = NodeSelection.create(editor.state.doc, nodePos);
+            editor.view.dispatch(editor.state.tr.setSelection(nodeSelection));
+            foundPos = nodePos;
+          }
+        } catch (err) {}
+      }
+
+      setSelectedImage({
+        src,
+        alt,
+        title,
+        width,
+        height,
+        align,
+        pos: foundPos
+      });
+    }
+  };
+
+  const updateSelectedImage = (attrs) => {
+    if (!editor) return;
+
+    setSelectedImage(prev => prev ? ({ ...prev, ...attrs }) : null);
+
+    if (selectedImage?.pos !== null && selectedImage?.pos !== undefined) {
+      try {
+        const node = editor.state.doc.nodeAt(selectedImage.pos);
+        if (node && node.type.name === 'image') {
+          const tr = editor.state.tr.setNodeMarkup(selectedImage.pos, undefined, {
+            ...node.attrs,
+            ...attrs
+          });
+          editor.view.dispatch(tr);
+          onChange(editor.getHTML());
+          return;
+        }
+      } catch (err) {}
+    }
+
+    editor.chain().focus().updateAttributes('image', attrs).run();
+  };
+
   const handleOpenMedia = (isReplace = false) => {
     setIsReplacingImage(isReplace);
     setMediaModalOpen(true);
+  };
+
+  const handleRemoveImage = () => {
+    if (!editor) return;
+    if (selectedImage?.pos !== null && selectedImage?.pos !== undefined) {
+      try {
+        const node = editor.state.doc.nodeAt(selectedImage.pos);
+        if (node) {
+          const tr = editor.state.tr.delete(selectedImage.pos, selectedImage.pos + node.nodeSize);
+          editor.view.dispatch(tr);
+          setSelectedImage(null);
+          onChange(editor.getHTML());
+          return;
+        }
+      } catch (err) {}
+    }
+    editor.chain().focus().deleteSelection().run();
+    setSelectedImage(null);
   };
 
   return (
@@ -714,18 +867,37 @@ export default function TiptapEditor({ content, onChange }) {
       <MenuBar 
         editor={editor} 
         onInsertImage={() => handleOpenMedia(false)}
-        onReplaceImage={() => handleOpenMedia(true)}
+        selectedImage={selectedImage}
+        onOpenImageEditor={() => {}}
       />
-      <div className="tiptap-wrapper">
+      
+      {/* Comprehensive Image Editing Panel */}
+      <ImageEditPanel 
+        selectedImage={selectedImage}
+        onUpdate={updateSelectedImage}
+        onReplace={() => handleOpenMedia(true)}
+        onRemove={handleRemoveImage}
+        onClose={() => setSelectedImage(null)}
+      />
+
+      <div 
+        ref={editorContainerRef} 
+        onClick={handleWrapperClick}
+        className="tiptap-wrapper"
+      >
          <EditorContent editor={editor} />
       </div>
+
       <MediaPickerModal 
         open={mediaModalOpen} 
-        onClose={() => setMediaModalOpen(false)} 
+        onClose={() => {
+          setMediaModalOpen(false);
+          setIsReplacingImage(false);
+        }} 
         onSelect={(media) => {
           if (media && media.url) {
-            if (isReplacingImage && editor) {
-              editor.chain().focus().updateAttributes('image', { src: media.url, alt: media.filename || '' }).run();
+            if (isReplacingImage && selectedImage) {
+              updateSelectedImage({ src: media.url, alt: media.filename || '' });
             } else if (editor) {
               editor.chain().focus().setImage({ src: media.url, alt: media.filename || '' }).run();
             }
@@ -754,8 +926,21 @@ export default function TiptapEditor({ content, onChange }) {
         .tiptap-wrapper .ProseMirror li { margin-bottom: 0.15rem; }
         .tiptap-wrapper .ProseMirror li p { margin-bottom: 0 !important; }
         .tiptap-wrapper .ProseMirror blockquote { border-left: 3px solid #e5e7eb; padding-left: 1.25rem; font-style: italic; color: #4b5563; margin: 1.5rem 0; }
-        .tiptap-wrapper .ProseMirror img { max-width: 100%; border-radius: 8px; }
-        .tiptap-wrapper .ProseMirror img.ProseMirror-selectednode { outline: 3px solid #2271b1; outline-offset: 2px; }
+        .tiptap-wrapper .ProseMirror img { 
+          max-width: 100%; 
+          border-radius: 8px; 
+          cursor: pointer;
+          transition: outline 0.15s ease, box-shadow 0.15s ease;
+        }
+        .tiptap-wrapper .ProseMirror img:hover { 
+          outline: 2px dashed #2271b1; 
+          outline-offset: 3px; 
+        }
+        .tiptap-wrapper .ProseMirror img.ProseMirror-selectednode { 
+          outline: 3px solid #2271b1 !important; 
+          outline-offset: 4px !important; 
+          box-shadow: 0 0 0 6px rgba(34, 113, 177, 0.15);
+        }
         .tiptap-wrapper .ProseMirror img[data-align="center"], .tiptap-wrapper .ProseMirror img:not([data-align]) { margin: 1.5rem auto; display: block; }
         .tiptap-wrapper .ProseMirror img[data-align="left"] { margin: 1.5rem auto 1.5rem 0; display: block; }
         .tiptap-wrapper .ProseMirror img[data-align="right"] { margin: 1.5rem 0 1.5rem auto; display: block; }
