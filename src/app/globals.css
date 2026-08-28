@@ -381,11 +381,31 @@ img {
 }
 /* Responsive Images inside Rich Text */
 .editorial-content-rich img {
-  max-width: 100% !important;
-  height: auto !important;
-  display: block;
-  margin: 2rem auto !important;
+  max-width: 100%;
   border-radius: 8px;
+}
+.editorial-content-rich img[data-align="center"], 
+.editorial-content-rich img:not([data-align]) {
+  margin: 1.5rem auto;
+  display: block;
+}
+.editorial-content-rich img[data-align="left"] {
+  margin: 1.5rem auto 1.5rem 0;
+  display: block;
+}
+.editorial-content-rich img[data-align="right"] {
+  margin: 1.5rem 0 1.5rem auto;
+  display: block;
+}
+.editorial-content-rich img[data-align="float-left"] {
+  float: left;
+  margin: 0.5rem 1.5rem 1rem 0;
+  display: inline-block;
+}
+.editorial-content-rich img[data-align="float-right"] {
+  float: right;
+  margin: 0.5rem 0 1rem 1.5rem;
+  display: inline-block;
 }
 /* Responsive Tables inside Rich Text */
 .editorial-content-rich table {

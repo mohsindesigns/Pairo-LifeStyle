@@ -9,17 +9,15 @@ import { getProductUrl } from "@/lib/routes";
 function makeInternalLinksDofollow(html) {
   if (!html) return "";
   return html.replace(/<a\s+([^>]*href=["']([^"']*)["'][^>]*)>/gi, (match, body, href) => {
-    const isInternal = href.startsWith('/') || href.includes('pairolifestyle.com');
-    if (isInternal) {
-      if (/rel=["']([^"']*)["']/i.test(body)) {
-        return match.replace(/rel=["']([^"']*)["']/gi, (relMatch, relValue) => {
-          const cleanRel = relValue
-            .replace(/\bnofollow\b/gi, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-          return cleanRel ? `rel="${cleanRel}"` : '';
-        });
-      }
+    if (/rel=["']([^"']*)["']/i.test(body)) {
+      return match.replace(/rel=["']([^"']*)["']/gi, (relMatch, relValue) => {
+        const cleanRel = relValue
+          .replace(/\bnofollow\b/gi, '')
+          .replace(/\bnoindex\b/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return cleanRel ? `rel="${cleanRel}"` : '';
+      });
     }
     return match;
   });
@@ -285,6 +283,33 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
         }
         .blog-content a:hover {
           opacity: 0.7 !important;
+        }
+        .blog-content img {
+          border-radius: 8px;
+          max-width: 100%;
+          height: auto;
+        }
+        .blog-content img[data-align="center"], .blog-content img:not([data-align]) {
+          margin: 1.5rem auto;
+          display: block;
+        }
+        .blog-content img[data-align="left"] {
+          margin: 1.5rem auto 1.5rem 0;
+          display: block;
+        }
+        .blog-content img[data-align="right"] {
+          margin: 1.5rem 0 1.5rem auto;
+          display: block;
+        }
+        .blog-content img[data-align="float-left"] {
+          float: left;
+          margin: 0.5rem 1.5rem 1rem 0;
+          display: inline-block;
+        }
+        .blog-content img[data-align="float-right"] {
+          float: right;
+          margin: 0.5rem 0 1rem 1.5rem;
+          display: inline-block;
         }
       `}} />
          <motion.div className="fixed top-0 left-0 right-0 h-0.5 bg-black origin-left z-[100]" style={{ scaleX }} />

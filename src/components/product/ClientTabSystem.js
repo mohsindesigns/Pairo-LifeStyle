@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HelpCircle, ChevronDown, MessageSquareText } from "lucide-react";
-
 import dynamic from "next/dynamic";
 
 const ProductReviews = dynamic(() => import("./ProductReviews"), {
@@ -26,12 +25,39 @@ const ProductQuestionsAnswers = dynamic(() => import("./ProductQuestionsAnswers"
   )
 });
 
+function makeLinksDofollow(html) {
+  if (!html) return "";
+  return html.replace(/<a\s+([^>]*href=["']([^"']*)["'][^>]*)>/gi, (match, body) => {
+    if (/rel=["']([^"']*)["']/i.test(body)) {
+      return match.replace(/rel=["']([^"']*)["']/gi, (relMatch, relValue) => {
+        const cleanRel = relValue
+          .replace(/\bnofollow\b/gi, '')
+          .replace(/\bnoindex\b/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return cleanRel ? `rel="${cleanRel}"` : '';
+      });
+    }
+    return match;
+  });
+}
+
 export default function ClientTabSystem({ product }) {
   const [activeTab, setActiveTab] = useState("Product Details");
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
 
+  useEffect(() => {
+    const handleSwitchTab = (e) => {
+      if (e.detail) {
+        setActiveTab(e.detail);
+      }
+    };
+    window.addEventListener("switch-product-tab", handleSwitchTab);
+    return () => window.removeEventListener("switch-product-tab", handleSwitchTab);
+  }, []);
+
   return (
-    <div className="mt-6 md:mt-10 border-t border-black/5">
+    <div id="product-tabs-section" className="scroll-mt-24 mt-6 md:mt-10 border-t border-black/5">
       <div className="flex border-b border-black/5 overflow-x-auto scrollbar-hide snap-x">
          {["Product Details", "Rating & Reviews", "Questions & Answers"].map((tab) => (
             <button 
@@ -51,7 +77,7 @@ export default function ClientTabSystem({ product }) {
                   <div>
                      <div 
                          className="editorial-content-rich w-full max-w-none"
-                         dangerouslySetInnerHTML={{ __html: product.description || "Detailed overview coming soon..." }}
+                         dangerouslySetInnerHTML={{ __html: makeLinksDofollow(product.description || "Detailed overview coming soon...") }}
                        />
                   </div>
                </motion.div>

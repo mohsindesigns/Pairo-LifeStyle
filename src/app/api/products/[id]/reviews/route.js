@@ -264,12 +264,13 @@ export async function POST(req, { params }) {
       }
     }
 
-    // 4. Anti-Abuse Rate Limiting
+    // 4. Anti-Abuse Rate Limiting (Temporarily disabled for bulk reviews upload)
     const ip = req.headers.get("x-forwarded-for") || req.ip || "127.0.0.1";
     const userAgent = req.headers.get("user-agent") || "unknown";
     const crypto = await import("crypto");
     const fingerprint = crypto.createHash("sha256").update(ip + userAgent).digest("hex");
 
+    /*
     const cooldownPeriod = 10 * 60 * 1000; // 10-minute Cooldown
     const recentReview = await Review.findOne({
       $or: [
@@ -282,6 +283,7 @@ export async function POST(req, { params }) {
     if (recentReview) {
       return NextResponse.json({ error: "You are submitting reviews too frequently. Please wait a few minutes." }, { status: 429 });
     }
+    */
 
     // IP Submission count in last 24h
     const ipCount24h = await Review.countDocuments({

@@ -670,59 +670,169 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
         </div>
       </div>
 
-      {/* Privacy & Terms Page Links */}
+      {/* Privacy, Terms & Sitemap Links */}
       <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">Privacy & Terms Links</h3>
+        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">Footer Bottom Links (Privacy, Terms, Sitemap)</h3>
         <p className="px-4 pt-3 text-[12px] text-[#646970]">
-          Select which published page should open when a visitor clicks the Privacy or Terms link in the footer.
-          Create your pages first under <strong>Pages → Add New</strong>.
+          Configure labels, links, and visibility for the links displayed at the bottom of the footer next to the copyright notice.
         </p>
         <table className="w-full mt-2">
           <tbody>
+            {/* Privacy Policy Link */}
             <tr className="border-b border-[#f0f0f1]">
               <th className="text-left px-4 py-3 align-top w-52">
-                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Privacy Policy Page</label>
-                <p className="text-[12px] text-[#646970]">Footer &ldquo;Privacy&rdquo; link target</p>
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Privacy Policy</label>
+                <p className="text-[12px] text-[#646970]">Label, target page/URL & visibility</p>
               </th>
-              <td className="px-4 py-3">
-                <select
-                  value={fc.privacyPageSlug || ""}
-                  onChange={e => setFc({ privacyPageSlug: e.target.value })}
-                  className="w-full max-w-sm border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
-                >
-                  <option value="">— None selected —</option>
-                  {(dbPages || []).map(p => (
-                    <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
-                  ))}
-                </select>
-                {fc.privacyPageSlug && (
-                  <p className="text-[11px] text-[#2271b1] mt-1">
-                    Link will go to: <strong>/{fc.privacyPageSlug}</strong>
-                  </p>
-                )}
+              <td className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={fc.showPrivacyLink !== false}
+                      onChange={e => setFc({ showPrivacyLink: e.target.checked })}
+                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
+                    />
+                    <span>Show in Footer</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fc.privacyLabel ?? "Privacy"}
+                    onChange={e => setFc({ privacyLabel: e.target.value })}
+                    placeholder="Link Label (e.g. Privacy Policy)"
+                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
+                  <div>
+                    <label className="text-[11px] text-[#646970] block mb-0.5">Select CMS Page:</label>
+                    <select
+                      value={fc.privacyPageSlug || ""}
+                      onChange={e => setFc({ privacyPageSlug: e.target.value })}
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+                    >
+                      <option value="">— None selected —</option>
+                      {(dbPages || []).map(p => (
+                        <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[#646970] block mb-0.5">Or Custom URL (optional):</label>
+                    <input
+                      type="text"
+                      value={fc.privacyUrl || ""}
+                      onChange={e => setFc({ privacyUrl: e.target.value })}
+                      placeholder="/privacy or https://..."
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+                    />
+                  </div>
+                </div>
               </td>
             </tr>
+
+            {/* Terms of Service Link */}
+            <tr className="border-b border-[#f0f0f1]">
+              <th className="text-left px-4 py-3 align-top w-52">
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Terms of Service</label>
+                <p className="text-[12px] text-[#646970]">Label, target page/URL & visibility</p>
+              </th>
+              <td className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={fc.showTermsLink !== false}
+                      onChange={e => setFc({ showTermsLink: e.target.checked })}
+                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
+                    />
+                    <span>Show in Footer</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fc.termsLabel ?? "Terms"}
+                    onChange={e => setFc({ termsLabel: e.target.value })}
+                    placeholder="Link Label (e.g. Terms of Service)"
+                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
+                  <div>
+                    <label className="text-[11px] text-[#646970] block mb-0.5">Select CMS Page:</label>
+                    <select
+                      value={fc.termsPageSlug || ""}
+                      onChange={e => setFc({ termsPageSlug: e.target.value })}
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+                    >
+                      <option value="">— None selected —</option>
+                      {(dbPages || []).map(p => (
+                        <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[#646970] block mb-0.5">Or Custom URL (optional):</label>
+                    <input
+                      type="text"
+                      value={fc.termsUrl || ""}
+                      onChange={e => setFc({ termsUrl: e.target.value })}
+                      placeholder="/terms or https://..."
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+                    />
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            {/* Sitemap Link */}
+            <tr className="border-b border-[#f0f0f1]">
+              <th className="text-left px-4 py-3 align-top w-52">
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Sitemap Link</label>
+                <p className="text-[12px] text-[#646970]">Label, URL & visibility</p>
+              </th>
+              <td className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={fc.showSitemapLink !== false}
+                      onChange={e => setFc({ showSitemapLink: e.target.checked })}
+                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
+                    />
+                    <span>Show in Footer</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fc.sitemapLabel ?? "Sitemap"}
+                    onChange={e => setFc({ sitemapLabel: e.target.value })}
+                    placeholder="Link Label (e.g. Sitemap)"
+                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
+                  />
+                  <input
+                    type="text"
+                    value={fc.sitemapUrl ?? "/sitemap"}
+                    onChange={e => setFc({ sitemapUrl: e.target.value })}
+                    placeholder="URL (e.g. /sitemap)"
+                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
+                  />
+                </div>
+              </td>
+            </tr>
+
+            {/* Copyright & Brand Text */}
             <tr>
               <th className="text-left px-4 py-3 align-top w-52">
-                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Terms of Service Page</label>
-                <p className="text-[12px] text-[#646970]">Footer &ldquo;Terms&rdquo; link target</p>
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Copyright & Brand Text</label>
+                <p className="text-[12px] text-[#646970]">Copyright notice in footer</p>
               </th>
-              <td className="px-4 py-3">
-                <select
-                  value={fc.termsPageSlug || ""}
-                  onChange={e => setFc({ termsPageSlug: e.target.value })}
-                  className="w-full max-w-sm border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
-                >
-                  <option value="">— None selected —</option>
-                  {(dbPages || []).map(p => (
-                    <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
-                  ))}
-                </select>
-                {fc.termsPageSlug && (
-                  <p className="text-[11px] text-[#2271b1] mt-1">
-                    Link will go to: <strong>/{fc.termsPageSlug}</strong>
-                  </p>
-                )}
+              <td className="px-4 py-3 space-y-2">
+                <input
+                  type="text"
+                  value={config.brand?.copyrightText ?? "PAIRO — ALL RIGHTS RESERVED © 2026."}
+                  onChange={e => onChange({ ...config, brand: { ...(config.brand || {}), copyrightText: e.target.value } })}
+                  placeholder="e.g. PAIRO — ALL RIGHTS RESERVED © 2026."
+                  className="w-full max-w-xl border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white"
+                />
               </td>
             </tr>
           </tbody>
