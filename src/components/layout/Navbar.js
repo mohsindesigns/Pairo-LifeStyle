@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, ShoppingCart, User, Menu, X, ChevronDown, LogIn } from "lucide-react";
+import { Search, ShoppingCart, User, Menu, X, ChevronDown, LogIn, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
 import logo from '../../assets/png-file.png';
@@ -155,6 +155,7 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeOffer, setActiveOffer] = useState(0);
+  const [isOfferHovered, setIsOfferHovered] = useState(false);
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [mobileDropdowns, setMobileDropdowns] = useState({});
   const [mounted, setMounted] = useState(false);
@@ -264,35 +265,99 @@ export default function Navbar() {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll, { passive: true });
 
-    if (offers.length > 0) {
+    if (offers.length > 1 && !isOfferHovered) {
       const offerInterval = setInterval(() => {
         setActiveOffer(prev => (prev + 1) % offers.length);
-      }, 4000);
+      }, 4500);
       return () => {
         window.removeEventListener("scroll", handleScroll);
         clearInterval(offerInterval);
       };
     }
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [offers]);
+  }, [offers, isOfferHovered]);
+
+  const handlePrevOffer = (e) => {
+    e.stopPropagation();
+    setActiveOffer(prev => (prev - 1 + offers.length) % offers.length);
+  };
+
+  const handleNextOffer = (e) => {
+    e.stopPropagation();
+    setActiveOffer(prev => (prev + 1) % offers.length);
+  };
 
   return (
     <>
-      {/* Top Carousel Banner */}
-      <div className="bg-black text-white text-center py-2 text-xs md:text-sm font-medium relative overflow-hidden h-10">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeOffer}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -20, opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="absolute inset-0 flex items-center justify-center font-sans tracking-wide px-4"
-          >
-            {offers[activeOffer]}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      {/* Top Luxury Announcement Bar */}
+      {offers && offers.length > 0 && (
+        <div 
+          onMouseEnter={() => setIsOfferHovered(true)}
+          onMouseLeave={() => setIsOfferHovered(false)}
+          className="relative bg-[#0a0a0a] text-white border-b border-white/[0.08] overflow-hidden select-none h-9 sm:h-10 flex items-center transition-all shadow-inner"
+        >
+          {/* Subtle luminous ambient background */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent pointer-events-none" />
+          
+          <div className="container mx-auto px-2 sm:px-4 md:px-8 relative flex items-center justify-between h-full">
+            {/* Left Nav Arrow (if multiple offers) */}
+            {offers.length > 1 ? (
+              <button
+                type="button"
+                onClick={handlePrevOffer}
+                aria-label="Previous announcement"
+                className="hidden sm:flex items-center justify-center w-6 h-6 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all cursor-pointer z-10"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            ) : <div className="hidden sm:block w-6" />}
+
+            {/* Central Animated Announcement Content */}
+            <div className="relative flex-1 h-full overflow-hidden flex items-center justify-center">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeOffer}
+                  initial={{ y: 14, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -14, opacity: 0 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex items-center justify-center gap-2 text-[10px] sm:text-[11px] md:text-[12px] font-bold tracking-[0.2em] uppercase text-center text-white/95 px-2"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
+                  <span>{offers[activeOffer]}</span>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Right Nav Arrow & Indicators (if multiple offers) */}
+            {offers.length > 1 ? (
+              <div className="hidden sm:flex items-center gap-2 z-10">
+                <div className="flex items-center gap-1 mr-1">
+                  {offers.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setActiveOffer(idx)}
+                      aria-label={`Go to announcement ${idx + 1}`}
+                      className={`h-1 rounded-full transition-all duration-300 ${
+                        activeOffer === idx ? "w-3.5 bg-white" : "w-1 bg-white/25 hover:bg-white/60"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNextOffer}
+                  aria-label="Next announcement"
+                  className="flex items-center justify-center w-6 h-6 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : <div className="hidden sm:block w-6" />}
+          </div>
+        </div>
+      )}
 
       <header
         className={`sticky top-0 z-50 w-full transition-all duration-500 border-b border-black/5 h-20 md:h-24 flex items-center ${scrolled ? "bg-white/90 backdrop-blur-xl shadow-sm" : "bg-white"
