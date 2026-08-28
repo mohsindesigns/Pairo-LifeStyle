@@ -265,104 +265,55 @@ export default function Navbar() {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll, { passive: true });
 
-    if (offers.length > 1 && !isOfferHovered) {
+    if (offers.length > 0) {
       const offerInterval = setInterval(() => {
         setActiveOffer(prev => (prev + 1) % offers.length);
-      }, 4500);
+      }, 4000);
       return () => {
         window.removeEventListener("scroll", handleScroll);
         clearInterval(offerInterval);
       };
     }
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [offers, isOfferHovered]);
-
-  const handlePrevOffer = (e) => {
-    e.stopPropagation();
-    setActiveOffer(prev => (prev - 1 + offers.length) % offers.length);
-  };
-
-  const handleNextOffer = (e) => {
-    e.stopPropagation();
-    setActiveOffer(prev => (prev + 1) % offers.length);
-  };
+  }, [offers]);
 
   return (
     <>
-      {/* Top Luxury Announcement Bar */}
-      {offers && offers.length > 0 && (
-        <div 
-          onMouseEnter={() => setIsOfferHovered(true)}
-          onMouseLeave={() => setIsOfferHovered(false)}
-          className="relative bg-[#09090b] text-white border-b border-white/[0.08] overflow-hidden select-none h-10 md:h-11 flex items-center transition-all shadow-[inset_0_-1px_0_rgba(255,255,255,0.05)]"
-        >
-          {/* Subtle luminous ambient gradient sweep */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent pointer-events-none" />
-          
-          <div className="container mx-auto px-3 sm:px-4 md:px-8 relative flex items-center justify-between h-full">
-            {/* Left Nav Arrow (if multiple offers) */}
-            {offers.length > 1 ? (
-              <button
-                type="button"
-                onClick={handlePrevOffer}
-                aria-label="Previous announcement"
-                className="hidden sm:flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/[0.05] hover:bg-white/[0.15] border border-white/[0.08] text-white/60 hover:text-white transition-all cursor-pointer z-10 shrink-0"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-            ) : <div className="hidden sm:block w-7" />}
-
-            {/* Central Animated Announcement Content */}
-            <div className="relative flex-1 h-full overflow-hidden flex items-center justify-center px-2">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeOffer}
-                  initial={{ y: 12, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -12, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex items-center justify-center gap-2 sm:gap-2.5 text-[10.5px] sm:text-[11.5px] md:text-[12px] font-semibold tracking-[0.16em] uppercase text-center text-white/90"
-                >
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/25 text-amber-300 text-[8.5px] sm:text-[9px] font-bold tracking-widest shrink-0 uppercase shadow-sm">
-                    <Sparkles className="w-2.5 h-2.5 fill-amber-300 text-amber-300 animate-pulse" />
-                    <span>OFFER</span>
-                  </span>
-                  <span className="truncate max-w-[280px] sm:max-w-md md:max-w-xl font-medium tracking-[0.14em]">
-                    {offers[activeOffer]}
-                  </span>
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Right Nav Arrow & Indicators (if multiple offers) */}
-            {offers.length > 1 ? (
-              <div className="hidden sm:flex items-center gap-2.5 z-10 shrink-0">
-                <div className="flex items-center gap-1 mr-1">
-                  {offers.map((_, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setActiveOffer(idx)}
-                      aria-label={`Go to announcement ${idx + 1}`}
-                      className={`h-1 rounded-full transition-all duration-300 ${
-                        activeOffer === idx ? "w-3.5 bg-amber-400" : "w-1 bg-white/20 hover:bg-white/50"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleNextOffer}
-                  aria-label="Next announcement"
-                  className="flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/[0.05] hover:bg-white/[0.15] border border-white/[0.08] text-white/60 hover:text-white transition-all cursor-pointer"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : <div className="hidden sm:block w-7" />}
-          </div>
-        </div>
-      )}
+      {/* Top Carousel Banner */}
+      <div className="bg-black text-white text-center py-2 text-xs md:text-sm font-medium relative overflow-hidden h-10 select-none">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeOffer}
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ duration: 0.35 }}
+            className="absolute inset-0 flex items-center justify-center font-sans tracking-[0.14em] uppercase text-[11px] sm:text-[12px] px-4 font-semibold"
+          >
+            <span className="announcement-glow-text">
+              {offers[activeOffer]}
+            </span>
+          </motion.div>
+        </AnimatePresence>
+        <style jsx>{`
+          .announcement-glow-text {
+            animation: breatheGlow 2.8s ease-in-out infinite;
+            display: inline-block;
+          }
+          @keyframes breatheGlow {
+            0%, 100% {
+              opacity: 0.55;
+              filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0));
+              letter-spacing: 0.14em;
+            }
+            50% {
+              opacity: 1;
+              filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.65));
+              letter-spacing: 0.16em;
+            }
+          }
+        `}</style>
+      </div>
 
       <header
         className={`sticky top-0 z-50 w-full transition-all duration-500 border-b border-black/5 h-20 md:h-24 flex items-center ${scrolled ? "bg-white/90 backdrop-blur-xl shadow-sm" : "bg-white"

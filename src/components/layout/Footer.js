@@ -218,8 +218,10 @@ export default function Footer() {
   }
 
   // ── Brand & Bottom Links section ──
-  const footerBrandName = brand?.footerBrandName || 'PAiRO';
-  const copyrightText = brand?.copyrightText || fc?.copyrightText || 'PAIRO — ALL RIGHTS RESERVED © 2026.';
+  const rawBrandName = brand?.footerBrandName || 'PAiRO';
+  const footerBrandName = rawBrandName.replace(/./g, char => char.toLowerCase() === 'i' ? 'i' : char.toUpperCase());
+  const rawCopyright = brand?.copyrightText || fc?.copyrightText || 'PAiRO — ALL RIGHTS RESERVED © 2026.';
+  const copyrightText = rawCopyright.replace(/pairo/gi, 'PAiRO');
 
   const privacyLabel = fc?.privacyLabel || 'Privacy';
   const privacyUrl = fc?.privacyUrl || (fc?.privacyPageSlug
