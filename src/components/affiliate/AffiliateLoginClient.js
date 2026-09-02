@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
 import Link from "next/link";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 export default function AffiliateLoginClient() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [hpField, setHpField] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -21,6 +25,17 @@ export default function AffiliateLoginClient() {
       setError("Please enter your email and password.");
       return;
     }
+
+    if (hpField) {
+      setError("Invalid credentials. Please try again.");
+      return;
+    }
+
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -28,17 +43,22 @@ export default function AffiliateLoginClient() {
         email: email.toLowerCase().trim(),
         password,
         loginType: "affiliate",
+        turnstileToken,
         redirect: false,
       });
 
       if (res?.error) {
         setError(res.error || "Invalid credentials. Please try again.");
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
       } else {
         toast.success("Welcome back!");
         window.location.replace("/affiliate/dashboard");
       }
     } catch {
       setError("Login failed. Please check your connection and try again.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
     } finally {
       setLoading(false);
     }
@@ -92,6 +112,12 @@ export default function AffiliateLoginClient() {
               <label className="text-[10px] font-bold text-black/40 uppercase tracking-widest">
                 Password
               </label>
+              <Link
+                href="/affiliate/forgot-password"
+                className="text-[10px] font-bold text-black/40 hover:text-black uppercase tracking-widest transition-colors"
+              >
+                Forgot?
+              </Link>
             </div>
             <div className="relative">
               <input
@@ -107,18 +133,33 @@ export default function AffiliateLoginClient() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-black/30 hover:text-black transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-black/30 hover:text-black transition-colors cursor-pointer"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
+          <input
+            type="text"
+            className="hidden"
+            value={hpField}
+            onChange={(e) => setHpField(e.target.value)}
+            tabIndex="-1"
+            autoComplete="off"
+          />
+
+          <TurnstileWidget
+            ref={turnstileRef}
+            onVerify={(token) => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken("")}
+          />
+
           {/* Submit */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-14 bg-black text-white rounded-xl text-xs font-bold uppercase tracking-[0.2em] hover:bg-black/90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+            className="w-full h-14 bg-black text-white rounded-xl text-xs font-bold uppercase tracking-[0.2em] hover:bg-black/90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed mt-2 cursor-pointer"
           >
             {loading ? (
               <>

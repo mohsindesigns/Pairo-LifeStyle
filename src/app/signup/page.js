@@ -1,27 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { Mail } from "lucide-react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [hpField, setHpField] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+    if (e && e.preventDefault) e.preventDefault();
     setError("");
+
+    if (hpField) {
+      // Honeypot triggered by bot
+      setSubmitted(true);
+      return;
+    }
+
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ 
+          name, 
+          email, 
+          password, 
+          hp_field: hpField,
+          turnstileToken 
+        }),
       });
 
       const data = await res.json();
@@ -29,10 +51,14 @@ export default function SignupPage() {
       if (res.ok || data.pendingVerification || data.resent) {
         setSubmitted(true);
       } else {
-        setError(data.message || "Something went wrong");
+        setError(data.message || data.error || "Something went wrong");
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
       }
     } catch (err) {
-      setError("Failed to create account");
+      setError("Failed to create account. Please try again.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
     } finally {
       setLoading(false);
     }
@@ -60,7 +86,7 @@ export default function SignupPage() {
           <div className="border-t border-black/10 pt-5 space-y-3">
             <p className="text-[10px] text-black/50 uppercase tracking-widest">Didn&apos;t receive it?</p>
             <button
-              onClick={handleSubmit.bind(null, { preventDefault: () => {} })}
+              onClick={() => handleSubmit({ preventDefault: () => {} })}
               className="text-[10px] font-black uppercase tracking-widest text-black underline underline-offset-4 hover:opacity-70 transition cursor-pointer"
             >
               Resend Verification Email
@@ -131,6 +157,21 @@ export default function SignupPage() {
               />
             </div>
           </div>
+
+          <input
+            type="text"
+            className="hidden"
+            value={hpField}
+            onChange={(e) => setHpField(e.target.value)}
+            tabIndex="-1"
+            autoComplete="off"
+          />
+
+          <TurnstileWidget
+            ref={turnstileRef}
+            onVerify={(token) => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken("")}
+          />
 
           <button
             type="submit"

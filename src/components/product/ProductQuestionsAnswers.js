@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, HelpCircle, Plus, X, ArrowUpRight, Loader, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 export default function ProductQuestionsAnswers({ productId, productName }) {
   const [questions, setQuestions] = useState([]);
@@ -16,6 +17,8 @@ export default function ProductQuestionsAnswers({ productId, productName }) {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [questionText, setQuestionText] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -44,6 +47,11 @@ export default function ProductQuestionsAnswers({ productId, productName }) {
       return;
     }
 
+    if (!turnstileToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch(`/api/products/${productId}/questions`, {
@@ -52,17 +60,23 @@ export default function ProductQuestionsAnswers({ productId, productName }) {
         body: JSON.stringify({
           customerName: customerName.trim(),
           customerEmail: customerEmail.trim(),
-          question: questionText.trim()
+          question: questionText.trim(),
+          turnstileToken
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to submit question");
+      if (!res.ok) {
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
+        throw new Error(data.error || "Failed to submit question");
+      }
 
       toast.success("Thank you! Your question has been submitted for review.");
       setModalOpen(false);
       setCustomerName("");
       setCustomerEmail("");
       setQuestionText("");
+      setTurnstileToken("");
       fetchQuestions(1);
     } catch (err) {
       console.error(err);
@@ -273,6 +287,12 @@ export default function ProductQuestionsAnswers({ productId, productName }) {
                       className="w-full border border-neutral-200 rounded-lg p-3 text-xs outline-none focus:border-black transition-colors resize-none"
                     />
                   </div>
+
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken("")}
+                  />
                 </form>
               </div>
 

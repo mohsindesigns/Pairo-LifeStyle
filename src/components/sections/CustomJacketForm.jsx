@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { Upload, X, Check, AlertCircle, ArrowRight, Loader2, ImageIcon } from "lucide-react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 const JACKET_TYPES = ["Biker Jacket", "Bomber Jacket", "Racer Jacket", "Aviator / Shearling", "Trench Coat", "Blazer", "Vest / Gilet", "Custom / Other"];
 const LEATHER_TYPES = ["Full-Grain Cowhide", "Top-Grain Lambskin", "Genuine Suede", "Shearling", "Nappa Leather", "Distressed Leather", "Vegan Leather", "Custom Specification"];
@@ -49,6 +50,8 @@ export default function CustomJacketForm({
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
 
   const validate = () => {
     const newErrors = {};
@@ -118,11 +121,17 @@ export default function CustomJacketForm({
       return;
     }
 
+    if (!turnstileToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload = {
         ...form,
-        referenceImages: uploadedFiles.map(f => f.url)
+        referenceImages: uploadedFiles.map(f => f.url),
+        turnstileToken
       };
 
       const res = await fetch("/api/custom-jacket/inquiry", {
@@ -131,11 +140,17 @@ export default function CustomJacketForm({
         body: JSON.stringify(payload)
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Submission failed");
+      if (!res.ok) {
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
+        throw new Error(data.error || "Submission failed");
+      }
 
       setSubmitted(true);
       toast.success("Inquiry submitted! We'll contact you within 24 hours.");
     } catch (err) {
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
       toast.error(err.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
@@ -358,6 +373,12 @@ export default function CustomJacketForm({
               </div>
 
               <div className="border-t border-border pt-6">
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken("")}
+                />
+
                 <button
                   type="submit"
                   disabled={submitting}

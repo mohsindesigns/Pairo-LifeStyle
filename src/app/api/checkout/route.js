@@ -19,17 +19,43 @@ import {
   buildGuestCheckoutAccountPayload,
   resolveGuestCheckoutCustomerAction,
 } from "@/lib/guestCheckoutAccount";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { sanitizeText, sanitizeObject } from "@/lib/sanitize";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(req) {
   let session = null;
   const correlationId = req.headers.get("x-correlation-id") || crypto.randomUUID();
   const tenantId = req.headers.get("x-tenant-id") || "DEFAULT_STORE";
   const log = getContextLogger(correlationId, { path: '/api/checkout', tenantId });
+  const ip = getClientIp(req);
+
+  // 1. Rate Limiting (10 checkouts per minute per IP)
+  const rateCheck = await checkRateLimit(req, { limit: 10, window: 60, keyPrefix: "CHECKOUT" });
+  if (!rateCheck.success) {
+    return NextResponse.json(
+      { error: `Too many checkout requests. Please wait ${rateCheck.resetIn} seconds before trying again.` },
+      { status: 429 }
+    );
+  }
+
+  const rawBody = await req.json().catch(() => ({}));
+  const { turnstileToken } = rawBody;
+
+  // 2. Cloudflare Turnstile Verification
+  const turnstileCheck = await verifyTurnstileToken(turnstileToken, ip);
+  if (!turnstileCheck.success) {
+    return NextResponse.json(
+      { error: turnstileCheck.error || "Security check failed. Please complete the captcha." },
+      { status: 400 }
+    );
+  }
+
+  const body = sanitizeObject(rawBody);
 
   const MAX_RETRIES = 3;
   let attempt = 0;
 
-  const body = await req.json();
   const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode } = body;
 
   while (attempt < MAX_RETRIES) {

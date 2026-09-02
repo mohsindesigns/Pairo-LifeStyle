@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { useSiteData } from "@/context/SiteContext";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 function SearchableDropdown({
   label,
@@ -144,6 +145,8 @@ export default function CheckoutPage() {
   const [applyingPromo, setApplyingPromo] = useState(false);
   const [promoError, setPromoError] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const router = useRouter();
 
   // Form State
@@ -479,6 +482,11 @@ export default function CheckoutPage() {
       return;
     }
 
+    if (!turnstileToken) {
+      alert("Please complete the security check.");
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -488,6 +496,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           items: cartItems,
           idempotencyKey,
+          turnstileToken,
           customerEmail: formData.email,
           customerNote: formData.customerNote,
           shippingAddress: {
@@ -544,9 +553,13 @@ export default function CheckoutPage() {
         clearCart();
         router.push(`/checkout/success?id=${data.orderId}&orderNumber=${data.orderNumber}`);
       } else {
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
         alert(data.error || "Order failed");
       }
     } catch (err) {
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
       console.error(err);
       alert("An error occurred during checkout.");
     } finally {
@@ -961,7 +974,13 @@ export default function CheckoutPage() {
             </section>
 
             {/* Submit Action */}
-            <div className="pt-4">
+            <div className="pt-4 space-y-4">
+              <TurnstileWidget
+                ref={turnstileRef}
+                onVerify={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken("")}
+              />
+
               <button
                 type="button"
                 onClick={handlePayment}

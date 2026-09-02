@@ -174,6 +174,7 @@ function FooterColumn({ col, siteData, handleNewsletterSubmit, email, setEmail, 
 export default function Footer() {
   const siteData = useSiteData();
   const [email, setEmail] = useState('');
+  const [hpField, setHpField] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (!siteData) return null;
@@ -245,12 +246,17 @@ export default function Footer() {
   const handleNewsletterSubmit = async (e) => {
     e.preventDefault();
     if (!email) return;
+    if (hpField) {
+      toast.success("You're on the list!");
+      setEmail('');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, hp_field: hpField, sourcePage: 'Footer' })
       });
       const data = await res.json();
       if (res.ok) {

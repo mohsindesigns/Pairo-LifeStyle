@@ -1,10 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { Mail, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 export default function AffiliateForgotPasswordClient() {
   const [email, setEmail] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -15,22 +18,35 @@ export default function AffiliateForgotPasswordClient() {
       setError("Please enter your email address.");
       return;
     }
+
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/affiliate/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ 
+          email: email.trim(),
+          turnstileToken 
+        }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setSuccess(true);
       } else {
         setError(data.error || "Something went wrong. Please try again.");
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
       }
     } catch {
       setError("Network error. Please check your connection.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
     } finally {
       setLoading(false);
     }
@@ -153,6 +169,13 @@ export default function AffiliateForgotPasswordClient() {
                   />
                 </div>
               </div>
+
+              <TurnstileWidget
+                ref={turnstileRef}
+                theme="dark"
+                onVerify={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken("")}
+              />
 
               <button
                 type="submit"

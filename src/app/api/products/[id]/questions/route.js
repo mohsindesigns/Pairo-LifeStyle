@@ -3,6 +3,9 @@ import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
 import ProductQuestion from "@/models/ProductQuestion";
 import { sendQuestionConfirmationEmail, sendAdminQuestionNotification } from "@/lib/email";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { sanitizeText, sanitizeObject } from "@/lib/sanitize";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import mongoose from "mongoose";
 
 export async function GET(req, { params }) {
@@ -61,10 +64,30 @@ export async function GET(req, { params }) {
 
 export async function POST(req, { params }) {
   try {
-    const resolvedParams = await params;
-    const { id: paramId } = resolvedParams;
+    const ip = getClientIp(req);
 
-    const body = await req.json();
+    // 1. Rate Limiting (5 questions per minute per IP)
+    const rateCheck = await checkRateLimit(req, { limit: 5, window: 60, keyPrefix: "PROD_QUESTION" });
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: `Too many requests. Please wait ${rateCheck.resetIn} seconds before trying again.` },
+        { status: 429 }
+      );
+    }
+
+    const rawBody = await req.json().catch(() => ({}));
+    const { turnstileToken } = rawBody;
+
+    // 2. Cloudflare Turnstile Verification
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, ip);
+    if (!turnstileCheck.success) {
+      return NextResponse.json(
+        { error: turnstileCheck.error || "Security check failed. Please verify the captcha." },
+        { status: 400 }
+      );
+    }
+
+    const body = sanitizeObject(rawBody);
     const { customerName, customerEmail, question } = body;
 
     // Field validation
@@ -77,6 +100,9 @@ export async function POST(req, { params }) {
     if (!question || question.trim() === "") {
       return NextResponse.json({ error: "Question text is required" }, { status: 400 });
     }
+
+    const resolvedParams = await params;
+    const { id: paramId } = resolvedParams;
 
     await dbConnect();
 
@@ -96,26 +122,26 @@ export async function POST(req, { params }) {
     // Create the question in Pending status
     const newQuestion = await ProductQuestion.create({
       productId: product._id,
-      customerName: customerName.trim(),
-      customerEmail: customerEmail.trim(),
-      question: question.trim(),
+      customerName: sanitizeText(customerName.trim()),
+      customerEmail: sanitizeText(customerEmail.trim()),
+      question: sanitizeText(question.trim()),
       status: "Pending"
     });
 
-    // Send customer confirmation email
-    await sendQuestionConfirmationEmail({
-      customerEmail: customerEmail.trim(),
-      customerName: customerName.trim(),
-      productName: product.name
-    });
-
-    // Send admin notification email
-    await sendAdminQuestionNotification({
-      customerName: customerName.trim(),
-      customerEmail: customerEmail.trim(),
-      productName: product.name,
-      questionText: question.trim()
-    });
+    // Send emails non-blocking
+    Promise.all([
+      sendQuestionConfirmationEmail({
+        customerEmail: customerEmail.trim(),
+        customerName: customerName.trim(),
+        productName: product.name
+      }),
+      sendAdminQuestionNotification({
+        customerName: customerName.trim(),
+        customerEmail: customerEmail.trim(),
+        productName: product.name,
+        questionText: question.trim()
+      })
+    ]).catch(err => console.error("[ProductQuestion Email Error]", err.message));
 
     return NextResponse.json({
       success: true,

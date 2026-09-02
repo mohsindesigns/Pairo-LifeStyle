@@ -1,35 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock } from "lucide-react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [hpField, setHpField] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    setError("");
 
-    if (result.error) {
-      setError(result.error);
-    } else {
-      const { getSession } = await import("next-auth/react");
-      const session = await getSession();
-      if (session?.user?.isStaff) {
-        router.push("/admin");
+    if (hpField) {
+      // Honeypot caught bot
+      setError("Invalid credentials");
+      return;
+    }
+
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        loginType: "customer",
+        turnstileToken,
+        redirect: false,
+      });
+
+      if (result.error) {
+        setError(result.error);
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
       } else {
-        router.push("/profile");
+        const { getSession } = await import("next-auth/react");
+        const session = await getSession();
+        if (session?.user?.isStaff) {
+          router.push("/admin");
+        } else {
+          router.push("/profile");
+        }
       }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -93,11 +125,27 @@ export default function LoginPage() {
             </div>
           </div>
 
+          <input
+            type="text"
+            className="hidden"
+            value={hpField}
+            onChange={(e) => setHpField(e.target.value)}
+            tabIndex="-1"
+            autoComplete="off"
+          />
+
+          <TurnstileWidget
+            ref={turnstileRef}
+            onVerify={(token) => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken("")}
+          />
+
           <button
             type="submit"
-            className="w-full py-4 bg-black text-white rounded-[4px] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-neutral-900 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+            disabled={loading}
+            className="w-full py-4 bg-black text-white rounded-[4px] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-neutral-900 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
           >
-            Sign In
+            {loading ? "Signing In..." : "Sign In"}
           </button>
 
           <div className="text-center pt-2">

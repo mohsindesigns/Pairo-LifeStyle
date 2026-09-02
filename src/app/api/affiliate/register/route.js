@@ -4,14 +4,13 @@ import AffiliateApplication from "@/models/AffiliateApplication";
 import { sendAffiliateApplicationReceived, sendAffiliateEmailVerification } from "@/lib/email";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/affiliate/rateLimiter";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { sanitizeText, sanitizeObject } from "@/lib/sanitize";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 
-function sanitize(text) {
-  if (!text || typeof text !== 'string') return "";
-  return text.replace(/<[^>]*>/g, '').trim();
-}
+const sanitize = (text) => sanitizeText(text);
 
 // Validates and saves a single uploaded file, returns the saved filename or throws
 async function validateAndSaveFile(file, allowedMimes, maxSize, privateDir) {
@@ -50,6 +49,13 @@ export async function POST(req) {
 
     const formData = await req.formData();
     
+    // Cloudflare Turnstile Verification
+    const turnstileToken = formData.get("turnstileToken");
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken);
+    if (!turnstileCheck.success) {
+      return NextResponse.json({ error: turnstileCheck.error || "Security check failed. Please verify the captcha." }, { status: 400 });
+    }
+
     const email = sanitize(formData.get("email")?.toLowerCase());
     const name = sanitize(formData.get("name"));
     const phone = sanitize(formData.get("phone"));
