@@ -3,7 +3,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 
 describe("Cloudflare Turnstile Verification", () => {
   const originalEnv = process.env;
-
+  const TEST_SECRET_KEY = "0x4AAAAAAEJg7b1or2dWbrKr";
   beforeEach(() => {
     vi.restoreAllMocks();
     process.env = { ...originalEnv };
@@ -28,8 +28,7 @@ describe("Cloudflare Turnstile Verification", () => {
 
   it("should successfully verify official test token against Cloudflare", async () => {
     process.env.STRICT_CAPTCHA_TEST = "true";
-    process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA";
-
+    process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY || TEST_SECRET_KEY;
     // Mock global fetch
     global.fetch = vi.fn().mockResolvedValue({
       json: async () => ({
