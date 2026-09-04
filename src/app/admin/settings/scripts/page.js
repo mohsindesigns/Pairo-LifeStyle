@@ -19,9 +19,11 @@ import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRBAC } from "@/hooks/useRBAC";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 
 export default function ScriptManagementPage() {
   const { can } = useRBAC();
+  const { showConfirm } = usePopup();
   const [scripts, setScripts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -61,7 +63,8 @@ export default function ScriptManagementPage() {
   };
 
   const deleteScript = async (id) => {
-    if (!confirm("Are you sure you want to delete this script? This will stop tracking immediately.")) return;
+    const ok = await showConfirm("Are you sure you want to delete this script? This will stop tracking immediately.");
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/scripts/${id}`, { method: 'DELETE' });
       if (res.ok) {

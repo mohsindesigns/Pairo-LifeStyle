@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { Search, User as UserIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { usePopup } from "@/context/PopupContext";
 
 export default function AdminCustomers() {
+  const { showConfirm } = usePopup();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -31,7 +33,8 @@ export default function AdminCustomers() {
   }, []);
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to move this customer to trash?")) return;
+    const ok = await showConfirm("Are you sure you want to move this customer to trash?");
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/customers?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchCustomers();
@@ -61,7 +64,8 @@ export default function AdminCustomers() {
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} customers?`)) {
+     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} customers?`);
+     if (ok) {
         try {
            for (const id of selectedIds) {
               if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {

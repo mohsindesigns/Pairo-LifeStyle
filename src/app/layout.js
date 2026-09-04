@@ -13,6 +13,7 @@ import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import ScriptLoader from "@/components/common/ScriptLoader";
 import ThemeStyle from "@/components/common/ThemeStyle";
 import { Toaster } from "react-hot-toast";
+import { PopupProvider } from "@/context/PopupContext";
 import { cache, Suspense } from "react";
 import CookieConsent from "@/components/common/CookieConsent";
 import AffiliateTracker from "@/components/common/AffiliateTracker";
@@ -186,18 +187,20 @@ export default async function RootLayout({ children }) {
       <body className={`${inter.variable} ${poppins.variable} font-sans antialiased`}>
         <ScriptLoader location="body_top" />
         <AuthProvider>
-          <Toaster position="top-right" />
-          <CookieConsent />
-          <Suspense fallback={null}>
-            <AffiliateTracker />
-          </Suspense>
-          <SiteProvider initialData={sanitizedConfig}>
-            <CartProvider>
-              <LayoutWrapper>
-                {children}
-              </LayoutWrapper>
-            </CartProvider>
-          </SiteProvider>
+          <PopupProvider>
+            <Toaster position="top-right" />
+            <CookieConsent />
+            <Suspense fallback={null}>
+              <AffiliateTracker />
+            </Suspense>
+            <SiteProvider initialData={sanitizedConfig}>
+              <CartProvider>
+                <LayoutWrapper>
+                  {children}
+                </LayoutWrapper>
+              </CartProvider>
+            </SiteProvider>
+          </PopupProvider>
         </AuthProvider>
         <ScriptLoader location="body_bottom" />
       </body>

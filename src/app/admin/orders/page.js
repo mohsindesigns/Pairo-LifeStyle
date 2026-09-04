@@ -13,9 +13,11 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
+import { usePopup } from "@/context/PopupContext";
 
 export default function AdminOrdersPage() {
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -50,7 +52,8 @@ export default function AdminOrdersPage() {
   }, [fetchOrders]);
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this order permanently?")) return;
+    const ok = await showConfirm("Are you sure you want to delete this order permanently?");
+    if (!ok) return;
     const previousOrders = orders;
     setOrders(prev => prev.filter(o => o._id !== id));
     
@@ -95,7 +98,8 @@ export default function AdminOrdersPage() {
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} orders?`)) {
+     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} orders?`);
+     if (ok) {
         try {
            for (const id of selectedIds) {
               if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {

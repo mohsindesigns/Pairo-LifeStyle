@@ -23,9 +23,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { getProductUrl } from "@/lib/routes";
+import { usePopup } from "@/context/PopupContext";
 
 export default function AdminProducts() {
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -76,7 +78,7 @@ export default function AdminProducts() {
   }, []);
 
   const handleTrash = async (id) => {
-    if (!confirm("Move to trash?")) return;
+    if (!(await showConfirm("Move this product to trash?", "Move to Trash"))) return;
     try {
       const res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchProducts();
@@ -99,7 +101,7 @@ export default function AdminProducts() {
   };
 
   const handlePermanentDeleteProduct = async (id, name) => {
-    if (!confirm(`Are you sure you want to permanently delete "${name}"? This cannot be undone.`)) return;
+    if (!(await showConfirm(`Are you sure you want to permanently delete "${name}"? This cannot be undone.`, "Permanently Delete"))) return;
     try {
       const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
       if (res.ok) fetchProducts();
@@ -130,7 +132,7 @@ export default function AdminProducts() {
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`)) {
+     if (await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`, "Bulk Action")) {
         try {
            for (const id of selectedIds) {
               if (bulkAction === "Move to Trash") {

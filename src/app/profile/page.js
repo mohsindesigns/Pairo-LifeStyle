@@ -6,9 +6,11 @@ import { useEffect, useState, useCallback } from "react";
 import { Trash2, ShoppingBag, ChevronDown, ChevronUp, Star, LogOut, MapPin, User, Search, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import { usePopup } from "@/context/PopupContext";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
+  const { showPopup } = usePopup();
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editingInfo, setEditingInfo] = useState(false);
@@ -72,11 +74,19 @@ export default function ProfilePage() {
           setReviewSuccessMessage("");
         }, 3000);
       } else {
-        alert(data.error || "Failed to submit review.");
+        showPopup({
+          title: "Review Error",
+          message: data.error || "Failed to submit review.",
+          type: "error",
+        });
       }
     } catch (err) {
       console.error(err);
-      alert("Error submitting review.");
+      showPopup({
+        title: "Submission Error",
+        message: "An error occurred while submitting your review. Please try again.",
+        type: "error",
+      });
     } finally {
       setSubmittingReview(false);
     }

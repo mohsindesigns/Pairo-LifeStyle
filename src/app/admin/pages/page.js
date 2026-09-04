@@ -12,13 +12,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
-import { useRBAC } from "@/hooks/useRBAC";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import { usePopup } from "@/context/PopupContext";
 
 export default function PagesManagementPage() {
   const { can } = useRBAC();
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [pages, setPages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -46,7 +47,8 @@ export default function PagesManagementPage() {
 
   const deletePage = async (id, isSystem) => {
     if (isSystem) return toast.error("System pages cannot be deleted");
-    if (!confirm("Are you sure you want to move this page to trash?")) return;
+    const ok = await showConfirm("Are you sure you want to move this page to trash?");
+    if (!ok) return;
     
     try {
       const res = await fetch(`/api/admin/pages/${id}`, { method: 'DELETE' });
@@ -90,7 +92,8 @@ export default function PagesManagementPage() {
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} pages?`)) {
+     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} pages?`);
+     if (ok) {
         try {
            for (const id of selectedIds) {
               const page = pages.find(p => p._id === id);

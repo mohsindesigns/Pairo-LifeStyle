@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from 'next/dynamic';
+import { toast } from "react-hot-toast";
 import {
    ChevronDown,
    Image as ImageIcon,
@@ -343,17 +344,17 @@ export default function ProductForm({ productId = null }) {
          });
           if (res.ok) {
              const savedProduct = await res.json();
-             alert(productId ? "Product updated successfully!" : "Product created successfully!");
+             toast.success(productId ? "Product updated successfully!" : "Product created successfully!");
              if (!productId && savedProduct._id) {
                 router.push(`/admin/products/${savedProduct._id}`);
              }
           } else {
             const errData = await res.json().catch(() => ({}));
-            alert(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
+            toast.error(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
             console.error("[ProductForm] Save failed:", errData);
          }
       } catch (err) {
-         alert(`Network error: ${err.message}`);
+         toast.error(`Network error: ${err.message}`);
          console.error(err);
       } finally {
          setSaving(false);

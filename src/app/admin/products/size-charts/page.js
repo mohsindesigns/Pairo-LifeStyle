@@ -20,9 +20,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 
 export default function AdminSizeCharts() {
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [sizeCharts, setSizeCharts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -63,7 +65,8 @@ export default function AdminSizeCharts() {
 
   // Handle Delete
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this size chart?")) return;
+    const ok = await showConfirm("Are you sure you want to delete this size chart?");
+    if (!ok) return;
 
     try {
       const res = await fetch(`/api/admin/size-charts/${id}`, { method: "DELETE" });
@@ -125,7 +128,8 @@ export default function AdminSizeCharts() {
     if (bulkAction === "Bulk actions") return toast.error("Please select a bulk action");
 
     if (bulkAction === "delete") {
-      if (!confirm(`Are you sure you want to bulk-delete ${selectedIds.length} size charts?`)) return;
+      const ok = await showConfirm(`Are you sure you want to bulk-delete ${selectedIds.length} size charts?`);
+      if (!ok) return;
       let successes = 0;
       for (const id of selectedIds) {
         try {

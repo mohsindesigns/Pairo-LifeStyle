@@ -5,6 +5,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { Star, Search, MessageSquare, Edit2, CornerDownRight, X, Square, CheckSquare } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getProductUrl } from "@/lib/routes";
+import { usePopup } from "@/context/PopupContext";
 
 // Helper to format date like WordPress: YYYY/MM/DD at hh:mm am/pm
 const formatDate = (dateString) => {
@@ -25,6 +26,7 @@ const formatDate = (dateString) => {
 };
 
 export default function AdminReviewsPage() {
+  const { showConfirm } = usePopup();
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState({ 
     averageRating: 0, 
@@ -112,7 +114,8 @@ export default function AdminReviewsPage() {
       bulkAction === "delete_permanently" ? "permanently delete" :
       bulkAction === "restore" ? "restore" : bulkAction;
 
-    if (!window.confirm(`Are you sure you want to ${actionText} ${selectedIds.length} review(s)?`)) {
+    const ok = await showConfirm(`Are you sure you want to ${actionText} ${selectedIds.length} review(s)?`);
+    if (!ok) {
       return;
     }
 
@@ -177,7 +180,8 @@ export default function AdminReviewsPage() {
 
   // Move review to trash (soft-delete)
   const handleTrashSingle = async (reviewId) => {
-    if (window.confirm("Are you sure you want to move this review to Trash?")) {
+    const ok = await showConfirm("Are you sure you want to move this review to Trash?");
+    if (ok) {
       try {
         const res = await fetch(`/api/admin/reviews/${reviewId}`, {
           method: "DELETE"
@@ -215,7 +219,8 @@ export default function AdminReviewsPage() {
 
   // Permanently delete review
   const handleDeletePermanentlySingle = async (reviewId) => {
-    if (window.confirm("Are you sure you want to PERMANENTLY delete this review? This action is irreversible.")) {
+    const ok = await showConfirm("Are you sure you want to PERMANENTLY delete this review? This action is irreversible.");
+    if (ok) {
       try {
         const res = await fetch(`/api/admin/reviews/${reviewId}`, {
           method: "DELETE"

@@ -10,6 +10,7 @@ import SwatchBubble from "@/components/common/SwatchBubble";
 import MadeToMeasureModal from "@/components/product/MadeToMeasureModal";
 import CustomizeProductModal from "@/components/product/CustomizeProductModal";
 import SizeGuideModal from "@/components/product/SizeGuideModal";
+import { usePopup } from "@/context/PopupContext";
 
 export default function ClientProductActions({ product, onVariantChange }) {
   const [selectedOptions, setSelectedOptions] = useState({});
@@ -25,6 +26,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
   }, []);
   const { addToCart } = useCart();
   const router = useRouter();
+  const { showPopup } = usePopup();
 
   const getResolvedSizeChart = () => {
     const source = product.sizeChartSource || (product.sizeGuide?.enabled ? "product_custom" : "category_default");
@@ -147,7 +149,13 @@ export default function ClientProductActions({ product, onVariantChange }) {
     if (product.productType === "variable") {
       const missingAttrs = attributes.filter(attr => !selectedOptions[attr.name]);
       if (missingAttrs.length > 0) {
-        alert(`Please select: ${missingAttrs.map(a => a.name).join(", ")}`);
+        const missingLabels = missingAttrs.map(a => a.name).join(" and ");
+        showPopup({
+          title: "Select Options Required",
+          message: `Please choose your preferred ${missingLabels} before adding this item to your bag.`,
+          type: "warning",
+          confirmText: "Select Options",
+        });
         return;
       }
     }
@@ -189,7 +197,13 @@ export default function ClientProductActions({ product, onVariantChange }) {
     if (product.productType === "variable") {
       const missingAttrs = attributes.filter(attr => !selectedOptions[attr.name]);
       if (missingAttrs.length > 0) {
-        alert(`Please select: ${missingAttrs.map(a => a.name).join(", ")}`);
+        const missingLabels = missingAttrs.map(a => a.name).join(" and ");
+        showPopup({
+          title: "Select Options Required",
+          message: `Please choose your preferred ${missingLabels} before proceeding to checkout.`,
+          type: "warning",
+          confirmText: "Select Options",
+        });
         return;
       }
     }

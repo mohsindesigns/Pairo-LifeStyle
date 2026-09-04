@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
 import { stripePromise } from "@/lib/stripeClient";
 import StripePaymentForm from "@/components/checkout/StripePaymentForm";
+import { usePopup } from "@/context/PopupContext";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -217,6 +218,7 @@ export default function CheckoutPage() {
   const [loadingClientSecret, setLoadingClientSecret] = useState(false);
   const [paymentIntentError, setPaymentIntentError] = useState("");
   const router = useRouter();
+  const { showPopup } = usePopup();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -569,7 +571,11 @@ export default function CheckoutPage() {
     }
 
     if (!turnstileToken) {
-      alert("Please complete the security check.");
+      showPopup({
+        title: "Security Check Required",
+        message: "Please complete the security check before placing your order.",
+        type: "warning",
+      });
       return;
     }
     return true;
@@ -679,13 +685,21 @@ export default function CheckoutPage() {
       } else {
         turnstileRef.current?.reset();
         setTurnstileToken("");
-        alert(data.error || "Order failed");
+        showPopup({
+          title: "Order Failed",
+          message: data.error || "Unable to complete order. Please check your information and try again.",
+          type: "error",
+        });
       }
     } catch (err) {
       turnstileRef.current?.reset();
       setTurnstileToken("");
       console.error(err);
-      alert("An error occurred during checkout.");
+      showPopup({
+        title: "Order Error",
+        message: "An unexpected error occurred during checkout. Please try again.",
+        type: "error",
+      });
     } finally {
       setIsProcessing(false);
     }

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Search, Shield, Mail, Key, UserCheck, UserX, MoreVertical, Lock } from "lucide-react";
+import { UserPlus, Search, Shield, Mail, Key, UserCheck, UserX, MoreVertical, Lock, Eye, EyeOff, Trash2, X } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRBAC } from "@/hooks/useRBAC";
+import { toast } from "react-hot-toast";
 
 export default function StaffManagement() {
   const router = useRouter();
@@ -12,6 +13,8 @@ export default function StaffManagement() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState({ open: false, id: null, name: "", loading: false });
+  const [passwordTarget, setPasswordTarget] = useState({ open: false, id: null, name: "", password: "", showPass: false, loading: false });
 
   const fetchStaff = async () => {
     try {
@@ -47,37 +50,53 @@ export default function StaffManagement() {
     }
   };
 
-  const deleteStaff = async (id) => {
-    if (!confirm("Are you sure you want to delete this staff member? This cannot be undone.")) return;
+  const confirmDeleteStaff = async () => {
+    if (!deleteTarget.id) return;
+    setDeleteTarget(prev => ({ ...prev, loading: true }));
     try {
-      const res = await fetch(`/api/admin/staff/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/staff/${deleteTarget.id}`, { method: 'DELETE' });
       if (res.ok) {
-        setStaff(staff.filter(s => s._id !== id));
+        setStaff(staff.filter(s => s._id !== deleteTarget.id));
+        toast.success(`Staff member "${deleteTarget.name}" deleted successfully.`);
+        setDeleteTarget({ open: false, id: null, name: "", loading: false });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Failed to delete staff member.");
+        setDeleteTarget(prev => ({ ...prev, loading: false }));
       }
     } catch (err) {
       console.error(err);
+      toast.error("Error deleting staff member.");
+      setDeleteTarget(prev => ({ ...prev, loading: false }));
     }
   };
 
-  const resetPassword = async (id) => {
-    const newPassword = prompt("Enter new password (min 6 characters):");
-    if (!newPassword || newPassword.length < 6) return;
-    
+  const submitResetPassword = async (e) => {
+    e?.preventDefault();
+    if (!passwordTarget.password || passwordTarget.password.length < 6) {
+      toast.error("Password must be at least 6 characters long.");
+      return;
+    }
+
+    setPasswordTarget(prev => ({ ...prev, loading: true }));
     try {
-      const res = await fetch(`/api/admin/staff/${id}`, {
+      const res = await fetch(`/api/admin/staff/${passwordTarget.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword })
+        body: JSON.stringify({ password: passwordTarget.password })
       });
       if (res.ok) {
-        alert("Password reset successfully!");
+        toast.success(`Password for "${passwordTarget.name}" updated successfully!`);
+        setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false });
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to reset password");
+        toast.error(data.error || "Failed to reset password");
+        setPasswordTarget(prev => ({ ...prev, loading: false }));
       }
     } catch (err) {
       console.error(err);
-      alert("Error resetting password");
+      toast.error("Error resetting password");
+      setPasswordTarget(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -196,42 +215,152 @@ export default function StaffManagement() {
                     </td>
                      <td className="px-4 py-4 text-center">
                         <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
-                           {s.roleId?.slug !== 'super-admin' && s._id !== session?.user?.id && (
-                              <button 
-                                title="Delete Staff Member" 
-                                onClick={() => deleteStaff(s._id)}
-                                className="p-1.5 text-[#646970] hover:text-red-600 hover:bg-red-50 rounded"
-                              >
-                                <UserX className="w-4 h-4" />
-                              </button>
-                           )}
-                           {s.roleId?.slug === 'super-admin' && (
-                              <div title="System Protected" className="p-1.5 text-gray-300">
-                                 <Lock className="w-4 h-4" />
-                              </div>
-                           )}
-                           <button 
-                             title="Reset Password" 
-                             onClick={() => resetPassword(s._id)}
-                             className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
-                           >
-                             <Key className="w-4 h-4" />
-                           </button>
-                           <button 
-                             title="Edit Member" 
-                             onClick={() => router.push(`/admin/settings/team/${s._id}`)}
-                             className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
-                           >
-                             <MoreVertical className="w-4 h-4" />
-                           </button>
-                        </div>
-                     </td>
-                  </tr>
-                ))
+                            {s.roleId?.slug !== 'super-admin' && s._id !== session?.user?.id && (
+                               <button 
+                                 title="Delete Staff Member" 
+                                 onClick={() => setDeleteTarget({ open: true, id: s._id, name: s.name, loading: false })}
+                                 className="p-1.5 text-[#646970] hover:text-red-600 hover:bg-red-50 rounded"
+                               >
+                                 <UserX className="w-4 h-4" />
+                               </button>
+                            )}
+                            {s.roleId?.slug === 'super-admin' && (
+                               <div title="System Protected" className="p-1.5 text-gray-300">
+                                  <Lock className="w-4 h-4" />
+                               </div>
+                            )}
+                            <button 
+                              title="Reset Password" 
+                              onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
+                              className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
+                            >
+                              <Key className="w-4 h-4" />
+                            </button>
+                            <button 
+                              title="Edit Member" 
+                              onClick={() => router.push(`/admin/settings/team/${s._id}`)}
+                              className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                         </div>
+                      </td>
+                   </tr>
+                 ))
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteTarget.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
+              onClick={() => !deleteTarget.loading && setDeleteTarget({ open: false, id: null, name: "", loading: false })} 
+            />
+            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden z-10 animate-in zoom-in-95">
+              <div className="h-1 bg-red-500 w-full" />
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-neutral-900">Delete Staff Member</h3>
+                    <p className="text-xs text-neutral-500">Revoke administrative access</p>
+                  </div>
+                </div>
+                <p className="text-sm text-neutral-600 mb-6">
+                  Are you sure you want to delete <span className="font-semibold text-neutral-900">{deleteTarget.name}</span>? This action cannot be undone and will revoke their access immediately.
+                </p>
+                <div className="flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    disabled={deleteTarget.loading}
+                    onClick={() => setDeleteTarget({ open: false, id: null, name: "", loading: false })}
+                    className="px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deleteTarget.loading}
+                    onClick={confirmDeleteStaff}
+                    className="px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 active:scale-[0.98] transition-all flex items-center gap-2"
+                  >
+                    {deleteTarget.loading ? "Deleting..." : "Delete Member"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reset Password Modal */}
+        {passwordTarget.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
+              onClick={() => !passwordTarget.loading && setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })} 
+            />
+            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden z-10 animate-in zoom-in-95">
+              <div className="h-1 bg-[#2271b1] w-full" />
+              <form onSubmit={submitResetPassword} className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-[#f0f6fb] flex items-center justify-center text-[#2271b1]">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-neutral-900">Update Password</h3>
+                    <p className="text-xs text-neutral-500">For {passwordTarget.name}</p>
+                  </div>
+                </div>
+                <div className="space-y-3 mb-6">
+                  <label className="block text-xs font-semibold text-neutral-700">
+                    New Password <span className="text-neutral-400 font-normal">(min. 6 characters)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={passwordTarget.showPass ? "text" : "password"}
+                      autoFocus
+                      required
+                      minLength={6}
+                      placeholder="Enter new password..."
+                      value={passwordTarget.password}
+                      onChange={(e) => setPasswordTarget(prev => ({ ...prev, password: e.target.value }))}
+                      className="w-full pl-3 pr-10 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPasswordTarget(prev => ({ ...prev, showPass: !prev.showPass }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                    >
+                      {passwordTarget.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    disabled={passwordTarget.loading}
+                    onClick={() => setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })}
+                    className="px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={passwordTarget.loading}
+                    className="px-4 py-2 rounded-lg bg-[#2271b1] text-white text-xs font-semibold hover:bg-[#135e96] active:scale-[0.98] transition-all flex items-center gap-2"
+                  >
+                    {passwordTarget.loading ? "Saving..." : "Update Password"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </AdminPageLayout>
   );

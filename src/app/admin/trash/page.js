@@ -12,6 +12,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
 
 export default function AdminTrash() {
   const [activeTab, setActiveTab] = useState("products");
@@ -82,14 +83,15 @@ export default function AdminTrash() {
       });
       
       if (res.ok) {
+        toast.success("Item restored successfully");
         fetchTrash();
       } else {
         const err = await res.json();
-        alert(err.error || "Failed to restore");
+        toast.error(err.error || "Failed to restore");
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to restore item");
+      toast.error("Failed to restore item");
     }
   };
 
@@ -113,15 +115,16 @@ export default function AdminTrash() {
       });
       
       if (res.ok) {
+        toast.success("Item permanently deleted");
         setConfirmModal({ open: false, type: "", id: null, name: "" });
         fetchTrash();
       } else {
         const err = await res.json();
-        alert(err.error || "Failed to delete permanently");
+        toast.error(err.error || "Failed to delete permanently");
       }
     } catch (err) {
       console.error(err);
-      alert("Error deleting item permanently");
+      toast.error("Error deleting item permanently");
     } finally {
       setProcessing(false);
     }

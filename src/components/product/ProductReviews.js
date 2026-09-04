@@ -22,6 +22,7 @@ import {
   Loader
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 
 // Helper to generate initials from customer name
 const getInitials = (name) => {
@@ -51,6 +52,7 @@ const getAvatarColor = (name) => {
 
 export default function ProductReviews({ productId, productName, autoOpen = false }) {
   const { data: session } = useSession();
+  const { showConfirm } = usePopup();
   
   // State variables
   const [reviews, setReviews] = useState([]);
@@ -292,7 +294,11 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
 
   // Report handler
   const handleReport = async (reviewId) => {
-    if (window.confirm("Are you sure you want to report this review for violations?")) {
+    const confirmed = await showConfirm(
+      "Are you sure you want to report this review for violations?",
+      "Report Review"
+    );
+    if (confirmed) {
       try {
         const res = await fetch(`/api/reviews/${reviewId}/report`, {
           method: "POST"

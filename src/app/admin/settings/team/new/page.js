@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserPlus, Shield, Mail, Key, ArrowLeft, Save, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { toast } from "react-hot-toast";
 
 export default function InviteStaff() {
   const router = useRouter();
@@ -37,10 +38,11 @@ export default function InviteStaff() {
         body: JSON.stringify(formData)
       });
       if (res.ok) {
+        toast.success("Staff member created successfully!");
         router.push("/admin/settings/team");
       } else {
         const error = await res.json();
-        alert(error.error || "Failed to create staff member");
+        toast.error(error.error || "Failed to create staff member");
       }
     } catch (err) {
       console.error(err);

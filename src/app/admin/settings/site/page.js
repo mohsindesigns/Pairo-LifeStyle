@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
+import { usePopup } from "@/context/PopupContext";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
 
@@ -928,6 +929,7 @@ function SocialLinksTab({ config, onChange }) {
    TAB: Redirect Manager
    ═══════════════════════════════════════════════════════════════ */
 function RedirectsTab() {
+  const { showConfirm } = usePopup();
   const [redirects, setRedirects] = useState([]);
   const [totalRedirects, setTotalRedirects] = useState(0);
   const [redirectsPage, setRedirectsPage] = useState(1);
@@ -1004,7 +1006,8 @@ function RedirectsTab() {
   };
 
   const handleDeleteRedirect = async (id) => {
-    if (!confirm("Are you sure you want to delete this redirect rule?")) return;
+    const ok = await showConfirm("Are you sure you want to delete this redirect rule?");
+    if (!ok) return;
     try {
       const res = await fetch("/api/admin/redirects", {
         method: "DELETE",

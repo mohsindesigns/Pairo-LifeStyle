@@ -8,6 +8,7 @@ import {
   Truck, Check, Pencil, Info, Loader2
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { usePopup } from "@/context/PopupContext";
 
 // ─── Shared WordPress input styles ─────────────────────────────────────────────
 const inp  = "w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white transition-all shadow-sm";
@@ -205,6 +206,7 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
 
 // ─── Zone Postbox (Metabox) ────────────────────────────────────────────────────
 function ZoneCard({ zone: initZone, onDelete, onUpdate }) {
+  const { showConfirm } = usePopup();
   const [zone, setZone]               = useState(initZone);
   const [methods, setMethods]         = useState([]);
   const [hasLoaded, setHasLoaded]     = useState(false);
@@ -251,7 +253,8 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate }) {
   };
 
   const deleteMethod = async (mid) => {
-    if (!confirm("Are you sure you want to delete this shipping method?")) return;
+    const ok = await showConfirm("Are you sure you want to delete this shipping method?");
+    if (!ok) return;
     setDM(mid);
     try {
       const res = await fetch(`/api/admin/shipping/zones/${zone._id}/methods?id=${mid}`, { method: "DELETE" });
@@ -529,6 +532,7 @@ function AddZoneForm({ onCreated }) {
 
 // ─── Main Shipping Settings Page ──────────────────────────────────────────────
 export default function ShippingSettingsPage() {
+  const { showConfirm } = usePopup();
   const [zones, setZones]   = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -545,7 +549,8 @@ export default function ShippingSettingsPage() {
   }, []);
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this zone and ALL its shipping methods? This cannot be undone.")) return;
+    const ok = await showConfirm("Delete this zone and ALL its shipping methods? This cannot be undone.");
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/shipping/zones?id=${id}`, { method: "DELETE" });
       const data = await res.json();

@@ -20,10 +20,12 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { can } from "@/lib/rbac";
 import { formatCurrency } from "@/lib/currency";
 import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
+import { usePopup } from "@/context/PopupContext";
 
 export default function OrderDetailPage() {
   const { id } = useParams();
   const { data: session } = useSession();
+  const { showConfirm } = usePopup();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -223,8 +225,9 @@ export default function OrderDetailPage() {
 
     return (
       <button
-        onClick={() => {
-          if (confirm("Are you sure you want to cancel this order?")) {
+        onClick={async () => {
+          const ok = await showConfirm("Are you sure you want to cancel this order?");
+          if (ok) {
             updateStatus('Cancelled');
           }
         }}

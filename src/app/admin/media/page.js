@@ -7,8 +7,10 @@ import {
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 
 export default function AdminMedia() {
+  const { showConfirm } = usePopup();
   const [items, setItems]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [view, setView]             = useState("grid");          // grid | list
@@ -78,7 +80,7 @@ export default function AdminMedia() {
       const res = await fetch("/api/admin/media/upload", { method: "POST", body: formData });
       const data = await res.json();
       if (data.success) { await fetchMedia("", 1, "library"); setSearch(""); setPage(1); setTab("library"); }
-      if (data.errors?.length) alert(data.errors.map(e => `${e.file}: ${e.error}`).join('\n'));
+      if (data.errors?.length) toast.error(data.errors.map(e => `${e.file}: ${e.error}`).join('\n'));
     } finally { setUploading(false); }
   };
 
@@ -101,7 +103,8 @@ export default function AdminMedia() {
   };
 
   const softDelete = async (id) => {
-    if (!confirm("Are you sure you want to move this file to trash?")) return;
+    const ok = await showConfirm("Are you sure you want to move this file to trash?");
+    if (!ok) return;
     const previousItems = items;
     setItems(prev => prev.filter(item => item._id !== id));
     setDetailItem(null);
@@ -126,7 +129,8 @@ export default function AdminMedia() {
   };
 
   const permanentDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this file permanently? This will break references on products and pages!")) return;
+    const ok = await showConfirm("Are you sure you want to delete this file permanently? This will break references on products and pages!");
+    if (!ok) return;
     const previousItems = items;
     setItems(prev => prev.filter(item => item._id !== id));
     setDetailItem(null);

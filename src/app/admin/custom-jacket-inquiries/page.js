@@ -5,6 +5,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
 import { Eye, Trash2, Search, ChevronLeft, ChevronRight, X, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { usePopup } from "@/context/PopupContext";
 
 const STATUS_COLORS = {
   New: "bg-blue-100 text-blue-700 border-blue-200",
@@ -171,6 +172,7 @@ function DetailModal({ inquiry, onClose, onStatusChange }) {
 }
 
 export default function CustomJacketInquiriesPage() {
+  const { showConfirm } = usePopup();
   const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -208,7 +210,8 @@ export default function CustomJacketInquiriesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Move this inquiry to trash?")) return;
+    const ok = await showConfirm("Move this inquiry to trash?");
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/custom-jacket-inquiries/${id}`, { method: "DELETE" });
       if (res.ok) {

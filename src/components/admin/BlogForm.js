@@ -17,6 +17,7 @@ const TiptapEditor = dynamic(() => import('./TiptapEditor'), { ssr: false });
 import MediaPicker from "@/components/admin/MediaPicker";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
+import { toast } from "react-hot-toast";
 
 export default function BlogForm({ blogId }) {
    const router = useRouter();
@@ -126,15 +127,15 @@ export default function BlogForm({ blogId }) {
             method: "DELETE"
          });
          if (res.ok) {
-            alert("Blog post moved to trash successfully.");
+            toast.success("Blog post moved to trash successfully.");
             router.push("/admin/blogs");
          } else {
             const errData = await res.json().catch(() => ({}));
-            alert(`Failed to move to trash: ${errData.error || res.statusText || "Unknown error"}`);
+            toast.error(`Failed to move to trash: ${errData.error || res.statusText || "Unknown error"}`);
          }
       } catch (err) {
          console.error(err);
-         alert(`Network Error: ${err.message}`);
+         toast.error(`Network Error: ${err.message}`);
       }
    };
 
@@ -164,18 +165,18 @@ export default function BlogForm({ blogId }) {
          });
          if (res.ok) {
             const savedBlog = await res.json();
-            alert(blogId ? "Blog post updated successfully!" : "Blog post created successfully!");
+            toast.success(blogId ? "Blog post updated successfully!" : "Blog post created successfully!");
             if (!blogId && savedBlog._id) {
                router.push(`/admin/blogs/${savedBlog._id}`);
             }
          } else {
             const errData = await res.json().catch(() => ({}));
-            alert(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
+            toast.error(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
             console.error("[BlogForm] Save failed:", errData);
          }
       } catch (err) {
          console.error(err);
-         alert(`Network Error: ${err.message}`);
+         toast.error(`Network Error: ${err.message}`);
       } finally {
          setSaving(false);
       }

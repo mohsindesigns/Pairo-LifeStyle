@@ -23,6 +23,7 @@ import SimulationPanel from "@/components/admin/promotions/Simulator/SimulationP
 import Validator from "@/lib/promotionEngine/Validator";
 
 import RevisionHistory from "@/components/admin/promotions/History/RevisionHistory";
+import { toast } from "react-hot-toast";
 
 export default function PromotionEditor({ isNew = false } = {}) {
   const params = useParams();
@@ -89,7 +90,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
 
   const handleSave = async () => {
     if (!validation.isValid) {
-        alert("Please fix the errors before saving.");
+        toast.error("Please fix the errors before saving.");
         return;
     }
     setSaving(true);

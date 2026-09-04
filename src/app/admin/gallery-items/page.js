@@ -5,6 +5,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, GripVertical, Eye, EyeOff, X, Save, Loader2, Search } from "lucide-react";
+import { usePopup } from "@/context/PopupContext";
 
 const inputClass = "border border-[#8c8f94] bg-white text-[13px] px-3 py-2 rounded-[3px] outline-none focus:border-[#2271b1] w-full";
 
@@ -196,6 +197,7 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
 }
 
 export default function GalleryItemsPage() {
+  const { showConfirm } = usePopup();
   const [items, setItems] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -237,7 +239,8 @@ export default function GalleryItemsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this gallery item?")) return;
+    const ok = await showConfirm("Delete this gallery item?");
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/gallery-items/${id}`, { method: "DELETE" });
       if (res.ok) {

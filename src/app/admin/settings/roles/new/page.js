@@ -6,6 +6,7 @@ import { Shield, Save, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { ALL_PERMISSIONS } from "@/lib/rbac";
+import { toast } from "react-hot-toast";
 
 export default function CreateRole() {
   const router = useRouter();
@@ -26,10 +27,11 @@ export default function CreateRole() {
         body: JSON.stringify(formData)
       });
       if (res.ok) {
+        toast.success("Role created successfully!");
         router.push("/admin/settings/roles");
       } else {
         const error = await res.json();
-        alert(error.error || "Failed to create role");
+        toast.error(error.error || "Failed to create role");
       }
     } catch (err) {
       console.error(err);

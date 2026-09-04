@@ -5,8 +5,10 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPicker from "@/components/admin/MediaPicker";
 import { ArrowUp, ArrowDown, Trash2, Plus, Edit2, Check, X, Move, ImageIcon } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 
 export default function AdminProductProcessPage() {
+  const { showConfirm } = usePopup();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("Our Craftsmanship Process");
@@ -73,8 +75,9 @@ export default function AdminProductProcessPage() {
   };
 
   // Delete Step
-  const handleDeleteStep = (id) => {
-    if (confirm("Are you sure you want to delete this step?")) {
+  const handleDeleteStep = async (id) => {
+    const ok = await showConfirm("Are you sure you want to delete this step?");
+    if (ok) {
       const filtered = steps.filter(s => s.id !== id);
       // Re-index orders
       const reindexed = filtered.map((s, i) => ({ ...s, order: i }));

@@ -16,9 +16,11 @@ import {
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRouter } from "next/navigation";
+import { usePopup } from "@/context/PopupContext";
 
 export default function AdminBlogs() {
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,7 +76,8 @@ export default function AdminBlogs() {
   }, [fetchBlogs]);
 
   const handleTrash = async (id) => {
-    if (!confirm("Move to trash?")) return;
+    const ok = await showConfirm("Are you sure you want to move this blog to trash?");
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/blogs?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchBlogs();
@@ -97,7 +100,8 @@ export default function AdminBlogs() {
   };
 
   const handlePermanentDeleteBlog = async (id, title) => {
-    if (!confirm(`Are you sure you want to permanently delete "${title}"? This cannot be undone.`)) return;
+    const ok = await showConfirm(`Are you sure you want to permanently delete "${title}"? This cannot be undone.`);
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/blogs?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchBlogs();
@@ -128,7 +132,8 @@ export default function AdminBlogs() {
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`)) {
+     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`);
+     if (ok) {
         try {
            for (const id of selectedIds) {
               if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {

@@ -21,8 +21,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { usePopup } from "@/context/PopupContext";
 
 export default function PromotionsDashboard() {
+  const { showConfirm } = usePopup();
   const [promotions, setPromotions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -86,7 +88,8 @@ export default function PromotionsDashboard() {
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} promotions?`)) {
+     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} promotions?`);
+     if (ok) {
         try {
            for (const id of selectedIds) {
               if (bulkAction === "Delete Permanently" || bulkAction === "Move to Trash") {

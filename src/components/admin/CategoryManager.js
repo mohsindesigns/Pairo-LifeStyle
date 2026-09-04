@@ -6,9 +6,11 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getCategoryUrl } from "@/lib/routes";
+import { usePopup } from "@/context/PopupContext";
 
 export default function CategoryManager({ type = "product", title = "Categories" }) {
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,7 +39,8 @@ export default function CategoryManager({ type = "product", title = "Categories"
   }, [fetchCategories]);
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure?")) return;
+    const ok = await showConfirm("Are you sure you want to delete this category?");
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchCategories();
@@ -68,7 +71,8 @@ export default function CategoryManager({ type = "product", title = "Categories"
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (confirm(`Apply "${bulkAction}" to ${selectedIds.length} categories?`)) {
+     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} categories?`);
+     if (ok) {
         try {
            for (const id of selectedIds) {
               if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {

@@ -4,8 +4,10 @@ import React, { useState, useEffect } from "react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { MessageSquare, Check, EyeOff, Trash2, Reply, Eye, Search, AlertCircle, X, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 
 export default function AdminProductQuestionsPage() {
+  const { showConfirm } = usePopup();
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState([]);
   const [stats, setStats] = useState({ pendingCount: 0, approvedCount: 0, hiddenCount: 0 });
@@ -92,7 +94,8 @@ export default function AdminProductQuestionsPage() {
   };
 
   const handleDeleteQuestion = async (id) => {
-    if (confirm("Delete this question permanently?")) {
+    const ok = await showConfirm("Delete this question permanently?");
+    if (ok) {
       try {
         const res = await fetch(`/api/admin/products/questions/${id}`, { method: "DELETE" });
         if (!res.ok) throw new Error();

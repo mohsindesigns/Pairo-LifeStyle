@@ -17,9 +17,11 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { usePopup } from "@/context/PopupContext";
 
 export default function UserOrderDetailPage() {
   const { id } = useParams();
+  const { showPopup, showConfirm } = usePopup();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
@@ -35,62 +37,80 @@ export default function UserOrderDetailPage() {
     recommend: true
   });
 
-  const handleReviewSubmit = async (e, productId, orderNumber, customerName) => {
+  const handleReviewSubmit = async (e, productId, orderId) => {
     e.preventDefault();
     setSubmittingReview(true);
-    setReviewSuccessMessage("");
     try {
-      const res = await fetch(`/api/products/${productId}/reviews`, {
+      const res = await fetch("/api/reviews/product", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          productId,
+          orderId,
           rating: reviewForm.rating,
           title: reviewForm.title,
           comment: reviewForm.comment,
-          customerName: reviewForm.customerName || customerName || "Customer",
-          recommend: reviewForm.recommend,
-          orderNumber: orderNumber
+          customerName: reviewForm.customerName,
+          recommend: reviewForm.recommend
         })
       });
       const data = await res.json();
       if (res.ok) {
         setReviewSuccessMessage("Thank you! Your verified review has been submitted.");
-        setReviewForm({
-          rating: 5,
-          title: "",
-          comment: "",
-          customerName: "",
-          recommend: true
-        });
+        setReviewForm({ rating: 5, title: "", comment: "", customerName: "", recommend: true });
         setTimeout(() => {
           setActiveReviewId(null);
           setReviewSuccessMessage("");
         }, 3000);
       } else {
-        alert(data.error || "Failed to submit review.");
+        showPopup({
+          title: "Review Error",
+          message: data.error || "Failed to submit review.",
+          type: "error",
+        });
       }
     } catch (err) {
       console.error(err);
-      alert("Error submitting review.");
+      showPopup({
+        title: "Error",
+        message: "Error submitting review. Please try again.",
+        type: "error",
+      });
     } finally {
       setSubmittingReview(false);
     }
   };
 
   const handleCancel = async () => {
-    if (!confirm("Are you sure you want to cancel this order? This action cannot be undone.")) return;
+    const confirmed = await showConfirm(
+      "Are you sure you want to cancel this order? This action cannot be undone.",
+      "Cancel Order"
+    );
+    if (!confirmed) return;
     setCancelling(true);
     try {
       const res = await fetch(`/api/profile/orders/${id}/cancel`, { method: "PATCH" });
       const data = await res.json();
       if (data.success) {
-        alert("Order cancelled successfully.");
+        await showPopup({
+          title: "Order Cancelled",
+          message: "Order cancelled successfully.",
+          type: "success",
+        });
         window.location.reload();
       } else {
-        alert(data.error);
+        showPopup({
+          title: "Cancellation Failed",
+          message: data.error || "Failed to cancel order.",
+          type: "error",
+        });
       }
     } catch (err) {
-      alert("Failed to cancel order.");
+      showPopup({
+        title: "Error",
+        message: "Failed to cancel order.",
+        type: "error",
+      });
     } finally {
       setCancelling(false);
     }

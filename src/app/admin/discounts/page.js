@@ -4,10 +4,12 @@ import React, { useEffect, useState, useCallback, Suspense } from "react";
 import { ChevronDown, Search, Edit2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { usePopup } from "@/context/PopupContext";
 
 function CouponsContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
@@ -168,7 +170,8 @@ function CouponsContent() {
   };
 
   const handleDelete = async (id, isPermanently = false) => {
-    if (!confirm(`Are you sure you want to ${isPermanently ? 'permanently delete' : 'trash'} this coupon?`)) return;
+    const ok = await showConfirm(`Are you sure you want to ${isPermanently ? 'permanently delete' : 'trash'} this coupon?`);
+    if (!ok) return;
     setErrorNotice("");
     setSuccessNotice("");
     try {
@@ -214,7 +217,8 @@ function CouponsContent() {
     setSuccessNotice("");
     
     const count = selectedIds.length;
-    if (confirm(`Apply "${bulkAction}" to ${count} coupon(s)?`)) {
+    const ok = await showConfirm(`Apply "${bulkAction}" to ${count} coupon(s)?`);
+    if (ok) {
       try {
         let successCount = 0;
         let failCount = 0;

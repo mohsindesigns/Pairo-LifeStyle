@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 const TiptapEditor = dynamic(() => import('@/components/admin/TiptapEditor'), { ssr: false });
 import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
 import { Pencil, ExternalLink } from "lucide-react";
+import { toast } from "react-hot-toast";
 
 export default function CategoryForm({ categoryId = null, type = "product" }) {
   const router = useRouter();
@@ -124,17 +125,17 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       
       if (res.ok) {
         const savedCat = await res.json();
-        alert(categoryId ? "Category updated successfully!" : "Category created successfully!");
+        toast.success(categoryId ? "Category updated successfully!" : "Category created successfully!");
         if (!categoryId && savedCat._id) {
           router.push(type === 'product' ? `/admin/products/categories/${savedCat._id}` : `/admin/blogs/categories/${savedCat._id}`);
         }
       } else {
         const data = await res.json();
-        alert("Error saving category: " + (data.error || "Unknown error"));
+        toast.error("Error saving category: " + (data.error || "Unknown error"));
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to save category. Check console.");
+      toast.error("Failed to save category. Check console.");
     } finally {
       setSaving(false);
     }

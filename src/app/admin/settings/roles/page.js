@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Shield, Save, Plus, Trash2, Copy, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { ALL_PERMISSIONS, ACTIONS } from "@/lib/rbac";
+import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 
 export default function RoleManagement() {
+  const router = useRouter();
+  const { showConfirm } = usePopup();
   const [roles, setRoles] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,43 +63,27 @@ export default function RoleManagement() {
       });
       if (res.ok) {
         setRoles(roles.map(r => r._id === selectedRole._id ? selectedRole : r));
-        alert("Permissions saved successfully!");
+        toast.success("Permissions saved successfully!");
       }
     } catch (err) {
       console.error(err);
+      toast.error("Failed to save permissions");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCreateRole = async () => {
-    const name = prompt("Enter new role name (e.g., Marketing Manager):");
-    if (!name) return;
-    const description = prompt("Enter role description:");
-    
-    try {
-      const res = await fetch("/api/admin/roles", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description, permissions: {} })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setRoles([...roles, data]);
-        setSelectedRole(data);
-        alert(`Role "${name}" created successfully!`);
-      } else {
-        alert(data.error || "Failed to create role");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error creating role");
-    }
+  const handleCreateRole = () => {
+    router.push("/admin/settings/roles/new");
   };
 
   const deleteRole = async (role) => {
-    if (role.isSystem) return alert("System roles cannot be deleted.");
-    if (!confirm(`Are you sure you want to delete the "${role.name}" role?`)) return;
+    if (role.isSystem) return toast.error("System roles cannot be deleted.");
+    const confirmed = await showConfirm(
+      `Are you sure you want to delete the "${role.name}" role?`,
+      "Delete Role"
+    );
+    if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/admin/roles/${role._id}`, { method: 'DELETE' });
@@ -102,10 +91,11 @@ export default function RoleManagement() {
         const remaining = roles.filter(r => r._id !== role._id);
         setRoles(remaining);
         if (selectedRole?._id === role._id) setSelectedRole(remaining[0] || null);
-        alert("Role deleted successfully.");
+        toast.success("Role deleted successfully.");
       }
     } catch (err) {
       console.error(err);
+      toast.error("Failed to delete role");
     }
   };
 
