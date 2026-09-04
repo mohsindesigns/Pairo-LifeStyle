@@ -35,6 +35,8 @@ export async function createOrderFromCheckoutPayload(payload, {
         checkoutEmail,
         orderUserId,
         tenantId,
+        shippingAddress,
+        shippingSnapshot,
         mongoSession,
         dryRun: false,
       });
@@ -48,6 +50,8 @@ export async function createOrderFromCheckoutPayload(payload, {
         affiliateDiscountType,
         affiliateDiscountValue,
         affiliateDiscountAmount,
+        authoritativeShippingCost,
+        authoritativeTax,
         authoritativeTotal,
       } = pricing;
 
@@ -101,12 +105,9 @@ export async function createOrderFromCheckoutPayload(payload, {
       const count = await Order.countDocuments({ tenantId }, { session: mongoSession });
       const orderNumber = `PAI-${1000 + count + 1}`;
 
-      if (shippingSnapshot && typeof shippingSnapshot.cost === 'number') {
-        const declaredShipping = Number(financials.shippingCost ?? 0);
-        if (Math.abs(shippingSnapshot.cost - declaredShipping) > 0.01) {
-          throw new Error(`Shipping cost mismatch: snapshot says ${shippingSnapshot.cost}, financials says ${declaredShipping}.`);
-        }
-      }
+      // Shipping cost is no longer taken from the client at all — computeAuthoritativeCheckout
+      // above already re-derived it from the real ShippingZone/ShippingMethod config and threw
+      // if the selected method wasn't actually available, so there's nothing further to verify here.
 
       const isPaid = paymentInfo?.status === 'Paid';
       const initialStatus = isPaid ? 'Confirmed' : 'Pending';
@@ -129,8 +130,8 @@ export async function createOrderFromCheckoutPayload(payload, {
         affiliateReferralCode,
         financials: {
           subtotal:              financials.subtotal,
-          shippingCost:          financials.shippingCost || 0,
-          tax:                   financials.tax || 0,
+          shippingCost:          authoritativeShippingCost,
+          tax:                   authoritativeTax,
           discountTotal:         finalDiscountTotal,
           affiliateDiscountType,
           affiliateDiscountValue,

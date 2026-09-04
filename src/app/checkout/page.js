@@ -12,6 +12,7 @@ import TurnstileWidget from "@/components/common/TurnstileWidget";
 import { stripePromise } from "@/lib/stripeClient";
 import StripePaymentForm from "@/components/checkout/StripePaymentForm";
 import { usePopup } from "@/context/PopupContext";
+import { getProductUrl } from "@/lib/routes";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -1206,15 +1207,25 @@ export default function CheckoutPage() {
                 return (
                   <div key={itemKey} className="flex gap-4 items-center py-3.5 first:pt-0 last:pb-0">
                     <div className="relative shrink-0 w-14 h-18">
-                      <div className="w-full h-full bg-[#FAF9F6] rounded-lg border border-black/[0.05] overflow-hidden">
+                      <Link 
+                        href={getProductUrl(item)} 
+                        className="block w-full h-full bg-[#FAF9F6] rounded-lg border border-black/[0.05] overflow-hidden hover:opacity-85 transition-opacity"
+                        title={item.name}
+                      >
                         <img src={itemImage} alt={item.name} className="w-full h-full object-cover" />
-                      </div>
-                      <span className="absolute -top-1.5 -right-1.5 bg-black text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-bold shadow-md z-10 border border-white">
+                      </Link>
+                      <span className="absolute -top-1.5 -right-1.5 bg-black text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-bold shadow-md z-10 border border-white pointer-events-none">
                         {item.quantity}
                       </span>
                     </div>
                     <div className="flex-1 space-y-0.5 min-w-0">
-                      <p className="text-[13px] font-bold text-black uppercase tracking-wide truncate">{item.name}</p>
+                      <Link 
+                        href={getProductUrl(item)} 
+                        className="text-[13px] font-bold text-black uppercase tracking-wide truncate hover:underline hover:text-black/80 transition-all block"
+                        title={item.name}
+                      >
+                        {item.name}
+                      </Link>
 
                       {item.selectedOptions && (
                         <p className="text-[10px] text-black font-semibold uppercase tracking-wider">

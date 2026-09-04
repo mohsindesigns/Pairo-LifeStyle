@@ -459,7 +459,10 @@ export default function Footer() {
       {/* Animated Brand Name Section */}
       <div className="relative my-8 md:my-12">
         <div className="text-center px-4">
-          <div className="text-[25vw] font-bold heading-font leading-[0.75] normal-case tracking-tighter text-white inline-flex justify-center flex-wrap select-none">
+          <div 
+            className="text-[25vw] font-bold font-montserrat leading-[0.75] normal-case tracking-tighter text-white inline-flex justify-center flex-wrap select-none"
+            style={{ fontFamily: "var(--font-montserrat), 'Montserrat', sans-serif" }}
+          >
             {footerBrandName.split("").map((letter, i) => (
               <motion.span key={i} custom={i} initial="hidden" whileInView="visible" viewport={{ once: false, amount: 0.1 }} variants={letterVariants} className="inline-block">{letter}</motion.span>
             ))}

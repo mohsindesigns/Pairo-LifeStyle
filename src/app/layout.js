@@ -1,4 +1,4 @@
-import { Inter, Poppins } from "next/font/google";
+import { Inter, Poppins, Montserrat } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import AuthProvider from "@/components/providers/AuthProvider";
@@ -20,6 +20,7 @@ import AffiliateTracker from "@/components/common/AffiliateTracker";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const poppins = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-poppins" });
+const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"], variable: "--font-montserrat" });
 
 export const revalidate = 60; // Enable ISR, cache public pages for 60 seconds
 
@@ -184,7 +185,7 @@ export default async function RootLayout({ children }) {
         <ScriptLoader location="head" />
         <ThemeStyle />
       </head>
-      <body className={`${inter.variable} ${poppins.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${poppins.variable} ${montserrat.variable} font-sans antialiased`}>
         <ScriptLoader location="body_top" />
         <AuthProvider>
           <PopupProvider>

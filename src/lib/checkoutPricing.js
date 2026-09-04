@@ -4,8 +4,27 @@ import Promotion from "@/models/Promotion";
 import Affiliate from "@/models/Affiliate";
 import Engine from "@/lib/promotionEngine/Engine";
 import { validateLegacyDiscount, calculateEligibleSubtotal } from "@/lib/couponValidator";
+import { shippingService } from "@/services/shipping/ShippingService";
 
 const withSession = (query, mongoSession) => mongoSession ? query.session(mongoSession) : query;
+
+// Recomputes the real shipping cost server-side instead of trusting whatever
+// the client submitted — otherwise a forged request can claim any shipping
+// price (including $0) for a real order. If the zone has no rates at all,
+// authoritative cost is 0 (nothing to charge for); if rates exist, the
+// client's selected method must still be one of them.
+async function resolveAuthoritativeShippingCost({ tenantId, shippingAddress, shippingSnapshot, subtotal, items, mongoSession }) {
+  if (!shippingAddress) return 0;
+
+  const result = await shippingService.getRatesForAddress(tenantId, shippingAddress, subtotal, items);
+  if (!result.rates || result.rates.length === 0) return 0;
+
+  const matchedRate = result.rates.find(r => String(r.methodId) === String(shippingSnapshot?.methodId));
+  if (!matchedRate) {
+    throw new Error("Selected shipping method is no longer available for this address. Please refresh and choose a shipping method again.");
+  }
+  return matchedRate.cost;
+}
 
 export async function computeAuthoritativeCheckout({
   items,
@@ -14,6 +33,8 @@ export async function computeAuthoritativeCheckout({
   checkoutEmail,
   orderUserId,
   tenantId,
+  shippingAddress = null,
+  shippingSnapshot = null,
   mongoSession = null,
   dryRun = false,
   log = null,
@@ -194,10 +215,18 @@ export async function computeAuthoritativeCheckout({
     }
   }
 
+  const authoritativeShippingCost = await resolveAuthoritativeShippingCost({
+    tenantId, shippingAddress, shippingSnapshot, subtotal: financials.subtotal, items, mongoSession,
+  });
+
+  // Tax is not yet wired into checkout by design (see admin Tax Settings / TaxService) —
+  // forced to 0 here rather than trusting a client-submitted financials.tax value.
+  const authoritativeTax = 0;
+
   const authoritativeTotal = Math.max(
     0,
     (financials.subtotal || 0) - finalDiscountTotal - affiliateDiscountAmount +
-    Number(financials.shippingCost || 0) + Number(financials.tax || 0)
+    authoritativeShippingCost + authoritativeTax
   );
 
   return {
@@ -210,6 +239,8 @@ export async function computeAuthoritativeCheckout({
     affiliateDiscountType,
     affiliateDiscountValue,
     affiliateDiscountAmount,
+    authoritativeShippingCost,
+    authoritativeTax,
     authoritativeTotal
   };
 }

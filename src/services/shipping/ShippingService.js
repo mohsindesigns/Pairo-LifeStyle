@@ -56,7 +56,7 @@ class ShippingService {
    */
   async #getStoreCurrency(tenantId) {
     try {
-      const config = await SiteConfig.findOne({ key: 'main' }).select('commerce').lean();
+      const config = await SiteConfig.findOne({ key: 'main', tenantId }).select('commerce').lean();
       return config?.commerce?.storeCurrency ?? 'USD';
     } catch {
       return 'USD';

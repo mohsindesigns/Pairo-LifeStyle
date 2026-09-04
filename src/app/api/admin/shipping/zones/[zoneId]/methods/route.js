@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import mongoose        from 'mongoose';
 import dbConnect      from '@/lib/db';
+import ShippingZone   from '@/models/ShippingZone';
 import ShippingMethod from '@/models/ShippingMethod';
 import { getServerSession } from 'next-auth';
 import { authOptions }      from '@/app/api/auth/[...nextauth]/route';
@@ -31,11 +33,17 @@ export async function POST(req, { params }) {
     if (!await requireSettings()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     await dbConnect();
     const { zoneId } = await params;
+    if (!mongoose.Types.ObjectId.isValid(zoneId)) {
+      return NextResponse.json({ error: 'Invalid zone id.' }, { status: 400 });
+    }
+    const zoneExists = await ShippingZone.exists({ _id: zoneId, tenantId: TENANT_ID });
+    if (!zoneExists) return NextResponse.json({ error: 'Shipping zone not found.' }, { status: 404 });
+
     const body = await req.json();
     const { name, description, provider, settings, conditions, status, sortOrder, activeFrom, activeUntil } = body;
     if (!name?.trim()) return NextResponse.json({ error: 'Method name is required.' }, { status: 400 });
     if (!provider) return NextResponse.json({ error: 'Provider is required.' }, { status: 400 });
-    const method = await ShippingMethod.create({ tenantId: TENANT_ID, zoneId, name: name.trim(), description: description ?? '', provider, settings: settings ?? {}, conditions: conditions ?? [], status: status ?? 'Active', sortOrder: sortOrder ?? 0, activeFrom: activeFrom ?? null, activeUntil: activeUntil ?? null });
+    const method = await ShippingMethod.create({ tenantId: TENANT_ID, zoneId, name: name.trim(), description: description ?? '', provider, settings: settings ?? {}, conditions: conditions ?? [], status: status ?? 'Active', sortOrder: sortOrder ?? 0, activeFrom: activeFrom || null, activeUntil: activeUntil || null });
     return NextResponse.json({ success: true, method }, { status: 201 });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -47,12 +55,16 @@ export async function PUT(req, { params }) {
     if (!await requireSettings()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     await dbConnect();
     const { zoneId } = await params;
+    if (!mongoose.Types.ObjectId.isValid(zoneId)) {
+      return NextResponse.json({ error: 'Invalid zone id.' }, { status: 400 });
+    }
     const body = await req.json();
     const { id, name, description, provider, settings, conditions, status, sortOrder, activeFrom, activeUntil } = body;
     if (!id) return NextResponse.json({ error: 'Method id is required.' }, { status: 400 });
+    if (!name?.trim()) return NextResponse.json({ error: 'Method name is required.' }, { status: 400 });
     const method = await ShippingMethod.findOneAndUpdate(
       { _id: id, zoneId, tenantId: TENANT_ID },
-      { $set: { name, description, provider, settings, conditions, status, sortOrder, activeFrom, activeUntil } },
+      { $set: { name: name.trim(), description, provider, settings, conditions, status, sortOrder, activeFrom: activeFrom || null, activeUntil: activeUntil || null } },
       { new: true, runValidators: true }
     );
     if (!method) return NextResponse.json({ error: 'Method not found.' }, { status: 404 });
