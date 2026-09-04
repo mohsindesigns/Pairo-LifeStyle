@@ -85,8 +85,8 @@ export default function ContactSection({
   officeHours = "",
   bespokeFittingText = "",
   channels = [
-    { label: "General Inquiries", value: "concierge@pairo.com" },
-    { label: "Press & Media", value: "press@pairo.com" }
+    { label: "General Inquiries", value: "support@pairolifestyle.com" },
+    { label: "Press & Media", value: "support@pairolifestyle.com" }
   ],
   socialLabel = "FOLLOW OUR JOURNEY",
   socialLinks = [],

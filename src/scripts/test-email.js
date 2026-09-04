@@ -69,7 +69,7 @@ async function testEmail() {
     console.log("Sending test mail...");
     const info = await transporter.sendMail({
       from: `"PAIRO Test" <${process.env.EMAIL_FROM}>`,
-      to: "ammansoor0077@gmail.com",
+      to: "support@pairolifestyle.com",
       subject: "PAIRO Email Connectivity Test",
       text: "If you are reading this, your SMTP configuration is working correctly.",
       html: "<b>If you are reading this, your SMTP configuration is working correctly.</b>"

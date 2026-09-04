@@ -6,7 +6,7 @@ export const siteConfig = {
     address: "123 Excellence Way, Suite 100",
     city: "New York, NY 10001",
     country: "USA",
-    email: "support@pairo.com",
+    email: "support@pairolifestyle.com",
     phone: "+1 (555) PAIRO-EX"
   },
   invoice: {

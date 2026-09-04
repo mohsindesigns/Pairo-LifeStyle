@@ -22,7 +22,7 @@ export async function GET(req) {
         cookieDurationDays: 30,
         minimumPayoutAmount: 50,
         autoApproveApplications: false,
-        supportEmail: "affiliates@pairolifestyle.com"
+        supportEmail: "support@pairolifestyle.com"
       });
     }
 

@@ -7,7 +7,7 @@ const AffiliateSettingsSchema = new mongoose.Schema({
   autoApproveApplications: { type: Boolean, default: false },
   allowedCountries: { type: [String], default: [] }, // Empty means all
   referralAttributionMode: { type: String, enum: ['last-click', 'first-click'], default: 'last-click' },
-  supportEmail: { type: String, default: 'affiliates@pairolifestyle.com' }
+  supportEmail: { type: String, default: 'support@pairolifestyle.com' }
 }, { timestamps: true });
 
 delete mongoose.models.AffiliateSettings;

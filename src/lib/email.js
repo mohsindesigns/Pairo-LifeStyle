@@ -1044,7 +1044,7 @@ export async function sendCustomerPasswordReset(toEmail, name, resetUrl) {
  * Send a confirmation email to the customer who submitted a Custom Jacket inquiry.
  */
 export async function sendCustomJacketConfirmation(toEmail, firstName, inquiry) {
-  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'info@pairolifestyle.com';
+  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'support@pairolifestyle.com';
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const storeUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pairolifestyle.com';
 
@@ -1111,8 +1111,8 @@ export async function sendCustomJacketConfirmation(toEmail, firstName, inquiry) 
  * Notify admin of a new Custom Jacket inquiry.
  */
 export async function sendCustomJacketAdminNotification(inquiry) {
-  const adminEmail = process.env.ADMIN_EMAIL || process.env.STORE_EMAIL || 'info@pairolifestyle.com';
-  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'info@pairolifestyle.com';
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.STORE_EMAIL || 'support@pairolifestyle.com';
+  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'support@pairolifestyle.com';
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const storeUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pairolifestyle.com';
 

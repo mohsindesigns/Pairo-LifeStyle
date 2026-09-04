@@ -20,7 +20,7 @@ export default function AffiliatesManagerClient({ userSession }) {
     cookieDurationDays: 30,
     minimumPayoutAmount: 50,
     autoApproveApplications: false,
-    supportEmail: "affiliates@pairolifestyle.com"
+    supportEmail: "support@pairolifestyle.com"
   });
 
   // Action / Edit Modal States
