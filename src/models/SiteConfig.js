@@ -118,7 +118,11 @@ const SiteConfigSchema = new mongoose.Schema({
   commerce: {
     storeCurrency: { type: String, default: 'USD' },              // ISO 4217 currency code
     weightUnit:    { type: String, enum: ['kg', 'lb'], default: 'kg' },
-    dimensionUnit: { type: String, enum: ['cm', 'in'], default: 'cm' }
+    dimensionUnit: { type: String, enum: ['cm', 'in'], default: 'cm' },
+    paymentMethods: {
+      cardEnabled: { type: Boolean, default: true },
+      codEnabled:  { type: Boolean, default: true },
+    }
   },
 
   // ─── Legacy fields kept for backward compatibility ─────────

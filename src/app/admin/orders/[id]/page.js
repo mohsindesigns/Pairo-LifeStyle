@@ -307,8 +307,9 @@ export default function OrderDetailPage() {
                   <div className="text-[13px] space-y-1 leading-relaxed">
                     <p>{order.shippingAddress?.street || "—"}</p>
                     <p>
-                      {order.shippingAddress?.city || "—"},{" "}
-                      {order.shippingAddress?.zip || "—"}
+                      {order.shippingAddress?.city || "—"}
+                      {order.shippingAddress?.state ? `, ${order.shippingAddress.state}` : ""}
+                      {order.shippingAddress?.zip ? ` ${order.shippingAddress.zip}` : ""}
                     </p>
                     <p>{order.shippingAddress?.country || "—"}</p>
                     <p className="pt-2 text-[#2271b1] font-medium">

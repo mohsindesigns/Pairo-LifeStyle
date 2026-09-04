@@ -28,7 +28,7 @@ const InvoiceTemplate = ({ order }) => {
           <p className="text-sm font-bold">{order.shippingAddress.fullName}</p>
           <p className="text-sm leading-relaxed text-black/60">
             {order.shippingAddress.street}<br />
-            {order.shippingAddress.city}, {order.shippingAddress.zip}<br />
+            {order.shippingAddress.city}{order.shippingAddress.state ? `, ${order.shippingAddress.state}` : ""} {order.shippingAddress.zip}<br />
             {order.shippingAddress.country}
           </p>
           <p className="text-sm font-medium mt-2">{order.shippingAddress.phone}</p>

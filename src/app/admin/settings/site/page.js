@@ -99,6 +99,13 @@ const SOCIALS = [
 function GeneralTab({ config, onChange }) {
   const b = config.brand || {};
   const set = (k, v) => onChange({ ...config, brand: { ...b, [k]: v } });
+  const pm = config.commerce?.paymentMethods || {};
+  const setPm = (k, v) => onChange({
+    ...config,
+    commerce: { ...(config.commerce || {}), paymentMethods: { cardEnabled: true, codEnabled: true, ...pm, [k]: v } }
+  });
+  const cardEnabled = pm.cardEnabled !== false;
+  const codEnabled = pm.codEnabled !== false;
   return (
     <table className="form-table w-full"><tbody>
       <TextRow label="Site Title" value={b.name} onChange={v => set('name', v)} placeholder="Pairo" />
@@ -122,6 +129,34 @@ function GeneralTab({ config, onChange }) {
             onChange={e => onChange({ ...config, disableSearchEngineIndexing: e.target.checked })}
             className="w-4 h-4 accent-[#2271b1] cursor-pointer"
           />
+        </td>
+      </tr>
+      <tr className="border-b border-[#f0f0f1]">
+        <th className="text-left px-3 py-4 align-top w-52">
+          <label className={labelClass}>Payment Methods</label>
+          <p className={descClass}>Choose which payment methods customers can select at checkout. At least one must stay on.</p>
+        </th>
+        <td className="px-3 py-4 space-y-2">
+          <label className="flex items-center gap-2 text-[13px] text-[#1d2327] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={cardEnabled}
+              onChange={e => setPm('cardEnabled', e.target.checked)}
+              disabled={cardEnabled && !codEnabled}
+              className="w-4 h-4 accent-[#2271b1] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            Card (Stripe)
+          </label>
+          <label className="flex items-center gap-2 text-[13px] text-[#1d2327] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={codEnabled}
+              onChange={e => setPm('codEnabled', e.target.checked)}
+              disabled={codEnabled && !cardEnabled}
+              className="w-4 h-4 accent-[#2271b1] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            Cash on Delivery (COD)
+          </label>
         </td>
       </tr>
     </tbody></table>

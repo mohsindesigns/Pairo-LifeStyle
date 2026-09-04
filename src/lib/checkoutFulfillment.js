@@ -65,6 +65,14 @@ export async function createOrderFromCheckoutPayload(payload, {
           if (!invRes) throw new Error(`Insufficient stock for ${product.name}`);
         }
 
+        const selectedOptions = item.selectedOptions && Object.keys(item.selectedOptions).length > 0
+          ? item.selectedOptions
+          : null;
+        const variantTitle = selectedOptions
+          ? (product.attributes || []).map(a => selectedOptions[a.name]).filter(Boolean).join(" / ")
+            || Object.values(selectedOptions).join(" / ")
+          : null;
+
         orderItems.push({
           productId: product._id,
           name: product.name,
@@ -72,7 +80,9 @@ export async function createOrderFromCheckoutPayload(payload, {
           image: item.image || product.images?.[0] || product.image,
           priceAtPurchase: item.price,
           quantity: item.quantity,
-          ...(item.madeToMeasure?.enabled ? { madeToMeasure: item.madeToMeasure } : {})
+          ...(variantTitle ? { selectedVariant: { title: variantTitle, options: selectedOptions } } : {}),
+          ...(item.madeToMeasure?.enabled ? { madeToMeasure: item.madeToMeasure } : {}),
+          ...(item.customization?.enabled ? { customization: item.customization } : {})
         });
       }
 

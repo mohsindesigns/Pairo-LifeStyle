@@ -209,6 +209,9 @@ export default function CheckoutPage() {
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef(null);
+  const paymentMethods = siteData?.commerce?.paymentMethods || {};
+  const cardMethodEnabled = paymentMethods.cardEnabled !== false;
+  const codMethodEnabled = paymentMethods.codEnabled !== false;
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [clientSecret, setClientSecret] = useState("");
   const [loadingClientSecret, setLoadingClientSecret] = useState(false);
@@ -249,6 +252,17 @@ export default function CheckoutPage() {
       setIdempotencyKey(`pai_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`);
     });
   }, []);
+
+  // Keep the selected payment method valid if the admin disables one
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      if (paymentMethod === "card" && !cardMethodEnabled && codMethodEnabled) {
+        setPaymentMethod("cod");
+      } else if (paymentMethod === "cod" && !codMethodEnabled && cardMethodEnabled) {
+        setPaymentMethod("card");
+      }
+    });
+  }, [cardMethodEnabled, codMethodEnabled, paymentMethod]);
 
   // Load all countries on mount
   useEffect(() => {
@@ -1075,40 +1089,44 @@ export default function CheckoutPage() {
             <section className="space-y-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-black">Payment</h2>
               <div className="border border-neutral-200 rounded-[4px] divide-y divide-neutral-200 overflow-hidden bg-white">
-                <label
-                  className={`flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50/50 transition-colors ${paymentMethod === "card" ? "bg-neutral-50/30" : ""}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      checked={paymentMethod === "card"}
-                      onChange={() => setPaymentMethod("card")}
-                      className="accent-black w-4 h-4"
-                    />
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-5 h-5 text-neutral-600" />
-                      <span className="text-[13px] font-semibold text-black">Credit / Debit Card</span>
+                {cardMethodEnabled && (
+                  <label
+                    className={`flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50/50 transition-colors ${paymentMethod === "card" ? "bg-neutral-50/30" : ""}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={paymentMethod === "card"}
+                        onChange={() => setPaymentMethod("card")}
+                        className="accent-black w-4 h-4"
+                      />
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-5 h-5 text-neutral-600" />
+                        <span className="text-[13px] font-semibold text-black">Credit / Debit Card</span>
+                      </div>
                     </div>
-                  </div>
-                </label>
-                <label
-                  className={`flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50/50 transition-colors ${paymentMethod === "cod" ? "bg-neutral-50/30" : ""}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      checked={paymentMethod === "cod"}
-                      onChange={() => setPaymentMethod("cod")}
-                      className="accent-black w-4 h-4"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Truck className="w-5 h-5 text-neutral-600" />
-                      <span className="text-[13px] font-semibold text-black">Cash on Delivery (COD)</span>
+                  </label>
+                )}
+                {codMethodEnabled && (
+                  <label
+                    className={`flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50/50 transition-colors ${paymentMethod === "cod" ? "bg-neutral-50/30" : ""}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={paymentMethod === "cod"}
+                        onChange={() => setPaymentMethod("cod")}
+                        className="accent-black w-4 h-4"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Truck className="w-5 h-5 text-neutral-600" />
+                        <span className="text-[13px] font-semibold text-black">Cash on Delivery (COD)</span>
+                      </div>
                     </div>
-                  </div>
-                </label>
+                  </label>
+                )}
               </div>
 
               {paymentMethod === "card" && (

@@ -106,6 +106,7 @@ const OrderSchema = new mongoose.Schema({
     fullName: String,
     street: String,
     city: String,
+    state: String,
     zip: String,
     country: String,
     phone: String
