@@ -138,10 +138,10 @@ export function PopupProvider({ children }) {
       case "success":
         return <CheckCircle2 className="w-6 h-6 text-emerald-600" />;
       case "confirm":
-        return <HelpCircle className="w-6 h-6 text-black" />;
+        return <HelpCircle className="w-6 h-6 text-[var(--foreground)]" />;
       case "info":
       default:
-        return <Info className="w-6 h-6 text-neutral-800" />;
+        return <Info className="w-6 h-6 text-[var(--foreground)]" />;
     }
   };
 
@@ -154,10 +154,9 @@ export function PopupProvider({ children }) {
       case "success":
         return "bg-emerald-50 border-emerald-200 text-emerald-800";
       case "confirm":
-        return "bg-neutral-100 border-neutral-200 text-neutral-800";
       case "info":
       default:
-        return "bg-neutral-100 border-neutral-200 text-neutral-800";
+        return "bg-[var(--secondary)] border-[var(--border)] text-[var(--foreground)]";
     }
   };
 
@@ -179,7 +178,7 @@ export function PopupProvider({ children }) {
           />
 
           {/* Modal Container */}
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95">
+          <div className="relative w-full max-w-md bg-[var(--background)] rounded-[var(--radius,16px)] shadow-2xl border border-[var(--border)] overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95">
             {/* Top decorative accent bar */}
             <div
               className={`h-1.5 w-full ${
@@ -189,14 +188,14 @@ export function PopupProvider({ children }) {
                   ? "bg-amber-500"
                   : popupState.type === "success"
                   ? "bg-emerald-500"
-                  : "bg-black"
+                  : "bg-[var(--primary)]"
               }`}
             />
 
             {/* Close X Button */}
             <button
               onClick={() => closePopup(false)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[var(--foreground)]/40 hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors"
               aria-label="Close modal"
             >
               <X className="w-4 h-4" />
@@ -206,14 +205,15 @@ export function PopupProvider({ children }) {
               {/* Icon & Badge */}
               <div className="flex items-center gap-3 mb-4">
                 <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center border ${getBadgeStyle()}`}
+                  className={`w-11 h-11 rounded-[var(--radius,12px)] flex items-center justify-center border ${getBadgeStyle()}`}
                 >
                   {getIcon()}
                 </div>
                 <div>
                   <h3
                     id="global-popup-title"
-                    className="text-lg font-bold text-neutral-900 tracking-tight leading-snug"
+                    style={{ fontFamily: "var(--brand-font)" }}
+                    className="text-lg font-bold text-[var(--foreground)] tracking-tight leading-snug"
                   >
                     {popupState.title}
                   </h3>
@@ -222,7 +222,7 @@ export function PopupProvider({ children }) {
 
               {/* Message */}
               <div className="mt-2 mb-6">
-                <p className="text-[14px] leading-relaxed text-neutral-600 whitespace-pre-line font-normal">
+                <p className="text-[14px] leading-relaxed text-[var(--foreground)]/70 whitespace-pre-line font-normal">
                   {popupState.message}
                 </p>
               </div>
@@ -233,7 +233,7 @@ export function PopupProvider({ children }) {
                   <button
                     type="button"
                     onClick={() => closePopup(false)}
-                    className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl border border-neutral-300 text-neutral-700 text-xs font-semibold uppercase tracking-wider hover:bg-neutral-50 active:scale-[0.98] transition-all"
+                    className="flex-1 sm:flex-initial px-5 py-2.5 rounded-[var(--radius,12px)] border border-[var(--border)] text-[var(--foreground)] text-xs font-semibold uppercase tracking-wider hover:bg-[var(--secondary)] active:scale-[0.98] transition-all"
                   >
                     {popupState.cancelText}
                   </button>
@@ -242,7 +242,7 @@ export function PopupProvider({ children }) {
                   type="button"
                   autoFocus
                   onClick={() => closePopup(true)}
-                  className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-black text-white text-xs font-semibold uppercase tracking-wider hover:bg-neutral-800 active:scale-[0.98] transition-all shadow-sm"
+                  className="flex-1 sm:flex-initial px-6 py-2.5 rounded-[var(--radius,12px)] bg-[var(--primary)] text-[var(--background)] text-xs font-semibold uppercase tracking-wider hover:opacity-90 active:scale-[0.98] transition-all shadow-sm"
                 >
                   {popupState.confirmText}
                 </button>
