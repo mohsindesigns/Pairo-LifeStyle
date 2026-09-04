@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "react-hot-toast";
 import { User, MapPin, Globe, Award, Upload, ArrowRight, ArrowLeft, Loader2, Check, Camera, RefreshCw, ChevronDown, Search } from "lucide-react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 function SearchableDropdown({
   label,
@@ -162,6 +163,8 @@ export default function BecomeAffiliateClient() {
   const [bankDocFile, setBankDocFile] = useState(null);
   const [checkingCode, setCheckingCode] = useState(false);
   const [codeAvailable, setCodeAvailable] = useState(null); // null | true | false
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
 
   // Selfie Verification States
   const [selfieFile, setSelfieFile] = useState(null);
@@ -425,6 +428,10 @@ export default function BecomeAffiliateClient() {
        toast.error("Please capture your live selfie to verify your identity.");
        return;
      }
+     if (!turnstileToken) {
+       toast.error("Please complete the security check.");
+       return;
+     }
 
     setLoading(true);
     const dataToSend = new FormData();
@@ -443,6 +450,7 @@ export default function BecomeAffiliateClient() {
     if (profilePhotoFile) dataToSend.append("profilePhoto", profilePhotoFile);
     if (bankDocFile) dataToSend.append("bankVerificationDocument", bankDocFile);
     if (selfieFile) dataToSend.append("liveSelfie", selfieFile);
+    if (turnstileToken) dataToSend.append("turnstileToken", turnstileToken);
 
 
     try {
@@ -986,6 +994,12 @@ export default function BecomeAffiliateClient() {
                 )}
               </div>
             </div>
+
+            <TurnstileWidget
+              ref={turnstileRef}
+              onVerify={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+            />
           </div>
         )}
 

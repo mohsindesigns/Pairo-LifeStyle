@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, ShoppingCart, User, Menu, X, ChevronDown, LogIn } from "lucide-react";
+import { Search, ShoppingCart, User, Menu, X, ChevronDown, LogIn, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "next-auth/react";
 import logo from '../../assets/png-file.png';
@@ -155,6 +155,7 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeOffer, setActiveOffer] = useState(0);
+  const [isOfferHovered, setIsOfferHovered] = useState(false);
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [mobileDropdowns, setMobileDropdowns] = useState({});
   const [mounted, setMounted] = useState(false);
@@ -279,19 +280,39 @@ export default function Navbar() {
   return (
     <>
       {/* Top Carousel Banner */}
-      <div className="bg-black text-white text-center py-2 text-xs md:text-sm font-medium relative overflow-hidden h-10">
+      <div className="bg-black text-white text-center py-2 text-xs md:text-sm font-medium relative overflow-hidden h-10 select-none">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeOffer}
-            initial={{ y: 20, opacity: 0 }}
+            initial={{ y: 12, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -20, opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="absolute inset-0 flex items-center justify-center font-sans tracking-wide px-4"
+            exit={{ y: -12, opacity: 0 }}
+            transition={{ duration: 0.35 }}
+            className="absolute inset-0 flex items-center justify-center font-sans tracking-[0.14em] uppercase text-[11px] sm:text-[12px] px-4 font-semibold"
           >
-            {offers[activeOffer]}
+            <span className="announcement-glow-text">
+              {offers[activeOffer]}
+            </span>
           </motion.div>
         </AnimatePresence>
+        <style jsx>{`
+          .announcement-glow-text {
+            animation: breatheGlow 2.8s ease-in-out infinite;
+            display: inline-block;
+          }
+          @keyframes breatheGlow {
+            0%, 100% {
+              opacity: 0.55;
+              filter: drop-shadow(0 0 0px rgba(255, 255, 255, 0));
+              letter-spacing: 0.14em;
+            }
+            50% {
+              opacity: 1;
+              filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.65));
+              letter-spacing: 0.16em;
+            }
+          }
+        `}</style>
       </div>
 
       <header

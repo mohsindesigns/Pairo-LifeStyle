@@ -86,6 +86,18 @@ const SiteConfigSchema = new mongoose.Schema({
     logoUrl: { type: String, default: '' },        // dynamic footer logo
     // ── Dynamic columns (new system) ──────────────────────────
     footerColumns: [FooterColumnSchema],           // fully dynamic column array
+    // ── Bottom Links (Privacy, Terms, Sitemap) ────────────────
+    privacyLabel: { type: String, default: 'Privacy' },
+    privacyUrl: { type: String, default: '' },
+    privacyPageSlug: { type: String, default: '' },
+    showPrivacyLink: { type: Boolean, default: true },
+    termsLabel: { type: String, default: 'Terms' },
+    termsUrl: { type: String, default: '' },
+    termsPageSlug: { type: String, default: '' },
+    showTermsLink: { type: Boolean, default: true },
+    sitemapLabel: { type: String, default: 'Sitemap' },
+    sitemapUrl: { type: String, default: '/sitemap' },
+    showSitemapLink: { type: Boolean, default: true },
     // ── Legacy fields (backward compat — used when footerColumns is empty) ──
     newsletterHeading: { type: String, default: 'Elite List' },
     newsletterDescription: { type: String, default: '' },

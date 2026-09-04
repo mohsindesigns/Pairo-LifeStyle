@@ -94,7 +94,7 @@ import { writeFile, unlink, mkdir } from 'fs/promises';
 import path from 'path';
 
 async function uploadToLocal(buffer, originalName) {
-  const uploadDir = path.join(process.cwd(), 'public/uploads');
+  const uploadDir = process.env.LOCAL_UPLOAD_DIR || path.join(process.cwd(), 'public/uploads');
   await mkdir(uploadDir, { recursive: true });
   const safeName = `${Date.now()}-${originalName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9.-]/g, '')}`;
   const filePath = path.join(uploadDir, safeName);
@@ -111,7 +111,8 @@ async function uploadToLocal(buffer, originalName) {
 
 async function deleteFromLocal(publicId) {
   try {
-    const filePath = path.join(process.cwd(), 'public/uploads', publicId);
+    const uploadDir = process.env.LOCAL_UPLOAD_DIR || path.join(process.cwd(), 'public/uploads');
+    const filePath = path.join(uploadDir, publicId);
     await unlink(filePath);
     return { success: true };
   } catch (err) {

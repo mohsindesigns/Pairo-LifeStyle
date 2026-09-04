@@ -77,7 +77,7 @@ function TextRow({ label, description, value, onChange, placeholder, textarea })
       <th className="text-left px-3 py-4 align-top w-52"><label className={labelClass}>{label}</label>{description && <p className={descClass}>{description}</p>}</th>
       <td className="px-3 py-4">
         {textarea ? <textarea className={`${inputClass} resize-none`} rows={3} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
-        : <input className={inputClass} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />}
+          : <input className={inputClass} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />}
       </td>
     </tr>
   );
@@ -104,8 +104,8 @@ function GeneralTab({ config, onChange }) {
       <TextRow label="Site Title" value={b.name} onChange={v => set('name', v)} placeholder="Pairo" />
       <ImagePicker label="Favicon" description="Upload a square icon (e.g. 512x512) for the browser tab." value={b.faviconUrl} onChange={v => set('faviconUrl', v)} />
       <TextRow label="Tagline" value={b.tagline} onChange={v => set('tagline', v)} placeholder="Premium Shearling" description="In a few words, explain what this site is about." />
-      <TextRow label="Footer Brand Name" value={b.footerBrandName} onChange={v => set('footerBrandName', v)} placeholder="PAIRO" description="Large animated text shown at the bottom of the footer." />
-      <TextRow label="Copyright Text" value={b.copyrightText} onChange={v => set('copyrightText', v)} placeholder="PAIRO — ALL RIGHTS RESERVED © 2026" />
+      <TextRow label="Footer Brand Name" value={b.footerBrandName} onChange={v => set('footerBrandName', v)} placeholder="PAiRO" description="Large animated text shown at the bottom of the footer." />
+      <TextRow label="Copyright Text" value={b.copyrightText} onChange={v => set('copyrightText', v)} placeholder="PAIRO — ALL RIGHTS RESERVED © 2026." />
       <TextRow label="Privacy Policy URL" value={b.privacyUrl} onChange={v => set('privacyUrl', v)} placeholder="/privacy" />
       <TextRow label="Terms of Service URL" value={b.termsUrl} onChange={v => set('termsUrl', v)} placeholder="/terms" />
       <TextRow label="WhatsApp Number" value={b.whatsappNumber} onChange={v => set('whatsappNumber', v)} placeholder="+1234567890" description="Atelier WhatsApp contact number with country code." />
@@ -439,30 +439,30 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
    ════════════════════════════════════════════════════════════ */
 
 const COLUMN_TYPES = [
-  { value: 'newsletter',   label: 'Newsletter' },
-  { value: 'collections',  label: 'Collections' },
-  { value: 'blog_posts',   label: 'Blog Posts' },
-  { value: 'pages',        label: 'Pages' },
+  { value: 'newsletter', label: 'Newsletter' },
+  { value: 'collections', label: 'Collections' },
+  { value: 'blog_posts', label: 'Blog Posts' },
+  { value: 'pages', label: 'Pages' },
   { value: 'custom_links', label: 'Custom Links' },
 ];
 
 function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChange, onDelete, onMove }) {
   const [expanded, setExpanded] = useState(true);
 
-  const addCustomLink = () => onChange({ customLinks: [...(col.customLinks || []), { id: generateId(), label: '', url: '', order: (col.customLinks||[]).length }] });
-  const updateCustomLink = (li, u) => onChange({ customLinks: (col.customLinks||[]).map((l,i) => i===li ? {...l,...u} : l) });
-  const removeCustomLink = (li) => onChange({ customLinks: (col.customLinks||[]).filter((_,i) => i!==li).map((l,i) => ({...l,order:i})) });
+  const addCustomLink = () => onChange({ customLinks: [...(col.customLinks || []), { id: generateId(), label: '', url: '', order: (col.customLinks || []).length }] });
+  const updateCustomLink = (li, u) => onChange({ customLinks: (col.customLinks || []).map((l, i) => i === li ? { ...l, ...u } : l) });
+  const removeCustomLink = (li) => onChange({ customLinks: (col.customLinks || []).filter((_, i) => i !== li).map((l, i) => ({ ...l, order: i })) });
 
-  const toggleCat   = (slug) => { const ids = col.categoryIds||[]; onChange({ categoryIds: ids.includes(slug) ? ids.filter(s=>s!==slug) : [...ids,slug] }); };
-  const toggleBlog  = (id)   => { const ids = col.blogIds||[];     onChange({ blogIds:     ids.includes(id)   ? ids.filter(s=>s!==id)   : [...ids,id]   }); };
-  const togglePage  = (id)   => { const ids = col.pageIds||[];     onChange({ pageIds:     ids.includes(id)   ? ids.filter(s=>s!==id)   : [...ids,id]   }); };
+  const toggleCat = (slug) => { const ids = col.categoryIds || []; onChange({ categoryIds: ids.includes(slug) ? ids.filter(s => s !== slug) : [...ids, slug] }); };
+  const toggleBlog = (id) => { const ids = col.blogIds || []; onChange({ blogIds: ids.includes(id) ? ids.filter(s => s !== id) : [...ids, id] }); };
+  const togglePage = (id) => { const ids = col.pageIds || []; onChange({ pageIds: ids.includes(id) ? ids.filter(s => s !== id) : [...ids, id] }); };
 
   return (
     <div className="bg-white border border-[#c3c4c7] rounded-[3px] overflow-hidden">
       {/* Column Card Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7]">
         <div className="flex items-center gap-3">
-          <span className="text-[11px] font-bold text-[#646970] uppercase tracking-wider">Col {idx+1}</span>
+          <span className="text-[11px] font-bold text-[#646970] uppercase tracking-wider">Col {idx + 1}</span>
           <input
             className={`${inputClass} w-48 text-[13px] font-semibold`}
             value={col.heading}
@@ -478,11 +478,11 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
           </select>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" disabled={idx===0} onClick={() => onMove(idx, -1)}
+          <button type="button" disabled={idx === 0} onClick={() => onMove(idx, -1)}
             className="p-1.5 rounded-[3px] text-[#646970] hover:bg-[#e5e5e5] disabled:opacity-30 transition-colors" title="Move Up">
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
-          <button type="button" disabled={idx===total-1} onClick={() => onMove(idx, 1)}
+          <button type="button" disabled={idx === total - 1} onClick={() => onMove(idx, 1)}
             className="p-1.5 rounded-[3px] text-[#646970] hover:bg-[#e5e5e5] disabled:opacity-30 transition-colors" title="Move Down">
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
@@ -513,16 +513,16 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
               {dbCategories.length === 0
                 ? <p className="text-[12px] text-[#646970] italic">No published categories found.</p>
                 : <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {dbCategories.map(cat => {
-                      const selected = (col.categoryIds||[]).includes(cat.slug);
-                      return (
-                        <label key={cat.slug} className={`flex items-center gap-2 p-2.5 border rounded-[3px] cursor-pointer text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
-                          <input type="checkbox" checked={selected} onChange={() => toggleCat(cat.slug)} />
-                          <span className="font-medium text-[#1d2327]">{cat.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {dbCategories.map(cat => {
+                    const selected = (col.categoryIds || []).includes(cat.slug);
+                    return (
+                      <label key={cat.slug} className={`flex items-center gap-2 p-2.5 border rounded-[3px] cursor-pointer text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
+                        <input type="checkbox" checked={selected} onChange={() => toggleCat(cat.slug)} />
+                        <span className="font-medium text-[#1d2327]">{cat.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               }
             </div>
           )}
@@ -534,17 +534,17 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
               {dbBlogs.length === 0
                 ? <p className="text-[12px] text-[#646970] italic">No published blog posts found.</p>
                 : <div className="max-h-48 overflow-y-auto border border-[#c3c4c7] rounded-[3px] divide-y divide-[#f0f0f1]">
-                    {dbBlogs.map(blog => {
-                      const id = blog._id?.toString();
-                      const selected = (col.blogIds||[]).includes(id);
-                      return (
-                        <label key={id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-[12px] transition-colors ${selected ? 'bg-[#f0f6fb]' : 'hover:bg-[#f6f7f7]'}`}>
-                          <input type="checkbox" checked={selected} onChange={() => toggleBlog(id)} />
-                          <span className="text-[#1d2327] truncate">{blog.title}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {dbBlogs.map(blog => {
+                    const id = blog._id?.toString();
+                    const selected = (col.blogIds || []).includes(id);
+                    return (
+                      <label key={id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-[12px] transition-colors ${selected ? 'bg-[#f0f6fb]' : 'hover:bg-[#f6f7f7]'}`}>
+                        <input type="checkbox" checked={selected} onChange={() => toggleBlog(id)} />
+                        <span className="text-[#1d2327] truncate">{blog.title}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               }
             </div>
           )}
@@ -556,17 +556,17 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
               {dbPages.length === 0
                 ? <p className="text-[12px] text-[#646970] italic">No published pages found.</p>
                 : <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {dbPages.map(page => {
-                      const id = page._id?.toString();
-                      const selected = (col.pageIds||[]).includes(id);
-                      return (
-                        <label key={id} className={`flex items-center gap-2 p-2.5 border rounded-[3px] cursor-pointer text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
-                          <input type="checkbox" checked={selected} onChange={() => togglePage(id)} />
-                          <span className="font-medium text-[#1d2327]">{page.title || page.slug}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  {dbPages.map(page => {
+                    const id = page._id?.toString();
+                    const selected = (col.pageIds || []).includes(id);
+                    return (
+                      <label key={id} className={`flex items-center gap-2 p-2.5 border rounded-[3px] cursor-pointer text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
+                        <input type="checkbox" checked={selected} onChange={() => togglePage(id)} />
+                        <span className="font-medium text-[#1d2327]">{page.title || page.slug}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               }
             </div>
           )}
@@ -574,11 +574,11 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
           {/* Custom Links */}
           {col.type === 'custom_links' && (
             <div className="space-y-2">
-              {(col.customLinks||[]).length === 0 && <p className="text-[12px] text-[#646970] italic">No links yet. Add one below.</p>}
-              {(col.customLinks||[]).map((link, li) => (
-                <div key={link.id||li} className="flex gap-2 items-center">
+              {(col.customLinks || []).length === 0 && <p className="text-[12px] text-[#646970] italic">No links yet. Add one below.</p>}
+              {(col.customLinks || []).map((link, li) => (
+                <div key={link.id || li} className="flex gap-2 items-center">
                   <input className={`${inputClass} flex-1`} value={link.label} onChange={e => updateCustomLink(li, { label: e.target.value })} placeholder="Label" />
-                  <input className={`${inputClass} flex-1`} value={link.url}   onChange={e => updateCustomLink(li, { url:   e.target.value })} placeholder="/url or https://..." />
+                  <input className={`${inputClass} flex-1`} value={link.url} onChange={e => updateCustomLink(li, { url: e.target.value })} placeholder="/url or https://..." />
                   <button type="button" onClick={() => removeCustomLink(li)} className="p-1 text-[#d63638] hover:bg-red-50 rounded-[3px]"><X className="w-4 h-4" /></button>
                 </div>
               ))}
@@ -598,7 +598,7 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
   const fc = config.footerConfig || {};
   const setFc = (u) => onChange({ ...config, footerConfig: { ...fc, ...u } });
 
-  const columns = (fc.footerColumns || []).slice().sort((a,b) => (a.order||0)-(b.order||0));
+  const columns = (fc.footerColumns || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const addColumn = () => {
     const newCol = { id: generateId(), type: 'custom_links', heading: 'New Column', order: columns.length, categoryIds: [], blogIds: [], pageIds: [], customLinks: [] };
@@ -606,12 +606,12 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
   };
 
   const updateColumn = (idx, u) => {
-    const updated = columns.map((c,i) => i===idx ? {...c,...u} : c);
+    const updated = columns.map((c, i) => i === idx ? { ...c, ...u } : c);
     setFc({ footerColumns: updated });
   };
 
   const deleteColumn = (idx) => {
-    const updated = columns.filter((_,i) => i!==idx).map((c,i) => ({...c, order:i}));
+    const updated = columns.filter((_, i) => i !== idx).map((c, i) => ({ ...c, order: i }));
     setFc({ footerColumns: updated });
   };
 
@@ -620,7 +620,7 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
     const target = idx + dir;
     if (target < 0 || target >= arr.length) return;
     [arr[idx], arr[target]] = [arr[target], arr[idx]];
-    setFc({ footerColumns: arr.map((c,i) => ({...c, order:i})) });
+    setFc({ footerColumns: arr.map((c, i) => ({ ...c, order: i })) });
   };
 
   return (
@@ -655,7 +655,7 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
           )}
           {columns.map((col, idx) => (
             <ColumnEditor
-              key={col.id||idx}
+              key={col.id || idx}
               col={col}
               idx={idx}
               total={columns.length}
@@ -670,59 +670,169 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
         </div>
       </div>
 
-      {/* Privacy & Terms Page Links */}
+      {/* Privacy, Terms & Sitemap Links */}
       <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">Privacy & Terms Links</h3>
+        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">Footer Bottom Links (Privacy, Terms, Sitemap)</h3>
         <p className="px-4 pt-3 text-[12px] text-[#646970]">
-          Select which published page should open when a visitor clicks the Privacy or Terms link in the footer.
-          Create your pages first under <strong>Pages → Add New</strong>.
+          Configure labels, links, and visibility for the links displayed at the bottom of the footer next to the copyright notice.
         </p>
         <table className="w-full mt-2">
           <tbody>
+            {/* Privacy Policy Link */}
             <tr className="border-b border-[#f0f0f1]">
               <th className="text-left px-4 py-3 align-top w-52">
-                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Privacy Policy Page</label>
-                <p className="text-[12px] text-[#646970]">Footer &ldquo;Privacy&rdquo; link target</p>
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Privacy Policy</label>
+                <p className="text-[12px] text-[#646970]">Label, target page/URL & visibility</p>
               </th>
-              <td className="px-4 py-3">
-                <select
-                  value={fc.privacyPageSlug || ""}
-                  onChange={e => setFc({ privacyPageSlug: e.target.value })}
-                  className="w-full max-w-sm border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
-                >
-                  <option value="">— None selected —</option>
-                  {(dbPages || []).map(p => (
-                    <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
-                  ))}
-                </select>
-                {fc.privacyPageSlug && (
-                  <p className="text-[11px] text-[#2271b1] mt-1">
-                    Link will go to: <strong>/{fc.privacyPageSlug}</strong>
-                  </p>
-                )}
+              <td className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={fc.showPrivacyLink !== false}
+                      onChange={e => setFc({ showPrivacyLink: e.target.checked })}
+                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
+                    />
+                    <span>Show in Footer</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fc.privacyLabel ?? "Privacy"}
+                    onChange={e => setFc({ privacyLabel: e.target.value })}
+                    placeholder="Link Label (e.g. Privacy Policy)"
+                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
+                  <div>
+                    <label className="text-[11px] text-[#646970] block mb-0.5">Select CMS Page:</label>
+                    <select
+                      value={fc.privacyPageSlug || ""}
+                      onChange={e => setFc({ privacyPageSlug: e.target.value })}
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+                    >
+                      <option value="">— None selected —</option>
+                      {(dbPages || []).map(p => (
+                        <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[#646970] block mb-0.5">Or Custom URL (optional):</label>
+                    <input
+                      type="text"
+                      value={fc.privacyUrl || ""}
+                      onChange={e => setFc({ privacyUrl: e.target.value })}
+                      placeholder="/privacy or https://..."
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+                    />
+                  </div>
+                </div>
               </td>
             </tr>
+
+            {/* Terms of Service Link */}
+            <tr className="border-b border-[#f0f0f1]">
+              <th className="text-left px-4 py-3 align-top w-52">
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Terms of Service</label>
+                <p className="text-[12px] text-[#646970]">Label, target page/URL & visibility</p>
+              </th>
+              <td className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={fc.showTermsLink !== false}
+                      onChange={e => setFc({ showTermsLink: e.target.checked })}
+                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
+                    />
+                    <span>Show in Footer</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fc.termsLabel ?? "Terms"}
+                    onChange={e => setFc({ termsLabel: e.target.value })}
+                    placeholder="Link Label (e.g. Terms of Service)"
+                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
+                  <div>
+                    <label className="text-[11px] text-[#646970] block mb-0.5">Select CMS Page:</label>
+                    <select
+                      value={fc.termsPageSlug || ""}
+                      onChange={e => setFc({ termsPageSlug: e.target.value })}
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+                    >
+                      <option value="">— None selected —</option>
+                      {(dbPages || []).map(p => (
+                        <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[#646970] block mb-0.5">Or Custom URL (optional):</label>
+                    <input
+                      type="text"
+                      value={fc.termsUrl || ""}
+                      onChange={e => setFc({ termsUrl: e.target.value })}
+                      placeholder="/terms or https://..."
+                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
+                    />
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            {/* Sitemap Link */}
+            <tr className="border-b border-[#f0f0f1]">
+              <th className="text-left px-4 py-3 align-top w-52">
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Sitemap Link</label>
+                <p className="text-[12px] text-[#646970]">Label, URL & visibility</p>
+              </th>
+              <td className="px-4 py-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={fc.showSitemapLink !== false}
+                      onChange={e => setFc({ showSitemapLink: e.target.checked })}
+                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
+                    />
+                    <span>Show in Footer</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fc.sitemapLabel ?? "Sitemap"}
+                    onChange={e => setFc({ sitemapLabel: e.target.value })}
+                    placeholder="Link Label (e.g. Sitemap)"
+                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
+                  />
+                  <input
+                    type="text"
+                    value={fc.sitemapUrl ?? "/sitemap"}
+                    onChange={e => setFc({ sitemapUrl: e.target.value })}
+                    placeholder="URL (e.g. /sitemap)"
+                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
+                  />
+                </div>
+              </td>
+            </tr>
+
+            {/* Copyright & Brand Text */}
             <tr>
               <th className="text-left px-4 py-3 align-top w-52">
-                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Terms of Service Page</label>
-                <p className="text-[12px] text-[#646970]">Footer &ldquo;Terms&rdquo; link target</p>
+                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Copyright & Brand Text</label>
+                <p className="text-[12px] text-[#646970]">Copyright notice in footer</p>
               </th>
-              <td className="px-4 py-3">
-                <select
-                  value={fc.termsPageSlug || ""}
-                  onChange={e => setFc({ termsPageSlug: e.target.value })}
-                  className="w-full max-w-sm border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
-                >
-                  <option value="">— None selected —</option>
-                  {(dbPages || []).map(p => (
-                    <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
-                  ))}
-                </select>
-                {fc.termsPageSlug && (
-                  <p className="text-[11px] text-[#2271b1] mt-1">
-                    Link will go to: <strong>/{fc.termsPageSlug}</strong>
-                  </p>
-                )}
+              <td className="px-4 py-3 space-y-2">
+                <input
+                  type="text"
+                  value={config.brand?.copyrightText ?? "PAiRO — ALL RIGHTS RESERVED © 2026."}
+                  onChange={e => onChange({ ...config, brand: { ...(config.brand || {}), copyrightText: e.target.value } })}
+                  placeholder="e.g. PAiRO — ALL RIGHTS RESERVED © 2026."
+                  className="w-full max-w-xl border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white"
+                />
               </td>
             </tr>
           </tbody>
@@ -788,7 +898,7 @@ function RedirectsTab() {
   const [redirectsPage, setRedirectsPage] = useState(1);
   const [loadingRedirects, setLoadingRedirects] = useState(false);
   const [redirectSearch, setRedirectSearch] = useState("");
-  
+
   const [redirectForm, setRedirectForm] = useState({
     _id: "",
     sourceUrl: "",
@@ -965,7 +1075,7 @@ function RedirectsTab() {
       <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
         <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-[13px] font-bold text-[#1d2327] m-0">Active Redirect Rules ({totalRedirects})</h3>
-          
+
           {/* Search bar */}
           <div className="relative max-w-xs w-full">
             <input
@@ -1012,9 +1122,8 @@ function RedirectsTab() {
                       {item.targetUrl}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                        item.statusCode === 301 ? "bg-green-50 text-green-700 border border-green-200" : "bg-blue-50 text-blue-700 border border-blue-200"
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${item.statusCode === 301 ? "bg-green-50 text-green-700 border border-green-200" : "bg-blue-50 text-blue-700 border border-blue-200"
+                        }`}>
                         {item.statusCode}
                       </span>
                     </td>
@@ -1145,11 +1254,10 @@ export default function SiteSettingsPage() {
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`px-4 py-2 text-[13px] font-semibold border-b-[3px] transition-colors ${
-              tab === key
+            className={`px-4 py-2 text-[13px] font-semibold border-b-[3px] transition-colors ${tab === key
                 ? 'border-[#2271b1] text-[#1d2327]'
                 : 'border-transparent text-[#646970] hover:text-[#135e96]'
-            }`}
+              }`}
           >
             {label}
           </button>

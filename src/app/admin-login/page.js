@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Lock, User, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import logo from "@/assets/png-file.png";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -18,22 +21,30 @@ export default function AdminLoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const res = await signIn("credentials", {
         email,
         password,
+        loginType: "staff",
+        turnstileToken,
         redirect: false,
       });
 
       if (res?.error) {
-        setError("Invalid credentials. Please check your admin access.");
+        setError("Invalid credentials or security check failed. Please check your admin access.");
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
       } else {
         // Wait for the session cookie to be fully established before navigating.
-        // router.push("/admin") without waiting causes the middleware to see no token
-        // and bounce back to /admin-login (race condition).
         const { getSession } = await import("next-auth/react");
         let attempts = 0;
         let session = null;
@@ -47,10 +58,14 @@ export default function AdminLoginPage() {
           window.location.replace("/admin");
         } else {
           setError("Session could not be established. Please try again.");
+          turnstileRef.current?.reset();
+          setTurnstileToken("");
         }
       }
     } catch (err) {
       setError("An unexpected error occurred.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
     } finally {
       setLoading(false);
     }
@@ -58,7 +73,7 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f0f1] flex flex-col items-center justify-center p-4 font-sans select-none">
-      <div className="w-full max-w-[320px] space-y-4">
+      <div className="w-full max-w-[340px] space-y-4">
         {/* WP-style Logo Header */}
         <div className="text-center mb-4">
           <Link href="/" className="inline-block hover:opacity-80 transition-opacity">
@@ -82,7 +97,7 @@ export default function AdminLoginPage() {
             <div className="space-y-1">
               <label className="text-[14px] text-[#3c434a] font-normal block">Username or Email Address</label>
               <input 
-                type="email"
+                type="email" 
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -110,6 +125,13 @@ export default function AdminLoginPage() {
               />
             </div>
 
+            <TurnstileWidget
+              ref={turnstileRef}
+              theme="light"
+              onVerify={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+            />
+
             <div className="flex items-center justify-between pt-2">
               <label className="flex items-center gap-2 cursor-pointer select-none text-[13px] text-[#3c434a] font-normal">
                 <input 
@@ -123,7 +145,7 @@ export default function AdminLoginPage() {
               <button 
                 type="submit" 
                 disabled={loading}
-                className="bg-[#2271b1] hover:bg-[#135e96] border border-[#135e96] text-white px-3 py-1.5 rounded-[3px] text-[13px] font-bold shadow-[0_1px_0_#135e96] hover:shadow-[0_1px_0_#135e96] active:translate-y-[1px] active:shadow-none transition-all disabled:opacity-50 inline-flex items-center justify-center min-h-[30px]"
+                className="bg-[#2271b1] hover:bg-[#135e96] border border-[#135e96] text-white px-3 py-1.5 rounded-[3px] text-[13px] font-bold shadow-[0_1px_0_#135e96] hover:shadow-[0_1px_0_#135e96] active:translate-y-[1px] active:shadow-none transition-all disabled:opacity-50 inline-flex items-center justify-center min-h-[30px] cursor-pointer"
               >
                 {loading ? "Logging in..." : "Log In"}
               </button>

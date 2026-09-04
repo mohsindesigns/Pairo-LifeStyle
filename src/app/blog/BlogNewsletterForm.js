@@ -5,17 +5,29 @@ import { toast } from "react-hot-toast";
 
 export default function BlogNewsletterForm({ dark = false }) {
   const [email, setEmail] = useState("");
+  const [hpField, setHpField] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubscribe = async (e) => {
     e.preventDefault();
     if (!email) return;
+
+    if (hpField) {
+      toast.success("You're on the list!");
+      setEmail("");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/newsletter/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ 
+          email, 
+          hp_field: hpField,
+          sourcePage: "/blog"
+        })
       });
       const data = await res.json();
       if (res.ok) {
@@ -46,10 +58,18 @@ export default function BlogNewsletterForm({ dark = false }) {
               : "bg-white border-black/15 text-black placeholder-black/30 focus:border-black"
           }`}
        />
+       <input
+          type="text"
+          className="hidden"
+          value={hpField}
+          onChange={(e) => setHpField(e.target.value)}
+          tabIndex="-1"
+          autoComplete="off"
+       />
        <button
           type="submit"
           disabled={submitting}
-          className={`px-8 py-3.5 rounded-[4px] font-black text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-50 whitespace-nowrap ${
+          className={`px-8 py-3.5 rounded-[4px] font-black text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-50 whitespace-nowrap cursor-pointer ${
             dark
               ? "bg-white text-black hover:bg-neutral-100"
               : "bg-black text-white hover:bg-neutral-900"

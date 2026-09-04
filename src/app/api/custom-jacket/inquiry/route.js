@@ -2,12 +2,37 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import CustomJacketInquiry from "@/models/CustomJacketInquiry";
 import { sendCustomJacketConfirmation, sendCustomJacketAdminNotification } from "@/lib/email";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { sanitizeObject, sanitizeText } from "@/lib/sanitize";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(req) {
   try {
-    await dbConnect();
+    const ip = getClientIp(req);
 
-    const body = await req.json();
+    // 1. Rate Limiting (5 requests per minute per IP)
+    const rateCheck = await checkRateLimit(req, { limit: 5, window: 60, keyPrefix: "CUSTOM_JACKET" });
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: `Too many requests. Please wait ${rateCheck.resetIn} seconds before trying again.` },
+        { status: 429 }
+      );
+    }
+
+    const rawBody = await req.json().catch(() => ({}));
+    
+    // 2. Cloudflare Turnstile Verification
+    const turnstileCheck = await verifyTurnstileToken(rawBody.turnstileToken, ip);
+    if (!turnstileCheck.success) {
+      return NextResponse.json(
+        { error: turnstileCheck.error || "Security check failed. Please verify the captcha." },
+        { status: 400 }
+      );
+    }
+
+    // 3. Anti-XSS & NoSQL Sanitization
+    const body = sanitizeObject(rawBody);
+
     const {
       firstName, lastName, email, phone, country, city,
       jacketType, gender, preferredLeather, preferredColor, size,
@@ -24,9 +49,8 @@ export async function POST(req) {
     if (!jacketType?.trim()) return NextResponse.json({ error: "Jacket type is required" }, { status: 400 });
     if (!preferredLeather?.trim()) return NextResponse.json({ error: "Preferred leather is required" }, { status: 400 });
 
-    // Capture IP
-    const forwarded = req.headers.get("x-forwarded-for");
-    const ipAddress = forwarded ? forwarded.split(",")[0].trim() : req.headers.get("x-real-ip") || "unknown";
+    await dbConnect();
+
     const userAgent = req.headers.get("user-agent") || "";
 
     const inquiry = await CustomJacketInquiry.create({
@@ -45,12 +69,12 @@ export async function POST(req) {
       deadline: deadline?.trim() || "",
       referenceImages: Array.isArray(referenceImages) ? referenceImages : [],
       additionalNotes: additionalNotes?.trim() || "",
-      ipAddress,
+      ipAddress: ip,
       userAgent,
       tenantId: "DEFAULT_STORE"
     });
 
-    // Send emails (non-blocking — don't fail the request if email fails)
+    // Send emails (non-blocking)
     Promise.all([
       sendCustomJacketConfirmation(email, firstName, inquiry.toObject()),
       sendCustomJacketAdminNotification(inquiry.toObject())

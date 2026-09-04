@@ -1,14 +1,17 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 export default function AffiliateResetPasswordClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -38,13 +41,23 @@ export default function AffiliateResetPasswordClient() {
       setError("Password must be at least 8 characters.");
       return;
     }
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/affiliate/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email, password }),
+        body: JSON.stringify({ 
+          token, 
+          email, 
+          password,
+          turnstileToken 
+        }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -52,9 +65,13 @@ export default function AffiliateResetPasswordClient() {
         setTimeout(() => router.push("/affiliate/login"), 3000);
       } else {
         setError(data.error || "Failed to reset password. Please try again.");
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
       }
     } catch {
       setError("Network error. Please check your connection.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
     } finally {
       setLoading(false);
     }
@@ -221,6 +238,13 @@ export default function AffiliateResetPasswordClient() {
                   )}
                 </div>
 
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  theme="dark"
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken("")}
+                />
+
                 <button
                   type="submit"
                   disabled={loading || !token || !email}
@@ -234,7 +258,7 @@ export default function AffiliateResetPasswordClient() {
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "8px"
                   }}
                 >
-                  {loading ? <><Loader2 size={16} /> Updating...</> : "Update Password"}
+                  {loading ? <><Loader2 size={16} className="animate-spin" /> Updating...</> : "Update Password"}
                 </button>
               </form>
             )}

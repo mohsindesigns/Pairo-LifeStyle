@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import dbConnect from './db';
 import Staff from '@/models/Staff';
 import Role from '@/models/Role';
+import { escapeHtml } from './sanitize';
 
 const smtpHost = process.env.AWS_SMTP_HOST || process.env.EMAIL_SERVER || 'email-smtp.eu-north-1.amazonaws.com';
 const smtpPort = parseInt(process.env.AWS_SMTP_PORT || process.env.EMAIL_PORT || '465');

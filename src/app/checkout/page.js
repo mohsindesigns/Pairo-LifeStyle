@@ -8,6 +8,7 @@ import { useCart } from "@/context/CartContext";
 import { useSiteData } from "@/context/SiteContext";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 import { stripePromise } from "@/lib/stripeClient";
 import StripePaymentForm from "@/components/checkout/StripePaymentForm";
 
@@ -206,6 +207,8 @@ export default function CheckoutPage() {
   const [applyingPromo, setApplyingPromo] = useState(false);
   const [promoError, setPromoError] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [clientSecret, setClientSecret] = useState("");
   const [loadingClientSecret, setLoadingClientSecret] = useState(false);
@@ -550,12 +553,18 @@ export default function CheckoutPage() {
       }
       return false;
     }
+
+    if (!turnstileToken) {
+      alert("Please complete the security check.");
+      return;
+    }
     return true;
   };
 
   const buildCheckoutPayload = () => ({
     items: cartItems,
     idempotencyKey,
+          turnstileToken,
     customerEmail: formData.email,
     customerNote: formData.customerNote,
     shippingAddress: {
@@ -654,9 +663,13 @@ export default function CheckoutPage() {
         clearCart();
         router.push(`/checkout/success?id=${data.orderId}&orderNumber=${data.orderNumber}`);
       } else {
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
         alert(data.error || "Order failed");
       }
     } catch (err) {
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
       console.error(err);
       alert("An error occurred during checkout.");
     } finally {
@@ -1128,7 +1141,13 @@ export default function CheckoutPage() {
 
             {/* Submit Action (Cash on Delivery only — Card has its own submit button above) */}
             {paymentMethod === "cod" && (
-              <div className="pt-4">
+              <div className="pt-4 space-y-4">
+              <TurnstileWidget
+                ref={turnstileRef}
+                onVerify={(token) => setTurnstileToken(token)}
+                onExpire={() => setTurnstileToken("")}
+              />
+
                 <button
                   type="button"
                   onClick={handlePayment}

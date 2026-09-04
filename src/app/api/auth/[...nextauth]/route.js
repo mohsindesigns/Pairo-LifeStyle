@@ -6,6 +6,8 @@ import Customer from "@/models/Customer";
 import Affiliate from "@/models/Affiliate";
 import Role from "@/models/Role";
 import bcrypt from "bcryptjs";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { rateLimit } from "@/lib/rateLimit";
 
 export const authOptions = {
   providers: [
@@ -14,20 +16,37 @@ export const authOptions = {
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
-        loginType: { label: "Type", type: "text" } // 'staff', 'customer', or 'affiliate'
+        loginType: { label: "Type", type: "text" }, // 'staff', 'customer', or 'affiliate'
+        turnstileToken: { label: "Turnstile Token", type: "text" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         await dbConnect();
 
-        // 1. Try Staff
+        const cleanEmail = typeof credentials?.email === "string" ? credentials.email.toLowerCase().trim() : "";
+        const password = credentials?.password || "";
+        const turnstileToken = credentials?.turnstileToken;
+
+        // 1. Rate Limiting (8 login attempts per minute per email/IP)
+        const rateLimitResult = await rateLimit(`LOGIN:${cleanEmail || 'UNKNOWN'}`, 8, 60);
+        if (!rateLimitResult.success) {
+          throw new Error("Too many login attempts. Please wait a minute before trying again.");
+        }
+
+        // 2. Cloudflare Turnstile Verification
+        const turnstileCheck = await verifyTurnstileToken(turnstileToken);
+        if (!turnstileCheck.success) {
+          throw new Error(turnstileCheck.error || "Captcha verification failed. Please try again.");
+        }
+
+        // 3. Try Staff
         if (!credentials.loginType || credentials.loginType === 'staff') {
-            const staff = await Staff.findOne({ email: credentials.email }).populate('roleId').lean();
+            const staff = await Staff.findOne({ email: cleanEmail }).populate('roleId').lean();
             if (staff) {
                 if (staff.status !== 'Active') {
                     throw new Error(staff.status === 'Suspended' ? "Account suspended" : "Account locked");
                 }
 
-                const isMatch = await bcrypt.compare(credentials.password, staff.password);
+                const isMatch = await bcrypt.compare(password, staff.password);
                 if (isMatch) {
                     const ip = "127.0.0.1";
                     await Staff.updateOne(
@@ -53,15 +72,15 @@ export const authOptions = {
             }
         }
 
-        // 2. Try Affiliate
+        // 4. Try Affiliate
         if (!credentials.loginType || credentials.loginType === 'affiliate') {
-            const affiliate = await Affiliate.findOne({ email: credentials.email }).lean();
+            const affiliate = await Affiliate.findOne({ email: cleanEmail }).lean();
             if (affiliate) {
                 if (affiliate.status !== 'Active') {
                     throw new Error("Affiliate account is suspended or inactive");
                 }
 
-                const isMatch = await bcrypt.compare(credentials.password, affiliate.password);
+                const isMatch = await bcrypt.compare(password, affiliate.password);
                 if (isMatch) {
                     return {
                         id: affiliate._id.toString(),
@@ -75,11 +94,11 @@ export const authOptions = {
             }
         }
 
-        // 3. Try Customer
+        // 5. Try Customer
         if (!credentials.loginType || credentials.loginType === 'customer') {
-            const customer = await Customer.findOne({ email: credentials.email }).lean();
+            const customer = await Customer.findOne({ email: cleanEmail }).lean();
             if (customer) {
-                const isMatch = await bcrypt.compare(credentials.password, customer.password);
+                const isMatch = await bcrypt.compare(password, customer.password);
                 if (isMatch) {
                     // Block unverified customers
                     if (!customer.emailVerified) {
@@ -142,7 +161,6 @@ export const authOptions = {
           }
       }
 
-      console.log("[NextAuth] Final JWT token:", JSON.stringify(token));
       return token;
     },
     async session({ session, token }) {

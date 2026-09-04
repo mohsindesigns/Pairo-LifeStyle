@@ -999,7 +999,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
         {/* Category Full Description (content) */}
         {currentDbCategory && currentDbCategory.content && (
           <div className="mt-16 border-t border-border pt-12 editorial-content-rich w-full max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: currentDbCategory.content }} />
+            <div dangerouslySetInnerHTML={{ __html: currentDbCategory.content.replace(/<a\s+([^>]*href=["']([^"']*)["'][^>]*)>/gi, (m, b) => /rel=["']([^"']*)["']/i.test(b) ? m.replace(/rel=["']([^"']*)["']/gi, (rm, rv) => { const c = rv.replace(/\bnofollow\b/gi, '').replace(/\bnoindex\b/gi, '').replace(/\s+/g, ' ').trim(); return c ? `rel="${c}"` : ''; }) : m) }} />
           </div>
         )}
 

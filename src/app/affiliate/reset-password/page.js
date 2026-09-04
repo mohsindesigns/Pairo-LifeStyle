@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import AffiliateResetPasswordClient from "@/components/affiliate/AffiliateResetPasswordClient";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Reset Password — PAIRO Partner Portal",
   description: "Set a new password for your PAIRO affiliate account.",

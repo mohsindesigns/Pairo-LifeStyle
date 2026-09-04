@@ -1,11 +1,27 @@
 "use client";
 
+function makeLinksDofollow(html) {
+  if (!html) return "";
+  return html.replace(/<a\s+([^>]*href=["']([^"']*)["'][^>]*)>/gi, (match, body) => {
+    if (/rel=["']([^"']*)["']/i.test(body)) {
+      return match.replace(/rel=["']([^"']*)["']/gi, (relMatch, relValue) => {
+        const cleanRel = relValue
+          .replace(/\bnofollow\b/gi, '')
+          .replace(/\bnoindex\b/gi, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return cleanRel ? `rel="${cleanRel}"` : '';
+      });
+    }
+    return match;
+  });
+}
+
 export default function RichTextSection({ title = "", content = "", headingLevel = "h1" }) {
   if (!content && !title) return null;
 
   return (
     <>
-      {/* Quill Snow rendered HTML styles scoped to this section */}
       <style>{`
         .rich-text-body h1,
         .rich-text-body h1 * {
@@ -84,6 +100,32 @@ export default function RichTextSection({ title = "", content = "", headingLevel
           border-top: 1px solid #e0e0e0;
           margin: 24px 0;
         }
+        .rich-text-body img {
+          border-radius: 8px;
+          max-width: 100%;
+        }
+        .rich-text-body img[data-align="center"], .rich-text-body img:not([data-align]) {
+          margin: 1.5rem auto;
+          display: block;
+        }
+        .rich-text-body img[data-align="left"] {
+          margin: 1.5rem auto 1.5rem 0;
+          display: block;
+        }
+        .rich-text-body img[data-align="right"] {
+          margin: 1.5rem 0 1.5rem auto;
+          display: block;
+        }
+        .rich-text-body img[data-align="float-left"] {
+          float: left;
+          margin: 0.5rem 1.5rem 1rem 0;
+          display: inline-block;
+        }
+        .rich-text-body img[data-align="float-right"] {
+          float: right;
+          margin: 0.5rem 0 1rem 1.5rem;
+          display: inline-block;
+        }
       `}</style>
 
       <section className="py-10 md:py-16 bg-white min-h-[50vh]">
@@ -100,7 +142,7 @@ export default function RichTextSection({ title = "", content = "", headingLevel
             {content && (
               <div
                 className="rich-text-body"
-                dangerouslySetInnerHTML={{ __html: content }}
+                dangerouslySetInnerHTML={{ __html: makeLinksDofollow(content) }}
               />
             )}
           </div>

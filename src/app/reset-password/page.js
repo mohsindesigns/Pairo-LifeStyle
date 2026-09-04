@@ -1,8 +1,9 @@
 "use client";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -12,6 +13,8 @@ function ResetPasswordForm() {
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [showPass, setShowPass] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,13 +37,23 @@ function ResetPasswordForm() {
       setError("Passwords do not match.");
       return;
     }
+    if (!turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/user/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, email, password }),
+        body: JSON.stringify({ 
+          token, 
+          email, 
+          password,
+          turnstileToken
+        }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -48,9 +61,13 @@ function ResetPasswordForm() {
         setTimeout(() => router.push("/login"), 3000);
       } else {
         setError(data.error || "Something went wrong. Please try again.");
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
       }
     } catch {
       setError("Network error. Please check your connection.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
     } finally {
       setLoading(false);
     }
@@ -144,6 +161,12 @@ function ResetPasswordForm() {
                 </button>
               </div>
             </div>
+
+            <TurnstileWidget
+              ref={turnstileRef}
+              onVerify={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken("")}
+            />
 
             <button
               type="submit"

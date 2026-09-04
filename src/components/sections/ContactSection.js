@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { Mail, Phone, MapPin, ArrowRight, User, Tag, MessageSquare, ChevronDown } from "lucide-react";
 import { useSiteData } from "@/context/SiteContext";
+import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 const InstagramIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -99,6 +100,8 @@ export default function ContactSection({
     : Array.isArray(subjects) ? subjects : ["General Inquiry"];
 
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -133,6 +136,11 @@ export default function ContactSection({
       return;
     }
 
+    if (!turnstileToken) {
+      toast.error("Please complete the security check.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/contact", {
@@ -143,18 +151,26 @@ export default function ContactSection({
           email: emailClean,
           subject: formData.subject,
           message: messageClean,
+          hp_field: formData.hp_field,
+          turnstileToken,
           sourcePage: window.location.pathname
         })
       });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.success) {
         toast.success(data.message || "Message sent!");
         setFormData({ name: "", email: "", subject: subjectList[0], message: "", hp_field: "" });
+        setTurnstileToken("");
+        turnstileRef.current?.reset();
       } else {
         toast.error(data.error || "Failed to send message");
+        turnstileRef.current?.reset();
+        setTurnstileToken("");
       }
     } catch (err) {
       toast.error("Network error. Please try again.");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
     } finally {
       setLoading(false);
     }
@@ -384,6 +400,12 @@ export default function ContactSection({
                   </div>
 
                   <input type="text" className="hidden" value={formData.hp_field} onChange={e => setFormData({ ...formData, hp_field: e.target.value })} tabIndex="-1" autoComplete="off" />
+
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken("")}
+                  />
 
                   <button
                     disabled={loading}

@@ -1,27 +1,48 @@
 import dbConnect from "@/lib/db";
 import Customer from "@/models/Customer";
 import { sendCustomerPasswordReset } from "@/lib/email";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
 export async function POST(req) {
-  await dbConnect();
   try {
-    const { email } = await req.json().catch(() => ({}));
+    const ip = getClientIp(req);
+
+    // 1. Rate Limiting (5 forgot password requests per minute per IP)
+    const rateCheck = await checkRateLimit(req, { limit: 5, window: 60, keyPrefix: "FORGOT_PW" });
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: `Too many requests. Please wait ${rateCheck.resetIn} seconds before trying again.` },
+        { status: 429 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { email, turnstileToken } = body;
+
+    // 2. Cloudflare Turnstile Verification
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, ip);
+    if (!turnstileCheck.success) {
+      return NextResponse.json(
+        { error: turnstileCheck.error || "Security check failed. Please verify the captcha." },
+        { status: 400 }
+      );
+    }
+
     if (!email || typeof email !== "string") {
       return NextResponse.json({ error: "A valid email address is required." }, { status: 400 });
     }
+
+    await dbConnect();
 
     const customer = await Customer.findOne({
       email: email.toLowerCase().trim(),
     });
 
     // Always return success to prevent email enumeration
-    if (!customer) {
-      return NextResponse.json({ success: true, message: "If an account exists, a reset link has been sent." });
-    }
-
-    if (!customer.emailVerified) {
+    if (!customer || !customer.emailVerified) {
       return NextResponse.json({ success: true, message: "If an account exists, a reset link has been sent." });
     }
 

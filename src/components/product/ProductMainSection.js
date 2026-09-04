@@ -126,12 +126,25 @@ export default function ProductMainSection({ product }) {
           </h1>
 
           <div className="flex flex-wrap items-center gap-3">
-            <p className="flex items-center gap-2 text-[13px] md:text-[14px] font-semibold text-primary/80">
-              <Star className="w-3.5 h-3.5 fill-primary text-primary" />
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("switch-product-tab", { detail: "Rating & Reviews" }));
+                  const el = document.getElementById("product-tabs-section");
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }
+                }
+              }}
+              className="flex items-center gap-2 text-[13px] md:text-[14px] font-semibold text-primary/80 hover:text-primary hover:underline transition-all cursor-pointer text-left group"
+              title="Click to view ratings & reviews"
+            >
+              <Star className="w-3.5 h-3.5 fill-primary text-primary transition-transform group-hover:scale-110" />
               <span>{(product.rating || 0).toFixed(1)}/5.0</span>
-              <span className="text-black/10">•</span>
-              <span>({product.reviewCount || 0} Reviews)</span>
-            </p>
+              <span className="text-black/20">•</span>
+              <span className="underline-offset-2">({product.reviewCount || 0} Reviews)</span>
+            </button>
 
             {deliveryRange && (
               <span

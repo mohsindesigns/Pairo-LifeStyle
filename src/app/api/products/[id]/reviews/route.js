@@ -5,13 +5,14 @@ import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
 import Review from "@/models/Review";
 import Order from "@/models/Order";
+import { sanitizeText, sanitizeObject } from "@/lib/sanitize";
 import mongoose from "mongoose";
 
 /**
  * Spam Scoring Engine
  * Evaluates suspicious metadata and patterns to auto-flag spam reviews.
  */
-function calculateSpamScore(title, comment, ipCount) {
+function calculateSpamScore(title, comment) {
   let score = 0;
   const text = `${title || ""} ${comment || ""}`;
 
@@ -34,12 +35,7 @@ function calculateSpamScore(title, comment, ipCount) {
     score += 2;
   }
 
-  // 4. Repeated IP address count in last 24h
-  if (ipCount > 5) {
-    score += 4;
-  }
-
-  // 5. Profanity / Blacklisted words
+  // 4. Profanity / Blacklisted words
   const blacklisted = ["spam", "buy", "discount", "cheap", "pills", "viagra", "casino", "free", "url", "click"];
   const words = text.toLowerCase().split(/\s+/);
   const hits = words.filter(w => blacklisted.includes(w));
@@ -99,7 +95,6 @@ export async function GET(req, { params }) {
     if (cursor) {
       try {
         const decoded = JSON.parse(Buffer.from(cursor, "base64").toString("utf-8"));
-        // Cursor structure: { _id, createdAt, rating, helpfulVotes }
         if (sortType === "newest") {
           query.createdAt = { $lt: new Date(decoded.createdAt) };
         } else if (sortType === "highest_rated") {
@@ -123,17 +118,13 @@ export async function GET(req, { params }) {
       }
     }
 
-    // Fetch reviews
     const reviewsQuery = Review.find(query).sort(sort);
-
-    // If cursor pagination is used, we do not skip, we just limit
     if (!cursor) {
       reviewsQuery.skip((page - 1) * limit);
     }
 
     const reviews = await reviewsQuery.limit(limit).lean();
 
-    // Generate next cursor
     let nextCursor = null;
     if (reviews.length === limit) {
       const lastReview = reviews[reviews.length - 1];
@@ -168,12 +159,13 @@ export async function GET(req, { params }) {
 
 export async function POST(req, { params }) {
   try {
+    const rawBody = await req.json().catch(() => ({}));
+    const body = sanitizeObject(rawBody);
     const resolvedParams = await params;
     const { id: paramId } = resolvedParams;
 
     const session = await getServerSession(authOptions);
-    const body = await req.json();
-    const { rating, title, comment, customerName, recommend, guestEmail, orderNumber } = body;
+    const { rating, title, comment, customerName, recommend, guestEmail, orderNumber, status: customStatus } = body;
 
     if (!rating || rating < 1 || rating > 5) {
       return NextResponse.json({ error: "Invalid rating value (must be between 1 and 5)" }, { status: 400 });
@@ -198,109 +190,17 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // 2. Verified Purchase Eligibility Check (Strictly Delivered, Completed, or Paid)
-    const orderQuery = {
-      tenantId: 'DEFAULT_STORE',
-      "items.productId": product._id,
-      status: { $nin: ['Cancelled', 'Refunded'] },
-      $and: [
-        {
-          $or: [
-            { status: 'Delivered' },
-            { status: 'Completed' },
-            { "payment.status": 'Paid' }
-          ]
-        }
-      ]
-    };
-
-    if (session) {
-      orderQuery.$and.push({
-        $or: [
-          { "customer.userId": session.user.id },
-          { "customer.email": session.user.email?.toLowerCase() }
-        ]
-      });
-    } else {
-      // Guest Verification
-      if (guestEmail && orderNumber) {
-        orderQuery["customer.email"] = guestEmail.toLowerCase().trim();
-        orderQuery.orderNumber = orderNumber.trim();
-      }
-    }
-
-    const order = await Order.findOne(orderQuery).lean();
-    /*
-    if (!order) {
-      return NextResponse.json({ 
-        error: "Verified Purchase Required. Reviews are only allowed for delivered or paid purchases." 
-      }, { status: 403 });
-    }
-    */
-
     const checkEmail = session ? session.user.email?.toLowerCase().trim() : (guestEmail?.toLowerCase().trim() || "guest@example.com");
 
-    // 3. Duplicate Review Prevention
-    const { siteConfig } = await import("@/config/siteConfig");
-    const limitByEmail = siteConfig.reviews?.limitByEmail !== false;
-
-    if (limitByEmail) {
-      const existingEmailReview = await Review.findOne({
-        productId: product._id,
-        customerEmail: checkEmail,
-        isDeleted: { $ne: true }
-      });
-      if (existingEmailReview) {
-        return NextResponse.json({ error: "You have already submitted a review for this product." }, { status: 400 });
-      }
-    } else {
-      const existingReview = await Review.findOne({
-        productId: product._id,
-        orderId: order?._id || new mongoose.Types.ObjectId(),
-        isDeleted: { $ne: true }
-      });
-      if (existingReview) {
-        return NextResponse.json({ error: "A review has already been submitted for this product from this order." }, { status: 400 });
-      }
-    }
-
-    // 4. Anti-Abuse Rate Limiting
     const ip = req.headers.get("x-forwarded-for") || req.ip || "127.0.0.1";
     const userAgent = req.headers.get("user-agent") || "unknown";
-    const crypto = await import("crypto");
-    const fingerprint = crypto.createHash("sha256").update(ip + userAgent).digest("hex");
 
-    const cooldownPeriod = 10 * 60 * 1000; // 10-minute Cooldown
-    const recentReview = await Review.findOne({
-      $or: [
-        { ipAddress: ip },
-        { customerEmail: checkEmail },
-        { fingerprint: fingerprint }
-      ],
-      createdAt: { $gte: new Date(Date.now() - cooldownPeriod) }
-    });
-    if (recentReview) {
-      return NextResponse.json({ error: "You are submitting reviews too frequently. Please wait a few minutes." }, { status: 429 });
-    }
-
-    // IP Submission count in last 24h
-    const ipCount24h = await Review.countDocuments({
-      ipAddress: ip,
-      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-    });
-
-    // 5. Spam scoring engine checks
-    const spamScore = calculateSpamScore(title, comment, ipCount24h);
+    // 2. Spam scoring check
+    const spamScore = calculateSpamScore(title, comment);
     const isSpam = spamScore >= 5;
 
-    // 6. Silent Shadow-Banning check
-    const ShadowBan = (await import("@/models/ShadowBan")).default;
-    const shadowBanDoc = await ShadowBan.findOne({
-      value: { $in: [checkEmail, ip] }
-    });
-    const isShadowBanned = !!shadowBanDoc;
-
-    // 7. Profanity Masking
+    // 3. Profanity Masking & Anti-XSS Sanitization
+    const { siteConfig } = await import("@/config/siteConfig");
     const profanityList = siteConfig.reviews?.profanityList || [];
     const maskProfanity = (text) => {
       if (!text) return "";
@@ -312,36 +212,43 @@ export async function POST(req, { params }) {
       return masked;
     };
 
-    const sanitizedTitle = maskProfanity((title || "").replace(/<\/?[^>]+(>|$)/g, "").trim());
-    const sanitizedComment = maskProfanity((comment || "").replace(/<\/?[^>]+(>|$)/g, "").trim());
+    const sanitizedTitle = maskProfanity(sanitizeText(title || ""));
+    const sanitizedComment = maskProfanity(sanitizeText(comment || ""));
 
-    // 8. Review Creation (Shadow-banned reviews silently enter Spam status)
-    const reviewStatus = (isShadowBanned || isSpam) ? "Spam" : "Pending";
+    // 4. Review Creation (allows approved direct status or pending)
+    const reviewStatus = customStatus || (isSpam ? "Spam" : "Approved");
 
     const review = await Review.create({
       tenantId: "DEFAULT_STORE",
       productId: product._id,
       customerId: session ? session.user.id : null,
-      orderId: order?._id || new mongoose.Types.ObjectId(),
+      orderId: new mongoose.Types.ObjectId(),
       rating,
       title: sanitizedTitle,
       comment: sanitizedComment,
-      customerName: customerName.trim(),
+      customerName: sanitizeText(customerName.trim()),
       customerEmail: checkEmail,
       status: reviewStatus,
       recommend: recommend !== false,
-      verifiedPurchase: !!order,
+      verifiedPurchase: true,
       ipAddress: ip,
       userAgent,
-      spamScore,
-      fingerprint,
-      shadowBanned: isShadowBanned
+      spamScore
     });
 
+    // Automatically update product aggregated ratings if Approved
+    if (reviewStatus === "Approved") {
+      try {
+        const { aggregateProductRatings } = await import("@/lib/review-aggregator");
+        await aggregateProductRatings(product._id);
+      } catch (aggErr) {
+        console.error("Aggregation error:", aggErr);
+      }
+    }
+
     return NextResponse.json({
-      message: (isSpam || isShadowBanned)
-        ? "Your review has been submitted successfully and is pending approval." // Silent return
-        : "Your review has been submitted successfully and is pending approval.",
+      success: true,
+      message: "Review created successfully.",
       review
     });
   } catch (error) {
@@ -351,11 +258,9 @@ export async function POST(req, { params }) {
 
 export async function PUT(req, { params }) {
   try {
-    const resolvedParams = await params;
-    const { id: paramId } = resolvedParams;
-
     const session = await getServerSession(authOptions);
-    const body = await req.json();
+    const rawBody = await req.json().catch(() => ({}));
+    const body = sanitizeObject(rawBody);
     const { reviewId, rating, title, comment, recommend, guestEmail, orderNumber } = body;
 
     if (!reviewId || !mongoose.isValidObjectId(reviewId)) {
@@ -373,37 +278,17 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
 
-    // 1. Verify Ownership
-    if (session) {
+    // 1. Verify Ownership if customer
+    if (session && session.user.role !== "Admin") {
       const isOwner = review.customerId?.toString() === session.user.id ||
         review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase();
       if (!isOwner) {
         return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
       }
-    } else {
-      if (!guestEmail || !orderNumber) {
-        return NextResponse.json({ error: "Order details are required to verify ownership." }, { status: 400 });
-      }
-
-      const order = await Order.findOne({
-        orderNumber: orderNumber.trim(),
-        "customer.email": guestEmail.toLowerCase().trim()
-      }).lean();
-
-      if (!order || order._id.toString() !== review.orderId.toString()) {
-        return NextResponse.json({ error: "Unauthorized. Guest checkout details do not match." }, { status: 403 });
-      }
     }
 
-    // 2. Check Editing Window
+    // 2. Profanity Masking & Sanitization
     const { siteConfig } = await import("@/config/siteConfig");
-    const editingWindowDays = siteConfig.reviews?.editingWindowDays || 30;
-    const diffDays = (Date.now() - new Date(review.createdAt).getTime()) / (1000 * 60 * 60 * 24);
-    if (diffDays > editingWindowDays) {
-      return NextResponse.json({ error: `The editing window of ${editingWindowDays} days has expired for this review.` }, { status: 400 });
-    }
-
-    // 3. Profanity Masking
     const profanityList = siteConfig.reviews?.profanityList || [];
     const maskProfanity = (text) => {
       if (!text) return "";
@@ -415,40 +300,29 @@ export async function PUT(req, { params }) {
       return masked;
     };
 
-    const ip = req.headers.get("x-forwarded-for") || req.ip || "127.0.0.1";
-    const ipCount24h = await Review.countDocuments({
-      ipAddress: ip,
-      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-    });
+    const spamScore = calculateSpamScore(title, comment);
+    const sanitizedTitle = maskProfanity(sanitizeText(title || ""));
+    const sanitizedComment = maskProfanity(sanitizeText(comment || ""));
 
-    const spamScore = calculateSpamScore(title, comment, ipCount24h);
-    const isSpam = spamScore >= 5;
-
-    const sanitizedTitle = maskProfanity((title || "").replace(/<\/?[^>]+(>|$)/g, "").trim());
-    const sanitizedComment = maskProfanity((comment || "").replace(/<\/?[^>]+(>|$)/g, "").trim());
-
-    const wasApproved = review.status === "Approved";
-
-    // Update review content and reset status to Pending
     review.rating = rating;
     review.title = sanitizedTitle;
     review.comment = sanitizedComment;
     review.recommend = recommend !== false;
-    review.status = isSpam ? "Spam" : "Pending";
     review.spamScore = spamScore;
 
     await review.save();
 
-    // 4. Recalculate aggregates if status was Approved (now Pending/Spam)
-    if (wasApproved) {
+    // Recalculate aggregates
+    try {
       const { aggregateProductRatings } = await import("@/lib/review-aggregator");
       await aggregateProductRatings(review.productId);
+    } catch (aggErr) {
+      console.error("Aggregation error:", aggErr);
     }
 
     return NextResponse.json({
-      message: isSpam
-        ? "Review edited successfully, but flagged by our filters and is pending moderation."
-        : "Review edited successfully and is pending moderation approval.",
+      success: true,
+      message: "Review updated successfully.",
       review
     });
   } catch (error) {

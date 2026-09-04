@@ -3,6 +3,8 @@ import BecomeAffiliateClient from "@/components/affiliate/BecomeAffiliateClient"
 import Link from "next/link";
 import { Shield, Target, Award, ArrowLeft, ArrowUpRight } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Pairo Studio — Become an Affiliate Partner",
   description: "Join the Pairo Lifestyle Affiliate Program. Partner with us, promote premium handcrafted shearling jackets, and earn high commissions.",
@@ -10,7 +12,11 @@ export const metadata = {
 };
 
 export default async function BecomeAnAffiliatePage() {
-  await dbConnect();
+  try {
+    await dbConnect();
+  } catch (e) {
+    // Graceful fallback during build
+  }
   
   return (
     <div className="bg-[#FAF9F6] min-h-screen text-black font-sans py-16">
