@@ -56,6 +56,18 @@ export async function createOrderFromCheckoutPayload(payload, {
         const product = await Product.findOne({ _id: item.id || item._id, tenantId }).session(mongoSession);
         if (!product) throw new Error(`Product ${item.id} not found.`);
 
+        if (product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
+          const isMadeToMeasure = !!item.madeToMeasure?.enabled;
+          const missingAttrs = product.attributes.filter((attr) => {
+            // Made-to-measure orders replace the standard Size selection with custom measurements.
+            if (isMadeToMeasure && attr.name.toLowerCase().includes("size")) return false;
+            return !item.selectedOptions?.[attr.name];
+          });
+          if (missingAttrs.length > 0) {
+            throw new Error(`Please select ${missingAttrs.map((a) => a.name).join(" and ")} for "${product.name}" before checkout.`);
+          }
+        }
+
         if (product.manageStock) {
           const invRes = await Product.findOneAndUpdate(
             { _id: product._id, tenantId, stock: { $gte: item.quantity } },

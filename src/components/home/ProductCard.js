@@ -1,14 +1,36 @@
 "use client";
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { ShoppingBag, Eye, Star } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { getProductUrl } from "@/lib/routes";
+import SizeSelectionModal from "@/components/product/SizeSelectionModal";
 
 export default function ProductCard({ product }) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { addToCart } = useCart();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const productAttributes =
+    product.attributes || product.variants?.map((v) => ({ name: v.name, values: v.values })) || [];
+  const needsOptions = product.productType === "variable" && productAttributes.length > 0;
+
+  const handleAddToBag = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (needsOptions) {
+      setIsOptionsModalOpen(true);
+    } else {
+      addToCart(product);
+    }
+  };
 
   const getAbsoluteUrl = (url) => {
     if (!url) return "/placeholder.jpg";
@@ -73,14 +95,11 @@ export default function ProductCard({ product }) {
         {/* Hover Actions */}
         <div className="absolute bottom-2 md:bottom-3 left-2 md:left-3 right-2 md:right-3 flex gap-2 z-20 pointer-events-none group-hover:pointer-events-auto">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              addToCart(product);
-            }}
+            onClick={handleAddToBag}
             className="group/btn relative flex-[2] bg-black text-white h-9 md:h-10 rounded-lg md:rounded-xl font-bold text-[9px] md:text-[11px] uppercase tracking-widest flex items-center justify-center gap-1.5 md:gap-2 shadow-xl translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out active:scale-95 hover:bg-neutral-800"
           >
             <ShoppingBag className="w-3 h-3 md:w-3.5 md:h-3.5" />
-            Add to Bag
+            {needsOptions ? "Select Options" : "Add to Bag"}
           </button>
 
           <Link href={getProductUrl(product)} className="flex-1">
@@ -118,6 +137,16 @@ export default function ProductCard({ product }) {
           </div>
         </div>
       </div>
+
+      {mounted && typeof document !== "undefined" && needsOptions && createPortal(
+        <SizeSelectionModal
+          product={product}
+          isOpen={isOptionsModalOpen}
+          onClose={() => setIsOptionsModalOpen(false)}
+          onConfirm={(cartItem) => addToCart(cartItem)}
+        />,
+        document.body
+      )}
     </div>
   );
 }
