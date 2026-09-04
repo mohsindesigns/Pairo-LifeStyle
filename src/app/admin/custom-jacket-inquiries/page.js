@@ -11,16 +11,46 @@ const STATUS_COLORS = {
   New: "bg-blue-100 text-blue-700 border-blue-200",
   Contacted: "bg-yellow-100 text-yellow-700 border-yellow-200",
   "In Progress": "bg-purple-100 text-purple-700 border-purple-200",
+  Converted: "bg-indigo-100 text-indigo-700 border-indigo-200",
   Completed: "bg-green-100 text-green-700 border-green-200",
   Cancelled: "bg-red-100 text-red-700 border-red-200"
 };
 
-const ALL_STATUSES = ["New", "Contacted", "In Progress", "Completed", "Cancelled"];
+const ALL_STATUSES = ["New", "Contacted", "In Progress", "Converted", "Completed", "Cancelled"];
 
-function DetailModal({ inquiry, onClose, onStatusChange }) {
+function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
   const [status, setStatus] = useState(inquiry.status);
   const [notes, setNotes] = useState(inquiry.adminNotes || "");
   const [saving, setSaving] = useState(false);
+  const [quoteAmount, setQuoteAmount] = useState("");
+  const [converting, setConverting] = useState(false);
+
+  const handleConvert = async () => {
+    const amount = Number(quoteAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a valid quote amount");
+      return;
+    }
+    setConverting(true);
+    try {
+      const res = await fetch(`/api/admin/custom-jacket-inquiries/${inquiry._id}/convert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quoteAmount: amount })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Order #${data.order.orderNumber} created`);
+        onConverted(inquiry._id, data.order);
+      } else {
+        toast.error(data.error || "Failed to convert inquiry");
+      }
+    } catch {
+      toast.error("Failed to convert inquiry");
+    } finally {
+      setConverting(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -133,6 +163,40 @@ function DetailModal({ inquiry, onClose, onStatusChange }) {
 
           <hr className="border-gray-100" />
 
+          {/* Convert to Order */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Custom Order</p>
+            {inquiry.orderId ? (
+              <Link
+                href={`/admin/orders/${inquiry.orderId}`}
+                className="inline-flex items-center gap-1.5 text-[#2271b1] hover:text-[#135e96] text-[13px] font-medium bg-blue-50 border border-blue-100 rounded-lg px-3 py-2"
+              >
+                View Order <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="Quoted price (USD)"
+                  value={quoteAmount}
+                  onChange={e => setQuoteAmount(e.target.value)}
+                  className="border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] w-48 outline-none focus:border-[#2271b1]"
+                />
+                <button
+                  onClick={handleConvert}
+                  disabled={converting}
+                  className="bg-[#1a1a1a] text-white px-4 py-2 rounded-[3px] text-[12px] font-bold uppercase tracking-wide hover:bg-black disabled:opacity-60"
+                >
+                  {converting ? "Creating..." : "Convert to Order"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <hr className="border-gray-100" />
+
           {/* Status + Notes */}
           <div className="space-y-4">
             <div>
@@ -207,6 +271,11 @@ export default function CustomJacketInquiriesPage() {
 
   const handleStatusChange = (id, newStatus, newNotes) => {
     setInquiries(prev => prev.map(i => i._id === id ? { ...i, status: newStatus, adminNotes: newNotes } : i));
+  };
+
+  const handleConverted = (id, order) => {
+    setInquiries(prev => prev.map(i => i._id === id ? { ...i, status: "Converted", orderId: order._id } : i));
+    setSelectedInquiry(prev => prev && prev._id === id ? { ...prev, status: "Converted", orderId: order._id } : prev);
   };
 
   const handleDelete = async (id) => {
@@ -308,6 +377,14 @@ export default function CustomJacketInquiriesPage() {
                         >
                           <Trash2 className="w-3.5 h-3.5" /> Delete
                         </button>
+                        {inq.orderId && (
+                          <Link
+                            href={`/admin/orders/${inq.orderId}`}
+                            className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-[12px] font-medium"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" /> Order
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -345,6 +422,7 @@ export default function CustomJacketInquiriesPage() {
           inquiry={selectedInquiry}
           onClose={() => setSelectedInquiry(null)}
           onStatusChange={handleStatusChange}
+          onConverted={handleConverted}
         />
       )}
     </AdminPageLayout>

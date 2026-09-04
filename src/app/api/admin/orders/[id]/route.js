@@ -7,6 +7,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { can } from "@/lib/rbac";
 import mongoose from "mongoose";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
+import { reconcilePaymentLinkOrder } from "@/lib/stripeFulfillment";
 
 export async function GET(req, { params }) {
   try {
@@ -22,8 +23,13 @@ export async function GET(req, { params }) {
     }
 
     const { id } = await params;
-    const order = await Order.findById(id).populate("affiliateId", "name email affiliateId referralCode");
+    let order = await Order.findById(id).populate("affiliateId", "name email affiliateId referralCode");
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+
+    // Self-heal: if this is a Custom Order with an unpaid Stripe payment link,
+    // check Stripe directly in case the checkout.session.completed webhook
+    // never arrived. No-op once the order is Paid or has no payment link.
+    order = await reconcilePaymentLinkOrder(order, null);
 
     return NextResponse.json({ success: true, order });
 
