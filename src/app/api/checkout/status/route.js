@@ -2,6 +2,7 @@ import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
 import PendingCheckout from "@/models/PendingCheckout";
 import stripe from "@/lib/stripe";
+import { fulfillSucceededPaymentIntent } from "@/lib/stripeFulfillment";
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
@@ -50,6 +51,19 @@ export async function GET(req) {
       try {
         const paymentIntent = await stripe.paymentIntents.retrieve(pending.stripePaymentIntentId);
         if (paymentIntent.status === 'succeeded') {
+          // The webhook may be delayed, missed, or (in local dev, without a
+          // `stripe listen` forwarder) never arrive at all — self-heal here
+          // instead of polling forever. Safe to call repeatedly: fulfillment
+          // is guarded by the Order's unique idempotencyKey index.
+          const fulfilledOrder = await fulfillSucceededPaymentIntent(paymentIntent, null);
+          if (fulfilledOrder) {
+            return NextResponse.json({
+              success: true,
+              status: 'succeeded',
+              orderId: fulfilledOrder._id,
+              orderNumber: fulfilledOrder.orderNumber,
+            });
+          }
           return NextResponse.json({ success: true, status: 'processing' });
         }
         if (paymentIntent.status === 'canceled' || paymentIntent.last_payment_error) {

@@ -84,7 +84,7 @@ const OrderSchema = new mongoose.Schema({
   },
   
   payment: {
-    method: { type: String, enum: ['Cash on Delivery', 'Card'], default: 'Cash on Delivery' },
+    method: { type: String, enum: ['Cash on Delivery', 'Card', 'Custom Inquiry', 'Custom Order'], default: 'Cash on Delivery' },
     status: { type: String, enum: ['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'], default: 'Pending' },
     provider: { type: String, default: null },
     stripePaymentIntentId: { type: String, index: true, sparse: true },
@@ -93,6 +93,38 @@ const OrderSchema = new mongoose.Schema({
     paidAt: Date,
     refundedAmount: { type: Number, default: 0 },
     transactionId: String
+  },
+
+  // Set when this order originated from a converted Custom Jacket Inquiry
+  customJacketInquiryId: { type: mongoose.Schema.Types.ObjectId, ref: 'CustomJacketInquiry', index: true, sparse: true },
+  // Read-only snapshot of the inquiry's specs, captured at conversion time for display on the order
+  customJacketSnapshot: {
+    jacketType: String,
+    gender: String,
+    preferredLeather: String,
+    preferredColor: String,
+    size: String,
+    budget: String,
+    deadline: String,
+    referenceImages: [{ type: String }],
+    additionalNotes: String
+  },
+
+  // Stripe Payment Link generated for admin-initiated (Custom Order) payment collection
+  paymentLink: {
+    url: String,
+    stripePaymentLinkId: String,
+    stripePriceId: String,
+    stripeProductId: String,
+    active: { type: Boolean, default: true },
+    createdAt: Date,
+    sentAt: Date,
+    sentCount: { type: Number, default: 0 }
+  },
+
+  invoice: {
+    sentAt: Date,
+    sentCount: { type: Number, default: 0 }
   },
 
   customer: {

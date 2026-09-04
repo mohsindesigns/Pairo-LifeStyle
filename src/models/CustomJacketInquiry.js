@@ -27,7 +27,7 @@ const CustomJacketInquirySchema = new mongoose.Schema({
   // Inquiry Management
   status: {
     type: String,
-    enum: ['New', 'Contacted', 'In Progress', 'Completed', 'Cancelled'],
+    enum: ['New', 'Contacted', 'In Progress', 'Converted', 'Completed', 'Cancelled'],
     default: 'New',
     index: true
   },
@@ -37,6 +37,9 @@ const CustomJacketInquirySchema = new mongoose.Schema({
     default: 'Medium'
   },
   adminNotes: { type: String, trim: true },
+
+  // Set once an admin finalizes pricing and converts this inquiry into a real Order
+  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null, index: true },
 
   // Tracking
   ipAddress: { type: String },

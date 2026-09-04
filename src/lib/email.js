@@ -1182,3 +1182,156 @@ export async function sendCustomJacketAdminNotification(inquiry) {
     throw err;
   }
 }
+
+// ─── CUSTOM ORDER: PAYMENT LINK & INVOICE EMAILS ──────────────────────────────
+
+/**
+ * Email a Stripe Payment Link to the customer for an admin-finalized Custom Order.
+ */
+export async function sendPaymentLinkEmail(order, paymentLinkUrl) {
+  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'info@pairolifestyle.com';
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const firstName = escapeHtml((order.shippingAddress?.fullName || '').split(' ')[0] || 'there');
+  const item = order.items?.[0] || {};
+  const total = order.financials?.total || 0;
+  const currency = order.financials?.currency || 'USD';
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Complete Your Payment</title></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.08);">
+  <tr><td style="background:#1a1a1a;padding:32px 40px;text-align:center;">
+    <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:4px;text-transform:uppercase;">${storeName}</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Bespoke Jacket Service</p>
+  </td></tr>
+  <tr><td style="padding:40px;">
+    <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:700;">Hi ${firstName}, your jacket is ready to order!</h2>
+    <p style="margin:0 0 16px;color:#555;font-size:14px;line-height:1.7;">Your bespoke <strong>${escapeHtml(item.name || 'Custom Jacket')}</strong> has been finalized. Please complete your payment below to confirm and begin production of Order <strong>#${order.orderNumber}</strong>.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;margin:24px 0;">
+      <tr><td style="padding:20px;text-align:center;">
+        <p style="margin:0 0 6px;color:#999;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Amount Due</p>
+        <p style="margin:0;color:#1a1a1a;font-size:32px;font-weight:800;">${currency} ${total.toLocaleString()}</p>
+      </td></tr>
+    </table>
+
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${paymentLinkUrl}" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;padding:16px 40px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:4px;">Pay Now</a>
+    </div>
+
+    <p style="margin:0;color:#999;font-size:12px;line-height:1.6;">If the button above doesn't work, copy and paste this link into your browser:<br/><a href="${paymentLinkUrl}" style="color:#1a1a1a;word-break:break-all;">${paymentLinkUrl}</a></p>
+  </td></tr>
+  <tr><td style="background:#f9f9f9;border-top:1px solid #e8e8e8;padding:24px 40px;text-align:center;">
+    <p style="margin:0;color:#999;font-size:12px;">Questions about your order? Reply to this email and our team will assist you.</p>
+    <p style="margin:8px 0 0;color:#999;font-size:11px;">&copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>
+  `.trim();
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"${storeName}" <${storeEmail}>`,
+      to: order.customer?.email,
+      subject: `Complete Your Payment — Order #${order.orderNumber}`,
+      html
+    });
+    console.log(`[Email] ✅ Payment link sent to ${order.customer?.email} | MsgID: ${info.messageId}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send payment link email:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Email an HTML invoice to the customer for an order (used for admin-triggered "Send Invoice").
+ */
+export async function sendOrderInvoiceEmail(order) {
+  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'info@pairolifestyle.com';
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const currency = order.financials?.currency || 'USD';
+  const fullName = escapeHtml(order.shippingAddress?.fullName || 'Customer');
+
+  const itemsHtml = (order.items || []).map(item => `
+    <tr>
+      <td style="padding:12px 0;border-bottom:1px solid #eee;font-size:13px;color:#1a1a1a;">${escapeHtml(item.name || '')}</td>
+      <td style="padding:12px 0;border-bottom:1px solid #eee;font-size:13px;color:#555;text-align:center;">${item.quantity || 1}</td>
+      <td style="padding:12px 0;border-bottom:1px solid #eee;font-size:13px;color:#1a1a1a;text-align:right;font-weight:700;">${currency} ${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice #${order.orderNumber}</title></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 16px;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.08);">
+  <tr><td style="background:#1a1a1a;padding:32px 40px;">
+    <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">${storeName}</h1>
+    <p style="margin:8px 0 0;color:rgba(255,255,255,0.5);font-size:12px;">Invoice for Order #${order.orderNumber}</p>
+  </td></tr>
+  <tr><td style="padding:40px;">
+    <div style="margin-bottom:24px;">
+      <p style="margin:0 0 4px;color:#999;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Billed To</p>
+      <p style="margin:0;color:#1a1a1a;font-size:14px;font-weight:700;">${fullName}</p>
+      <p style="margin:2px 0 0;color:#555;font-size:13px;">${order.customer?.email || ''}</p>
+    </div>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+      <thead>
+        <tr>
+          <th style="text-align:left;padding-bottom:8px;border-bottom:2px solid #1a1a1a;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;">Item</th>
+          <th style="text-align:center;padding-bottom:8px;border-bottom:2px solid #1a1a1a;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;">Qty</th>
+          <th style="text-align:right;padding-bottom:8px;border-bottom:2px solid #1a1a1a;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;">Total</th>
+        </tr>
+      </thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+
+    <table width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="padding:4px 0;font-size:13px;color:#555;">Subtotal</td><td style="padding:4px 0;font-size:13px;color:#1a1a1a;text-align:right;">${currency} ${(order.financials?.subtotal || 0).toLocaleString()}</td></tr>
+      ${order.financials?.shippingCost ? `<tr><td style="padding:4px 0;font-size:13px;color:#555;">Shipping</td><td style="padding:4px 0;font-size:13px;color:#1a1a1a;text-align:right;">${currency} ${order.financials.shippingCost.toLocaleString()}</td></tr>` : ''}
+      ${order.financials?.tax ? `<tr><td style="padding:4px 0;font-size:13px;color:#555;">Tax</td><td style="padding:4px 0;font-size:13px;color:#1a1a1a;text-align:right;">${currency} ${order.financials.tax.toLocaleString()}</td></tr>` : ''}
+      <tr><td style="padding:12px 0 0;font-size:15px;font-weight:800;color:#1a1a1a;border-top:2px solid #1a1a1a;">Total</td><td style="padding:12px 0 0;font-size:15px;font-weight:800;color:#1a1a1a;text-align:right;border-top:2px solid #1a1a1a;">${currency} ${(order.financials?.total || 0).toLocaleString()}</td></tr>
+    </table>
+
+    <p style="margin:24px 0 0;color:#999;font-size:12px;">Payment status: <strong style="color:#1a1a1a;">${order.payment?.status || 'Pending'}</strong></p>
+
+    ${order.payment?.status !== 'Paid' && order.paymentLink?.url ? `
+    <div style="text-align:center;margin:28px 0 4px;padding-top:24px;border-top:1px solid #eee;">
+      <a href="${order.paymentLink.url}" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;padding:14px 36px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:4px;">Pay Now</a>
+      <p style="margin:12px 0 0;color:#999;font-size:11px;line-height:1.6;">Or copy this link into your browser:<br/><a href="${order.paymentLink.url}" style="color:#1a1a1a;word-break:break-all;">${order.paymentLink.url}</a></p>
+    </div>` : ''}
+  </td></tr>
+  <tr><td style="background:#f9f9f9;border-top:1px solid #e8e8e8;padding:20px 40px;text-align:center;">
+    <p style="margin:0;color:#999;font-size:11px;">&copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>
+  `.trim();
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"${storeName}" <${storeEmail}>`,
+      to: order.customer?.email,
+      subject: `Invoice — Order #${order.orderNumber}`,
+      html
+    });
+    console.log(`[Email] ✅ Invoice sent to ${order.customer?.email} | MsgID: ${info.messageId}`);
+  } catch (err) {
+    console.error('[Email] ❌ Failed to send invoice email:', err.message);
+    throw err;
+  }
+}

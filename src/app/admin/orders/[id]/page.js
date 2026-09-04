@@ -10,6 +10,10 @@ import {
   Package,
   Users,
   ExternalLink,
+  Copy,
+  Send,
+  FileText,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -21,6 +25,7 @@ import { can } from "@/lib/rbac";
 import { formatCurrency } from "@/lib/currency";
 import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
 import { usePopup } from "@/context/PopupContext";
+import { CUSTOM_ORDER_PAYMENT_METHODS } from "@/lib/customOrderConstants";
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -35,6 +40,12 @@ export default function OrderDetailPage() {
   const [refundAmount, setRefundAmount] = useState("");
   const [refunding, setRefunding] = useState(false);
   const [refundError, setRefundError] = useState("");
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [sendingLink, setSendingLink] = useState(false);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [editingAmount, setEditingAmount] = useState(false);
+  const [amountInput, setAmountInput] = useState("");
+  const [savingAmount, setSavingAmount] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -155,6 +166,95 @@ export default function OrderDetailPage() {
       setRefundError("Refund failed. Please try again.");
     } finally {
       setRefunding(false);
+    }
+  };
+
+  const startEditAmount = () => {
+    setAmountInput(order?.financials?.total ? String(order.financials.total) : "");
+    setEditingAmount(true);
+  };
+
+  const saveAmount = async () => {
+    const amt = Number(amountInput);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    setSavingAmount(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/amount`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update amount");
+      setOrder(data.order);
+      setEditingAmount(false);
+      toast.success("Final amount updated");
+    } catch (error) {
+      toast.error(error.message || "Failed to update amount");
+    } finally {
+      setSavingAmount(false);
+    }
+  };
+
+  const generatePaymentLink = async (regenerate = false) => {
+    setGeneratingLink(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/payment-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regenerate }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate payment link");
+      setOrder(data.order);
+      toast.success("Payment link generated");
+    } catch (error) {
+      toast.error(error.message || "Failed to generate payment link");
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  const sendPaymentLinkToCustomer = async () => {
+    setSendingLink(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/payment-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ send: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send payment link");
+      setOrder(data.order);
+      toast.success("Payment link emailed to customer");
+    } catch (error) {
+      toast.error(error.message || "Failed to send payment link");
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
+  const copyPaymentLink = () => {
+    if (!order?.paymentLink?.url) return;
+    navigator.clipboard.writeText(order.paymentLink.url);
+    toast.success("Link copied to clipboard");
+  };
+
+  const sendInvoice = async () => {
+    setSendingInvoice(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/send-invoice`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send invoice");
+      setOrder(data.order);
+      toast.success("Invoice emailed to customer");
+    } catch (error) {
+      toast.error(error.message || "Failed to send invoice");
+    } finally {
+      setSendingInvoice(false);
     }
   };
 
@@ -425,6 +525,56 @@ export default function OrderDetailPage() {
               )}
             </div>
 
+            {/* Custom Jacket Specifications */}
+            {order.customJacketSnapshot && (
+              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
+                <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  <h2 className="text-[14px] font-bold text-[#1d2327]">Custom Jacket Specifications</h2>
+                </div>
+                <div className="p-6 space-y-5">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-[13px]">
+                    {[
+                      ["Jacket Type", order.customJacketSnapshot.jacketType],
+                      ["Gender", order.customJacketSnapshot.gender],
+                      ["Leather", order.customJacketSnapshot.preferredLeather],
+                      ["Color", order.customJacketSnapshot.preferredColor],
+                      ["Size", order.customJacketSnapshot.size],
+                      ["Budget", order.customJacketSnapshot.budget],
+                      ["Deadline", order.customJacketSnapshot.deadline],
+                    ].map(([label, val]) => val ? (
+                      <div key={label}>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
+                        <p className="text-[#1d2327] font-medium mt-0.5">{val}</p>
+                      </div>
+                    ) : null)}
+                  </div>
+                  {order.customJacketSnapshot.additionalNotes && (
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Additional Notes</p>
+                      <p className="text-[13px] text-[#1d2327] leading-relaxed bg-gray-50 p-3 rounded-lg">
+                        {order.customJacketSnapshot.additionalNotes}
+                      </p>
+                    </div>
+                  )}
+                  {order.customJacketSnapshot.referenceImages?.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-3">
+                        Reference Images ({order.customJacketSnapshot.referenceImages.length})
+                      </p>
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        {order.customJacketSnapshot.referenceImages.map((url, i) => (
+                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-lg overflow-hidden border border-gray-100 group/img">
+                            <img src={url} alt={`Reference ${i + 1}`} className="w-full h-full object-cover group-hover/img:opacity-80 transition-opacity" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Order Items Box */}
             <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden rounded-[2px]">
               <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
@@ -626,6 +776,142 @@ export default function OrderDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Payment & Invoice Actions (Custom Orders only) */}
+            {CUSTOM_ORDER_PAYMENT_METHODS.includes(order.payment?.method) && (
+              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
+                <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
+                  <h2 className="text-[14px] font-bold text-[#1d2327]">Payment & Invoice</h2>
+                </div>
+                <div className="p-4 space-y-4">
+                  {/* Final Amount — set by admin after reviewing customization, drives the payment link + invoice */}
+                  <div className="space-y-2 pb-4 border-b border-gray-100">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block">
+                      Final Amount (after customization)
+                    </label>
+                    {editingAmount ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={amountInput}
+                          onChange={(e) => setAmountInput(e.target.value)}
+                          autoFocus
+                          className="flex-1 border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] outline-none focus:border-[#2271b1]"
+                        />
+                        <button
+                          onClick={saveAmount}
+                          disabled={savingAmount}
+                          className="px-3 py-1.5 bg-[#2271b1] text-white rounded-[3px] text-[11px] font-bold uppercase hover:bg-[#135e96] disabled:opacity-50"
+                        >
+                          {savingAmount ? "..." : "Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditingAmount(false)}
+                          disabled={savingAmount}
+                          className="px-3 py-1.5 border border-[#8c8f94] rounded-[3px] text-[11px] font-bold uppercase hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[20px] font-black text-[#1d2327]">
+                          {currencyCode} {(order.financials?.total || 0).toLocaleString()}
+                        </span>
+                        {order.payment?.status !== "Paid" && (
+                          <button
+                            onClick={startEditAmount}
+                            className="text-[11px] font-bold text-[#2271b1] hover:text-[#135e96] uppercase"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {order.paymentLink?.url && order.payment?.status !== "Paid" && (
+                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-[3px] px-2 py-1.5">
+                        Changing the amount deactivates the current payment link — you&apos;ll need to generate a new one.
+                      </p>
+                    )}
+                  </div>
+
+                  {order.payment?.status === "Paid" ? (
+                    <div className="w-full text-center py-2 bg-green-50 border border-green-200 text-green-700 text-xs font-bold uppercase rounded-[3px]">
+                      Payment Received
+                    </div>
+                  ) : order.paymentLink?.url ? (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block">Payment Link</label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          readOnly
+                          value={order.paymentLink.url}
+                          className="flex-1 border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[11px] bg-gray-50 outline-none font-mono"
+                        />
+                        <button
+                          onClick={copyPaymentLink}
+                          title="Copy link"
+                          className="p-1.5 border border-[#8c8f94] rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1]"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-[#3c434a]" />
+                        </button>
+                      </div>
+                      {order.paymentLink.sentAt && (
+                        <p className="text-[11px] text-[#646970]">
+                          Sent {new Date(order.paymentLink.sentAt).toLocaleString()} ({order.paymentLink.sentCount || 1}x)
+                        </p>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={sendPaymentLinkToCustomer}
+                          disabled={sendingLink}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-[#2271b1] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-[#135e96] transition-colors disabled:opacity-50"
+                        >
+                          <Send className="w-3.5 h-3.5" /> {sendingLink ? "Sending..." : "Send to Customer"}
+                        </button>
+                        <button
+                          onClick={() => generatePaymentLink(true)}
+                          disabled={generatingLink}
+                          title="Regenerate link"
+                          className="px-3 py-2 border border-[#8c8f94] rounded-[3px] text-xs font-bold uppercase hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {generatingLink ? "..." : "Regenerate"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => generatePaymentLink(false)}
+                      disabled={generatingLink}
+                      className="w-full bg-[#1a1a1a] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-black transition-colors disabled:opacity-50"
+                    >
+                      {generatingLink ? "Generating..." : "Generate Payment Link"}
+                    </button>
+                  )}
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <button
+                      onClick={sendInvoice}
+                      disabled={sendingInvoice}
+                      className="w-full flex items-center justify-center gap-1.5 border border-[#8c8f94] text-[#3c434a] py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                      <FileText className="w-3.5 h-3.5" /> {sendingInvoice ? "Sending..." : "Send Invoice"}
+                    </button>
+                    {order.invoice?.sentAt ? (
+                      <p className="text-[11px] text-[#646970] mt-1.5 text-center">
+                        Last sent {new Date(order.invoice.sentAt).toLocaleString()} ({order.invoice.sentCount || 1}x)
+                      </p>
+                    ) : order.payment?.status !== "Paid" ? (
+                      <p className="text-[11px] text-[#646970] mt-1.5 text-center">
+                        Includes a Pay Now link{order.paymentLink?.url ? "" : " (generated automatically if none exists yet)"}.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Affiliate Attribution */}
             {order.affiliateReferralCode && (

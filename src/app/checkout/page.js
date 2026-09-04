@@ -1143,6 +1143,15 @@ export default function CheckoutPage() {
                 )}
               </div>
 
+              {/* Security check — required before either payment method can submit */}
+              <div className="pt-4">
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken("")}
+                />
+              </div>
+
               {paymentMethod === "card" && (
                 <div className="pt-1">
                   {loadingClientSecret && !clientSecret && (
@@ -1173,13 +1182,7 @@ export default function CheckoutPage() {
 
             {/* Submit Action (Cash on Delivery only — Card has its own submit button above) */}
             {paymentMethod === "cod" && (
-              <div className="pt-4 space-y-4">
-              <TurnstileWidget
-                ref={turnstileRef}
-                onVerify={(token) => setTurnstileToken(token)}
-                onExpire={() => setTurnstileToken("")}
-              />
-
+              <div className="space-y-4">
                 <button
                   type="button"
                   onClick={handlePayment}
