@@ -236,7 +236,8 @@ export default function PickupLocationsPage() {
               <p className="text-[11.5px] text-[#646970]">Add a location above so it can be attached to a Local Pickup shipping method.</p>
             </div>
           ) : (
-            <table className="wp-list-table widefat fixed striped posts w-full border border-[#c3c4c7] border-collapse bg-white text-left text-[13px]">
+            <div className="overflow-x-auto w-full border border-[#c3c4c7] bg-white">
+              <table className="wp-list-table widefat striped posts w-full border-collapse bg-white text-left text-[13px]">
               <thead>
                 <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338]">
                   <th className="px-3 py-2 font-bold w-[30%]">Name</th>
@@ -281,6 +282,7 @@ export default function PickupLocationsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

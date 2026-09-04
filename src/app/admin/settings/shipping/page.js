@@ -410,7 +410,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
   const [zone, setZone]               = useState(initZone);
   const [methods, setMethods]         = useState([]);
   const [hasLoaded, setHasLoaded]     = useState(false);
-  const [expanded, setExpanded]       = useState(false);
+  const [expanded, setExpanded]       = useState(true);
   const [loadingMethods, setLM]       = useState(false);
   const [showMethodModal, setSMM]     = useState(false);
   const [editingMethod, setEM]        = useState(null);
@@ -426,17 +426,25 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
       const res = await fetch(`/api/admin/shipping/zones/${zone._id}/methods`);
       const data = await res.json();
       if (data.success) {
-        setMethods(data.methods);
+        setMethods(data.methods || []);
         setHasLoaded(true);
       }
     } catch { toast.error("Failed to load methods."); }
     finally { setLM(false); }
   }, [zone._id]);
 
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) loadMethods();
+    });
+    return () => { active = false; };
+  }, [loadMethods]);
+
   const toggle = () => {
     const next = !expanded;
     setExpanded(next);
-    if (next && methods.length === 0) loadMethods();
+    if (next) loadMethods();
   };
 
   const saveZone = async () => {
@@ -445,9 +453,6 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
       const res = await fetch("/api/admin/shipping/zones", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, id: zone._id }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      // PUT returns the raw document without the computed isCatchAll/methodCount
-      // fields the GET listing adds — recompute isCatchAll here so the badge and
-      // delete-guard stay correct immediately after a save.
       const saved = { ...zone, ...data.zone, isCatchAll: (data.zone.matchRules?.length ?? 0) === 0 };
       setZone(saved); setForm(saved); setEditing(false);
       toast.success("Zone saved.");
@@ -463,7 +468,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
     try {
       const res = await fetch(`/api/admin/shipping/zones/${zone._id}/methods?id=${mid}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
-      setMethods(p => p.filter(m => m._id !== mid));
+      await loadMethods();
       toast.success("Method deleted.");
     } catch (e) { toast.error(e.message); }
     finally { setDM(null); }
@@ -582,60 +587,71 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
           )}
 
           {methods.length > 0 && (
-            <table className="wp-list-table widefat fixed striped posts w-full border border-[#c3c4c7] border-collapse bg-white text-left text-[13px]">
-              <thead>
-                <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338]">
-                  <th className="px-3 py-2 font-bold w-[35%]">Method Name</th>
-                  <th className="px-3 py-2 font-bold w-[25%]">Provider</th>
-                  <th className="px-3 py-2 font-bold w-[20%]">Cost</th>
-                  <th className="px-3 py-2 font-bold w-[10%]">Status</th>
-                  <th className="px-3 py-2 font-bold w-[10%] text-center"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {methods.map(m => {
-                  const cost = m.provider === "FLAT_RATE" ? `$${m.settings?.cost ?? 0}`
-                    : m.provider === "FREE_SHIPPING" ? (m.settings?.minimumOrderAmount > 0 ? `Free over $${m.settings.minimumOrderAmount}` : "Free") : `$${m.settings?.cost ?? 0}`;
-                  return (
-                    <tr key={m._id} className="hover:bg-[#f0f6fb] border-b border-[#f0f0f1] last:border-0 group">
-                      <td className="px-3 py-2.5">
-                        <span className="font-bold text-[#1d2327]">{m.name}</span>
-                        {m.description && <p className="text-[11px] text-[#646970] mt-0.5">{m.description}</p>}
-                      </td>
-                      <td className="px-3 py-2.5 text-[#646970]">
-                        {providerLabel[m.provider]}
-                      </td>
-                      <td className="px-3 py-2.5 font-bold text-[#2271b1]">
-                        {cost}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <span className={`text-[10px] font-bold uppercase border px-1.5 py-0.5 rounded-[2px] ${
-                          m.status === "Active" ? "border-green-300 bg-green-50 text-green-700" : "border-[#c3c4c7] bg-[#f6f7f7] text-[#646970]"
-                        }`}>{m.status}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => { setEM(m); setSMM(true); }} className="text-[#2271b1] hover:text-[#135e96] font-semibold text-[12px] hover:underline">Edit</button>
-                          <span className="text-[#c3c4c7]">|</span>
-                          <button onClick={() => deleteMethod(m._id)} disabled={deletingMethod === m._id} className="text-[#b32d2e] hover:text-[#d63638] font-semibold text-[12px] hover:underline">
-                            {deletingMethod === m._id ? "..." : "Delete"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto w-full border border-[#c3c4c7] bg-white">
+              <table className="wp-list-table widefat striped posts w-full border-collapse bg-white text-left text-[13px]">
+                <thead>
+                  <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338]">
+                    <th className="px-3 py-2 font-bold min-w-[140px] w-[35%]">Method Name</th>
+                    <th className="px-3 py-2 font-bold min-w-[120px] w-[25%]">Provider</th>
+                    <th className="px-3 py-2 font-bold min-w-[90px] w-[20%]">Cost</th>
+                    <th className="px-3 py-2 font-bold min-w-[90px] w-[10%]">Status</th>
+                    <th className="px-3 py-2 font-bold min-w-[100px] w-[10%] text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {methods.map(m => {
+                    const cost = m.provider === "FLAT_RATE" ? `$${m.settings?.cost ?? 0}`
+                      : m.provider === "FREE_SHIPPING" ? (m.settings?.minimumOrderAmount > 0 ? `Free over $${m.settings.minimumOrderAmount}` : "Free") : `$${m.settings?.cost ?? 0}`;
+                    return (
+                      <tr key={m._id} className="hover:bg-[#f0f6fb] border-b border-[#f0f0f1] last:border-0 group">
+                        <td className="px-3 py-2.5">
+                          <span className="font-bold text-[#1d2327]">{m.name}</span>
+                          {m.description && <p className="text-[11px] text-[#646970] mt-0.5">{m.description}</p>}
+                        </td>
+                        <td className="px-3 py-2.5 text-[#646970]">
+                          {providerLabel[m.provider]}
+                        </td>
+                        <td className="px-3 py-2.5 font-bold text-[#2271b1]">
+                          {cost}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <span className={`text-[10px] font-bold uppercase border px-1.5 py-0.5 rounded-[2px] ${
+                            m.status === "Active" ? "border-green-300 bg-green-50 text-green-700" : "border-[#c3c4c7] bg-[#f6f7f7] text-[#646970]"
+                          }`}>{m.status}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button onClick={() => { setEM(m); setSMM(true); }} className="text-[#2271b1] hover:text-[#135e96] font-semibold text-[12px] hover:underline cursor-pointer">Edit</button>
+                            <span className="text-[#c3c4c7]">|</span>
+                            <button onClick={() => deleteMethod(m._id)} disabled={deletingMethod === m._id} className="text-[#b32d2e] hover:text-[#d63638] font-semibold text-[12px] hover:underline cursor-pointer">
+                              {deletingMethod === m._id ? "..." : "Delete"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
 
       {showMethodModal && (
         <MethodModal zoneId={zone._id} initial={editingMethod} onClose={() => { setSMM(false); setEM(null); }}
-          onSaved={saved => {
-            setMethods(p => editingMethod ? p.map(m => m._id === saved._id ? saved : m) : [...p, saved]);
-            setSMM(false); setEM(null);
+          onSaved={async (saved) => {
+            if (saved) {
+              setMethods(prev => {
+                const exists = prev.some(m => m._id === saved._id);
+                if (exists) return prev.map(m => m._id === saved._id ? saved : m);
+                return [...prev, saved];
+              });
+              setHasLoaded(true);
+            }
+            await loadMethods();
+            setSMM(false);
+            setEM(null);
           }} />
       )}
     </div>

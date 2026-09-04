@@ -501,7 +501,7 @@ export default function TaxSettingsPage() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="wp-list-table widefat fixed striped posts w-full border border-[#c3c4c7] border-collapse bg-white text-left text-[13px] min-w-[1000px]">
+                    <table className="wp-list-table widefat striped posts w-full border border-[#c3c4c7] border-collapse bg-white text-left text-[13px] min-w-[1000px]">
                       <thead>
                         <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338]">
                           <th className="px-2 py-2 font-bold">Country</th>
