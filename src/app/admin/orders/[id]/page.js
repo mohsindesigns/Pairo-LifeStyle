@@ -526,7 +526,7 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Custom Jacket Specifications */}
-            {order.customJacketSnapshot && (
+            {order.customJacketInquiryId && order.customJacketSnapshot && (
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
                 <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
                   <Sparkles className="w-3.5 h-3.5 text-purple-600" />
