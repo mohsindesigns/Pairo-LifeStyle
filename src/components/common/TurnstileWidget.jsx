@@ -34,6 +34,18 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const siteKey = process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || TEST_SITE_KEY;
 
+  // Callers pass onVerify/onExpire/onError as inline functions, which get a new
+  // identity on every parent re-render (e.g. typing into any other field in the
+  // same form). Stashing the latest versions in refs — read from inside the
+  // widget-render effect below — keeps that effect from re-running on every
+  // keystroke and tearing down/rebuilding the Cloudflare challenge mid-verification.
+  const onVerifyRef = useRef(onVerify);
+  const onExpireRef = useRef(onExpire);
+  const onErrorRef = useRef(onError);
+  onVerifyRef.current = onVerify;
+  onExpireRef.current = onExpire;
+  onErrorRef.current = onError;
+
   // Expose imperative methods to parent form (e.g. reset())
   useImperativeHandle(ref, () => ({
     reset: () => {
@@ -98,15 +110,15 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
         theme,
         size,
         callback: (token) => {
-          if (onVerify) onVerify(token);
+          onVerifyRef.current?.(token);
         },
         "expired-callback": () => {
-          if (onExpire) onExpire();
-          else if (onVerify) onVerify("");
+          if (onExpireRef.current) onExpireRef.current();
+          else onVerifyRef.current?.("");
         },
         "error-callback": (err) => {
           console.error("[Turnstile] Widget error:", err);
-          if (onError) onError(err);
+          onErrorRef.current?.(err);
         }
       });
       widgetIdRef.current = widgetId;
@@ -124,7 +136,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget(
         widgetIdRef.current = null;
       }
     };
-  }, [scriptLoaded, siteKey, theme, size, onVerify, onExpire, onError]);
+  }, [scriptLoaded, siteKey, theme, size]);
 
   return (
     <div className={`my-3 flex flex-col items-center justify-center ${className}`}>

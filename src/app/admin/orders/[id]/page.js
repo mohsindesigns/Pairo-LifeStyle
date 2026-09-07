@@ -25,7 +25,7 @@ import { can } from "@/lib/rbac";
 import { formatCurrency } from "@/lib/currency";
 import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
 import { usePopup } from "@/context/PopupContext";
-import { CUSTOM_ORDER_PAYMENT_METHODS } from "@/lib/customOrderConstants";
+import { isPayableByLink } from "@/lib/customOrderConstants";
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -46,6 +46,7 @@ export default function OrderDetailPage() {
   const [editingAmount, setEditingAmount] = useState(false);
   const [amountInput, setAmountInput] = useState("");
   const [savingAmount, setSavingAmount] = useState(false);
+  const [convertingToCard, setConvertingToCard] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -196,6 +197,27 @@ export default function OrderDetailPage() {
       toast.error(error.message || "Failed to update amount");
     } finally {
       setSavingAmount(false);
+    }
+  };
+
+  const convertToCard = async () => {
+    const confirmed = await showConfirm(
+      "This switches the order from Cash on Delivery to Card, generates a Stripe payment link, and emails the customer an invoice with a Pay Now button.",
+      "Update to Card Payment?"
+    );
+    if (!confirmed) return;
+
+    setConvertingToCard(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/convert-to-card`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update payment method");
+      setOrder(data.order);
+      toast.success("Order updated to Card — invoice with payment link sent");
+    } catch (error) {
+      toast.error(error.message || "Failed to update payment method");
+    } finally {
+      setConvertingToCard(false);
     }
   };
 
@@ -433,6 +455,15 @@ export default function OrderDetailPage() {
                     <p className="text-[#646970] mt-1">
                       Method: {order.payment?.method || "Cash on Delivery"}
                     </p>
+                    {order.payment?.method === "Cash on Delivery" && order.payment?.status !== "Paid" && (
+                      <button
+                        onClick={convertToCard}
+                        disabled={convertingToCard}
+                        className="mt-2 flex items-center gap-1.5 border border-[#8c8f94] text-[#3c434a] px-2.5 py-1.5 rounded-[3px] text-[11px] font-bold uppercase hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      >
+                        <Send className="w-3 h-3" /> {convertingToCard ? "Updating..." : "Update to Card & Send Invoice"}
+                      </button>
+                    )}
                     {order.payment?.provider === 'stripe' && order.payment?.stripePaymentIntentId && (
                       <a
                         href={`https://dashboard.stripe.com/payments/${order.payment.stripePaymentIntentId}`}
@@ -778,7 +809,7 @@ export default function OrderDetailPage() {
             </div>
 
             {/* Payment & Invoice Actions (Custom Orders only) */}
-            {CUSTOM_ORDER_PAYMENT_METHODS.includes(order.payment?.method) && (
+            {isPayableByLink(order) && (
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
                 <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
                   <h2 className="text-[14px] font-bold text-[#1d2327]">Payment & Invoice</h2>

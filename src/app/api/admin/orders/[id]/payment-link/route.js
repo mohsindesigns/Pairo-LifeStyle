@@ -5,7 +5,7 @@ import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
 import { can } from "@/lib/rbac";
 import { sendPaymentLinkEmail } from "@/lib/email";
-import { CUSTOM_ORDER_PAYMENT_METHODS } from "@/lib/customOrderConstants";
+import { isPayableByLink } from "@/lib/customOrderConstants";
 import { createStripePaymentLinkForOrder, deactivateStripePaymentLink } from "@/lib/orderPaymentLink";
 
 export async function POST(req, { params }) {
@@ -22,8 +22,8 @@ export async function POST(req, { params }) {
 
     const order = await Order.findById(id);
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    if (!CUSTOM_ORDER_PAYMENT_METHODS.includes(order.payment?.method)) {
-      return NextResponse.json({ error: "Payment links are only available for Custom Orders" }, { status: 400 });
+    if (!isPayableByLink(order)) {
+      return NextResponse.json({ error: "This order isn't set up for payment-link collection" }, { status: 400 });
     }
     if (order.payment?.status === "Paid") {
       return NextResponse.json({ error: "This order has already been paid" }, { status: 400 });

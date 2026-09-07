@@ -4,7 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
 import { can } from "@/lib/rbac";
-import { CUSTOM_ORDER_PAYMENT_METHODS } from "@/lib/customOrderConstants";
+import { isPayableByLink } from "@/lib/customOrderConstants";
 import { deactivateStripePaymentLink } from "@/lib/orderPaymentLink";
 
 /**
@@ -34,8 +34,8 @@ export async function POST(req, { params }) {
 
     const order = await Order.findById(id);
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-    if (!CUSTOM_ORDER_PAYMENT_METHODS.includes(order.payment?.method)) {
-      return NextResponse.json({ error: "The final amount can only be set on Custom Orders" }, { status: 400 });
+    if (!isPayableByLink(order)) {
+      return NextResponse.json({ error: "The final amount can only be set on orders payable by link" }, { status: 400 });
     }
     if (order.payment?.status === "Paid") {
       return NextResponse.json({ error: "This order has already been paid" }, { status: 400 });
