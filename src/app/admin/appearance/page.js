@@ -167,26 +167,26 @@ export default function AppearanceManagement() {
                     <p className="text-[11px] text-[#646970] mt-1 uppercase tracking-wider">{theme.config.typography.headingFont}</p>
                   </div>
 
-                  {/* WP-Style Hover Actions */}
-                  <div className="absolute inset-0 bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                  {/* WP-Style Actions (touch-friendly on mobile) */}
+                  <div className="absolute inset-0 bg-white/95 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
                      {!theme.isActive && (
                         <button 
                           onClick={() => activateTheme(theme._id)}
-                          className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-bold hover:bg-[#135e96] shadow-sm"
+                          className="bg-[#2271b1] text-white px-3 xs:px-4 py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-bold hover:bg-[#135e96] shadow-sm"
                         >
                           Activate
                         </button>
                      )}
                      <button 
                       onClick={() => setEditingTheme(theme)}
-                      className="bg-white border border-[#2271b1] text-[#2271b1] px-4 py-1.5 rounded-[3px] text-[13px] font-bold hover:bg-[#f0f6fb] shadow-sm"
+                      className="bg-white border border-[#2271b1] text-[#2271b1] px-3 xs:px-4 py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-bold hover:bg-[#f0f6fb] shadow-sm"
                      >
                        Customize
                      </button>
                   </div>
 
                   {theme.isActive && (
-                    <div className="absolute top-2 left-2 bg-[#2271b1] text-white text-[10px] font-bold uppercase px-2 py-1 rounded-[2px]">
+                    <div className="absolute top-2 left-2 bg-[#2271b1] text-white text-[10px] font-bold uppercase px-2 py-1 rounded-[2px] z-10">
                       Active
                     </div>
                   )}
@@ -194,8 +194,8 @@ export default function AppearanceManagement() {
 
                 {/* Info Bar */}
                 <div className="px-3 py-2 flex items-center justify-between bg-white">
-                  <span className="text-[12px] font-bold text-[#1d2327]">{theme.name}</span>
-                  <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-bold text-[#1d2327] truncate">{theme.name}</span>
+                  <div className="flex items-center gap-2 shrink-0">
                     <button onClick={() => duplicateTheme(theme)} className="text-[#2271b1] hover:text-[#135e96]" title="Duplicate">
                       <Copy className="w-3.5 h-3.5" />
                     </button>
@@ -210,15 +210,15 @@ export default function AppearanceManagement() {
             ))}
 
             {/* Add New Placeholder */}
-            <div className="border-2 border-dashed border-[#ccd0d4] rounded-[2px] aspect-[16/10] flex flex-col items-center justify-center text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] transition-all cursor-pointer group">
-               <Plus className="w-8 h-8 mb-2 group-hover:scale-110 transition-transform" />
-               <span className="text-[13px] font-bold">Add New Theme</span>
+            <div className="border-2 border-dashed border-[#ccd0d4] rounded-[2px] aspect-[16/10] flex flex-col items-center justify-center text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] transition-all cursor-pointer group p-3">
+               <Plus className="w-7 h-7 xs:w-8 xs:h-8 mb-2 group-hover:scale-110 transition-transform" />
+               <span className="text-[12px] xs:text-[13px] font-bold">Add New Theme</span>
             </div>
           </div>
         </div>
 
         {/* Sidebar: Help & Info */}
-        <div className="space-y-5">
+        <div className="space-y-4 xs:space-y-5 min-w-0">
           <MetaBox title="About Appearance">
              <p className="text-[13px] text-[#3c434a] leading-relaxed mb-3">
                This screen allows you to manage the visual themes for your public storefront. 
@@ -251,23 +251,23 @@ export default function AppearanceManagement() {
 
       {/* WordPress-Style Theme Customizer Modal */}
       {editingTheme && (
-        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-           <div className="w-full max-w-4xl bg-[#f0f2f1] rounded-[2px] shadow-2xl flex flex-col h-[90vh] overflow-hidden border border-[#ccd0d4]">
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 xs:p-3 sm:p-4">
+           <div className="w-full max-w-4xl bg-[#f0f2f1] rounded-[2px] shadow-2xl flex flex-col h-[92vh] xs:h-[90vh] overflow-hidden border border-[#ccd0d4]">
               
               {/* Modal Header */}
-              <div className="bg-[#1d2327] text-white px-6 py-3 flex items-center justify-between">
-                 <div className="flex items-center gap-3">
-                    <Palette className="w-4 h-4 text-[#72aee6]" />
-                    <span className="text-[14px] font-bold">Customizing: {editingTheme.name}</span>
+              <div className="bg-[#1d2327] text-white px-3 xs:px-4 sm:px-6 py-2.5 xs:py-3 flex items-center justify-between shrink-0">
+                 <div className="flex items-center gap-2 xs:gap-3 min-w-0">
+                    <Palette className="w-4 h-4 text-[#72aee6] shrink-0" />
+                    <span className="text-[13px] xs:text-[14px] font-bold truncate">Customizing: {editingTheme.name}</span>
                  </div>
-                 <button onClick={() => setEditingTheme(null)} className="text-gray-400 hover:text-white transition-colors" title="Close">
+                 <button onClick={() => setEditingTheme(null)} className="text-gray-400 hover:text-white transition-colors shrink-0 p-1" title="Close">
                     <X className="w-5 h-5" />
                  </button>
               </div>
 
-              <div className="flex-1 flex overflow-hidden">
+              <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
                  {/* Left Sidebar: Controls */}
-                 <div className="w-[300px] bg-white border-r border-[#ccd0d4] overflow-y-auto p-5 space-y-8">
+                 <div className="w-full md:w-[300px] bg-white border-b md:border-b-0 md:border-r border-[#ccd0d4] overflow-y-auto p-3 xs:p-4 sm:p-5 space-y-6 sm:space-y-8 shrink-0">
                     
                     {/* Colors */}
                     <div className="space-y-4">

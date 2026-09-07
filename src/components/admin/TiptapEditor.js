@@ -212,8 +212,8 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
   const selectClass = "text-[12px] border border-[#c3c4c7] bg-white px-2 py-1.5 rounded-[2px] outline-none hover:border-[#8c8f94] transition-all cursor-pointer font-medium text-gray-700 h-[32px] flex items-center";
 
   return (
-    <div className="border-b border-[#c3c4c7] bg-[#f6f7f7] px-3 py-2 sticky top-0 z-10 select-none">
-      <div className="flex flex-wrap items-center gap-1.5">
+    <div className="border-b border-[#c3c4c7] bg-[#f6f7f7] px-1.5 xs:px-3 py-2 sticky top-0 z-10 select-none max-w-full overflow-hidden">
+      <div className="flex flex-wrap items-center gap-1 xs:gap-1.5 tiptap-toolbar max-w-full min-w-0">
         {/* Block / Headings Type */}
         <select 
           value={getHeadingValue()} 

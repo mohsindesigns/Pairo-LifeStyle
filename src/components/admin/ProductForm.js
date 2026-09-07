@@ -501,7 +501,7 @@ export default function ProductForm({ productId = null }) {
                   <input
                      required
                      placeholder="Enter title here"
-                     className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-4 py-2.5 text-[20px] bg-white shadow-sm font-semibold transition-all"
+                     className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-3 xs:px-4 py-2 xs:py-2.5 text-[16px] xs:text-[18px] sm:text-[20px] bg-white shadow-sm font-semibold transition-all"
                      value={formData.name}
                       onChange={(e) => {
                          const newName = e.target.value;
@@ -513,7 +513,7 @@ export default function ProductForm({ productId = null }) {
                       }}
                   />
                   {/* Permalink / Slug Row */}
-                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5">
+                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5 break-words">
                      <span>Permalink:</span>
                      <span className="text-gray-400 font-mono break-all">pairolifestyle.com/product/</span>
 
@@ -847,7 +847,7 @@ export default function ProductForm({ productId = null }) {
                                                              </div>
                                                              {/* Swatch preview + picker */}
                                                              {swatchType==="color" ? (
-                                                                <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded border border-gray-100 shrink-0 min-w-[160px]">
+                                                                <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded border border-gray-100 w-full xs:w-auto shrink-0 min-w-0 max-w-full xs:min-w-[160px]">
                                                                    <div className="flex items-center gap-2">
                                                                       {/* Final preview bubble */}
                                                                       <div

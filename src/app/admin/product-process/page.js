@@ -206,7 +206,7 @@ export default function AdminProductProcessPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left 1 Column: General Settings */}
-        <div className="bg-white p-6 border border-[#ccd0d4] rounded-[3px] shadow-sm space-y-4 h-fit">
+        <div className="bg-white p-3 sm:p-6 border border-[#ccd0d4] rounded-[3px] shadow-sm space-y-4 h-fit">
           <h2 className="text-[14px] font-bold text-[#1d2327] border-b border-[#ccd0d4] pb-2 uppercase tracking-wide">
             General Options
           </h2>
@@ -246,8 +246,8 @@ export default function AdminProductProcessPage() {
 
         {/* Right 2 Columns: Steps List */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-6 border border-[#ccd0d4] rounded-[3px] shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-[#ccd0d4] pb-2">
+          <div className="bg-white p-3 sm:p-6 border border-[#ccd0d4] rounded-[3px] shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#ccd0d4] pb-2">
               <h2 className="text-[14px] font-bold text-[#1d2327] uppercase tracking-wide">
                 Process Steps ({steps.length})
               </h2>
@@ -281,10 +281,10 @@ export default function AdminProductProcessPage() {
                       }`}
                     >
                       {/* Accordion header / main bar */}
-                      <div className="flex items-center justify-between p-3.5 bg-[#fcfcfc] border-b border-[#f0f0f1] cursor-move">
-                        <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-2.5 sm:p-3.5 bg-[#fcfcfc] border-b border-[#f0f0f1] cursor-move">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                           <Move className="w-4 h-4 text-[#8c8f94] shrink-0" />
-                          <span className="text-[11px] font-bold text-white bg-black/80 px-2 py-0.5 rounded-[3px]">
+                          <span className="text-[11px] font-bold text-white bg-black/80 px-2 py-0.5 rounded-[3px] shrink-0">
                             {index + 1}
                           </span>
                           {step.image ? (
@@ -294,14 +294,14 @@ export default function AdminProductProcessPage() {
                               <ImageIcon className="w-4 h-4 text-[#8c8f94]" />
                             </div>
                           )}
-                          <div className="truncate">
+                          <div className="truncate min-w-0">
                             <p className="text-[13px] font-bold text-[#1d2327] truncate">{step.heading || "(No title)"}</p>
                             {step.subheading && <p className="text-[11px] text-[#646970] truncate">{step.subheading}</p>}
                           </div>
                         </div>
 
                         {/* Reorder and Action controls */}
-                        <div className="flex items-center gap-1 shrink-0 ml-4">
+                        <div className="flex items-center gap-1 shrink-0 ml-auto sm:ml-4">
                           <button
                             type="button"
                             onClick={() => moveUp(index)}

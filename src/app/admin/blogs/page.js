@@ -189,18 +189,18 @@ export default function AdminBlogs() {
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 shadow-sm">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-               <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none min-w-0 max-w-full" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 shadow-sm">
+            <div className="flex flex-wrap items-center gap-1.5 xs:gap-2 min-w-0">
+               <select className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none min-w-0 max-w-full" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
                   <option>Bulk actions</option>
                   <option>Duplicate</option>
                   <option>Move to Trash</option>
                   <option>Delete Permanently</option>
                </select>
-               <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
+               <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
                
                <select 
-                 className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] sm:ml-2 min-w-0 max-w-full"
+                 className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] min-w-0 max-w-full"
                  value={selectedCategory}
                  onChange={(e) => setSelectedCategory(e.target.value)}
                >
@@ -211,15 +211,17 @@ export default function AdminBlogs() {
                </select>
             </div>
 
-           <div className="flex items-center gap-2 w-full md:w-auto min-w-0">
+           <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto min-w-0">
               <input
                 type="text"
                 placeholder="Search blog..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
+                className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
               />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shrink-0 whitespace-nowrap">Search Posts</button>
+              <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shrink-0 whitespace-nowrap">
+                Search <span className="hidden xs:inline">Posts</span>
+              </button>
            </div>
         </div>
 
@@ -255,7 +257,7 @@ export default function AdminBlogs() {
                                {b.title}
                             </Link>
                             {b.status === "Draft" && <span className="font-bold text-[#1d2327] text-[12px] -mt-1 mb-1">— Draft</span>}
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
                                {view === "trash" ? (
                                   <>
                                      <button onClick={() => handleRestoreBlog(b._id)} className="hover:text-[#135e96]">Restore</button>

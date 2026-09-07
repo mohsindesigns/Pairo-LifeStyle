@@ -242,14 +242,14 @@ export default function AdminMedia() {
             </button>
           )}
 
-          <div className="ml-auto flex items-center gap-3">
-            <div className="relative group">
+          <div className="w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="relative group flex-1 sm:flex-initial">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8c8f94] group-focus-within:text-[#2271b1]" />
               <input value={search} onChange={e => handleSearch(e.target.value)}
-                placeholder="Search media..." className="pl-9 pr-3 py-1.5 border border-[#8c8f94] text-[13px] outline-none focus:border-[#2271b1] w-64 bg-white rounded-[3px] shadow-inner" />
+                placeholder="Search media..." className="pl-9 pr-3 py-1.5 border border-[#8c8f94] text-[13px] outline-none focus:border-[#2271b1] w-full sm:w-64 bg-white rounded-[3px] shadow-inner" />
             </div>
             
-            <label className="flex items-center gap-2 px-4 py-1.5 bg-[#2271b1] text-white text-[13px] font-bold rounded-[3px] hover:bg-[#135e96] cursor-pointer transition-all shadow-sm">
+            <label className="flex items-center gap-2 px-3 sm:px-4 py-1.5 bg-[#2271b1] text-white text-[13px] font-bold rounded-[3px] hover:bg-[#135e96] cursor-pointer transition-all shadow-sm shrink-0">
               <Upload className="w-4 h-4" />
               {uploading ? "Uploading..." : "Add New"}
               <input type="file" multiple accept="image/*" className="hidden" onChange={e => handleFiles(e.target.files)} disabled={uploading} />
@@ -269,7 +269,7 @@ export default function AdminMedia() {
       </div>
 
       {/* ── Main Content Area ── */}
-      <div className="flex flex-1 gap-6 min-h-[500px]">
+      <div className="flex flex-col lg:flex-row flex-1 gap-4 lg:gap-6 min-h-[500px]">
 
         {/* Left: Library Content */}
         <div className="flex-1 min-w-0 flex flex-col">
@@ -320,49 +320,51 @@ export default function AdminMedia() {
                 ))}
               </div>
             ) : (
-              <table className="w-full text-[13px] border-collapse">
-                <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] sticky top-0 z-10">
-                  <tr>
-                    {bulkMode && <th className="px-4 py-3 w-8" />}
-                    <th className="px-6 py-3 text-left font-bold text-[#2c3338] text-[11px] uppercase tracking-widest">File</th>
-                    <th className="px-6 py-3 text-left font-bold text-[#2c3338] text-[11px] uppercase tracking-widest">Title</th>
-                    <th className="px-6 py-3 text-center font-bold text-[#2c3338] text-[11px] uppercase tracking-widest">Type</th>
-                    <th className="px-6 py-3 text-right font-bold text-[#2c3338] text-[11px] uppercase tracking-widest">Size</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#f0f0f1]">
-                  {items.map(item => (
-                    <tr key={item._id} onClick={() => handleItemClick(item)} className={`transition-colors hover:bg-[#f6f7f7] ${detailItem?._id === item._id ? "bg-[#f0f6fa]" : ""}`}>
-                      {bulkMode && (
-                        <td className="px-4 py-3">
-                          <input type="checkbox" className="w-4 h-4" checked={selected.has(item._id)} onChange={() => toggleSelect(item._id)} onClick={e => e.stopPropagation()} />
-                        </td>
-                      )}
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-[#f0f2f1] border border-[#e0e0e0] overflow-hidden shrink-0 rounded">
-                            <img src={item.url} alt="" className="w-full h-full object-cover" />
-                          </div>
-                          <span className="font-bold text-[#2271b1] hover:underline cursor-pointer truncate max-w-[200px]">{item.filename}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 text-gray-700 font-medium">{item.title || '—'}</td>
-                      <td className="px-6 py-3 text-center text-gray-400 font-mono text-[11px]">{item.format?.toUpperCase() || 'IMG'}</td>
-                      <td className="px-6 py-3 text-right text-gray-500">{item.fileSize ? `${(item.fileSize/1024).toFixed(0)} KB` : '—'}</td>
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full text-[13px] border-collapse min-w-[500px]">
+                  <thead className="bg-[#f6f7f7] border-b border-[#c3c4c7] sticky top-0 z-10">
+                    <tr>
+                      {bulkMode && <th className="px-4 py-3 w-8" />}
+                      <th className="px-6 py-3 text-left font-bold text-[#2c3338] text-[11px] uppercase tracking-widest">File</th>
+                      <th className="px-6 py-3 text-left font-bold text-[#2c3338] text-[11px] uppercase tracking-widest">Title</th>
+                      <th className="px-6 py-3 text-center font-bold text-[#2c3338] text-[11px] uppercase tracking-widest">Type</th>
+                      <th className="px-6 py-3 text-right font-bold text-[#2c3338] text-[11px] uppercase tracking-widest">Size</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#f0f0f1]">
+                    {items.map(item => (
+                      <tr key={item._id} onClick={() => handleItemClick(item)} className={`transition-colors hover:bg-[#f6f7f7] ${detailItem?._id === item._id ? "bg-[#f0f6fa]" : ""}`}>
+                        {bulkMode && (
+                          <td className="px-4 py-3">
+                            <input type="checkbox" className="w-4 h-4" checked={selected.has(item._id)} onChange={() => toggleSelect(item._id)} onClick={e => e.stopPropagation()} />
+                          </td>
+                        )}
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-[#f0f2f1] border border-[#e0e0e0] overflow-hidden shrink-0 rounded">
+                              <img src={item.url} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            <span className="font-bold text-[#2271b1] hover:underline cursor-pointer truncate max-w-[200px]">{item.filename}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 text-gray-700 font-medium">{item.title || '—'}</td>
+                        <td className="px-6 py-3 text-center text-gray-400 font-mono text-[11px]">{item.format?.toUpperCase() || 'IMG'}</td>
+                        <td className="px-6 py-3 text-right text-gray-400 font-mono text-[11px]">{item.fileSize ? `${(item.fileSize/1024).toFixed(0)} KB` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
           {pagination.pages > 1 && (
-            <div className="flex items-center justify-between py-4 bg-transparent text-[13px] text-[#646970]">
+            <div className="flex flex-wrap items-center justify-between gap-2 py-4 bg-transparent text-[13px] text-[#646970]">
               <span className="font-medium">{pagination.total} items</span>
-              <div className="flex items-center gap-4">
-                <button disabled={page <= 1} onClick={() => { const p = page-1; setPage(p); fetchMedia(search, p, tab); }} className="px-4 py-1.5 bg-white border border-[#c3c4c7] font-bold disabled:opacity-30 hover:bg-[#f6f7f7] rounded-[3px] shadow-sm transition-all text-[#2c3338]">Previous</button>
+              <div className="flex items-center gap-2 sm:gap-4">
+                <button disabled={page <= 1} onClick={() => { const p = page-1; setPage(p); fetchMedia(search, p, tab); }} className="px-3 sm:px-4 py-1.5 bg-white border border-[#c3c4c7] font-bold disabled:opacity-30 hover:bg-[#f6f7f7] rounded-[3px] shadow-sm transition-all text-[#2c3338]">Previous</button>
                 <span className="font-bold text-[#2c3338]">Page {page} of {pagination.pages}</span>
-                <button disabled={page >= pagination.pages} onClick={() => { const p = page+1; setPage(p); fetchMedia(search, p, tab); }} className="px-4 py-1.5 bg-white border border-[#c3c4c7] font-bold disabled:opacity-30 hover:bg-[#f6f7f7] rounded-[3px] shadow-sm transition-all text-[#2c3338]">Next</button>
+                <button disabled={page >= pagination.pages} onClick={() => { const p = page+1; setPage(p); fetchMedia(search, p, tab); }} className="px-3 sm:px-4 py-1.5 bg-white border border-[#c3c4c7] font-bold disabled:opacity-30 hover:bg-[#f6f7f7] rounded-[3px] shadow-sm transition-all text-[#2c3338]">Next</button>
               </div>
             </div>
           )}
@@ -370,7 +372,7 @@ export default function AdminMedia() {
 
         {/* Right: Detail Sidebar */}
         {detailItem && (
-          <div className="w-[320px] shrink-0 bg-[#f6f7f7] border border-[#c3c4c7] shadow-sm overflow-y-auto flex flex-col rounded-[2px]">
+          <div className="w-full lg:w-[320px] shrink-0 bg-[#f6f7f7] border border-[#c3c4c7] shadow-sm overflow-y-auto flex flex-col rounded-[2px]">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[#ccd0d4] bg-white">
               <h3 className="text-[12px] font-bold uppercase tracking-widest text-gray-700">Media Details</h3>
               <button onClick={() => setDetailItem(null)} className="text-gray-400 hover:text-black transition-colors"><X className="w-5 h-5" /></button>

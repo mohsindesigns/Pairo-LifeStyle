@@ -511,49 +511,51 @@ export default function AffiliatesManagerClient({ userSession }) {
         {/* Tab: Referral Links */}
         {activeTab === "links" && (
           <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-            <table className="w-full text-left border-collapse text-[13px]">
-              <thead>
-                <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
-                  <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Code</th>
-                  <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Customer Discount</th>
-                  <th className="px-4 py-3 font-bold uppercase text-[11px]">Referral Link</th>
-                  <th className="px-4 py-3 w-24 text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#f0f0f1]">
-                {affiliates.length === 0 ? (
-                  <tr><td colSpan="5" className="p-8 text-center text-gray-400 italic">No active affiliates registered.</td></tr>
-                ) : affiliates.map(aff => {
-                  const link = typeof window !== 'undefined' ? `${window.location.origin}/?ref=${aff.referralCode}` : `https://pairolifestyle.com/?ref=${aff.referralCode}`;
-                  const discountLabel = aff.customerDiscountType === 'None' || !aff.customerDiscountValue ? 'None' :
-                    aff.customerDiscountType === 'Percentage' ? `${aff.customerDiscountValue}% Off` : `$${aff.customerDiscountValue} Off`;
-                  return (
-                    <tr key={aff._id} className="hover:bg-[#fbfbfb] transition-colors">
-                      <td className="px-4 py-3">
-                        <span className="font-bold text-[#1d2327]">{aff.name}</span>
-                        <div className="text-[11px] text-[#646970] mt-0.5">{aff.email}</div>
-                      </td>
-                      <td className="px-4 py-3 font-mono font-bold text-black">{aff.referralCode}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold ${discountLabel === 'None' ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-green-700'}`}>
-                          {discountLabel}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-[#646970] truncate max-w-xs">{link}</td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => { navigator.clipboard.writeText(link); toast.success("Link copied!"); }}
-                          className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[11px] font-bold hover:bg-[#f6f7f7] shadow-sm"
-                        >
-                          Copy
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto max-w-full">
+              <table className="w-full min-w-[520px] text-left border-collapse text-[13px]">
+                <thead>
+                  <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                    <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
+                    <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Code</th>
+                    <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Customer Discount</th>
+                    <th className="px-4 py-3 font-bold uppercase text-[11px]">Referral Link</th>
+                    <th className="px-4 py-3 w-24 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#f0f0f1]">
+                  {affiliates.length === 0 ? (
+                    <tr><td colSpan="5" className="p-8 text-center text-gray-400 italic">No active affiliates registered.</td></tr>
+                  ) : affiliates.map(aff => {
+                    const link = typeof window !== 'undefined' ? `${window.location.origin}/?ref=${aff.referralCode}` : `https://pairolifestyle.com/?ref=${aff.referralCode}`;
+                    const discountLabel = aff.customerDiscountType === 'None' || !aff.customerDiscountValue ? 'None' :
+                      aff.customerDiscountType === 'Percentage' ? `${aff.customerDiscountValue}% Off` : `$${aff.customerDiscountValue} Off`;
+                    return (
+                      <tr key={aff._id} className="hover:bg-[#fbfbfb] transition-colors">
+                        <td className="px-4 py-3">
+                          <span className="font-bold text-[#1d2327]">{aff.name}</span>
+                          <div className="text-[11px] text-[#646970] mt-0.5">{aff.email}</div>
+                        </td>
+                        <td className="px-4 py-3 font-mono font-bold text-black">{aff.referralCode}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold ${discountLabel === 'None' ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-green-700'}`}>
+                            {discountLabel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-[11px] text-[#646970] truncate max-w-xs">{link}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(link); toast.success("Link copied!"); }}
+                            className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[11px] font-bold hover:bg-[#f6f7f7] shadow-sm"
+                          >
+                            Copy
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -574,40 +576,42 @@ export default function AffiliatesManagerClient({ userSession }) {
                   value={orderSearchQuery}
                   onChange={e => setOrderSearchQuery(e.target.value)}
                   placeholder="Search orders by number, code, customer email..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-80 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
+                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-80 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
                 />
               </div>
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <table className="w-full text-left border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Order #</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Customer</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Ref Code</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Subtotal</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Ref Discount</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    {filteredOrds.length === 0 ? (
-                      <tr><td colSpan="7" className="p-8 text-center text-gray-400 italic">No referred orders match search.</td></tr>
-                    ) : filteredOrds.map(o => (
-                      <tr key={o._id} className="hover:bg-[#fbfbfb]">
-                        <td className="px-4 py-2.5 font-mono font-bold text-[12px] text-[#2271b1]">{o.orderNumber}</td>
-                        <td className="px-4 py-2.5 text-[#646970]">{new Date(o.createdAt).toLocaleDateString()}</td>
-                        <td className="px-4 py-2.5 text-[12px]">{o.customer?.email || '—'}</td>
-                        <td className="px-4 py-2.5 font-mono font-bold">{o.affiliateReferralCode}</td>
-                        <td className="px-4 py-2.5 text-right">${(o.financials?.subtotal ?? 0).toFixed(2)}</td>
-                        <td className="px-4 py-2.5 text-right text-green-700 font-bold">
-                          {o.financials?.affiliateDiscountAmount > 0 ? `-$${o.financials.affiliateDiscountAmount.toFixed(2)}` : '—'}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-bold">${(o.financials?.total ?? 0).toFixed(2)}</td>
+                <div className="overflow-x-auto max-w-full">
+                  <table className="w-full min-w-[550px] text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Order #</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Customer</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Ref Code</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Subtotal</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Ref Discount</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {filteredOrds.length === 0 ? (
+                        <tr><td colSpan="7" className="p-8 text-center text-gray-400 italic">No referred orders match search.</td></tr>
+                      ) : filteredOrds.map(o => (
+                        <tr key={o._id} className="hover:bg-[#fbfbfb]">
+                          <td className="px-4 py-2.5 font-mono font-bold text-[12px] text-[#2271b1]">{o.orderNumber}</td>
+                          <td className="px-4 py-2.5 text-[#646970]">{new Date(o.createdAt).toLocaleDateString()}</td>
+                          <td className="px-4 py-2.5 text-[12px]">{o.customer?.email || '—'}</td>
+                          <td className="px-4 py-2.5 font-mono font-bold">{o.affiliateReferralCode}</td>
+                          <td className="px-4 py-2.5 text-right">${(o.financials?.subtotal ?? 0).toFixed(2)}</td>
+                          <td className="px-4 py-2.5 text-right text-green-700 font-bold">
+                            {o.financials?.affiliateDiscountAmount > 0 ? `-$${o.financials.affiliateDiscountAmount.toFixed(2)}` : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-bold">${(o.financials?.total ?? 0).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
@@ -625,18 +629,18 @@ export default function AffiliatesManagerClient({ userSession }) {
           });
           return (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white border border-[#ccd0d4] p-4 rounded-[3px] shadow-sm text-center">
+              <div className="grid grid-cols-1 xs:grid-cols-3 gap-3 xs:gap-4">
+                <div className="bg-white border border-[#ccd0d4] p-3 xs:p-4 rounded-[3px] shadow-sm text-center">
                   <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Total Clicks</p>
-                  <p className="text-2xl font-bold text-[#1d2327]">{activityData.clicks?.length ?? 0}</p>
+                  <p className="text-xl xs:text-2xl font-bold text-[#1d2327]">{activityData.clicks?.length ?? 0}</p>
                 </div>
-                <div className="bg-white border border-[#ccd0d4] p-4 rounded-[3px] shadow-sm text-center">
+                <div className="bg-white border border-[#ccd0d4] p-3 xs:p-4 rounded-[3px] shadow-sm text-center">
                   <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Referred Orders</p>
-                  <p className="text-2xl font-bold text-[#1d2327]">{activityData.referredOrders?.length ?? 0}</p>
+                  <p className="text-xl xs:text-2xl font-bold text-[#1d2327]">{activityData.referredOrders?.length ?? 0}</p>
                 </div>
-                <div className="bg-white border border-[#ccd0d4] p-4 rounded-[3px] shadow-sm text-center">
+                <div className="bg-white border border-[#ccd0d4] p-3 xs:p-4 rounded-[3px] shadow-sm text-center">
                   <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Conversion Rate</p>
-                  <p className="text-2xl font-bold text-[#1d2327]">
+                  <p className="text-xl xs:text-2xl font-bold text-[#1d2327]">
                     {activityData.clicks?.length > 0
                       ? `${((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1)}%`
                       : '0%'}
@@ -649,31 +653,33 @@ export default function AffiliatesManagerClient({ userSession }) {
                   value={clickSearchQuery}
                   onChange={e => setClickSearchQuery(e.target.value)}
                   placeholder="Search clicks by code, name, IP..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
+                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
                 />
               </div>
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
                 <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4]"><h3 className="text-[13px] font-bold">Recent Clicks</h3></div>
-                <table className="w-full text-[13px]">
-                  <thead><tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
-                    <th className="px-4 py-2 text-left">Date</th>
-                    <th className="px-4 py-2 text-left">Affiliate</th>
-                    <th className="px-4 py-2 text-left">Ref Code</th>
-                    <th className="px-4 py-2 text-left">IP / Source</th>
-                  </tr></thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    {filteredClks.length === 0 ? (
-                      <tr><td colSpan="4" className="p-6 text-center text-gray-400 italic">No clicks match filter.</td></tr>
-                    ) : filteredClks.slice(0, 50).map((c, i) => (
-                      <tr key={c._id || i} className="hover:bg-[#fbfbfb]">
-                        <td className="px-4 py-2 text-[#646970]">{new Date(c.createdAt).toLocaleString()}</td>
-                        <td className="px-4 py-2 font-medium">{c.affiliateId?.name || '—'}</td>
-                        <td className="px-4 py-2 font-mono">{c.affiliateId?.referralCode || c.referralCode || '—'}</td>
-                        <td className="px-4 py-2 font-mono text-[11px] text-[#646970]">{c.ipAddress || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto max-w-full">
+                  <table className="w-full min-w-[450px] text-[13px]">
+                    <thead><tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
+                      <th className="px-4 py-2 text-left">Date</th>
+                      <th className="px-4 py-2 text-left">Affiliate</th>
+                      <th className="px-4 py-2 text-left">Ref Code</th>
+                      <th className="px-4 py-2 text-left">IP / Source</th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {filteredClks.length === 0 ? (
+                        <tr><td colSpan="4" className="p-6 text-center text-gray-400 italic">No clicks match filter.</td></tr>
+                      ) : filteredClks.slice(0, 50).map((c, i) => (
+                        <tr key={c._id || i} className="hover:bg-[#fbfbfb]">
+                          <td className="px-4 py-2 text-[#646970]">{new Date(c.createdAt).toLocaleString()}</td>
+                          <td className="px-4 py-2 font-medium">{c.affiliateId?.name || '—'}</td>
+                          <td className="px-4 py-2 font-mono">{c.affiliateId?.referralCode || c.referralCode || '—'}</td>
+                          <td className="px-4 py-2 font-mono text-[11px] text-[#646970]">{c.ipAddress || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
@@ -692,7 +698,7 @@ export default function AffiliatesManagerClient({ userSession }) {
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1 bg-white border border-[#ccd0d4] rounded-[3px] p-1 shadow-sm">
+                <div className="flex flex-wrap items-center gap-1 bg-white border border-[#ccd0d4] rounded-[3px] p-1 shadow-sm">
                   {["All", "Pending", "Approved", "Rejected"].map(status => (
                     <button
                       key={status}
@@ -716,43 +722,45 @@ export default function AffiliatesManagerClient({ userSession }) {
                   value={commissionSearchQuery}
                   onChange={e => setCommissionSearchQuery(e.target.value)}
                   placeholder="Search commissions..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
+                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
                 />
               </div>
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <table className="w-full text-left border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Order</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Rate</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Amount</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Status</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    {filteredComms.length === 0 ? (
-                      <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">No commissions match filter.</td></tr>
-                    ) : filteredComms.map(c => (
-                      <tr key={c._id} className="hover:bg-[#fbfbfb]">
-                        <td className="px-4 py-2.5">
-                          <span className="font-bold text-[#1d2327]">{c.affiliateId?.name || 'Unknown'}</span>
-                          <div className="text-[11px] text-[#646970] font-mono">{c.affiliateId?.referralCode}</div>
-                        </td>
-                        <td className="px-4 py-2.5 font-mono text-[12px]">{c.orderNumber || '—'}</td>
-                        <td className="px-4 py-2.5">{c.commissionType === 'Fixed' ? `$${c.commissionRate}` : `${c.commissionRate}%`}</td>
-                        <td className="px-4 py-2.5 text-right font-bold text-[#1d2327]">${(c.commissionAmount ?? 0).toFixed(2)}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase ${c.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
-                            c.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-amber-700'
-                            }`}>{c.status}</span>
-                        </td>
-                        <td className="px-4 py-2.5 text-[#646970]">{new Date(c.createdAt).toLocaleDateString()}</td>
+                <div className="overflow-x-auto max-w-full">
+                  <table className="w-full min-w-[550px] text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Order</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Rate</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Amount</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Status</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {filteredComms.length === 0 ? (
+                        <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">No commissions match filter.</td></tr>
+                      ) : filteredComms.map(c => (
+                        <tr key={c._id} className="hover:bg-[#fbfbfb]">
+                          <td className="px-4 py-2.5">
+                            <span className="font-bold text-[#1d2327]">{c.affiliateId?.name || 'Unknown'}</span>
+                            <div className="text-[11px] text-[#646970] font-mono">{c.affiliateId?.referralCode}</div>
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-[12px]">{c.orderNumber || '—'}</td>
+                          <td className="px-4 py-2.5">{c.commissionType === 'Fixed' ? `$${c.commissionRate}` : `${c.commissionRate}%`}</td>
+                          <td className="px-4 py-2.5 text-right font-bold text-[#1d2327]">${(c.commissionAmount ?? 0).toFixed(2)}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase ${c.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
+                              c.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-amber-700'
+                              }`}>{c.status}</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-[#646970]">{new Date(c.createdAt).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
@@ -857,90 +865,92 @@ export default function AffiliatesManagerClient({ userSession }) {
                   value={appSearchQuery}
                   onChange={e => setAppSearchQuery(e.target.value)}
                   placeholder="Search by name, email, phone, country…"
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-72 focus:outline-none focus:border-[#2271b1] shadow-sm"
+                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm"
                 />
               </div>
               {/* Table */}
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <table className="w-full text-left border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-48">Applicant</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-64">Contact details</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-32">Country</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Verification Docs</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-64">Strategy &amp; Reach</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-24">Status</th>
-                      <th className="px-4 py-3 w-28 text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    {filteredApps.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" className="p-8 text-center text-gray-400 italic">
-                          {appSearchQuery || appStatusFilter !== "All" ? "No applications match your filter." : "No applications found in database records."}
-                        </td>
+                <div className="overflow-x-auto max-w-full">
+                  <table className="w-full min-w-[650px] text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-48">Applicant</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-64">Contact details</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-32">Country</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Verification Docs</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-64">Strategy &amp; Reach</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-24">Status</th>
+                        <th className="px-4 py-3 w-28 text-right"></th>
                       </tr>
-                    ) : (
-                      filteredApps.map(app => (
-                        <tr key={app._id} className="hover:bg-[#fbfbfb] transition-colors">
-                          <td className="px-4 py-3">
-                            <span className="font-bold text-[#1d2327]">{app.name}</span>
-                            <div className="text-[11px] text-[#646970] mt-0.5">Applied: {new Date(app.createdAt).toLocaleDateString()}</div>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-[12px]">
-                            <div>{app.email}</div>
-                            <div className="text-[#646970] mt-0.5 text-[11px]">{app.phone}</div>
-                          </td>
-                          <td className="px-4 py-3">{app.address?.country}</td>
-                          <td className="px-4 py-3 font-mono text-[12px]">
-                            {app.identityDocuments?.map((filename, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => setViewingDocUrl(getDocumentUrl(filename))}
-                                className="text-[#2271b1] hover:text-[#135e96] underline mr-3 inline-flex items-center gap-1"
-                              >
-                                <Eye className="w-3.5 h-3.5" /> Doc #{idx + 1}
-                              </button>
-                            ))}
-                          </td>
-                          <td className="px-4 py-3 max-w-xs">
-                            <div className="truncate text-gray-600">{app.marketingAnswers?.promotionStrategy}</div>
-                            <div className="text-[10px] text-[#646970] font-bold uppercase tracking-wide mt-0.5">Reach: {app.marketingAnswers?.audienceSize}</div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
-                              app.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
-                              app.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-[#d6b656]'
-                            }`}>
-                              {app.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                            <button
-                              onClick={() => setViewingApplication(app)}
-                              className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
-                            >
-                              View Details
-                            </button>
-                            {app.status === 'Pending' && (
-                              <button
-                                onClick={() => {
-                                  setSelectedApplication(app);
-                                  setCustomCommissionRate(settings.defaultCommissionRate || 5);
-                                  setReviewReferralCode(app.referralCode || "");
-                                }}
-                                className="bg-[#2271b1] border border-[#2271b1] text-white px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] hover:border-[#135e96] transition-all shadow-sm"
-                              >
-                                Review
-                              </button>
-                            )}
+                    </thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {filteredApps.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="p-8 text-center text-gray-400 italic">
+                            {appSearchQuery || appStatusFilter !== "All" ? "No applications match your filter." : "No applications found in database records."}
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        filteredApps.map(app => (
+                          <tr key={app._id} className="hover:bg-[#fbfbfb] transition-colors">
+                            <td className="px-4 py-3">
+                              <span className="font-bold text-[#1d2327]">{app.name}</span>
+                              <div className="text-[11px] text-[#646970] mt-0.5">Applied: {new Date(app.createdAt).toLocaleDateString()}</div>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-[12px]">
+                              <div>{app.email}</div>
+                              <div className="text-[#646970] mt-0.5 text-[11px]">{app.phone}</div>
+                            </td>
+                            <td className="px-4 py-3">{app.address?.country}</td>
+                            <td className="px-4 py-3 font-mono text-[12px]">
+                              {app.identityDocuments?.map((filename, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => setViewingDocUrl(getDocumentUrl(filename))}
+                                  className="text-[#2271b1] hover:text-[#135e96] underline mr-3 inline-flex items-center gap-1"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Doc #{idx + 1}
+                                </button>
+                              ))}
+                            </td>
+                            <td className="px-4 py-3 max-w-xs">
+                              <div className="truncate text-gray-600">{app.marketingAnswers?.promotionStrategy}</div>
+                              <div className="text-[10px] text-[#646970] font-bold uppercase tracking-wide mt-0.5">Reach: {app.marketingAnswers?.audienceSize}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
+                                app.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
+                                app.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-[#d6b656]'
+                              }`}>
+                                {app.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                              <button
+                                onClick={() => setViewingApplication(app)}
+                                className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
+                              >
+                                View Details
+                              </button>
+                              {app.status === 'Pending' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedApplication(app);
+                                    setCustomCommissionRate(settings.defaultCommissionRate || 5);
+                                    setReviewReferralCode(app.referralCode || "");
+                                  }}
+                                  className="bg-[#2271b1] border border-[#2271b1] text-white px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] hover:border-[#135e96] transition-all shadow-sm"
+                                >
+                                  Review
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
@@ -984,101 +994,103 @@ export default function AffiliatesManagerClient({ userSession }) {
                   value={listSearchQuery}
                   onChange={e => setListSearchQuery(e.target.value)}
                   placeholder="Search affiliates..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
+                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
                 />
               </div>
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <table className="w-full text-left border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Referral Code</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Direct Coupon</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-32">Commission Rate</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Available Balance</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Lifetime Earnings</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-24">Status</th>
-                      <th className="px-4 py-3 w-28 text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    {filteredAffs.length === 0 ? (
-                      <tr>
-                        <td colSpan="8" className="p-8 text-center text-gray-400 italic">No active affiliates match filter.</td>
+                <div className="overflow-x-auto max-w-full">
+                  <table className="w-full min-w-[700px] text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Referral Code</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Direct Coupon</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-32">Commission Rate</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Available Balance</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Lifetime Earnings</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-24">Status</th>
+                        <th className="px-4 py-3 w-28 text-right"></th>
                       </tr>
-                    ) : (
-                      filteredAffs.map(aff => (
-                        <tr key={aff._id} className="hover:bg-[#fbfbfb] transition-colors">
-                          <td className="px-4 py-3">
-                            <span className="font-bold text-[#1d2327]">{aff.name}</span>
-                            <div className="text-[11px] text-[#646970] mt-0.5">{aff.email}</div>
-                          </td>
-                          <td className="px-4 py-3 font-mono font-semibold text-black">{aff.referralCode}</td>
-                          <td className="px-4 py-3 font-mono text-primary/60">{aff.couponCode || "—"}</td>
-                          <td className="px-4 py-3 font-bold text-black">
-                            {aff.commissionType === "Fixed" ? `$${aff.commissionRate} (Fixed)` : `${aff.commissionRate}%`}
-                          </td>
-                          <td className="px-4 py-3 font-bold text-[#1d2327]">${aff.balance?.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-[#646970]">${aff.lifetimeEarnings?.toFixed(2)}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${aff.status === 'Active' ? 'bg-[#d5e8d4] text-[#274e13]' : 'bg-[#f8cecc] text-[#b85450]'
-                              }`}>
-                              {aff.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              onClick={() => {
-                                setSelectedAffiliate(aff);
-                                setEditReferralCode(aff.referralCode || "");
-                                setEditForm({
-                                  name: aff.name || "",
-                                  email: aff.email || "",
-                                  phone: aff.phone || "",
-                                  dob: aff.dob ? new Date(aff.dob).toISOString().split('T')[0] : "",
-                                  commissionRate: aff.commissionRate ?? 5,
-                                  commissionType: aff.commissionType || "Percentage",
-                                  customerDiscountType: aff.customerDiscountType || "None",
-                                  customerDiscountValue: aff.customerDiscountValue || 0,
-                                  status: aff.status || "Active",
-                                  couponCode: aff.couponCode || "",
-                                  password: "",
-                                  // Address
-                                  street: aff.address?.street || "",
-                                  city: aff.address?.city || "",
-                                  state: aff.address?.state || "",
-                                  zipCode: aff.address?.zipCode || "",
-                                  country: aff.address?.country || "",
-                                  // Banking
-                                  accountHolder: aff.bankingInfo?.accountHolder || "",
-                                  bankName: aff.bankingInfo?.bankName || "",
-                                  accountNumber: aff.bankingInfo?.accountNumber || "",
-                                  iban: aff.bankingInfo?.iban || "",
-                                  swiftCode: aff.bankingInfo?.swiftCode || "",
-                                  routingNumber: aff.bankingInfo?.routingNumber || "",
-                                  paypalEmail: aff.bankingInfo?.paypalEmail || "",
-                                  // Business
-                                  companyName: aff.businessInfo?.companyName || "",
-                                  website: aff.businessInfo?.website || "",
-                                  createdAt: aff.createdAt ? new Date(aff.createdAt).toISOString().slice(0, 16) : "",
-                                });
-                              }}
-                              className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
-                            >
-                              Modify
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteAffiliate(aff)}
-                              className="border border-[#b85450] text-[#b85450] bg-white px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f8cecc] transition-all shadow-sm ml-2"
-                            >
-                              Delete
-                            </button>
-                          </td>
+                    </thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {filteredAffs.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="p-8 text-center text-gray-400 italic">No active affiliates match filter.</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        filteredAffs.map(aff => (
+                          <tr key={aff._id} className="hover:bg-[#fbfbfb] transition-colors">
+                            <td className="px-4 py-3">
+                              <span className="font-bold text-[#1d2327]">{aff.name}</span>
+                              <div className="text-[11px] text-[#646970] mt-0.5">{aff.email}</div>
+                            </td>
+                            <td className="px-4 py-3 font-mono font-semibold text-black">{aff.referralCode}</td>
+                            <td className="px-4 py-3 font-mono text-primary/60">{aff.couponCode || "—"}</td>
+                            <td className="px-4 py-3 font-bold text-black">
+                              {aff.commissionType === "Fixed" ? `$${aff.commissionRate} (Fixed)` : `${aff.commissionRate}%`}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-[#1d2327]">${aff.balance?.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-[#646970]">${aff.lifetimeEarnings?.toFixed(2)}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${aff.status === 'Active' ? 'bg-[#d5e8d4] text-[#274e13]' : 'bg-[#f8cecc] text-[#b85450]'
+                                }`}>
+                                {aff.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => {
+                                  setSelectedAffiliate(aff);
+                                  setEditReferralCode(aff.referralCode || "");
+                                  setEditForm({
+                                    name: aff.name || "",
+                                    email: aff.email || "",
+                                    phone: aff.phone || "",
+                                    dob: aff.dob ? new Date(aff.dob).toISOString().split('T')[0] : "",
+                                    commissionRate: aff.commissionRate ?? 5,
+                                    commissionType: aff.commissionType || "Percentage",
+                                    customerDiscountType: aff.customerDiscountType || "None",
+                                    customerDiscountValue: aff.customerDiscountValue || 0,
+                                    status: aff.status || "Active",
+                                    couponCode: aff.couponCode || "",
+                                    password: "",
+                                    // Address
+                                    street: aff.address?.street || "",
+                                    city: aff.address?.city || "",
+                                    state: aff.address?.state || "",
+                                    zipCode: aff.address?.zipCode || "",
+                                    country: aff.address?.country || "",
+                                    // Banking
+                                    accountHolder: aff.bankingInfo?.accountHolder || "",
+                                    bankName: aff.bankingInfo?.bankName || "",
+                                    accountNumber: aff.bankingInfo?.accountNumber || "",
+                                    iban: aff.bankingInfo?.iban || "",
+                                    swiftCode: aff.bankingInfo?.swiftCode || "",
+                                    routingNumber: aff.bankingInfo?.routingNumber || "",
+                                    paypalEmail: aff.bankingInfo?.paypalEmail || "",
+                                    // Business
+                                    companyName: aff.businessInfo?.companyName || "",
+                                    website: aff.businessInfo?.website || "",
+                                    createdAt: aff.createdAt ? new Date(aff.createdAt).toISOString().slice(0, 16) : "",
+                                  });
+                                }}
+                                className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
+                              >
+                                Modify
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteAffiliate(aff)}
+                                className="border border-[#b85450] text-[#b85450] bg-white px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f8cecc] transition-all shadow-sm ml-2"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
@@ -1098,7 +1110,7 @@ export default function AffiliatesManagerClient({ userSession }) {
           return (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1 bg-white border border-[#ccd0d4] rounded-[3px] p-1 shadow-sm">
+                <div className="flex flex-wrap items-center gap-1 bg-white border border-[#ccd0d4] rounded-[3px] p-1 shadow-sm">
                   {["All", "Requested", "Paid", "Rejected"].map(status => (
                     <button
                       key={status}
@@ -1122,63 +1134,65 @@ export default function AffiliatesManagerClient({ userSession }) {
                   value={payoutSearchQuery}
                   onChange={e => setPayoutSearchQuery(e.target.value)}
                   placeholder="Search payouts..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
+                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
                 />
               </div>
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <table className="w-full text-left border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                      <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Amount</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-40">Method</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Date</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-28">Status</th>
-                      <th className="px-4 py-3 font-bold uppercase text-[11px] w-48">Reference ID</th>
-                      <th className="px-4 py-3 w-28 text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    {filteredPays.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" className="p-8 text-center text-gray-400 italic">No payout requests match filter.</td>
+                <div className="overflow-x-auto max-w-full">
+                  <table className="w-full min-w-[600px] text-left border-collapse text-[13px]">
+                    <thead>
+                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
+                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Amount</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-40">Method</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Date</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-28">Status</th>
+                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-48">Reference ID</th>
+                        <th className="px-4 py-3 w-28 text-right"></th>
                       </tr>
-                    ) : (
-                      filteredPays.map(pay => (
-                        <tr key={pay._id} className="hover:bg-[#fbfbfb] transition-colors">
-                          <td className="px-4 py-3">
-                            <span className="font-bold text-[#1d2327]">{pay.affiliateId?.name || "Deleted Affiliate"}</span>
-                            <div className="text-[11px] text-[#646970] mt-0.5">Code: {pay.affiliateId?.referralCode || "—"}</div>
-                          </td>
-                          <td className="px-4 py-3 font-bold text-[#1d2327]">${pay.amount?.toFixed(2)}</td>
-                          <td className="px-4 py-3 font-mono text-[#646970]">{pay.paymentMethod}</td>
-                          <td className="px-4 py-3 text-gray-600">{new Date(pay.createdAt).toLocaleDateString()}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${pay.status === 'Paid' ? 'bg-[#d5e8d4] text-[#274e13]' :
-                              pay.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-[#d6b656]'
-                              }`}>
-                              {pay.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-[11px] text-gray-500">{pay.transactionId || "—"}</td>
-                          <td className="px-4 py-3 text-right">
-                            {pay.status === 'Requested' && (
-                              <button
-                                onClick={() => {
-                                  setSelectedPayout(pay);
-                                  setPayoutTxId(`TX-${Date.now()}`);
-                                }}
-                                className="bg-white border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f0f6fb] transition-all shadow-sm"
-                              >
-                                Process
-                              </button>
-                            )}
-                          </td>
+                    </thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {filteredPays.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="p-8 text-center text-gray-400 italic">No payout requests match filter.</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        filteredPays.map(pay => (
+                          <tr key={pay._id} className="hover:bg-[#fbfbfb] transition-colors">
+                            <td className="px-4 py-3">
+                              <span className="font-bold text-[#1d2327]">{pay.affiliateId?.name || "Deleted Affiliate"}</span>
+                              <div className="text-[11px] text-[#646970] mt-0.5">Code: {pay.affiliateId?.referralCode || "—"}</div>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-[#1d2327]">${pay.amount?.toFixed(2)}</td>
+                            <td className="px-4 py-3 font-mono text-[#646970]">{pay.paymentMethod}</td>
+                            <td className="px-4 py-3 text-gray-600">{new Date(pay.createdAt).toLocaleDateString()}</td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${pay.status === 'Paid' ? 'bg-[#d5e8d4] text-[#274e13]' :
+                                pay.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-[#d6b656]'
+                                }`}>
+                                {pay.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-mono text-[11px] text-gray-500">{pay.transactionId || "—"}</td>
+                            <td className="px-4 py-3 text-right">
+                              {pay.status === 'Requested' && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedPayout(pay);
+                                    setPayoutTxId(`TX-${Date.now()}`);
+                                  }}
+                                  className="bg-white border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f0f6fb] transition-all shadow-sm"
+                                >
+                                  Process
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
@@ -1617,9 +1631,9 @@ export default function AffiliatesManagerClient({ userSession }) {
 
         {/* Modal 1: Review Application */}
         {selectedApplication && (
-          <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-4 flex justify-center items-start md:py-8">
+          <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-2 xs:p-3 sm:p-4 flex justify-center items-start md:py-8">
             <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-md w-full">
-              <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
+              <div className="p-3 xs:p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
                 <h3 className="text-[14px] font-bold text-[#1d2327]">Review: {selectedApplication.name}</h3>
                 <button
                   type="button"
@@ -1630,7 +1644,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                 </button>
               </div>
 
-              <form onSubmit={handleApplicationReview} className="p-6 space-y-4">
+              <form onSubmit={handleApplicationReview} className="p-3 xs:p-4 sm:p-6 space-y-3 xs:space-y-4">
                 <div className="space-y-1">
                   <label className="text-[12px] font-bold text-[#1d2327]">Action *</label>
                   <select
@@ -1789,9 +1803,9 @@ export default function AffiliatesManagerClient({ userSession }) {
 
         {/* Modal 2: Modify Affiliate */}
         {selectedAffiliate && (
-          <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-4 flex justify-center items-start md:py-8">
+          <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-2 xs:p-3 sm:p-4 flex justify-center items-start md:py-8">
             <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-2xl w-full">
-              <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
+              <div className="p-3 xs:p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
                 <h3 className="text-[14px] font-bold text-[#1d2327]">Edit Affiliate: {selectedAffiliate.name}</h3>
                 <button
                   type="button"
@@ -1802,8 +1816,8 @@ export default function AffiliatesManagerClient({ userSession }) {
                 </button>
               </div>
 
-              <form onSubmit={handleAffiliateEditSubmit} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4 bg-[#f6f7f7] border border-[#ccd0d4] p-3 rounded-[3px] text-[12px]">
+              <form onSubmit={handleAffiliateEditSubmit} className="p-3 xs:p-4 sm:p-6 space-y-3 xs:space-y-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 xs:gap-4 bg-[#f6f7f7] border border-[#ccd0d4] p-2.5 xs:p-3 rounded-[3px] text-[12px]">
                   <div>
                     <span className="font-bold text-[#646970] block uppercase tracking-wider text-[10px]">Affiliate ID</span>
                     <span className="text-black font-semibold font-mono text-[13px]">{selectedAffiliate.affiliateId || "—"}</span>
@@ -1985,7 +1999,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                 {/* Business Info Section */}
                 <div className="border-t border-[#eee] pt-4 space-y-3">
                   <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Business Info</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <label className="text-[11px] font-bold text-[#1d2327]">Company / Brand Name</label>
                       <input
@@ -2012,8 +2026,8 @@ export default function AffiliatesManagerClient({ userSession }) {
                 {/* Address Section */}
                 <div className="border-t border-[#eee] pt-4 space-y-3">
                   <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Address</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2 space-y-1">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+                    <div className="col-span-1 xs:col-span-2 space-y-1">
                       <label className="text-[11px] font-bold text-[#1d2327]">Street</label>
                       <input type="text" value={editForm.street} onChange={e => setEditForm({ ...editForm, street: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" placeholder="Street address" />
                     </div>
@@ -2039,8 +2053,8 @@ export default function AffiliatesManagerClient({ userSession }) {
                 {/* Banking Section */}
                 <div className="border-t border-[#eee] pt-4 space-y-3">
                   <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Banking Info</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="col-span-2 space-y-1">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+                    <div className="col-span-1 xs:col-span-2 space-y-1">
                       <label className="text-[11px] font-bold text-[#1d2327]">Account Holder Name</label>
                       <input type="text" value={editForm.accountHolder} onChange={e => setEditForm({ ...editForm, accountHolder: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
                     </div>
@@ -2064,16 +2078,16 @@ export default function AffiliatesManagerClient({ userSession }) {
                       <label className="text-[11px] font-bold text-[#1d2327]">Routing Number</label>
                       <input type="text" value={editForm.routingNumber} onChange={e => setEditForm({ ...editForm, routingNumber: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
                     </div>
-                    <div className="col-span-2 space-y-1">
+                    <div className="col-span-1 xs:col-span-2 space-y-1">
                       <label className="text-[11px] font-bold text-[#1d2327]">PayPal Email</label>
                       <input type="email" value={editForm.paypalEmail} onChange={e => setEditForm({ ...editForm, paypalEmail: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
                     </div>
                   </div>
                 </div>
                 {/* Verification Comparison Panel */}
-                <div className="bg-[#f0f6fa] border border-[#ccd0d4] p-4 rounded-[3px] space-y-3">
+                <div className="bg-[#f0f6fa] border border-[#ccd0d4] p-3 xs:p-4 rounded-[3px] space-y-3">
                   <p className="text-[10px] font-bold text-[#2271b1] uppercase tracking-wider">Identity & Verification Comparison Panel</p>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 xs:gap-3">
                     <div className="space-y-1 text-center">
                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Profile Photo</p>
                       {selectedAffiliate.profilePhoto ? (
@@ -2251,9 +2265,9 @@ export default function AffiliatesManagerClient({ userSession }) {
 
         {/* Modal 3: Process Payout */}
         {selectedPayout && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 xs:p-3 sm:p-4">
             <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-md w-full overflow-hidden">
-              <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
+              <div className="p-3 xs:p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
                 <h3 className="text-[14px] font-bold text-[#1d2327]">Process Payout: ${selectedPayout.amount?.toFixed(2)}</h3>
                 <button
                   type="button"
@@ -2264,7 +2278,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                 </button>
               </div>
 
-              <form onSubmit={handlePayoutProcess} className="p-6 space-y-4">
+              <form onSubmit={handlePayoutProcess} className="p-3 xs:p-4 sm:p-6 space-y-3 xs:space-y-4">
                 <div className="space-y-1">
                   <label className="text-[12px] font-bold text-[#1d2327]">Action *</label>
                   <select
@@ -2325,9 +2339,9 @@ export default function AffiliatesManagerClient({ userSession }) {
 
         {/* Modal 4: Secure Document Viewer */}
         {viewingDocUrl && (
-          <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-2 xs:p-3 sm:p-4">
             <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-              <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
+              <div className="p-3 xs:p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
                 <h3 className="text-[14px] font-bold text-[#1d2327]">KYC Document Viewer</h3>
                 <button
                   type="button"

@@ -234,19 +234,19 @@ export default function BlogForm({ blogId }) {
                   <input
                      required
                      placeholder="Enter title here"
-                     className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-4 py-2.5 text-[20px] bg-white shadow-sm font-semibold transition-all"
+                     className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-3 sm:px-4 py-2 sm:py-2.5 text-[16px] sm:text-[20px] bg-white shadow-sm font-semibold transition-all"
                      value={formData.title}
                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   />
-                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex items-center gap-1.5 flex-wrap">
+                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex items-center gap-1.5 flex-wrap min-w-0 break-all">
                      <span>Permalink:</span>
-                     <span className="text-gray-400 font-mono">pairo.store/blog/</span>
+                     <span className="text-gray-400 font-mono text-[11px] sm:text-xs">pairo.store/blog/</span>
                      <input
                         readOnly={!editSlug}
                         className={`outline-none text-[#2271b1] font-mono px-1.5 py-0.5 rounded transition-all text-xs max-w-full min-w-0 ${
                            editSlug ? "border border-[#c3c4c7] bg-white ring-1 ring-[#2271b1]/20" : "border-none bg-transparent pointer-events-none"
                         }`}
-                        style={{ width: `${Math.max(60, (formData.slug || "").length * 8.5)}px` }}
+                        style={{ width: `${Math.min(220, Math.max(60, (formData.slug || "").length * 8.5))}px` }}
                         value={formData.slug}
                         onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                      />

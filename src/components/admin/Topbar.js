@@ -572,27 +572,27 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
   };
 
   return (
-    <header className="h-11 md:h-8 bg-[#1d2327] sticky top-0 z-[100] flex items-center justify-between gap-1 px-1 md:px-3 text-[#f0f0f1] font-sans select-none">
+    <header className="h-11 md:h-8 bg-[#1d2327] sticky top-0 z-[100] flex items-center justify-between gap-1 px-1 md:px-3 text-[#f0f0f1] font-sans select-none max-w-full">
 
       {/* Left items: Menu toggle (mobile), Brand logo & Visit Site */}
-      <div className="flex items-center gap-1 md:gap-4 shrink-0">
+      <div className="flex items-center gap-0.5 xs:gap-1 md:gap-4 shrink-0">
         <button
           type="button"
           onClick={onMenuToggle}
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
           aria-controls="admin-sidebar"
-          className={`md:hidden flex items-center justify-center w-10 h-11 hover:bg-[#2c3338] hover:text-[#72aee6] transition-colors cursor-pointer ${menuOpen ? "bg-[#2c3338] text-[#72aee6]" : ""}`}
+          className={`md:hidden flex items-center justify-center w-8 xs:w-10 h-11 hover:bg-[#2c3338] hover:text-[#72aee6] transition-colors cursor-pointer shrink-0 ${menuOpen ? "bg-[#2c3338] text-[#72aee6]" : ""}`}
         >
-          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {menuOpen ? <X className="w-4 h-4 xs:w-5 xs:h-5" /> : <Menu className="w-4 h-4 xs:w-5 xs:h-5" />}
         </button>
-        <Link href="/" className="flex items-center gap-2 hover:text-[#72aee6] transition-colors group px-1 md:px-2 py-1 h-8">
-          <div className="w-4 h-4 bg-white/20 rounded-sm flex items-center justify-center">
+        <Link href="/" className="flex items-center gap-1.5 hover:text-[#72aee6] transition-colors group px-1 md:px-2 py-1 h-8 shrink-0">
+          <div className="w-4 h-4 bg-white/20 rounded-sm flex items-center justify-center shrink-0">
             <span className="text-[10px] font-black italic text-white">P</span>
           </div>
           <span className="text-[13px] font-bold hidden sm:block">Pairo Admin</span>
         </Link>
-        <Link href="/" target="_blank" className="hidden xs:flex items-center gap-1 hover:text-[#72aee6] text-[13px] transition-colors px-1.5 md:px-2 py-1 h-8" title="Visit Store">
+        <Link href="/" target="_blank" className="hidden xs:flex items-center gap-1 hover:text-[#72aee6] text-[13px] transition-colors px-1.5 md:px-2 py-1 h-8 shrink-0" title="Visit Store">
           <Globe className="w-3.5 h-3.5" />
           <span className="hidden md:inline">Visit Store</span>
         </Link>
@@ -600,7 +600,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
 
       {/* Center items: Global Spotlight Search Box */}
       <div className="relative flex items-center h-8 flex-1 min-w-0 md:flex-none mx-1 md:mx-0" ref={searchRef}>
-        <div className="flex items-center gap-1.5 bg-[#2c3338] border border-white/10 hover:border-white/30 rounded-[3px] px-2 py-0.5 transition-all w-full md:w-auto min-w-0">
+        <div className="flex items-center gap-1 bg-[#2c3338] border border-white/10 hover:border-white/30 rounded-[3px] px-1.5 xs:px-2 py-0.5 transition-all w-full md:w-auto min-w-0">
           <Search className="w-3 h-3 text-[#a7aaad] shrink-0" />
           <input
             type="text"
@@ -621,7 +621,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
 
         {/* Command Search Results Dropdown */}
         {showSearchResults && (
-          <div className="fixed md:absolute left-2 right-2 top-11 md:top-full md:left-0 md:right-auto mt-1 bg-[#2c3338] border border-white/10 shadow-2xl rounded-[3px] max-h-[min(300px,calc(100dvh-4rem))] overflow-y-auto z-[110] divide-y divide-white/5 md:w-80">
+          <div className="fixed md:absolute left-1 right-1 top-11 md:top-full md:left-0 md:right-auto mt-1 bg-[#2c3338] border border-white/10 shadow-2xl rounded-[3px] max-h-[min(300px,calc(100dvh-4rem))] overflow-y-auto z-[110] divide-y divide-white/5 md:w-80 max-w-[calc(100vw-0.5rem)]">
             {searchResults.length === 0 ? (
               <div className="p-4 text-center text-[#a7aaad] text-[11px] italic">
                 No matches found.
@@ -676,7 +676,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
           </button>
 
           {showNotifications && (
-            <div className="fixed md:absolute left-2 right-2 top-11 md:top-full md:left-auto md:right-0 md:w-96 bg-white border border-[#c3c4c7] shadow-xl py-0 z-[110] text-[13px] text-gray-700 rounded-none border-t-transparent text-left">
+            <div className="fixed md:absolute left-1 right-1 top-11 md:top-full md:left-auto md:right-0 md:w-96 max-w-[calc(100vw-0.5rem)] bg-white border border-[#c3c4c7] shadow-xl py-0 z-[110] text-[13px] text-gray-700 rounded-none border-t-transparent text-left">
               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#1d2327] uppercase tracking-wider">Admin Notices</span>
                 {visibleNotices.length > 0 && (
@@ -699,7 +699,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                     const isUpdating = updatingId === notice.id;
 
                     return (
-                      <div key={notice.id} className={`p-3 pl-3 border-l-4 ${borderClass} hover:bg-[#f6f7f7] relative flex flex-col gap-1.5 transition-all`}>
+                      <div key={notice.id} className={`p-2.5 xs:p-3 pl-3 border-l-4 ${borderClass} hover:bg-[#f6f7f7] relative flex flex-col gap-1.5 transition-all`}>
                         <div className="pr-5">
                           <span className="font-bold text-[#1d2327] text-[11px] uppercase mr-1.5">[{notice.label}]</span>
                           <span className="text-[12px] text-[#2c3338] leading-normal">{notice.text}</span>
@@ -752,7 +752,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
             onMouseEnter={() => setShowProfile(true)}
             onClick={() => setShowProfile(!showProfile)}
             aria-label="Account menu"
-            className={`flex items-center gap-2 px-2 md:px-3 h-11 md:h-full hover:bg-[#2c3338] transition-all text-[#f0f0f1] hover:text-[#72aee6] ${showProfile ? 'bg-[#2c3338]' : ''}`}
+            className={`flex items-center gap-1.5 xs:gap-2 px-1.5 xs:px-2 md:px-3 h-11 md:h-full hover:bg-[#2c3338] transition-all text-[#f0f0f1] hover:text-[#72aee6] ${showProfile ? 'bg-[#2c3338]' : ''}`}
           >
             <span className="text-[13px] hidden lg:inline whitespace-nowrap">Howdy, <span className="font-bold">{session?.user?.name || "Admin"}</span></span>
             <div className="w-6 h-6 md:w-5 md:h-5 bg-white/10 rounded-full flex items-center justify-center overflow-hidden">
@@ -763,7 +763,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
           {showProfile && (
             <div
               onMouseLeave={() => setShowProfile(false)}
-              className="absolute top-full right-0 w-56 max-w-[calc(100vw-1rem)] bg-[#2c3338] border border-transparent shadow-xl py-1 z-[101] text-[13px] border-t-white/10"
+              className="absolute top-full right-0 w-48 xs:w-56 max-w-[calc(100vw-0.5rem)] bg-[#2c3338] border border-transparent shadow-xl py-1 z-[101] text-[13px] border-t-white/10"
             >
               <div className="px-4 py-3 bg-[#2c3338] border-b border-white/5 mb-1 text-left">
                 <span className="font-bold text-white truncate block">{session?.user?.name || "Admin"}</span>

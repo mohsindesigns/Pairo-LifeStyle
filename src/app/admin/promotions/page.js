@@ -157,40 +157,40 @@ export default function PromotionsDashboard() {
     >
       <div className="space-y-4 md:space-y-6">
         {/* Performance Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="bg-white p-3 sm:p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
                 <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-[#646970] font-medium uppercase tracking-wider">Active Offers</span>
+                    <span className="text-[12px] xs:text-[13px] text-[#646970] font-medium uppercase tracking-wider">Active Offers</span>
                     <TrendingUp className="w-4 h-4 text-emerald-500" />
                 </div>
-                <div className="text-2xl font-bold text-[#1d2327] mt-1">
+                <div className="text-xl sm:text-2xl font-bold text-[#1d2327] mt-1">
                     {promotions.filter(p => p.status === "Active").length}
                 </div>
             </div>
-            <div className="bg-white p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
+            <div className="bg-white p-3 sm:p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
                 <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-[#646970] font-medium uppercase tracking-wider">Total Usage</span>
+                    <span className="text-[12px] xs:text-[13px] text-[#646970] font-medium uppercase tracking-wider">Total Usage</span>
                     <Tag className="w-4 h-4 text-[#2271b1]" />
                 </div>
-                <div className="text-2xl font-bold text-[#1d2327] mt-1">
+                <div className="text-xl sm:text-2xl font-bold text-[#1d2327] mt-1">
                     {promotions.reduce((acc, p) => acc + (p.analytics?.timesUsed || 0), 0)}
                 </div>
             </div>
-            <div className="bg-white p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
+            <div className="bg-white p-3 sm:p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
                 <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-[#646970] font-medium uppercase tracking-wider">Discount Distributed</span>
+                    <span className="text-[12px] xs:text-[13px] text-[#646970] font-medium uppercase tracking-wider">Discount Distributed</span>
                     <AlertCircle className="w-4 h-4 text-rose-500" />
                 </div>
-                <div className="text-2xl font-bold text-[#1d2327] mt-1">
+                <div className="text-xl sm:text-2xl font-bold text-[#1d2327] mt-1">
                     ${promotions.reduce((acc, p) => acc + (p.analytics?.discountDistributed || 0), 0).toFixed(0)}
                 </div>
             </div>
-            <div className="bg-white p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
+            <div className="bg-white p-3 sm:p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
                 <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-[#646970] font-medium uppercase tracking-wider">Revenue Generated</span>
+                    <span className="text-[12px] xs:text-[13px] text-[#646970] font-medium uppercase tracking-wider">Revenue Generated</span>
                     <DollarSign className="w-4 h-4 text-emerald-600" />
                 </div>
-                <div className="text-2xl font-bold text-[#1d2327] mt-1">
+                <div className="text-xl sm:text-2xl font-bold text-[#1d2327] mt-1">
                     ${promotions.reduce((acc, p) => acc + (p.analytics?.revenueGenerated || 0), 0).toFixed(0)}
                 </div>
             </div>
@@ -212,26 +212,26 @@ export default function PromotionsDashboard() {
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 shadow-sm">
-           <div className="flex flex-wrap items-center gap-2">
-              <select className="min-w-0 border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 shadow-sm">
+           <div className="flex flex-wrap items-center gap-1.5 xs:gap-2">
+              <select className="min-w-0 border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none max-w-full" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
                  <option>Bulk actions</option>
                  <option>Duplicate</option>
                  <option>Move to Trash</option>
                  <option>Delete Permanently</option>
               </select>
-              <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
+              <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
            </div>
 
-           <div className="flex items-center gap-2 w-full md:w-auto">
+           <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto min-w-0">
               <input 
                 type="text" 
                 placeholder="Search campaigns..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
+                className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
               />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Search</button>
+              <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shrink-0 whitespace-nowrap">Search</button>
            </div>
         </div>
 
@@ -262,7 +262,7 @@ export default function PromotionsDashboard() {
                     <td className="px-3 py-4 align-top">
                        <Link href={`/admin/promotions/${p._id}`} className="text-[#2271b1] font-bold hover:underline text-sm">{p.title}</Link>
                        <div className="mt-0.5 font-mono text-[11px] text-[#646970]">{p.code || "Automatic (No Code)"}</div>
-                       <div className="flex flex-wrap items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
+                       <div className="flex flex-wrap items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
                           <Link href={`/admin/promotions/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
                           <span className="text-[#c3c4c7]">|</span>
                           <button onClick={() => handleDuplicate(p)} className="hover:text-[#135e96]">Duplicate</button>

@@ -201,7 +201,7 @@ export default function PagesManagementPage() {
                                 {p.isSystem && <span className="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-tight">System Page</span>}
                              </div>
                              
-                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
+                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
                                 <Link href={`/admin/pages/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
                                 {!p.isSystem && (
                                    <>

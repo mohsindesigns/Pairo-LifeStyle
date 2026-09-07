@@ -58,11 +58,11 @@ function AdminGuard({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f0f0f1] font-sans selection:bg-[#2271b1] selection:text-white admin-dashboard-container">
+    <div className="min-h-screen bg-[#f0f0f1] font-sans selection:bg-[#2271b1] selection:text-white admin-dashboard-container min-w-0 w-full overflow-x-clip">
       <AdminSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="pl-0 md:pl-[160px] flex flex-col min-h-screen admin-content-column">
+      <div className="pl-0 md:pl-[160px] flex flex-col min-h-screen admin-content-column min-w-0 w-full overflow-x-clip">
         <AdminTopbar onMenuToggle={() => setSidebarOpen((v) => !v)} menuOpen={sidebarOpen} />
-        <main className="flex-1 bg-[#f0f2f1]">
+        <main className="flex-1 bg-[#f0f2f1] min-w-0 w-full overflow-x-clip">
           {children}
         </main>
       </div>

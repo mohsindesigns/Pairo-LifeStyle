@@ -229,7 +229,7 @@ export default function SizeChartItemsPage() {
                       <button onClick={() => handleToggle(item)} className={`w-9 h-5 md:w-7 md:h-4 rounded-full transition-colors ${item.enabled ? "bg-[#2271b1]" : "bg-gray-300"}`} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button onClick={() => { setEditingItem(item); setFormOpen(true); }} className="text-[#2271b1] text-[12px] font-medium hover:text-[#135e96] flex items-center gap-1">
                           <Pencil className="w-3.5 h-3.5" /> Edit
                         </button>

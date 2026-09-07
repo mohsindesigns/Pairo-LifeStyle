@@ -163,17 +163,17 @@ export default function SEOConfigPanel({
   }
 
   return (
-    <div className="bg-white border border-[#c3c4c7] rounded-lg p-6 md:p-8 space-y-8 shadow-sm">
+    <div className="bg-white border border-[#c3c4c7] rounded-lg p-3 xs:p-5 sm:p-6 md:p-8 space-y-6 sm:space-y-8 shadow-sm max-w-full overflow-hidden">
       {/* Header and Auto Generator */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-[#dcdcde] pb-6">
-        <div className="space-y-1">
-          <h3 className="text-lg font-bold text-[#1d2327]">Search Engine Optimization (SEO)</h3>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6 border-b border-[#dcdcde] pb-4 sm:pb-6">
+        <div className="space-y-1 min-w-0">
+          <h3 className="text-base sm:text-lg font-bold text-[#1d2327]">Search Engine Optimization (SEO)</h3>
           <p className="text-xs text-neutral-500 font-medium">Configure search engine indexing, fallback metadata, and social previews.</p>
         </div>
         <button
           type="button"
           onClick={handleAutoGenerate}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#2271b1] hover:bg-blue-50 text-[#2271b1] rounded-lg text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white border border-[#2271b1] hover:bg-blue-50 text-[#2271b1] rounded-lg text-xs font-bold uppercase tracking-wider transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Auto-Generate Fields
@@ -181,7 +181,7 @@ export default function SEOConfigPanel({
       </div>
 
       {/* Sub-tab navigation */}
-      <div className="flex border-b border-[#dcdcde] gap-4 pb-0 overflow-x-auto scrollbar-hide select-none">
+      <div className="flex border-b border-[#dcdcde] gap-2 xs:gap-4 pb-0 overflow-x-auto scrollbar-hide select-none max-w-full">
         {[
           { id: "general", label: "General", icon: Search },
           { id: "social", label: "Social Share", icon: Share2 },
@@ -195,13 +195,13 @@ export default function SEOConfigPanel({
               key={t.id}
               type="button"
               onClick={() => setActiveSubTab(t.id)}
-              className={`flex items-center gap-2 pb-3.5 px-1 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-[2px] cursor-pointer ${
+              className={`flex items-center gap-1.5 xs:gap-2 pb-3 px-1 text-[11px] xs:text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-[2px] cursor-pointer whitespace-nowrap shrink-0 ${
                 isActive
                   ? "border-[#2271b1] text-[#2271b1]"
                   : "border-transparent text-neutral-400 hover:text-[#1d2327] hover:border-neutral-350"
               }`}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-3.5 h-3.5 xs:w-4 xs:h-4 shrink-0" />
               <span>{t.label}</span>
             </button>
           );

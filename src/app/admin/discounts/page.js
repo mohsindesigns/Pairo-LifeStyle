@@ -865,7 +865,7 @@ function CouponsContent() {
                               <Edit2 className="w-3.5 h-3.5 text-gray-505" /> Quick Edit Coupon
                             </h4>
                             
-                            <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
                               <div>
                                 <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Code</label>
                                 <input 
@@ -980,7 +980,7 @@ function CouponsContent() {
                                     onChange={(e) => setQuickEditData({...quickEditData, userRegistrationRequired: e.target.checked})}
                                     className="rounded-sm border-gray-300"
                                   />
-                                  <span>Require User Login</span>
+                                  <span>Must Be Registered Customer</span>
                                 </label>
 
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-[#2c3338] cursor-pointer">
@@ -1010,13 +1010,13 @@ function CouponsContent() {
                                     onChange={(e) => setQuickEditData({...quickEditData, oneRedemptionPerDevice: e.target.checked})}
                                     className="rounded-sm border-gray-300"
                                   />
-                                  <span>One Redemption Per Device</span>
+                                  <span>One Redemption Per Device/IP</span>
                                 </label>
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
                                 <div>
-                                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Limit Per Customer</label>
+                                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Per User Limit</label>
                                   <input
                                     type="number"
                                     min="1"
@@ -1121,7 +1121,7 @@ function CouponsContent() {
                       <td className="px-3 py-3 align-top">
                         <div className="flex flex-col">
                           <span onClick={() => !d.isDeleted && handleStartQuickEdit(d)} className="text-[13px] font-bold text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer tracking-wide uppercase">{d.code}</span>
-                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-0.5 font-semibold select-none">
+                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-0.5 font-semibold select-none">
                             {d.isDeleted ? (
                               <>
                                 <button onClick={() => handleRestore(d._id)} className="hover:text-[#135e96]">Restore</button>

@@ -29,13 +29,17 @@ export default function QuillEditor({ value = "", onChange, height = "280px" }) 
           border: none !important;
           border-bottom: 2px solid #000 !important;
           background: #fafafa;
-          padding: 8px 12px;
+          padding: 6px 8px;
           font-family: inherit;
+          display: flex !important;
+          flex-wrap: wrap !important;
+          max-width: 100% !important;
         }
         .ql-container.ql-snow {
           border: none !important;
           font-family: inherit;
           font-size: 13px;
+          max-width: 100% !important;
         }
         .ql-editor {
           min-height: ${height};

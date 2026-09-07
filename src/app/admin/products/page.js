@@ -224,10 +224,10 @@ export default function AdminProducts() {
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 shadow-sm font-sans">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 shadow-sm font-sans">
+          <div className="flex flex-wrap items-center gap-1.5 xs:gap-2">
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1]" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={bulkAction} 
               onChange={(e) => setBulkAction(e.target.value)}
             >
@@ -244,13 +244,13 @@ export default function AdminProducts() {
             <button 
               type="button"
               onClick={handleBulkAction} 
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
+              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
             >
               Apply
             </button>
             
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] ml-2" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={selectedCategory} 
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
@@ -259,7 +259,7 @@ export default function AdminProducts() {
             </select>
 
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] ml-1" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={selectedStock} 
               onChange={(e) => setSelectedStock(e.target.value)}
             >
@@ -270,7 +270,7 @@ export default function AdminProducts() {
             </select>
 
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] ml-1" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={selectedType} 
               onChange={(e) => setSelectedType(e.target.value)}
             >
@@ -281,25 +281,25 @@ export default function AdminProducts() {
 
             <button 
               type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
+              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
             >
               Filter
             </button>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto">
             <input 
               type="text" 
               placeholder="Search products..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="border border-[#8c8f94] outline-none px-3 py-1.5 text-[13px] flex-1 min-w-0 md:w-48 bg-white focus:border-[#2271b1] rounded-[3px]"
+              className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 xs:py-1.5 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-48 bg-white focus:border-[#2271b1] rounded-[3px]"
             />
             <button 
               type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer shrink-0"
+              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer shrink-0 whitespace-nowrap"
             >
-              Search Products
+              Search
             </button>
           </div>
         </div>
@@ -336,7 +336,7 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-3 py-3 align-top pt-3.5">
                       <Link href={`/admin/products/${p._id}`} className="text-[#2271b1] font-bold hover:text-[#135e96] text-[14px] block mb-0.5 leading-tight">{p.name}</Link>
-                      <div className="flex flex-wrap items-center gap-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium mt-1">
+                      <div className="flex flex-wrap items-center gap-x-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium mt-1">
                         {view === "trash" ? (
                           <>
                             <button onClick={() => handleRestoreProduct(p._id)} className="hover:text-[#135e96] cursor-pointer">Restore</button>

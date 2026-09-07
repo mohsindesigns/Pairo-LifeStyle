@@ -176,10 +176,10 @@ export default function AdminOrdersPage() {
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 shadow-sm font-sans">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 shadow-sm font-sans">
+          <div className="flex flex-wrap items-center gap-1.5 xs:gap-2">
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1]" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={bulkAction} 
               onChange={(e) => setBulkAction(e.target.value)}
             >
@@ -191,12 +191,12 @@ export default function AdminOrdersPage() {
             <button 
               type="button"
               onClick={handleBulkAction} 
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000]"
+              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000]"
             >
               Apply
             </button>
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1]" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={referralFilter} 
               onChange={(e) => setReferralFilter(e.target.value)}
             >
@@ -206,19 +206,19 @@ export default function AdminOrdersPage() {
             </select>
           </div>
            
-          <div className="flex items-center gap-2 w-full md:w-auto min-w-0">
+          <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto min-w-0">
             <input 
               type="text" 
               placeholder="Search orders..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-[#8c8f94] outline-none px-3 py-1.5 text-[13px] flex-1 min-w-0 md:w-56 bg-white focus:border-[#2271b1] rounded-[3px]"
+              className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 xs:py-1.5 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-56 bg-white focus:border-[#2271b1] rounded-[3px]"
             />
             <button 
               type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer shrink-0"
+              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer shrink-0 whitespace-nowrap"
             >
-              Search Orders
+              Search <span className="hidden xs:inline">Orders</span>
             </button>
           </div>
         </div>
@@ -262,7 +262,7 @@ export default function AdminOrdersPage() {
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium mt-1">
+                      <div className="flex flex-wrap items-center gap-x-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium mt-1">
                         <Link href={`/admin/orders/${order._id}`} className="hover:text-[#135e96]">View</Link>
                         <span className="text-[#c3c4c7] font-normal">|</span>
                         <button onClick={() => handleDuplicate(order)} className="hover:text-[#135e96] cursor-pointer">Duplicate</button>

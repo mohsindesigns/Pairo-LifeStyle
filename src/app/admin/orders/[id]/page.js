@@ -387,14 +387,14 @@ export default function OrderDetailPage() {
           <div className="lg:col-span-8 space-y-6">
 
             {/* Order Data Box */}
-            <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
-              <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
+            <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px] overflow-hidden">
+              <div className="px-3 xs:px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
                 <h2 className="text-[14px] font-bold text-[#1d2327]">Order Details</h2>
                 <span className="text-[11px] text-[#646970]">
                   {order.createdAt ? new Date(order.createdAt).toLocaleString() : "N/A"}
                 </span>
               </div>
-              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="p-3 xs:p-5 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-8">
 
                 {/* Customer */}
                 <div className="space-y-3">
@@ -501,9 +501,9 @@ export default function OrderDetailPage() {
 
               {/* Refund Action */}
               {canShowRefundButton && (
-                <div className="mx-6 mb-6 p-4 bg-white border border-[#ccd0d4] rounded-[2px]">
+                <div className="mx-3 xs:mx-5 sm:mx-6 mb-4 xs:mb-6 p-3 xs:p-4 bg-white border border-[#ccd0d4] rounded-[2px]">
                   {!showRefundForm ? (
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-3 xs:gap-4">
                       <p className="text-[12px] text-[#646970]">
                         Remaining refundable balance:{" "}
                         <span className="font-bold text-[#1d2327]">
@@ -530,7 +530,7 @@ export default function OrderDetailPage() {
                           step="0.01"
                           value={refundAmount}
                           onChange={(e) => setRefundAmount(e.target.value)}
-                          className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] outline-none focus:border-[#2271b1] w-40"
+                          className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] outline-none focus:border-[#2271b1] w-full xs:w-40"
                         />
                         <button
                           onClick={submitRefund}
@@ -558,13 +558,13 @@ export default function OrderDetailPage() {
 
             {/* Custom Jacket Specifications */}
             {order.customJacketInquiryId && order.customJacketSnapshot && (
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
-                <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px] overflow-hidden">
+                <div className="px-3 xs:px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                   <h2 className="text-[14px] font-bold text-[#1d2327]">Custom Jacket Specifications</h2>
                 </div>
-                <div className="p-6 space-y-5">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-[13px]">
+                <div className="p-3 xs:p-5 sm:p-6 space-y-4 xs:space-y-5">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 xs:gap-4 text-[13px]">
                     {[
                       ["Jacket Type", order.customJacketSnapshot.jacketType],
                       ["Gender", order.customJacketSnapshot.gender],
@@ -575,22 +575,22 @@ export default function OrderDetailPage() {
                       ["Deadline", order.customJacketSnapshot.deadline],
                     ].map(([label, val]) => val ? (
                       <div key={label}>
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-                        <p className="text-[#1d2327] font-medium mt-0.5">{val}</p>
+                        <p className="text-[10px] xs:text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
+                        <p className="text-[#1d2327] font-medium mt-0.5 break-words">{val}</p>
                       </div>
                     ) : null)}
                   </div>
                   {order.customJacketSnapshot.additionalNotes && (
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Additional Notes</p>
-                      <p className="text-[13px] text-[#1d2327] leading-relaxed bg-gray-50 p-3 rounded-lg">
+                      <p className="text-[10px] xs:text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-1.5">Additional Notes</p>
+                      <p className="text-[12px] xs:text-[13px] text-[#1d2327] leading-relaxed bg-gray-50 p-2.5 xs:p-3 rounded-lg break-words">
                         {order.customJacketSnapshot.additionalNotes}
                       </p>
                     </div>
                   )}
                   {order.customJacketSnapshot.referenceImages?.length > 0 && (
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-3">
+                      <p className="text-[10px] xs:text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">
                         Reference Images ({order.customJacketSnapshot.referenceImages.length})
                       </p>
                       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -608,137 +608,132 @@ export default function OrderDetailPage() {
 
             {/* Order Items Box */}
             <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden rounded-[2px]">
-              <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
+              <div className="px-3 xs:px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
                 <h2 className="text-[14px] font-bold text-[#1d2327]">Items to Fulfill</h2>
               </div>
-              <table className="w-full text-left border-collapse text-[13px]">
-                <thead>
-                  <tr className="bg-[#fcfcfc] border-b border-[#ccd0d4]">
-                    <th className="px-6 py-3 font-bold text-[#646970]">Product</th>
-                    <th className="px-6 py-3 font-bold text-[#646970]">Cost</th>
-                    <th className="px-6 py-3 font-bold text-[#646970]">Qty</th>
-                    <th className="px-6 py-3 font-bold text-[#646970] text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#f0f0f1]">
-                  {(order.items || []).map((item, i) => (
-                    <tr key={i} className="hover:bg-[#f6f7f7] transition-colors">
-                      <td className="px-6 py-4 flex gap-4 items-start">
-                        <div className="w-12 h-14 bg-gray-50 border border-[#ccd0d4] rounded overflow-hidden shrink-0">
-                          {item.image && (
-                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                          )}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[#2271b1] font-bold hover:underline cursor-pointer">{item.name}</p>
-                          <div className="flex flex-col gap-1">
-                            {item.selectedVariant?.options &&
-                              Object.entries(item.selectedVariant.options).map(([key, val]) => (
-                                <p key={key} className="text-[11px] text-[#646970]">
-                                  <span className="font-bold text-[#2c3338]">{key}:</span> {val}
-                                </p>
-                              ))}
-                            <p className="text-[11px] text-gray-400 font-mono">
-                              SKU: {item.sku || "—"}
-                            </p>
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full min-w-[460px] text-left border-collapse text-[13px]">
+                  <thead>
+                    <tr className="bg-[#fcfcfc] border-b border-[#ccd0d4]">
+                      <th className="px-3 xs:px-4 sm:px-6 py-3 font-bold text-[#646970]">Product</th>
+                      <th className="px-3 xs:px-4 sm:px-6 py-3 font-bold text-[#646970]">Cost</th>
+                      <th className="px-3 xs:px-4 sm:px-6 py-3 font-bold text-[#646970]">Qty</th>
+                      <th className="px-3 xs:px-4 sm:px-6 py-3 font-bold text-[#646970] text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f0f0f1]">
+                    {(order.items || []).map((item, i) => (
+                      <tr key={i} className="hover:bg-[#f6f7f7] transition-colors">
+                        <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4 flex gap-3 xs:gap-4 items-start">
+                          <div className="w-10 h-12 xs:w-12 xs:h-14 bg-gray-50 border border-[#ccd0d4] rounded overflow-hidden shrink-0">
+                            {item.image && (
+                              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                            )}
                           </div>
-                          {/* Made to Measure */}
-                          {item.madeToMeasure?.enabled && (
-                            <div className="mt-2">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wide">
-                                ✦ Made to Measure
-                              </span>
-                              {Object.keys(item.madeToMeasure.measurements || {}).length > 0 && (
-                                <details className="mt-1.5">
-                                  <summary className="text-[11px] text-[#2271b1] cursor-pointer hover:underline select-none">View measurements ({item.madeToMeasure.unit})</summary>
-                                  <div className="mt-2 grid grid-cols-3 gap-x-4 gap-y-1 text-[11px] text-[#1d2327]">
-                                    {Object.entries(item.madeToMeasure.measurements).map(([k, v]) => v ? (
-                                      <div key={k}>
-                                        <span className="font-semibold capitalize text-[#646970]">{k.replace(/([A-Z])/g, ' $1')}: </span>
-                                        {v} {item.madeToMeasure.unit}
-                                      </div>
-                                    ) : null)}
-                                  </div>
-                                  {item.madeToMeasure.notes && (
-                                    <p className="mt-2 text-[11px] italic text-[#646970]">Note: {item.madeToMeasure.notes}</p>
-                                  )}
-                                </details>
-                              )}
+                          <div className="space-y-1 min-w-0">
+                            <p className="text-[#2271b1] font-bold hover:underline cursor-pointer">{item.name}</p>
+                            <div className="flex flex-col gap-1">
+                              {item.selectedVariant?.options &&
+                                Object.entries(item.selectedVariant.options).map(([key, val]) => (
+                                  <p key={key} className="text-[11px] text-[#646970]">
+                                    <span className="font-bold text-[#2c3338]">{key}:</span> {val}
+                                  </p>
+                                ))}
+                              <p className="text-[11px] text-gray-400 font-mono">
+                                SKU: {item.sku || "—"}
+                              </p>
                             </div>
-                          )}
-                          {/* Customize Product options */}
-                          {item.customization?.enabled && (
-                            <div className="mt-3 pt-2 border-t border-neutral-100">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 border border-purple-200 text-purple-700 rounded text-[9px] font-bold uppercase tracking-wide">
-                                ✦ Custom Design Selections
-                              </span>
-                              <div className="mt-2 space-y-1.5 text-[11px] text-[#1d2327]">
-                                {item.customization.leatherColor && item.customization.leatherColor !== "None" && (
-                                  <div><span className="font-semibold text-[#646970]">Leather Color:</span> {item.customization.leatherColor} {item.customization.leatherColorNote && `(${item.customization.leatherColorNote})`}</div>
-                                )}
-                                {item.customization.leatherType && item.customization.leatherType !== "None" && (
-                                  <div><span className="font-semibold text-[#646970]">Leather Type:</span> {item.customization.leatherType} {item.customization.leatherTypeNote && `(${item.customization.leatherTypeNote})`}</div>
-                                )}
-                                {item.customization.innerLining && item.customization.innerLining !== "None" && (
-                                  <div><span className="font-semibold text-[#646970]">Inner Lining:</span> {item.customization.innerLining} {item.customization.innerLiningNote && `(${item.customization.innerLiningNote})`}</div>
-                                )}
-                                {item.customization.hardwareColor && item.customization.hardwareColor !== "None" && (
-                                  <div><span className="font-semibold text-[#646970]">Hardware Color:</span> {item.customization.hardwareColor} {item.customization.hardwareColorNote && `(${item.customization.hardwareColorNote})`}</div>
-                                )}
-                                {item.customization.fur?.type && item.customization.fur.type !== "None" && (
-                                  <div className="pl-2 border-l-2 border-neutral-200 mt-1">
-                                    <span className="font-bold text-[9px] uppercase tracking-wider text-neutral-400 block mb-0.5">Fur Customization</span>
-                                    <div><span className="font-semibold text-[#646970]">Fur Type:</span> {item.customization.fur.type} {item.customization.fur.typeNote && `(${item.customization.fur.typeNote})`}</div>
-                                    {item.customization.fur.color && <div><span className="font-semibold text-[#646970]">Fur Color:</span> {item.customization.fur.color}</div>}
-                                    {item.customization.fur.placement?.length > 0 && <div><span className="font-semibold text-[#646970]">Placement:</span> {item.customization.fur.placement.join(", ")}</div>}
-                                    {item.customization.fur.density && <div><span className="font-semibold text-[#646970]">Density:</span> {item.customization.fur.density}</div>}
-                                    {item.customization.fur.removable !== null && <div><span className="font-semibold text-[#646970]">Removable:</span> {item.customization.fur.removable ? "Yes" : "No"}</div>}
-                                  </div>
-                                )}
-                                {item.customization.artwork && Object.values(item.customization.artwork).some(Boolean) && (
-                                  <div className="mt-2 space-y-1">
-                                    <span className="font-bold text-[9px] uppercase tracking-wider text-neutral-400 block">Uploaded Artwork</span>
-                                    {Object.entries(item.customization.artwork).map(([placement, art]) => {
-                                      if (!art || !art.url) return null;
-                                      return (
-                                        <div key={placement} className="flex items-center gap-2 pl-2 text-[11px]">
-                                          <span className="font-semibold capitalize text-[#646970]">{placement.replace(/([A-Z])/g, ' $1')}:</span>
-                                          <a href={art.url} target="_blank" rel="noopener noreferrer" className="text-[#2271b1] hover:underline truncate max-w-[200px]">
-                                            {art.name || "Download File"}
-                                          </a>
-                                          {placement === "other" && art.note && <span className="text-neutral-400 italic">({art.note})</span>}
+                            {/* Made to Measure */}
+                            {item.madeToMeasure?.enabled && (
+                              <div className="mt-2">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wide">
+                                  ✦ Made to Measure
+                                </span>
+                                {Object.keys(item.madeToMeasure.measurements || {}).length > 0 && (
+                                  <details className="mt-1.5">
+                                    <summary className="text-[11px] text-[#2271b1] cursor-pointer hover:underline select-none">View measurements ({item.madeToMeasure.unit})</summary>
+                                    <div className="mt-2 grid grid-cols-2 xs:grid-cols-3 gap-x-4 gap-y-1 text-[11px] text-[#1d2327]">
+                                      {Object.entries(item.madeToMeasure.measurements).map(([k, v]) => v ? (
+                                        <div key={k}>
+                                          <span className="font-semibold capitalize text-[#646970]">{k.replace(/([A-Z])/g, ' $1')}: </span>
+                                          {v} {item.madeToMeasure.unit}
                                         </div>
-                                      );
-                                    })}
-                                  </div>
+                                      ) : null)}
+                                    </div>
+                                    {item.madeToMeasure.notes && (
+                                      <p className="mt-2 text-[11px] italic text-[#646970]">Note: {item.madeToMeasure.notes}</p>
+                                    )}
+                                  </details>
                                 )}
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        ${(item.priceAtPurchase || 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4">× {item.quantity || 1}</td>
-                      <td className="px-6 py-4 text-right font-bold text-[#1d2327]">
-                        ${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                            )}
+                            {/* Customize Product options */}
+                            {item.customization?.enabled && (
+                              <div className="mt-3 pt-2 border-t border-neutral-100">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 border border-purple-200 text-purple-700 rounded text-[9px] font-bold uppercase tracking-wide">
+                                  ✦ Custom Design Selections
+                                </span>
+                                <div className="mt-2 space-y-1.5 text-[11px] text-[#1d2327]">
+                                  {item.customization.leatherColor && item.customization.leatherColor !== "None" && (
+                                    <div><span className="font-semibold text-[#646970]">Leather Color:</span> {item.customization.leatherColor} {item.customization.leatherColorNote && `(${item.customization.leatherColorNote})`}</div>
+                                  )}
+                                  {item.customization.leatherType && item.customization.leatherType !== "None" && (
+                                    <div><span className="font-semibold text-[#646970]">Leather Type:</span> {item.customization.leatherType} {item.customization.leatherTypeNote && `(${item.customization.leatherTypeNote})`}</div>
+                                  )}
+                                  {item.customization.lining && item.customization.lining !== "None" && (
+                                    <div><span className="font-semibold text-[#646970]">Lining:</span> {item.customization.lining}</div>
+                                  )}
+                                  {item.customization.hardwareColor && item.customization.hardwareColor !== "None" && (
+                                    <div><span className="font-semibold text-[#646970]">Hardware:</span> {item.customization.hardwareColor}</div>
+                                  )}
+                                  {item.customization.notes && (
+                                    <div className="text-neutral-500 italic">"{item.customization.notes}"</div>
+                                  )}
+                                  {item.customization.artwork && Object.values(item.customization.artwork).some(Boolean) && (
+                                    <div className="mt-2 pt-2 border-t border-neutral-100 space-y-1">
+                                      <span className="font-bold text-[9px] uppercase tracking-wider text-neutral-400 block">Uploaded Artwork</span>
+                                      {Object.entries(item.customization.artwork).map(([placement, art]) => {
+                                        if (!art || !art.url) return null;
+                                        return (
+                                          <div key={placement} className="flex items-center gap-2 pl-2 text-[11px]">
+                                            <span className="font-semibold capitalize text-[#646970]">{placement.replace(/([A-Z])/g, ' $1')}:</span>
+                                            <a href={art.url} target="_blank" rel="noopener noreferrer" className="text-[#2271b1] hover:underline truncate max-w-[200px]">
+                                              {art.name || "Download File"}
+                                            </a>
+                                            {placement === "other" && art.note && <span className="text-neutral-400 italic">({art.note})</span>}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4">
+                          ${(item.priceAtPurchase || 0).toLocaleString()}
+                        </td>
+                        <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4">× {item.quantity || 1}</td>
+                        <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4 text-right font-bold text-[#1d2327]">
+                          ${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Financial Summary */}
-              <div className="p-6 bg-gray-50/50 border-t border-[#ccd0d4] flex flex-col items-end space-y-2">
-                <div className="flex justify-between w-56 text-[13px]">
+              <div className="p-3 xs:p-5 sm:p-6 bg-gray-50/50 border-t border-[#ccd0d4] flex flex-col items-stretch xs:items-end space-y-2">
+                <div className="flex justify-between w-full xs:w-56 text-[13px]">
                   <span className="text-[#646970]">Subtotal:</span>
                   <span className="font-bold text-[#1d2327]">
                     ${(order.financials?.subtotal || 0).toLocaleString()}
                   </span>
                 </div>
                 {order.financials?.discountTotal && Number(order.financials.discountTotal) > 0 ? (
-                  <div className="flex justify-between w-56 text-[13px]">
+                  <div className="flex justify-between w-full xs:w-56 text-[13px]">
                     <span className="text-[#646970]">Promo Discount:</span>
                     <span className="text-green-700 font-medium">
                       -${(Number(order.financials.discountTotal)).toLocaleString()}
@@ -746,7 +741,7 @@ export default function OrderDetailPage() {
                   </div>
                 ) : null}
                 {order.financials?.affiliateDiscountAmount && Number(order.financials.affiliateDiscountAmount) > 0 ? (
-                  <div className="flex justify-between w-56 text-[13px]">
+                  <div className="flex justify-between w-full xs:w-56 text-[13px]">
                     <span className="text-[#646970] flex items-center gap-1">
                       Referral Discount
                       {order.financials.affiliateDiscountType === 'Percentage' && (
@@ -760,7 +755,7 @@ export default function OrderDetailPage() {
                     </span>
                   </div>
                 ) : null}
-                <div className="flex justify-between w-56 text-[13px]">
+                <div className="flex justify-between w-full xs:w-56 text-[13px]">
                   <span className="text-[#646970]">Shipping:</span>
                   <span className="text-green-700 font-medium">
                     {order.financials?.shippingCost > 0
@@ -769,12 +764,12 @@ export default function OrderDetailPage() {
                   </span>
                 </div>
                 {order.financials?.tax > 0 && (
-                  <div className="flex justify-between w-56 text-[13px]">
+                  <div className="flex justify-between w-full xs:w-56 text-[13px]">
                     <span className="text-[#646970]">Tax:</span>
                     <span className="font-medium text-[#1d2327]">${order.financials.tax.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between w-56 text-[16px] font-bold border-t border-[#ccd0d4] pt-2 mt-2 text-[#1d2327]">
+                <div className="flex justify-between w-full xs:w-56 text-[15px] xs:text-[16px] font-bold border-t border-[#ccd0d4] pt-2 mt-2 text-[#1d2327]">
                   <span>Total:</span>
                   <span>${(order.financials?.total || 0).toLocaleString()}</span>
                 </div>
@@ -894,7 +889,7 @@ export default function OrderDetailPage() {
                           Sent {new Date(order.paymentLink.sentAt).toLocaleString()} ({order.paymentLink.sentCount || 1}x)
                         </p>
                       )}
-                      <div className="flex gap-2 pt-1">
+                      <div className="flex flex-col xs:flex-row gap-2 pt-1">
                         <button
                           onClick={sendPaymentLinkToCustomer}
                           disabled={sendingLink}
@@ -906,7 +901,7 @@ export default function OrderDetailPage() {
                           onClick={() => generatePaymentLink(true)}
                           disabled={generatingLink}
                           title="Regenerate link"
-                          className="px-3 py-2 border border-[#8c8f94] rounded-[3px] text-xs font-bold uppercase hover:bg-gray-50 disabled:opacity-50"
+                          className="px-3 py-2 border border-[#8c8f94] rounded-[3px] text-xs font-bold uppercase hover:bg-gray-50 disabled:opacity-50 text-center"
                         >
                           {generatingLink ? "..." : "Regenerate"}
                         </button>

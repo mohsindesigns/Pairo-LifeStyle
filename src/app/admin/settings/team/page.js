@@ -215,7 +215,7 @@ export default function StaffManagement() {
                        {s.security?.lastLogin ? new Date(s.security.lastLogin).toLocaleString() : "Never"}
                     </td>
                      <td className="px-4 py-4 text-center">
-                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
+                        <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
                             {s.roleId?.slug !== 'super-admin' && s._id !== session?.user?.id && (
                                <button 
                                  title="Delete Staff Member" 
