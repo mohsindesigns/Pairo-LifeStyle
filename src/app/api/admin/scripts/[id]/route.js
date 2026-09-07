@@ -32,7 +32,19 @@ export async function PUT(req, { params }) {
 
     await dbConnect();
     try {
-        const { auditLog, version, ...updateData } = await req.json();
+        const body = await req.json();
+        const { auditLog, version, ...updateData } = body;
+
+        const scriptSize = JSON.stringify(body).length;
+        if (scriptSize > 102400) {
+            return NextResponse.json({ error: "Script payload exceeds 100KB limit." }, { status: 400 });
+        }
+
+        const dangerousPatterns = [/document\.write\(/i];
+        if (updateData.code && dangerousPatterns.some(p => p.test(updateData.code))) {
+            return NextResponse.json({ error: "Script contains prohibited patterns (document.write)." }, { status: 400 });
+        }
+
         const existing = await Script.findById(id);
         if (!existing) return NextResponse.json({ error: "Script not found" }, { status: 404 });
 
