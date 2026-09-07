@@ -103,7 +103,7 @@ export async function syncPromotionToStripe(promotion) {
     });
 
     const promotionCodeParams = {
-      coupon: coupon.id,
+      promotion: { type: "coupon", coupon: coupon.id },
       code,
       active: isActive,
       metadata: { promotionId: promotion._id.toString(), tenantId: promotion.tenantId },
