@@ -3,6 +3,7 @@ import Order from "@/models/Order";
 import Subscriber from "@/models/Subscriber";
 import Customer from "@/models/Customer";
 import Product from "@/models/Product";
+import { resolveAuthoritativePrice, resolveAuthoritativeCompareAtPrice } from "@/lib/productPricing";
 
 /**
  * Hashes an IP address for privacy-safe storage/comparison in redeemedFingerprints.
@@ -13,8 +14,13 @@ export function hashFingerprint(ip) {
 }
 
 /**
- * Resolves the real, DB-verified product for each cart line item, keyed by
- * whatever identifier (Mongo _id or legacy numeric id) the item carries.
+ * Resolves the real, DB-verified product document for each cart line item,
+ * keyed by whatever identifier (Mongo _id or legacy numeric id) the item
+ * carries. Keeps the raw product doc (rather than a flattened price/onSale
+ * shape) so callers can resolve variant-specific pricing per line item via
+ * resolveAuthoritativePrice/resolveAuthoritativeCompareAtPrice — a bare
+ * per-product map can't hold two different prices for two cart lines of the
+ * same product with different selected variants.
  */
 async function loadDbProductMap(items = []) {
   const cartProductIds = items.map(item => item.id?.toString() || item.productId?.toString() || item._id?.toString());
@@ -39,20 +45,14 @@ async function loadDbProductMap(items = []) {
 
   let productsInDb = [];
   if (queryOr.length > 0) {
-    productsInDb = await Product.find({ $or: queryOr }).select("_id id categories price compareAtPrice");
+    productsInDb = await Product.find({ $or: queryOr }).select("_id id categories price compareAtPrice variantCombinations attributes");
   }
 
   const map = {}; // keyed by both the Mongo _id string AND the legacy numeric id string
   productsInDb.forEach(p => {
-    const entry = {
-      objectId: p._id.toString(),
-      categories: (p.categories || []).map(c => c.toString()),
-      price: p.price,
-      onSale: p.compareAtPrice != null && p.compareAtPrice > p.price
-    };
-    map[p._id.toString()] = entry;
+    map[p._id.toString()] = p;
     if (p.id !== undefined && p.id !== null) {
-      map[p.id.toString()] = entry;
+      map[p.id.toString()] = p;
     }
   });
 
@@ -202,7 +202,7 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
 
     const matched = cartProductIds.some(id => {
       const entry = dbProductMap[id];
-      return entry && allowedIds.includes(entry.objectId);
+      return entry && allowedIds.includes(entry._id.toString());
     });
     if (!matched) {
       return { valid: false, error: "This coupon is only valid for specific products." };
@@ -217,7 +217,7 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
 
     const matched = cartProductIds.some(id => {
       const entry = dbProductMap[id];
-      return entry && entry.categories.some(catId => allowedIds.includes(catId));
+      return entry && (entry.categories || []).some(catId => allowedIds.includes(catId.toString()));
     });
     if (!matched) {
       return { valid: false, error: "This coupon is only valid for specific categories." };
@@ -253,25 +253,27 @@ export async function calculateEligibleSubtotal(discount, items = []) {
     const dbEntry = dbProductMap[productId];
     // Fall back to the client-supplied price only when the product can't be found in the
     // DB (e.g. a since-deleted product still sitting in someone's cart) — a real, existing
-    // product's price is always taken from the DB, never from the request body.
-    const price = dbEntry ? dbEntry.price : item.price;
+    // product's price is always taken from the DB (variant-aware), never from the request body.
+    const price = dbEntry ? resolveAuthoritativePrice(dbEntry, item) : item.price;
 
     let isEligible = true;
 
     if (hasProductRestrictions) {
-      if (!dbEntry || !allowedProductIds.includes(dbEntry.objectId)) {
+      if (!dbEntry || !allowedProductIds.includes(dbEntry._id.toString())) {
         isEligible = false;
       }
     }
 
     if (hasCategoryRestrictions && isEligible) {
-      if (!dbEntry || !dbEntry.categories.some(catId => allowedCategoryIds.includes(catId))) {
+      if (!dbEntry || !(dbEntry.categories || []).some(catId => allowedCategoryIds.includes(catId.toString()))) {
         isEligible = false;
       }
     }
 
-    if (excludeSaleItems && isEligible && dbEntry?.onSale) {
-      isEligible = false;
+    if (excludeSaleItems && isEligible && dbEntry) {
+      const compareAtPrice = resolveAuthoritativeCompareAtPrice(dbEntry, item);
+      const onSale = compareAtPrice != null && compareAtPrice > price;
+      if (onSale) isEligible = false;
     }
 
     if (isEligible) {

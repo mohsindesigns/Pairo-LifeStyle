@@ -51,19 +51,19 @@ function SizeChartForm({ item, onSave, onClose, isNew }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-1rem)] sm:max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="font-bold text-[15px] text-[#1d2327]">{isNew ? "Add Size Chart" : "Edit Size Chart"}</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center">
+        <div className="flex items-center justify-between gap-2 p-4 sm:p-5 border-b border-gray-100">
+          <h2 className="font-bold text-[15px] text-[#1d2327] min-w-0 break-words">{isNew ? "Add Size Chart" : "Edit Size Chart"}</h2>
+          <button onClick={onClose} className="w-8 h-8 shrink-0 rounded-full hover:bg-gray-100 flex items-center justify-center">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-4 sm:p-5 space-y-4">
           {/* Title */}
           <div>
             <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Title *</label>
@@ -92,7 +92,7 @@ function SizeChartForm({ item, onSave, onClose, isNew }) {
           </div>
 
           {/* Order + Enabled */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Display Order</label>
               <input type="number" name="order" value={form.order} onChange={handleChange} min={0} className={inputClass} />
@@ -107,9 +107,9 @@ function SizeChartForm({ item, onSave, onClose, isNew }) {
           </div>
         </div>
 
-        <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
-          <button onClick={onClose} className="border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] flex items-center gap-2 disabled:opacity-60">
+        <div className="p-4 sm:p-5 border-t border-gray-100 flex flex-col-reverse xs:flex-row xs:justify-end gap-2 xs:gap-3">
+          <button onClick={onClose} className="w-full xs:w-auto border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="w-full xs:w-auto justify-center bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] flex items-center gap-2 disabled:opacity-60">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {saving ? "Saving..." : "Save Chart"}
           </button>
@@ -194,13 +194,13 @@ export default function SizeChartItemsPage() {
           Manage the size chart images displayed on your <strong>/size-chart</strong> page. Use the Display Order field to control the sequence.
         </p>
 
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[600px]">
+        <div className="bg-white border border-[#ccd0d4] max-w-full overflow-x-auto shadow-sm">
+          <table className="w-full text-left border-collapse text-[13px] min-w-[480px] md:min-w-[600px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                 <th className="px-4 py-2 font-bold text-[#1d2327]">Preview</th>
                 <th className="px-4 py-2 font-bold text-[#1d2327]">Title</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Order</th>
+                <th className="px-4 py-2 font-bold text-[#1d2327] hidden md:table-cell">Order</th>
                 <th className="px-4 py-2 font-bold text-[#1d2327]">Visible</th>
                 <th className="px-4 py-2 font-bold text-[#1d2327]">Actions</th>
               </tr>
@@ -224,9 +224,9 @@ export default function SizeChartItemsPage() {
                       <p className="font-medium text-[#1d2327]">{item.title}</p>
                       {item.description && <p className="text-[#646970] text-[12px] line-clamp-1">{item.description}</p>}
                     </td>
-                    <td className="px-4 py-3 text-[#646970]">{item.order}</td>
+                    <td className="px-4 py-3 text-[#646970] hidden md:table-cell">{item.order}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => handleToggle(item)} className={`w-7 h-4 rounded-full transition-colors ${item.enabled ? "bg-[#2271b1]" : "bg-gray-300"}`} />
+                      <button onClick={() => handleToggle(item)} className={`w-9 h-5 md:w-7 md:h-4 rounded-full transition-colors ${item.enabled ? "bg-[#2271b1]" : "bg-gray-300"}`} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

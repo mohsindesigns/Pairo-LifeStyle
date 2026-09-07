@@ -25,9 +25,16 @@ export function resolveVariantForItem(product, item) {
   return product.variantCombinations.find(vc => vc.title === variantTitle) || null;
 }
 
+// Must match the client-side constant in MadeToMeasureModal.js. Applied by
+// flag only (never trusting a client-supplied surcharge amount) — an item
+// tagged madeToMeasure.enabled always costs base/variant price + this fixed
+// amount, so a forged surcharge value can't be used to discount the item.
+export const MADE_TO_MEASURE_SURCHARGE = 25;
+
 export function resolveAuthoritativePrice(product, item) {
   const variant = resolveVariantForItem(product, item);
-  return (variant?.price !== undefined && variant?.price !== null) ? variant.price : product.price;
+  const basePrice = (variant?.price !== undefined && variant?.price !== null) ? variant.price : product.price;
+  return item?.madeToMeasure?.enabled ? basePrice + MADE_TO_MEASURE_SURCHARGE : basePrice;
 }
 
 export function resolveAuthoritativeCompareAtPrice(product, item) {

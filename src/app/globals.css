@@ -21,6 +21,9 @@
   --color-gray-800: var(--foreground);
   --color-gray-900: var(--foreground);
 
+  /* Extra small breakpoint for admin mobile layouts (300px-479px is the base range) */
+  --breakpoint-xs: 30rem;
+
   /* Fonts */
   --font-sans: var(--body-font, var(--font-inter)), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--brand-font), sans-serif;
@@ -198,6 +201,75 @@ img {
 }
 .admin-dashboard-container .text-\[14px\] {
   font-size: 13px !important;
+}
+
+/* ------------------------------------------------------------------
+   Admin Dashboard - Mobile responsiveness (down to 300px)
+   ------------------------------------------------------------------ */
+
+/* The content column must never produce a horizontal page scroll.
+   'clip' (not 'hidden') avoids creating a scroll container, so
+   position:sticky children keep working. */
+.admin-content-column {
+  min-width: 0;
+  overflow-x: clip;
+}
+
+/* Lock body scroll while the mobile sidebar drawer is open */
+body.admin-drawer-open {
+  overflow: hidden;
+}
+
+/* Touch devices have no hover: row-action links that are hover-only on
+   desktop must always be visible on small screens. */
+@media (max-width: 767px) {
+  .admin-dashboard-container .group-hover\:opacity-100 {
+    opacity: 1 !important;
+  }
+
+  /* Long unbroken strings (emails, URLs, SKUs, IDs) must wrap, not overflow */
+  .admin-dashboard-container td,
+  .admin-dashboard-container th,
+  .admin-dashboard-container p,
+  .admin-dashboard-container label,
+  .admin-dashboard-container h1,
+  .admin-dashboard-container h2,
+  .admin-dashboard-container h3 {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-dashboard-container pre,
+  .admin-dashboard-container code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* Safety net for dialogs: nothing inside a full-screen overlay may be
+     wider than the viewport. Pages also set responsive widths explicitly. */
+  .admin-dashboard-container .fixed.inset-0 > * {
+    max-width: calc(100vw - 1rem);
+  }
+
+  /* Form controls should never force a wider layout than their container */
+  .admin-dashboard-container input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  .admin-dashboard-container select,
+  .admin-dashboard-container textarea {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .admin-dashboard-container table {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 479px) {
+  .admin-dashboard-container h1 {
+    font-size: 18px !important;
+  }
+  .admin-dashboard-container .text-\[23px\] {
+    font-size: 18px !important;
+  }
 }
 
 /* Blog Content Rich-Text Typography */

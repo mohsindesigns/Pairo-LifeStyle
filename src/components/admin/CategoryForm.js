@@ -150,7 +150,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     ? [{ label: "WooCommerce", href: "/admin/orders" }, { label: "Categories", href: "/admin/categories" }, { label: categoryId ? "Edit" : "New" }]
     : [{ label: "Blog", href: "/admin/blogs" }, { label: "Categories", href: "/admin/blogs/categories" }, { label: categoryId ? "Edit" : "New" }];
 
-  if (loading) return <div className="p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
+  if (loading) return <div className="p-4 sm:p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
 
   return (
     <AdminPageLayout 
@@ -161,7 +161,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     >
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
          {/* Main Column */}
-         <div className="lg:col-span-3 space-y-4">
+         <div className="lg:col-span-3 min-w-0 space-y-4">
             <div className="space-y-1">
                 <input
                    required
@@ -176,12 +176,12 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                />
                <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5">
                   <span>Permalink:</span>
-                  <span className="text-gray-400 font-mono">
+                  <span className="text-gray-400 font-mono break-all">
                     pairolifestyle.com/{type === 'product' ? 'collections' : 'blog'}/
                   </span>
                   {slugLocked ? (
                     <>
-                      <span className="font-mono text-[#2271b1] font-semibold">{formData.slug || <span className="text-gray-300 italic">auto-generated</span>}</span>
+                      <span className="font-mono text-[#2271b1] font-semibold break-all">{formData.slug ||<span className="text-gray-300 italic">auto-generated</span>}</span>
                       <button
                         type="button"
                         title="Edit permalink"
@@ -194,7 +194,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                   ) : (
                     <>
                       <input
-                        className="border border-[#2271b1] bg-white outline-none text-[#2271b1] font-mono rounded px-1 py-0.5 text-[12px] min-w-[120px]"
+                        className="border border-[#2271b1] bg-white outline-none text-[#2271b1] font-mono rounded px-1 py-0.5 text-[12px] min-w-[120px] max-w-full"
                         value={formData.slug}
                         onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                         autoFocus
@@ -210,7 +210,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
             </div>
 
             {/* Tabs Selector */}
-            <div className="flex border-b border-[#c3c4c7] mb-4 gap-1">
+            <div className="flex flex-wrap border-b border-[#c3c4c7] mb-4 gap-1">
                <button
                   type="button"
                   onClick={() => setActiveTab("content")}
@@ -239,7 +239,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                <>
                   {/* Short Description — shown in banner overlay */}
                   <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between font-bold text-[13px] text-gray-700">
+                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-bold text-[13px] text-gray-700">
                         Short Description
                         <span className="text-[11px] font-normal text-gray-400">Shown in banner overlay</span>
                      </div>
@@ -256,7 +256,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
 
                   {/* Content Editor */}
                   <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between font-bold text-[13px] text-gray-700">
+                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-bold text-[13px] text-gray-700">
                         <span>Full Description</span>
                         <div className="flex gap-2 text-xs">
                            <button
@@ -291,7 +291,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
 
                   {/* Link Items */}
                   <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 font-bold text-[13px] text-gray-700 flex justify-between">
+                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 font-bold text-[13px] text-gray-700 flex flex-wrap justify-between gap-x-2">
                         <span>Link {type === 'product' ? 'Products' : 'Blogs'}</span>
                         <span className="text-[#2271b1]">{formData.linkedItems.length} selected</span>
                      </div>
@@ -308,7 +308,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                               <div className="p-3 text-center text-gray-400 text-[12px]">No items available.</div>
                            ) : (
                               filteredItems.map(item => (
-                                 <label key={item._id} className="flex items-center gap-3 p-2 hover:bg-[#f6f7f7] cursor-pointer">
+                                 <label key={item._id} className="flex items-center gap-3 p-2 min-w-0 hover:bg-[#f6f7f7] cursor-pointer">
                                     <input 
                                        type="checkbox" 
                                        className="w-4 h-4 text-[#2271b1]"
@@ -318,7 +318,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                                           else setFormData({...formData, linkedItems: formData.linkedItems.filter(id => id !== item._id)});
                                        }}
                                     />
-                                    <span className="text-[13px]">{item.title || item.name}</span>
+                                    <span className="text-[13px] min-w-0 break-words">{item.title || item.name}</span>
                                  </label>
                               ))
                            )}
@@ -330,7 +330,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                <>
                   {/* FAQ Manager */}
                   <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between font-bold text-[13px] text-gray-700">
+                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-bold text-[13px] text-gray-700">
                         <span>Frequently Asked Questions</span>
                         <button
                            type="button"
@@ -343,7 +343,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                            Add New FAQ
                         </button>
                      </div>
-                     <div className="p-4 space-y-4">
+                     <div className="p-3 sm:p-4 space-y-4">
                         {(!formData.faqs || formData.faqs.length === 0) ? (
                            <div className="text-center py-6 text-[13px] text-gray-400 italic">No FAQs configured yet. Click "Add New FAQ" to create one.</div>
                         ) : (
@@ -398,7 +398,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
 
                   {/* FAQ Schema Custom Block */}
                   <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between font-bold text-[13px] text-gray-700">
+                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-bold text-[13px] text-gray-700">
                         <span>Custom FAQ JSON-LD Schema</span>
                         <span className="text-[11px] font-normal text-gray-400">Optional: Overrides auto-generated schema</span>
                      </div>
@@ -428,13 +428,13 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
          </div>
 
          {/* Sidebar Column */}
-         <div className="space-y-4">
+         <div className="min-w-0 space-y-4">
             <div className="bg-white border border-[#c3c4c7] shadow-sm">
                <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Publish</div>
                <div className="p-3 space-y-4 text-[13px]">
                   <div className="space-y-3 py-2">
                      <p className="flex items-center gap-2"><span className="text-gray-500 w-16">Status:</span> 
-                        <select className="border border-[#c3c4c7] px-1 py-0.5" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                        <select className="border border-[#c3c4c7] px-1 py-0.5 min-w-0" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
                            <option>Published</option>
                            <option>Draft</option>
                         </select>
@@ -454,7 +454,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                         <ExternalLink className="w-3 h-3" /> Preview live page
                      </a>
                   )}
-                  <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex justify-between items-center">
+                  <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex flex-wrap justify-between items-center gap-2">
                      <button type="button" onClick={() => router.push(type === 'product' ? '/admin/categories' : '/admin/blogs/categories')} className="text-red-600 hover:underline">Cancel</button>
                      <button type="submit" disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold hover:bg-[#135e96]">
                         {saving ? "Saving..." : (categoryId ? "Update" : "Publish")}

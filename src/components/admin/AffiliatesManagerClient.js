@@ -320,10 +320,10 @@ export default function AffiliatesManagerClient({ userSession }) {
       title="Affiliate Management"
       breadcrumbs={[{ label: "Affiliates" }]}
     >
-      <div className="space-y-6 text-[#2c3338] font-sans">
+      <div className="space-y-4 md:space-y-6 text-[#2c3338] font-sans">
 
         {/* WP-Style Navigation Lifted to Top: Classic subsubsub */}
-        <ul className="subsubsub text-[13px] text-[#646970] flex flex-wrap gap-y-1.5 items-center mb-6 select-none leading-relaxed">
+        <ul className="subsubsub text-[13px] text-[#646970] flex flex-nowrap overflow-x-auto whitespace-nowrap pb-1 md:pb-0 md:flex-wrap md:overflow-visible md:whitespace-normal gap-y-1.5 items-center mb-6 select-none leading-relaxed">
           {[
             { id: "overview", label: "Overview", count: null },
             { id: "requests", label: "Applications", count: applications.filter(a => a.status === 'Pending').length },
@@ -336,7 +336,7 @@ export default function AffiliatesManagerClient({ userSession }) {
             { id: "analytics", label: "Analytics", count: null },
             { id: "settings", label: "Global Settings", count: null }
           ].map((tab, idx, arr) => (
-            <li key={tab.id} className="flex items-center">
+            <li key={tab.id} className="flex items-center shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
@@ -360,7 +360,7 @@ export default function AffiliatesManagerClient({ userSession }) {
 
         {/* Compact Summary Cards (Shown for all tabs except Overview) */}
         {activeTab !== "overview" && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { id: "list", label: "Active Partners", value: affiliates.length, icon: Users },
               { id: "requests", label: "Pending Reviews", value: applications.filter(a => a.status === 'Pending').length, icon: CheckSquare },
@@ -388,7 +388,7 @@ export default function AffiliatesManagerClient({ userSession }) {
         {activeTab === "overview" && (
           <div className="space-y-6 animate-in fade-in duration-200">
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 { label: "Total Affiliates", value: overviewStats?.stats?.totalAffiliates ?? affiliates.length, icon: Users, tab: "list" },
                 { label: "Total Clicks", value: overviewStats?.stats?.totalClicks ?? 0, icon: MousePointerClick, tab: "conversions" },
@@ -416,17 +416,17 @@ export default function AffiliatesManagerClient({ userSession }) {
             </div>
 
             {/* Split Grid for Tables */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-6">
               
               {/* Top Performing Partners */}
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden flex flex-col">
-                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4] flex justify-between items-center">
-                  <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wider">Top Performing Partners</h3>
-                  <span className="text-[10px] font-bold bg-[#2271b1]/10 text-[#2271b1] px-2 py-0.5 rounded-[2px] uppercase">Lifetime</span>
+                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4] flex flex-wrap justify-between items-center gap-2">
+                  <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wider min-w-0">Top Performing Partners</h3>
+                  <span className="text-[10px] font-bold bg-[#2271b1]/10 text-[#2271b1] px-2 py-0.5 rounded-[2px] uppercase shrink-0">Lifetime</span>
                 </div>
                 {overviewStats?.topAffiliates?.length > 0 ? (
-                  <div className="overflow-x-auto flex-1">
-                    <table className="w-full text-[13px] border-collapse">
+                  <div className="overflow-x-auto max-w-full flex-1">
+                    <table className="w-full min-w-[400px] text-[13px] border-collapse">
                       <thead>
                         <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
                           <th className="px-4 py-2.5 text-left">Affiliate</th>
@@ -460,13 +460,13 @@ export default function AffiliatesManagerClient({ userSession }) {
 
               {/* Recent Referred Orders */}
               <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden flex flex-col">
-                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4] flex justify-between items-center">
-                  <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wider">Recent Referred Orders</h3>
-                  <span className="text-[10px] font-bold bg-green-50 text-green-700 px-2 py-0.5 rounded-[2px] uppercase">Latest</span>
+                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4] flex flex-wrap justify-between items-center gap-2">
+                  <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wider min-w-0">Recent Referred Orders</h3>
+                  <span className="text-[10px] font-bold bg-green-50 text-green-700 px-2 py-0.5 rounded-[2px] uppercase shrink-0">Latest</span>
                 </div>
                 {overviewStats?.recentOrders?.length > 0 ? (
-                  <div className="overflow-x-auto flex-1">
-                    <table className="w-full text-[13px] border-collapse">
+                  <div className="overflow-x-auto max-w-full flex-1">
+                    <table className="w-full min-w-[400px] text-[13px] border-collapse">
                       <thead>
                         <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
                           <th className="px-4 py-2.5 text-left">Order</th>
@@ -498,7 +498,7 @@ export default function AffiliatesManagerClient({ userSession }) {
             </div>
 
             {!overviewStats && (
-              <div className="bg-white border border-[#ccd0d4] p-12 text-center text-[#646970] rounded-[3px]">
+              <div className="bg-white border border-[#ccd0d4] p-6 md:p-12 text-center text-[#646970] rounded-[3px]">
                 <BarChart2 className="w-8 h-8 mx-auto mb-3 opacity-30" />
                 <p className="text-[13px] font-medium">No overview data available yet. Stats will appear once affiliates generate activity.</p>
               </div>
@@ -801,7 +801,7 @@ export default function AffiliatesManagerClient({ userSession }) {
               </div>
             )}
             {!overviewStats && (
-              <div className="bg-white border border-[#ccd0d4] p-12 text-center text-[#646970] rounded-[3px]">
+              <div className="bg-white border border-[#ccd0d4] p-6 md:p-12 text-center text-[#646970] rounded-[3px]">
                 <TrendingUp className="w-8 h-8 mx-auto mb-3 opacity-30" />
                 <p className="text-[13px] font-medium">Analytics data will appear once affiliates generate clicks and orders.</p>
               </div>

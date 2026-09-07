@@ -126,9 +126,9 @@ export default function CategoryManager({ type = "product", title = "Categories"
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-           <div className="flex items-center gap-2">
-              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-4 shadow-sm">
+           <div className="flex flex-wrap items-center gap-2">
+              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none min-w-0" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
                  <option>Bulk actions</option>
                  <option>Duplicate</option>
                  <option>Move to Trash</option>
@@ -136,27 +136,27 @@ export default function CategoryManager({ type = "product", title = "Categories"
               </select>
               <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
            </div>
-           <div className="flex items-center gap-2 w-full md:w-auto">
+           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <input 
                 type="text" 
                 placeholder="Search categories..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
+                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] w-full sm:flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
               />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Search Categories</button>
+              <button className="w-full sm:w-auto border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Search Categories</button>
            </div>
         </div>
 
         {/* Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse table-fixed text-[13px] min-w-[800px]">
+        <div className="bg-white border border-[#ccd0d4] max-w-full overflow-x-auto shadow-sm">
+          <table className="w-full text-left border-collapse table-fixed text-[13px] min-w-[520px] md:min-w-[800px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                 <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredCategories.length} onChange={toggleSelectAll} /></th>
                 <th className="px-3 py-2 w-16 text-center"><ImageIcon className="w-4 h-4 mx-auto text-[#8c8f94]" /></th>
                 <th className="px-3 py-2 font-bold text-[#1d2327]">Name</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-48">Slug</th>
+                <th className="px-3 py-2 font-bold text-[#1d2327] w-48 hidden md:table-cell">Slug</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-24">Status</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-20 text-right">Items</th>
               </tr>
@@ -189,7 +189,7 @@ export default function CategoryManager({ type = "product", title = "Categories"
                          </div>
                       </div>
                     </td>
-                    <td className="px-3 py-4 align-top font-mono text-gray-500">{cat.slug}</td>
+                    <td className="px-3 py-4 align-top font-mono text-gray-500 break-all hidden md:table-cell">{cat.slug}</td>
                     <td className="px-3 py-4 align-top">
                        <span className={`px-2 py-0.5 rounded-[2px] text-[10px] font-bold uppercase ${cat.status === 'Published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                           {cat.status || "Published"}

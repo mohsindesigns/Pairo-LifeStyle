@@ -155,7 +155,7 @@ export default function PromotionsDashboard() {
       addNewLabel="Create Discount"
       breadcrumbs={[{ label: "Marketing", href: "#" }, { label: "Discounts" }]}
     >
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {/* Performance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
@@ -197,7 +197,7 @@ export default function PromotionsDashboard() {
         </div>
 
         {/* View Tabs */}
-        <ul className="flex items-center gap-2 text-[13px] text-[#2271b1]">
+        <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
            <li className={`${view === "all" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("all")}>
               All <span className="text-[#646970] font-normal">({promotions.length})</span>
            </li>
@@ -212,9 +212,9 @@ export default function PromotionsDashboard() {
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-           <div className="flex items-center gap-2">
-              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 shadow-sm">
+           <div className="flex flex-wrap items-center gap-2">
+              <select className="min-w-0 border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
                  <option>Bulk actions</option>
                  <option>Duplicate</option>
                  <option>Move to Trash</option>
@@ -229,24 +229,24 @@ export default function PromotionsDashboard() {
                 placeholder="Search campaigns..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
+                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
               />
               <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Search</button>
            </div>
         </div>
 
         {/* Data Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse table-fixed min-w-[1000px] text-[13px]">
+        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
+          <table className="w-full text-left border-collapse table-fixed min-w-[560px] md:min-w-[760px] lg:min-w-[1000px] text-[13px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                 <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredPromotions.length} onChange={toggleSelectAll} /></th>
                 <th className="px-3 py-2 font-bold text-[#1d2327]">Discount Name & Coupon Code</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Status</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Targeting</th>
+                <th className="hidden lg:table-cell px-3 py-2 font-bold text-[#1d2327] w-32">Targeting</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-48">Schedule</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Performance</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-28 text-center">Priority</th>
+                <th className="hidden md:table-cell px-3 py-2 font-bold text-[#1d2327] w-32">Performance</th>
+                <th className="hidden lg:table-cell px-3 py-2 font-bold text-[#1d2327] w-28 text-center">Priority</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-24 text-right">Actions</th>
               </tr>
             </thead>
@@ -262,7 +262,7 @@ export default function PromotionsDashboard() {
                     <td className="px-3 py-4 align-top">
                        <Link href={`/admin/promotions/${p._id}`} className="text-[#2271b1] font-bold hover:underline text-sm">{p.title}</Link>
                        <div className="mt-0.5 font-mono text-[11px] text-[#646970]">{p.code || "Automatic (No Code)"}</div>
-                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
+                       <div className="flex flex-wrap items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
                           <Link href={`/admin/promotions/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
                           <span className="text-[#c3c4c7]">|</span>
                           <button onClick={() => handleDuplicate(p)} className="hover:text-[#135e96]">Duplicate</button>
@@ -279,26 +279,26 @@ export default function PromotionsDashboard() {
                           {p.status}
                        </span>
                     </td>
-                    <td className="px-3 py-4 align-top">
+                    <td className="hidden lg:table-cell px-3 py-4 align-top">
                        <div className="flex items-center gap-1 text-[11px] font-medium text-gray-600 capitalize">
                           <Target className="w-3 h-3" />
                           {p.actions?.[0]?.target || 'Cart'}
                        </div>
                     </td>
                     <td className="px-3 py-4 align-top text-[#646970]">
-                       <div className="flex items-center gap-1.5">
+                       <div className="flex flex-wrap items-center gap-1.5">
                           <Calendar className="w-3 h-3" />
                           <span>{p.startDate ? new Date(p.startDate).toLocaleDateString() : 'Always'}</span>
                           <span>→</span>
                           <span>{p.endDate ? new Date(p.endDate).toLocaleDateString() : 'Indefinite'}</span>
                        </div>
                     </td>
-                    <td className="px-3 py-4 align-top">
+                    <td className="hidden md:table-cell px-3 py-4 align-top">
                        <div className="text-[11px] text-[#646970]">Used: <span className="font-bold text-[#1d2327]">{p.analytics?.timesUsed || 0}</span></div>
                        <div className="text-[11px] text-[#646970]">Saved: <span className="font-bold text-[#1d2327]">${(p.analytics?.discountDistributed || 0).toFixed(0)}</span></div>
                        <div className="text-[11px] text-[#646970]">Revenue: <span className="font-bold text-[#1d2327]">${(p.analytics?.revenueGenerated || 0).toFixed(0)}</span></div>
                     </td>
-                    <td className="px-3 py-4 align-top text-center text-[#646970] font-bold">{p.priority || 0}</td>
+                    <td className="hidden lg:table-cell px-3 py-4 align-top text-center text-[#646970] font-bold">{p.priority || 0}</td>
                     <td className="px-3 py-4 text-right align-top">
                        <button className="p-1.5 border border-[#ccd0d4] rounded hover:bg-white inline-block">
                           <MoreVertical className="w-4 h-4 text-[#646970]" />

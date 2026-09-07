@@ -1,13 +1,13 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { User, Bell, Search, LogOut, ChevronDown, Plus, X, Globe } from "lucide-react";
+import { User, Bell, Search, LogOut, ChevronDown, Plus, X, Globe, Menu } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 
-export default function AdminTopbar() {
+export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
   const { data: session } = useSession();
   const router = useRouter();
   const [showProfile, setShowProfile] = useState(false);
@@ -86,10 +86,10 @@ export default function AdminTopbar() {
 
         if (Array.isArray(prodsRes)) setProducts(prodsRes);
         else if (prodsRes?.success && Array.isArray(prodsRes.products)) setProducts(prodsRes.products);
-        
+
         if (Array.isArray(pagesRes)) setPages(pagesRes);
         else if (pagesRes?.success && Array.isArray(pagesRes.pages)) setPages(pagesRes.pages);
-        
+
         if (Array.isArray(blogsRes)) setBlogs(blogsRes);
         else if (blogsRes?.success && Array.isArray(blogsRes.blogs)) setBlogs(blogsRes.blogs);
 
@@ -253,7 +253,7 @@ export default function AdminTopbar() {
     }
 
     const queryWords = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
-    
+
     // Commands mapping
     const isEdit = queryWords.includes("edit") || queryWords.includes("modify") || queryWords.includes("change") || queryWords.includes("update");
     const isPrice = queryWords.includes("price") || queryWords.includes("pricing") || queryWords.includes("sale") || queryWords.includes("cost") || queryWords.includes("regular");
@@ -283,10 +283,10 @@ export default function AdminTopbar() {
         const nameLower = p.name.toLowerCase();
         const skuLower = (p.sku || "").toLowerCase();
         const matchesAll = searchWords.every(w => nameLower.includes(w) || skuLower.includes(w));
-        
+
         if (matchesAll) {
           const hasCommand = isPrice || isStock || isVariants || isSeo || isFaqs || isStats;
-          
+
           if (!hasCommand || isEdit) {
             results.push({
               category: "Products",
@@ -350,7 +350,7 @@ export default function AdminTopbar() {
       pages.forEach(pg => {
         const titleLower = pg.title.toLowerCase();
         const matchesAll = searchWords.every(w => titleLower.includes(w));
-        
+
         if (matchesAll) {
           const hasCommand = isSeo;
           if (!hasCommand) {
@@ -390,7 +390,7 @@ export default function AdminTopbar() {
       blogs.forEach(b => {
         const titleLower = b.title.toLowerCase();
         const matchesAll = searchWords.every(w => titleLower.includes(w));
-        
+
         if (matchesAll) {
           const hasCommand = isSeo;
           if (!hasCommand) {
@@ -416,7 +416,7 @@ export default function AdminTopbar() {
       categories.forEach(cat => {
         const nameLower = cat.name.toLowerCase();
         const matchesAll = searchWords.every(w => nameLower.includes(w));
-        
+
         if (matchesAll) {
           results.push({
             category: "Categories",
@@ -432,7 +432,7 @@ export default function AdminTopbar() {
         const nameLower = (cust.name || "").toLowerCase();
         const emailLower = (cust.email || "").toLowerCase();
         const matchesAll = searchWords.every(w => nameLower.includes(w) || emailLower.includes(w));
-        
+
         if (matchesAll) {
           results.push({
             category: "Customers",
@@ -449,7 +449,7 @@ export default function AdminTopbar() {
         const custNameLower = (order.shippingAddress?.fullName || "").toLowerCase();
         const custEmailLower = (order.customer?.email || "").toLowerCase();
         const matchesAll = searchWords.every(w => orderNumStr.includes(w) || custNameLower.includes(w) || custEmailLower.includes(w));
-        
+
         if (matchesAll) {
           results.push({
             category: "Orders",
@@ -464,7 +464,7 @@ export default function AdminTopbar() {
       discounts.forEach(d => {
         const codeLower = (d.code || "").toLowerCase();
         const matchesAll = searchWords.every(w => codeLower.includes(w));
-        
+
         if (matchesAll) {
           results.push({
             category: "Coupons",
@@ -481,7 +481,7 @@ export default function AdminTopbar() {
         const emailLower = (aff.email || "").toLowerCase();
         const codeLower = (aff.code || "").toLowerCase();
         const matchesAll = searchWords.every(w => nameLower.includes(w) || emailLower.includes(w) || codeLower.includes(w));
-        
+
         if (matchesAll) {
           results.push({
             category: "Affiliates",
@@ -496,7 +496,7 @@ export default function AdminTopbar() {
       promotions.forEach(promo => {
         const nameLower = (promo.name || "").toLowerCase();
         const matchesAll = searchWords.every(w => nameLower.includes(w));
-        
+
         if (matchesAll) {
           results.push({
             category: "Promotions",
@@ -512,7 +512,7 @@ export default function AdminTopbar() {
         const authorLower = (rev.author || "").toLowerCase();
         const contentLower = (rev.content || "").toLowerCase();
         const matchesAll = searchWords.every(w => authorLower.includes(w) || contentLower.includes(w));
-        
+
         if (matchesAll) {
           results.push({
             category: "Reviews",
@@ -527,7 +527,7 @@ export default function AdminTopbar() {
       scripts.forEach(sc => {
         const nameLower = (sc.name || "").toLowerCase();
         const matchesAll = searchWords.every(w => nameLower.includes(w));
-        
+
         if (matchesAll) {
           results.push({
             category: "Scripts",
@@ -572,37 +572,48 @@ export default function AdminTopbar() {
   };
 
   return (
-    <header className="h-8 bg-[#1d2327] sticky top-0 z-[100] flex items-center justify-between px-3 text-[#f0f0f1] font-sans select-none">
-      
-      {/* Left items: Brand logo & Visit Site */}
-      <div className="flex items-center gap-4">
-        <Link href="/" className="flex items-center gap-2 hover:text-[#72aee6] transition-colors group px-2 py-1 h-8">
+    <header className="h-11 md:h-8 bg-[#1d2327] sticky top-0 z-[100] flex items-center justify-between gap-1 px-1 md:px-3 text-[#f0f0f1] font-sans select-none">
+
+      {/* Left items: Menu toggle (mobile), Brand logo & Visit Site */}
+      <div className="flex items-center gap-1 md:gap-4 shrink-0">
+        <button
+          type="button"
+          onClick={onMenuToggle}
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          aria-controls="admin-sidebar"
+          className={`md:hidden flex items-center justify-center w-10 h-11 hover:bg-[#2c3338] hover:text-[#72aee6] transition-colors cursor-pointer ${menuOpen ? "bg-[#2c3338] text-[#72aee6]" : ""}`}
+        >
+          {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+        <Link href="/" className="flex items-center gap-2 hover:text-[#72aee6] transition-colors group px-1 md:px-2 py-1 h-8">
           <div className="w-4 h-4 bg-white/20 rounded-sm flex items-center justify-center">
             <span className="text-[10px] font-black italic text-white">P</span>
           </div>
           <span className="text-[13px] font-bold hidden sm:block">Pairo Admin</span>
         </Link>
-        <Link href="/" target="_blank" className="flex items-center gap-1 hover:text-[#72aee6] text-[13px] transition-colors px-2 py-1 h-8">
+        <Link href="/" target="_blank" className="hidden xs:flex items-center gap-1 hover:text-[#72aee6] text-[13px] transition-colors px-1.5 md:px-2 py-1 h-8" title="Visit Store">
           <Globe className="w-3.5 h-3.5" />
           <span className="hidden md:inline">Visit Store</span>
         </Link>
       </div>
 
       {/* Center items: Global Spotlight Search Box */}
-      <div className="relative flex items-center h-8" ref={searchRef}>
-        <div className="flex items-center gap-1.5 bg-[#2c3338] border border-white/10 hover:border-white/30 rounded-[3px] px-2 py-0.5 transition-all">
-          <Search className="w-3 h-3 text-[#a7aaad]" />
+      <div className="relative flex items-center h-8 flex-1 min-w-0 md:flex-none mx-1 md:mx-0" ref={searchRef}>
+        <div className="flex items-center gap-1.5 bg-[#2c3338] border border-white/10 hover:border-white/30 rounded-[3px] px-2 py-0.5 transition-all w-full md:w-auto min-w-0">
+          <Search className="w-3 h-3 text-[#a7aaad] shrink-0" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setShowSearchResults(true)}
             onKeyDown={handleKeyDown}
-            placeholder="Search commands, products..."
-            className="w-48 sm:w-64 bg-transparent border-none text-[11px] text-[#f0f0f1] placeholder-[#a7aaad] outline-none h-5"
+            placeholder="Search..."
+            aria-label="Search admin"
+            className="w-full min-w-0 md:w-48 lg:w-64 bg-transparent border-none text-[11px] text-[#f0f0f1] placeholder-[#a7aaad] outline-none h-5"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-white">
+            <button onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-white shrink-0">
               <X className="w-3 h-3" />
             </button>
           )}
@@ -610,7 +621,7 @@ export default function AdminTopbar() {
 
         {/* Command Search Results Dropdown */}
         {showSearchResults && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-[#2c3338] border border-white/10 shadow-2xl rounded-[3px] max-h-[300px] overflow-y-auto z-[110] divide-y divide-white/5 w-64 sm:w-80">
+          <div className="fixed md:absolute left-2 right-2 top-11 md:top-full md:left-0 md:right-auto mt-1 bg-[#2c3338] border border-white/10 shadow-2xl rounded-[3px] max-h-[min(300px,calc(100dvh-4rem))] overflow-y-auto z-[110] divide-y divide-white/5 md:w-80">
             {searchResults.length === 0 ? (
               <div className="p-4 text-center text-[#a7aaad] text-[11px] italic">
                 No matches found.
@@ -645,17 +656,18 @@ export default function AdminTopbar() {
       </div>
 
       {/* Right items: Howdy Profile & Notifications */}
-      <div className="flex items-center gap-0 h-8">
-        
+      <div className="flex items-center gap-0 h-8 shrink-0">
+
         {/* Notifications Dropdown (WP Overlay Notice Module) */}
         <div className="relative h-8 flex items-center" ref={dropdownRef}>
           <button
             onClick={() => setShowNotifications(!showNotifications)}
-            className={`flex items-center gap-1.5 px-3 h-full hover:bg-[#2c3338] transition-all text-[#f0f0f1] hover:text-[#72aee6] cursor-pointer ${
+            aria-label="Notifications"
+            className={`flex items-center gap-1.5 px-2 md:px-3 h-11 md:h-full hover:bg-[#2c3338] transition-all text-[#f0f0f1] hover:text-[#72aee6] cursor-pointer ${
               showNotifications ? "bg-[#2c3338] text-[#72aee6]" : ""
             }`}
           >
-            <Bell className="w-3.5 h-3.5" />
+            <Bell className="w-4 h-4 md:w-3.5 md:h-3.5" />
             {visibleNotices.length > 0 && (
               <span className="bg-[#d63638] text-white text-[9px] font-black px-1 py-0.5 rounded-full leading-none shrink-0">
                 {visibleNotices.length}
@@ -664,7 +676,7 @@ export default function AdminTopbar() {
           </button>
 
           {showNotifications && (
-            <div className="absolute top-full right-0 w-80 sm:w-96 bg-white border border-[#c3c4c7] shadow-xl py-0 z-[110] text-[13px] text-gray-700 rounded-none border-t-transparent text-left">
+            <div className="fixed md:absolute left-2 right-2 top-11 md:top-full md:left-auto md:right-0 md:w-96 bg-white border border-[#c3c4c7] shadow-xl py-0 z-[110] text-[13px] text-gray-700 rounded-none border-t-transparent text-left">
               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#1d2327] uppercase tracking-wider">Admin Notices</span>
                 {visibleNotices.length > 0 && (
@@ -673,7 +685,7 @@ export default function AdminTopbar() {
                   </span>
                 )}
               </div>
-              <div className="max-h-[260px] overflow-y-auto divide-y divide-[#f0f0f1]">
+              <div className="max-h-[min(260px,calc(100dvh-6rem))] overflow-y-auto divide-y divide-[#f0f0f1]">
                 {visibleNotices.length === 0 ? (
                   <div className="p-4 text-center text-gray-400 text-xs italic">
                     No active notifications.
@@ -739,10 +751,11 @@ export default function AdminTopbar() {
           <button
             onMouseEnter={() => setShowProfile(true)}
             onClick={() => setShowProfile(!showProfile)}
-            className={`flex items-center gap-2 px-3 h-full hover:bg-[#2c3338] transition-all text-[#f0f0f1] hover:text-[#72aee6] ${showProfile ? 'bg-[#2c3338]' : ''}`}
+            aria-label="Account menu"
+            className={`flex items-center gap-2 px-2 md:px-3 h-11 md:h-full hover:bg-[#2c3338] transition-all text-[#f0f0f1] hover:text-[#72aee6] ${showProfile ? 'bg-[#2c3338]' : ''}`}
           >
-            <span className="text-[13px]">Howdy, <span className="font-bold">{session?.user?.name || "Admin"}</span></span>
-            <div className="w-5 h-5 bg-white/10 rounded-full flex items-center justify-center overflow-hidden">
+            <span className="text-[13px] hidden lg:inline whitespace-nowrap">Howdy, <span className="font-bold">{session?.user?.name || "Admin"}</span></span>
+            <div className="w-6 h-6 md:w-5 md:h-5 bg-white/10 rounded-full flex items-center justify-center overflow-hidden">
               <User className="w-3.5 h-3.5 text-[#a7aaad]" />
             </div>
           </button>
@@ -750,7 +763,7 @@ export default function AdminTopbar() {
           {showProfile && (
             <div
               onMouseLeave={() => setShowProfile(false)}
-              className="absolute top-full right-0 w-48 bg-[#2c3338] border border-transparent shadow-xl py-1 z-[101] text-[13px] border-t-white/10"
+              className="absolute top-full right-0 w-56 max-w-[calc(100vw-1rem)] bg-[#2c3338] border border-transparent shadow-xl py-1 z-[101] text-[13px] border-t-white/10"
             >
               <div className="px-4 py-3 bg-[#2c3338] border-b border-white/5 mb-1 text-left">
                 <span className="font-bold text-white truncate block">{session?.user?.name || "Admin"}</span>

@@ -24,7 +24,7 @@ export default async function BuilderPage({ params }) {
   const sanitizedPage = JSON.parse(JSON.stringify(pageData));
 
   return (
-    <div className="min-h-screen bg-[#f0f0f1] p-4">
+    <div className="min-h-screen bg-[#f0f0f1] p-2 sm:p-4 overflow-x-clip">
       <PageBuilder initialPage={sanitizedPage} />
     </div>
   );

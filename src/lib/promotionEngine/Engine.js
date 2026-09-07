@@ -4,6 +4,7 @@ import ActionExecutor from './ActionExecutor.js';
 import ConflictResolver from './ConflictResolver.js';
 import dbConnect from '../db.js';
 import Product from '../../models/Product.js';
+import { resolveAuthoritativePrice } from '../productPricing.js';
 
 /**
  * The main entry point for the Promotion Engine.
@@ -60,7 +61,7 @@ export default class Engine {
 
     const enrichedItems = cart.items?.map(item => {
       const dbProduct = productsMap.get(item.productId?.toString() || item.id?.toString() || item._id?.toString());
-      const basePrice = dbProduct ? dbProduct.price : item.price;
+      const basePrice = dbProduct ? resolveAuthoritativePrice(dbProduct, item) : item.price;
       return {
         ...item,
         price: basePrice,

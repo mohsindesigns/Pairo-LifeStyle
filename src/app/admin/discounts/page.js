@@ -36,7 +36,7 @@ function ShareCouponModal({ discount, onClose }) {
   if (!discount) return null;
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const link = `${origin}/promo/${discount.code}`;
+  const link = `${origin}/promo/${encodeURIComponent(discount.code)}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(link);
@@ -45,18 +45,18 @@ function ShareCouponModal({ discount, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-[4px] border border-[#c3c4c7] shadow-xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-[14px] font-bold text-[#1d2327]">Share Coupon &quot;{discount.code}&quot;</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 overflow-y-auto bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-[4px] border border-[#c3c4c7] shadow-xl w-full max-w-sm max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[14px] font-bold text-[#1d2327] min-w-0 break-words">Share Coupon &quot;{discount.code}&quot;</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0"><X className="w-4 h-4" /></button>
         </div>
         <p className="text-[12px] text-[#646970]">Scanning this QR code (or opening the link) automatically applies the coupon and takes the shopper to the store.</p>
         <div className="flex justify-center bg-white p-4 border border-[#ccd0d4] rounded">
           <QRCodeSVG value={link} size={180} />
         </div>
         <div className="flex items-center gap-2">
-          <input readOnly value={link} className="flex-1 text-xs border border-[#ccd0d4] rounded-[3px] px-2.5 py-1.5 bg-[#f6f7f7] font-mono" onFocus={e => e.target.select()} />
+          <input readOnly value={link} className="flex-1 min-w-0 text-xs border border-[#ccd0d4] rounded-[3px] px-2.5 py-1.5 bg-[#f6f7f7] font-mono" onFocus={e => e.target.select()} />
           <button onClick={handleCopy} className="shrink-0 bg-[#2271b1] hover:bg-[#135e96] text-white text-xs font-semibold px-3 py-1.5 rounded-[3px] flex items-center gap-1.5">
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             {copied ? "Copied" : "Copy"}
@@ -429,12 +429,12 @@ function CouponsContent() {
         {/* WordPress Notices */}
         {errorNotice && (
           <div className="bg-white border-l-4 border-l-[#d63638] p-2.5 mb-4 text-[13px] font-medium flex items-center justify-between select-none">
-            <span className="text-[#d63638]">{errorNotice}</span>
-            <button onClick={() => setErrorNotice("")} className="text-gray-400 hover:text-gray-650 ml-2"><X className="w-4 h-4" /></button>
+            <span className="text-[#d63638] min-w-0 break-words">{errorNotice}</span>
+            <button onClick={() => setErrorNotice("")} className="text-gray-400 hover:text-gray-650 ml-2 shrink-0"><X className="w-4 h-4" /></button>
           </div>
         )}
 
-        <div className="max-w-[600px] bg-white border border-[#c3c4c7] p-6 space-y-5">
+        <div className="w-full max-w-[600px] bg-white border border-[#c3c4c7] p-3 sm:p-4 md:p-6 space-y-5">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-[13px] font-bold text-[#1d2327]">Coupon Code <span className="text-red-500">*</span></label>
@@ -463,7 +463,7 @@ function CouponsContent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[13px] font-bold text-[#1d2327]">Coupon Amount <span className="text-red-500">*</span></label>
                 <div className="relative">
@@ -498,7 +498,7 @@ function CouponsContent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[13px] font-bold text-[#1d2327]">Usage Limit</label>
                 <input
@@ -532,7 +532,7 @@ function CouponsContent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[13px] font-bold text-[#1d2327]">Start Date</label>
                 <input
@@ -613,7 +613,7 @@ function CouponsContent() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[13px] font-bold text-[#1d2327]">Usage Limit Per Customer</label>
                   <input
@@ -706,9 +706,9 @@ function CouponsContent() {
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2 select-none">
-              <button 
-                type="button" 
+            <div className="flex flex-wrap gap-2 pt-2 select-none">
+              <button
+                type="button"
                 onClick={() => router.push("/admin/discounts")}
                 className={btnClass}
               >
@@ -737,19 +737,19 @@ function CouponsContent() {
       {/* WordPress Notices */}
       {successNotice && (
         <div className="bg-white border-l-4 border-l-[#00a0d2] p-2.5 mb-4 text-[13px] font-medium flex items-center justify-between select-none">
-          <span className="text-[#1d2327]">{successNotice}</span>
-          <button onClick={() => setSuccessNotice("")} className="text-gray-400 hover:text-gray-650 ml-2"><X className="w-4 h-4" /></button>
+          <span className="text-[#1d2327] min-w-0 break-words">{successNotice}</span>
+          <button onClick={() => setSuccessNotice("")} className="text-gray-400 hover:text-gray-650 ml-2 shrink-0"><X className="w-4 h-4" /></button>
         </div>
       )}
       {errorNotice && (
         <div className="bg-white border-l-4 border-l-[#d63638] p-2.5 mb-4 text-[13px] font-medium flex items-center justify-between select-none">
-          <span className="text-[#d63638]">{errorNotice}</span>
-          <button onClick={() => setErrorNotice("")} className="text-gray-400 hover:text-gray-655 ml-2"><X className="w-4 h-4" /></button>
+          <span className="text-[#d63638] min-w-0 break-words">{errorNotice}</span>
+          <button onClick={() => setErrorNotice("")} className="text-gray-400 hover:text-gray-655 ml-2 shrink-0"><X className="w-4 h-4" /></button>
         </div>
       )}
 
       {/* Subsubsub Navigation & Search */}
-      <div className="flex flex-wrap items-center justify-between border-b border-[#c3c4c7] pb-2 mb-4 w-full">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#c3c4c7] pb-2 mb-4 w-full">
         <ul className="flex flex-wrap items-center gap-1 text-[13px] text-[#2c3338] font-medium select-none">
           <li>
             <button 
@@ -803,9 +803,9 @@ function CouponsContent() {
 
       {/* Main List View (Full Width) */}
       <div className="space-y-3 w-full">
-        <div className="flex items-center gap-1.5 select-none">
-          <select 
-            className="border border-[#ccd0d4] bg-white text-xs px-2 py-1 outline-none text-[#2c3338] font-medium rounded-[3px] focus:border-[#2271b1]"
+        <div className="flex flex-wrap items-center gap-1.5 select-none">
+          <select
+            className="min-w-0 border border-[#ccd0d4] bg-white text-xs px-2 py-1 outline-none text-[#2c3338] font-medium rounded-[3px] focus:border-[#2271b1]"
             value={bulkAction}
             onChange={(e) => setBulkAction(e.target.value)}
           >
@@ -831,17 +831,17 @@ function CouponsContent() {
           </button>
         </div>
 
-        <div className="bg-white border border-[#c3c4c7] overflow-hidden w-full">
-          <table className="w-full text-left border-collapse table-fixed text-[13px]">
+        <div className="bg-white border border-[#c3c4c7] overflow-x-auto max-w-full w-full">
+          <table className="w-full min-w-[420px] text-left border-collapse table-fixed text-[13px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338] font-bold select-none">
                 <th className="px-3 py-2 w-10 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === discounts.length} onChange={toggleSelectAll} className="rounded-sm border-gray-300" /></th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-1/4">Code</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-24">Type</th>
+                <th className="hidden md:table-cell px-3 py-2 font-bold text-[#1d2327] w-24">Type</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-24">Amount</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-24">Min Spend</th>
+                <th className="hidden md:table-cell px-3 py-2 font-bold text-[#1d2327] w-24">Min Spend</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-20">Usage</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-28">Expiry</th>
+                <th className="hidden lg:table-cell px-3 py-2 font-bold text-[#1d2327] w-28">Expiry</th>
                 <th className="px-3 py-2 font-bold text-[#1d2327] w-20 text-right">Status</th>
               </tr>
             </thead>
@@ -859,7 +859,7 @@ function CouponsContent() {
                   if (isQuickEditing) {
                     return (
                       <tr key={d._id} className="bg-[#f6f7f7] border-y-2 border-[#c3c4c7]">
-                        <td colSpan={8} className="p-3.5 align-top">
+                        <td colSpan={8} className="p-2 sm:p-3.5 align-top">
                           <div className="space-y-3">
                             <h4 className="text-[12px] font-bold text-gray-800 uppercase tracking-wider border-b border-gray-200 pb-1 flex items-center gap-1.5 select-none">
                               <Edit2 className="w-3.5 h-3.5 text-gray-505" /> Quick Edit Coupon
@@ -1093,9 +1093,9 @@ function CouponsContent() {
                               </div>
                             </div>
 
-                            <div className="flex justify-end gap-1.5 select-none">
-                              <button 
-                                type="button" 
+                            <div className="flex flex-wrap justify-end gap-1.5 select-none">
+                              <button
+                                type="button"
                                 onClick={() => setQuickEditingId(null)}
                                 className={`${btnClass} py-1`}
                               >
@@ -1142,19 +1142,19 @@ function CouponsContent() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 align-top text-gray-650 font-medium">
+                      <td className="hidden md:table-cell px-3 py-3 align-top text-gray-650 font-medium">
                         {d.type === 'percentage' ? 'Percentage' : 'Fixed Cart'}
                       </td>
                       <td className="px-3 py-3 align-top font-semibold text-[#2c3338]">
                         {d.type === 'percentage' ? `${d.value}%` : `$${d.value.toFixed(2)}`}
                       </td>
-                      <td className="px-3 py-3 align-top font-medium text-gray-500">
+                      <td className="hidden md:table-cell px-3 py-3 align-top font-medium text-gray-500">
                         ${(d.minPurchase || 0).toFixed(2)}
                       </td>
                       <td className="px-3 py-3 align-top">
                         <span className="font-bold text-[#2c3338]">{d.usageCount || 0}</span><span className="text-gray-400"> / {d.usageLimit || "∞"}</span>
                       </td>
-                      <td className="px-3 py-3 align-top text-gray-500 font-medium">
+                      <td className="hidden lg:table-cell px-3 py-3 align-top text-gray-500 font-medium">
                         {formatDate(d.endDate)}
                       </td>
                       <td className={`px-3 py-3 align-top text-right text-[11px] uppercase tracking-wider ${cStatus.color}`}>

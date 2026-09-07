@@ -103,7 +103,7 @@ export default function TaxRateRow({ row, onChange, onDelete }) {
         <button
           type="button"
           onClick={onDelete}
-          className="text-[#b32d2e] hover:text-[#d63638] p-1 rounded-[3px] hover:bg-[#fcf0f1] transition-colors cursor-pointer"
+          className="text-[#b32d2e] hover:text-[#d63638] p-1.5 md:p-1 rounded-[3px] hover:bg-[#fcf0f1] transition-colors cursor-pointer"
           aria-label="Delete rate row"
           title="Delete row"
         >

@@ -182,12 +182,12 @@ export default function BlogForm({ blogId }) {
       }
    };
 
-    if (loading) return <div className="p-10 text-[13px] text-gray-400 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
- 
+    if (loading) return <div className="p-4 sm:p-10 text-[13px] text-gray-400 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
+
     if (blogId && !formData.title) {
        return (
-          <div className="p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
-             <div className="bg-white p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
+          <div className="p-4 sm:p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
+             <div className="bg-white p-4 sm:p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
                 <h2 className="text-[#d63638] font-bold text-[16px] mb-2">
                    Failed to load blog data
                 </h2>
@@ -227,9 +227,9 @@ export default function BlogForm({ blogId }) {
       addNewLabel="Add New"
       breadcrumbs={[{ label: "Blog", href: "/admin/blogs" }, { label: blogId ? "Edit" : "New" }]}
     >
-         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start min-w-0">
             {/* Main Column */}
-            <div className="lg:col-span-3 space-y-4">
+            <div className="lg:col-span-3 space-y-4 min-w-0">
                <div className="space-y-1">
                   <input
                      required
@@ -243,7 +243,7 @@ export default function BlogForm({ blogId }) {
                      <span className="text-gray-400 font-mono">pairo.store/blog/</span>
                      <input
                         readOnly={!editSlug}
-                        className={`outline-none text-[#2271b1] font-mono px-1.5 py-0.5 rounded transition-all text-xs ${
+                        className={`outline-none text-[#2271b1] font-mono px-1.5 py-0.5 rounded transition-all text-xs max-w-full min-w-0 ${
                            editSlug ? "border border-[#c3c4c7] bg-white ring-1 ring-[#2271b1]/20" : "border-none bg-transparent pointer-events-none"
                         }`}
                         style={{ width: `${Math.max(60, (formData.slug || "").length * 8.5)}px` }}
@@ -271,7 +271,7 @@ export default function BlogForm({ blogId }) {
                </div>
 
                {/* Content / SEO Tabs */}
-               <div className="flex border-b border-[#ccd0d4] gap-6 select-none pb-0">
+               <div className="flex flex-wrap border-b border-[#ccd0d4] gap-x-4 sm:gap-x-6 gap-y-1 select-none pb-0">
                   <button
                      type="button"
                      onClick={() => setActiveFormTab("content")}
@@ -311,9 +311,9 @@ export default function BlogForm({ blogId }) {
                   <>
                      {/* Content Meta Box (General) */}
                      <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex justify-between items-center">
+                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex flex-wrap justify-between items-center gap-2">
                            <span>General Content</span>
-                           <div className="flex gap-2 text-xs">
+                           <div className="flex flex-wrap gap-2 text-xs">
                               <button
                                  type="button"
                                  onClick={() => setEditorMode("visual")}
@@ -374,9 +374,9 @@ export default function BlogForm({ blogId }) {
                )}
 
                {activeFormTab === "faq" && (
-                  <div className="bg-white border border-[#c3c4c7] shadow-sm p-6 space-y-6">
-                     <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                        <h2 className="text-[14px] font-bold text-gray-700">Frequently Asked Questions</h2>
+                  <div className="bg-white border border-[#c3c4c7] shadow-sm p-3 sm:p-6 space-y-4 sm:space-y-6">
+                     <div className="flex flex-wrap justify-between items-center gap-2 border-b border-gray-100 pb-3">
+                        <h2 className="text-[14px] font-bold text-gray-700 min-w-0 break-words">Frequently Asked Questions</h2>
                         <button
                            type="button"
                            onClick={() => {
@@ -384,7 +384,7 @@ export default function BlogForm({ blogId }) {
                               faqs.push({ question: "", answer: "" });
                               setFormData({ ...formData, faqs });
                            }}
-                           className="bg-[#2271b1] hover:bg-[#135e96] text-white px-3 py-1.5 rounded-[3px] text-[11px] font-bold transition-colors"
+                           className="bg-[#2271b1] hover:bg-[#135e96] text-white px-3 py-1.5 rounded-[3px] text-[11px] font-bold transition-colors shrink-0"
                         >
                            Add FAQ Item
                         </button>
@@ -397,8 +397,8 @@ export default function BlogForm({ blogId }) {
                      ) : (
                         <div className="space-y-4">
                            {formData.faqs.map((faq, idx) => (
-                              <div key={idx} className="border border-[#ccd0d4] rounded-[3px] p-4 bg-[#fcfcfc] space-y-3 relative group">
-                                 <div className="flex justify-between items-center">
+                              <div key={idx} className="border border-[#ccd0d4] rounded-[3px] p-3 sm:p-4 bg-[#fcfcfc] space-y-3 relative group">
+                                 <div className="flex flex-wrap justify-between items-center gap-2">
                                     <span className="text-xs font-bold text-gray-600">FAQ Item #{idx + 1}</span>
                                     <button
                                        type="button"
@@ -448,12 +448,12 @@ export default function BlogForm({ blogId }) {
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0">
                {/* Publish Box */}
                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Publish</div>
                   <div className="p-3 space-y-4">
-                     <div className="flex justify-between items-center">
+                     <div className="flex flex-wrap justify-between items-center gap-2">
                         <button 
                             type="button" 
                             onClick={handleSubmit}
@@ -464,10 +464,10 @@ export default function BlogForm({ blogId }) {
                         <button type="button" onClick={() => formData.slug && window.open(`/blog/${formData.slug}`, '_blank')} className="text-[#2271b1] underline text-[12px]" title={formData.slug ? `Preview /blog/${formData.slug}` : 'Save first to preview'}>Preview</button>
                      </div>
                      <div className="space-y-3 py-3 border-y border-gray-100 text-[13px]">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                             <p><span className="text-gray-400">Status:</span> <strong>{formData.status}</strong></p>
-                            <select 
-                                className="text-[11px] border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#2271b1]"
+                            <select
+                                className="text-[11px] border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#2271b1] max-w-full"
                                 value={formData.status}
                                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                             >
@@ -475,17 +475,17 @@ export default function BlogForm({ blogId }) {
                                 <option value="Published">Published</option>
                             </select>
                         </div>
-                        <div className="flex items-center justify-between pt-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                             <p><span className="text-gray-400">Published Date:</span></p>
-                            <input 
+                            <input
                                 type="date"
-                                className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-[#2271b1] bg-white text-black"
+                                className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-[#2271b1] bg-white text-black max-w-full min-w-0"
                                 value={formData.publishedAt}
                                 onChange={(e) => setFormData({ ...formData, publishedAt: e.target.value })}
                             />
                         </div>
                      </div>
-                     <div className="flex items-center justify-between bg-[#f6f7f7] -mx-3 -mb-3 p-3 border-t border-[#ccd0d4]">
+                     <div className="flex flex-wrap items-center justify-between gap-2 bg-[#f6f7f7] -mx-3 -mb-3 p-3 border-t border-[#ccd0d4]">
                         {blogId ? (
                            <button type="button" onClick={handleTrash} className="text-[#d63638] underline text-[12px]">Move to Trash</button>
                         ) : (
@@ -504,7 +504,7 @@ export default function BlogForm({ blogId }) {
 
                {/* Categories Box */}
                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex items-center justify-between">
+                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex flex-wrap items-center justify-between gap-2">
                      <span>Categories</span>
                      <button type="button" onClick={() => router.push("/admin/blogs/categories")} className="text-[10px] text-[#2271b1] hover:underline font-normal">Manage</button>
                   </div>
@@ -513,10 +513,10 @@ export default function BlogForm({ blogId }) {
                         <p className="text-[11px] text-gray-400 italic">No categories found.</p>
                      ) : (
                         categories.map(cat => (
-                           <label key={cat._id} className="flex items-center gap-2 text-[13px] cursor-pointer">
-                              <input 
-                                 type="checkbox" 
-                                 className="w-4 h-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1]" 
+                           <label key={cat._id} className="flex items-center gap-2 text-[13px] cursor-pointer min-w-0 break-words">
+                              <input
+                                 type="checkbox"
+                                 className="w-4 h-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1] shrink-0"
                                  checked={formData.category === cat.name}
                                  onChange={() => setFormData({...formData, category: formData.category === cat.name ? "" : cat.name})}
                               />
@@ -545,9 +545,9 @@ export default function BlogForm({ blogId }) {
                    <div className="p-4 space-y-4">
                       <div className="space-y-1.5">
                          <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Select Product</label>
-                         <select 
-                            className="w-full border border-[#c3c4c7] p-2 text-[13px] outline-none focus:border-[#2271b1] bg-white"
-                            value={formData.featuredProductId || ""} 
+                         <select
+                            className="w-full min-w-0 border border-[#c3c4c7] p-2 text-[13px] outline-none focus:border-[#2271b1] bg-white"
+                            value={formData.featuredProductId || ""}
                             onChange={(e) => setFormData({...formData, featuredProductId: e.target.value})}
                          >
                             <option value="">— Select a Product —</option>

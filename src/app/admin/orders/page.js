@@ -176,8 +176,8 @@ export default function AdminOrdersPage() {
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2.5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm font-sans">
-          <div className="flex items-center gap-2">
+        <div className="bg-white border border-[#ccd0d4] p-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 shadow-sm font-sans">
+          <div className="flex flex-wrap items-center gap-2">
             <select 
               className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1]" 
               value={bulkAction} 
@@ -206,17 +206,17 @@ export default function AdminOrdersPage() {
             </select>
           </div>
            
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 w-full md:w-auto min-w-0">
             <input 
               type="text" 
               placeholder="Search orders..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-[#8c8f94] outline-none px-3 py-1.5 text-[13px] flex-1 md:w-56 bg-white focus:border-[#2271b1] rounded-[3px]"
+              className="border border-[#8c8f94] outline-none px-3 py-1.5 text-[13px] flex-1 min-w-0 md:w-56 bg-white focus:border-[#2271b1] rounded-[3px]"
             />
             <button 
               type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer"
+              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer shrink-0"
             >
               Search Orders
             </button>
@@ -224,13 +224,13 @@ export default function AdminOrdersPage() {
         </div>
 
         {/* WP Data Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[800px] font-sans">
+        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
+          <table className="w-full text-left border-collapse text-[13px] min-w-[480px] md:min-w-[800px] font-sans">
             <thead>
               <tr className="border-b border-[#ccd0d4] bg-[#f6f7f7] text-[#2c3539]">
                 <th className="px-3 py-2.5 w-9 text-center align-middle"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === displayedOrders.length} onChange={toggleSelectAll} className="rounded-[2px] border-gray-300" /></th>
                 <th className="px-3 py-2.5 font-bold text-[#1d2327] w-auto">Order</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-36">Date</th>
+                <th className="hidden md:table-cell px-3 py-2.5 font-bold text-[#1d2327] w-36">Date</th>
                 <th className="px-3 py-2.5 font-bold text-[#1d2327] w-32">Status</th>
                 <th className="px-3 py-2.5 font-bold text-[#1d2327] w-28">Total</th>
               </tr>
@@ -245,7 +245,7 @@ export default function AdminOrdersPage() {
                   <tr key={order._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(order._id) ? "bg-[#f0f6fa]" : ""}`}>
                     <td className="px-3 py-3.5 text-center align-top pt-4"><input type="checkbox" checked={selectedIds.includes(order._id)} onChange={() => toggleSelect(order._id)} className="rounded-[2px] border-gray-300" /></td>
                     <td className="px-3 py-3.5 align-top pt-4">
-                      <Link href={`/admin/orders/${order._id}`} className="text-[#2271b1] font-bold hover:text-[#135e96] text-[14px] block mb-0.5 leading-tight">
+                      <Link href={`/admin/orders/${order._id}`} className="text-[#2271b1] font-bold hover:text-[#135e96] text-[14px] block mb-0.5 leading-tight break-words">
                         #{order.orderNumber} {order.shippingAddress?.fullName ? `by ${order.shippingAddress.fullName}` : (order.customer?.email ? `by ${order.customer.email}` : "by Guest")}
                       </Link>
                       
@@ -270,7 +270,7 @@ export default function AdminOrdersPage() {
                         <button onClick={() => handleDelete(order._id)} className="text-[#bc0b0d] cursor-pointer">Trash</button>
                       </div>
                     </td>
-                    <td className="px-3 py-3.5 align-top pt-4 text-[#646970] leading-normal">
+                    <td className="hidden md:table-cell px-3 py-3.5 align-top pt-4 text-[#646970] leading-normal">
                       {new Date(order.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-3 py-3.5 align-top pt-3.5">
@@ -289,7 +289,7 @@ export default function AdminOrdersPage() {
         </div>
 
         {/* WP Pagination Bar */}
-        <div className="flex items-center justify-between text-[13px] text-[#646970] font-sans">
+        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 text-[13px] text-[#646970] font-sans">
            <p>{pagination.total} items</p>
            <div className="flex items-center gap-1">
               <button 

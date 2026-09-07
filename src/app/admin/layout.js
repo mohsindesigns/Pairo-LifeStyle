@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import AdminSidebar from "@/components/admin/Sidebar";
 import AdminTopbar from "@/components/admin/Topbar";
 import AuthProvider from "@/components/providers/AuthProvider";
@@ -32,6 +32,14 @@ function PermissionErrorToast() {
 function AdminGuard({ children }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Lock the page behind the mobile drawer while it is open
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.toggle("admin-drawer-open", sidebarOpen);
+    return () => document.body.classList.remove("admin-drawer-open");
+  }, [sidebarOpen]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -51,9 +59,9 @@ function AdminGuard({ children }) {
 
   return (
     <div className="min-h-screen bg-[#f0f0f1] font-sans selection:bg-[#2271b1] selection:text-white admin-dashboard-container">
-      <AdminSidebar />
-      <div className="pl-[160px] flex flex-col min-h-screen">
-        <AdminTopbar />
+      <AdminSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="pl-0 md:pl-[160px] flex flex-col min-h-screen admin-content-column">
+        <AdminTopbar onMenuToggle={() => setSidebarOpen((v) => !v)} menuOpen={sidebarOpen} />
         <main className="flex-1 bg-[#f0f2f1]">
           {children}
         </main>

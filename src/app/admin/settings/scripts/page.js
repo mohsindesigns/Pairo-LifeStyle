@@ -89,7 +89,7 @@ export default function ScriptManagementPage() {
       addNewLabel="Add Script"
       breadcrumbs={[{ label: "Settings", href: "/admin/settings" }, { label: "Scripts" }]}
     >
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
            <div className="bg-white border border-[#ccd0d4] p-4 shadow-sm flex items-center gap-4">
@@ -122,9 +122,9 @@ export default function ScriptManagementPage() {
         </div>
 
         {/* Action Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-           <div className="flex items-center gap-2">
-              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none">
+        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-4 shadow-sm">
+           <div className="flex flex-wrap items-center gap-2">
+              <select className="min-w-0 border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none">
                  <option>Bulk actions</option>
                  <option>Activate</option>
                  <option>Deactivate</option>
@@ -133,8 +133,8 @@ export default function ScriptManagementPage() {
               <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
            </div>
 
-           <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
+           <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 min-w-0 sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#646970]" />
                 <input 
                   type="text" 
@@ -149,15 +149,16 @@ export default function ScriptManagementPage() {
 
         {/* Script Table */}
         <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden">
-           <table className="w-full text-left border-collapse text-[13px]">
+           <div className="overflow-x-auto max-w-full">
+           <table className="w-full min-w-[480px] md:min-w-[720px] text-left border-collapse text-[13px]">
               <thead>
                  <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                     <th className="px-4 py-2.5 w-10 text-center"><input type="checkbox" /></th>
                     <th className="px-4 py-2.5 font-bold text-[#1d2327]">Script Name</th>
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327]">Type</th>
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327]">Location</th>
+                    <th className="hidden md:table-cell px-4 py-2.5 font-bold text-[#1d2327]">Type</th>
+                    <th className="hidden md:table-cell px-4 py-2.5 font-bold text-[#1d2327]">Location</th>
                     <th className="px-4 py-2.5 font-bold text-[#1d2327]">Status</th>
-                    <th className="px-4 py-2.5 font-bold text-[#1d2327]">Priority</th>
+                    <th className="hidden lg:table-cell px-4 py-2.5 font-bold text-[#1d2327]">Priority</th>
                     <th className="px-4 py-2.5 font-bold text-[#1d2327] text-right">Actions</th>
                  </tr>
               </thead>
@@ -175,7 +176,7 @@ export default function ScriptManagementPage() {
                                 <div className={`w-9 h-9 rounded flex items-center justify-center ${s.isActive ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
                                    <Code2 className="w-5 h-5" />
                                 </div>
-                                <div className="flex flex-col">
+                                <div className="flex flex-col min-w-0">
                                    <Link href={`/admin/settings/scripts/${s._id}`} className="font-bold text-[#2271b1] hover:underline">
                                       {s.name}
                                    </Link>
@@ -187,8 +188,8 @@ export default function ScriptManagementPage() {
                                 </div>
                              </div>
                           </td>
-                          <td className="px-4 py-4 capitalize text-[#1d2327] font-medium">{s.type.replace('_', ' ')}</td>
-                          <td className="px-4 py-4">
+                          <td className="hidden md:table-cell px-4 py-4 capitalize text-[#1d2327] font-medium">{s.type.replace('_', ' ')}</td>
+                          <td className="hidden md:table-cell px-4 py-4">
                              <span className="px-2 py-0.5 bg-[#f0f0f1] border border-[#dcdcde] text-[#50575e] text-[11px] font-bold rounded uppercase">
                                 {s.location.replace('_', ' ')}
                              </span>
@@ -212,7 +213,7 @@ export default function ScriptManagementPage() {
                                  </span>
                               </div>
                            </td>
-                          <td className="px-4 py-4 font-mono text-gray-500">{s.priority}</td>
+                          <td className="hidden lg:table-cell px-4 py-4 font-mono text-gray-500">{s.priority}</td>
                           <td className="px-4 py-4 text-right">
                              <button className="p-1.5 text-[#646970] hover:text-[#1d2327] rounded hover:bg-gray-200 transition-colors">
                                 <MoreHorizontal className="w-5 h-5" />
@@ -223,10 +224,11 @@ export default function ScriptManagementPage() {
                  )}
               </tbody>
            </table>
+           </div>
         </div>
 
         {/* Footer Info */}
-        <div className="flex items-center justify-between text-[13px] text-[#646970] px-1">
+        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-1 text-[13px] text-[#646970] px-1">
            <p>Total Scripts: {scripts.length}</p>
            <p className="flex items-center gap-1"><ShieldCheck className="w-4 h-4" /> Secure Sandbox Enabled</p>
         </div>

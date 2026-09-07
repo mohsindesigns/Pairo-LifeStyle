@@ -106,7 +106,7 @@ const IconPicker = ({ value, onChange }) => {
           />
         </div>
       </div>
-      <div className="grid grid-cols-7 gap-1 p-1 max-h-[140px] overflow-y-auto bg-white border border-[#ccd0d4]">
+      <div className="grid grid-cols-5 xs:grid-cols-6 sm:grid-cols-7 gap-1 p-1 max-h-[140px] overflow-y-auto bg-white border border-[#ccd0d4]">
         {filteredIcons.map(iconName => {
           const ItemIcon = LucideIcons[iconName];
           if (!ItemIcon) return null;
@@ -150,18 +150,18 @@ const SortableSection = ({
 
   return (
     <div ref={setNodeRef} style={style} className={`bg-white border border-[#ccd0d4] mb-2 shadow-sm ${!section.enabled ? 'opacity-60' : ''}`}>
-      <div className="px-3 py-2 border-b border-[#ccd0d4] flex items-center justify-between bg-[#f6f7f7] hover:bg-white transition-colors">
-        <div className="flex items-center gap-3 flex-1">
-          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-[#646970] hover:text-[#2271b1]">
+      <div className="px-2 sm:px-3 py-2 border-b border-[#ccd0d4] flex items-center justify-between gap-2 bg-[#f6f7f7] hover:bg-white transition-colors">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-[#646970] hover:text-[#2271b1] shrink-0">
             <GripVertical className="w-4 h-4" />
           </div>
-          <div className="flex items-center gap-2 select-none" onClick={() => onToggleExpand(section.id)}>
-            <h3 className="text-[13px] font-bold text-[#1d2327]">{schema.name}</h3>
+          <div className="flex flex-wrap items-center gap-2 select-none min-w-0" onClick={() => onToggleExpand(section.id)}>
+            <h3 className="text-[13px] font-bold text-[#1d2327] break-words min-w-0">{schema.name}</h3>
             {!section.enabled && <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded uppercase font-black tracking-tighter">Hidden</span>}
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
            <button onClick={() => onUpdate(section.id, null, !section.enabled)} className={`p-1.5 rounded hover:bg-gray-100 ${section.enabled ? 'text-green-600' : 'text-gray-400'}`} title={section.enabled ? "Disable" : "Enable"}>
               {section.enabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
            </button>
@@ -178,8 +178,8 @@ const SortableSection = ({
       </div>
 
       {isExpanded && (
-        <div className="p-4 bg-white border-t border-[#f0f0f1]">
-          <div className="grid grid-cols-1 gap-6">
+        <div className="p-3 sm:p-4 bg-white border-t border-[#f0f0f1]">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6">
             {schema.fields.filter(field => {
               // New showWhen system
               if (field.showWhen) {
@@ -200,9 +200,9 @@ const SortableSection = ({
               </div>
             ))}
           </div>
-          <div className="mt-6 pt-3 border-t border-gray-100 flex justify-between items-center opacity-40">
-             <span className="text-[9px] font-mono tracking-tighter">TYPE: {section.type}</span>
-             <span className="text-[9px] font-mono tracking-tighter uppercase">ID: {section.id.slice(0, 8)}...</span>
+          <div className="mt-6 pt-3 border-t border-gray-100 flex flex-wrap justify-between items-center gap-x-3 gap-y-1 opacity-40">
+             <span className="text-[9px] font-mono tracking-tighter break-all">TYPE: {section.type}</span>
+             <span className="text-[9px] font-mono tracking-tighter uppercase break-all">ID: {section.id.slice(0, 8)}...</span>
           </div>
         </div>
       )}
@@ -308,9 +308,9 @@ export default function PageBuilder({ initialPage }) {
       case "image":
         return (
           <div className="flex flex-col gap-2">
-            <div className="flex gap-2">
-              <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} placeholder="External URL or Pick Asset..." />
-              <button onClick={() => onOpenMediaPicker(onChange)} className="px-4 bg-white border border-[#2271b1] text-[#2271b1] text-[11px] font-bold uppercase hover:bg-[#f0f6fa] shrink-0 rounded-sm">Pick Asset</button>
+            <div className="flex flex-col xs:flex-row gap-2">
+              <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} min-w-0`} placeholder="External URL or Pick Asset..." />
+              <button onClick={() => onOpenMediaPicker(onChange)} className="px-4 py-2 xs:py-0 w-full xs:w-auto bg-white border border-[#2271b1] text-[#2271b1] text-[11px] font-bold uppercase hover:bg-[#f0f6fa] shrink-0 rounded-sm">Pick Asset</button>
             </div>
             {value && <div className="w-full aspect-video border border-gray-100 rounded bg-gray-50 overflow-hidden"><img src={value} className="w-full h-full object-cover" /></div>}
           </div>
@@ -401,30 +401,30 @@ export default function PageBuilder({ initialPage }) {
   return (
     <div className="min-h-screen bg-[#f0f0f1] text-[#1d2327] font-sans pb-40">
       {/* ── Admin Bar ── */}
-      <div className="bg-[#1d2327] h-8 flex items-center px-4 justify-between sticky top-0 z-[100]">
-        <div className="flex items-center gap-4">
-          <Link href="/admin/pages" className="text-[#c3c4c7] hover:text-[#72aee6] text-[11px] font-medium flex items-center gap-1.5 transition-colors">
+      <div className="bg-[#1d2327] min-h-8 sm:h-8 flex flex-wrap sm:flex-nowrap items-center px-3 sm:px-4 py-1 sm:py-0 gap-x-3 gap-y-1 justify-between sticky top-0 z-[100]">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <Link href="/admin/pages" className="text-[#c3c4c7] hover:text-[#72aee6] text-[11px] font-medium flex items-center gap-1.5 transition-colors shrink-0 whitespace-nowrap">
             <ArrowLeft className="w-3 h-3" /> Back to List
           </Link>
-          <div className="w-px h-3 bg-white/10" />
-          <span className="text-[#72aee6] text-[11px] font-bold uppercase tracking-wider">{page.title}</span>
+          <div className="w-px h-3 bg-white/10 shrink-0" />
+          <span className="text-[#72aee6] text-[11px] font-bold uppercase tracking-wider truncate min-w-0">{page.title}</span>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-6 shrink-0">
           <div className="flex items-center gap-2 text-[#c3c4c7]">
              {isSaving ? <Clock className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3 text-green-500" />}
-             <span className="text-[10px] font-black uppercase tracking-tighter">{isSaving ? "Syncing..." : `Synced: ${lastSaved.toLocaleTimeString()}`}</span>
+             <span className="text-[10px] font-black uppercase tracking-tighter whitespace-nowrap">{isSaving ? "Syncing..." : `Synced: ${lastSaved.toLocaleTimeString()}`}</span>
           </div>
-          <a href={`/${page.slug}`} target="_blank" className="text-[#c3c4c7] hover:text-[#72aee6] text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-white/10 px-2 py-0.5 rounded transition-all">
+          <a href={`/${page.slug}`} target="_blank" className="text-[#c3c4c7] hover:text-[#72aee6] text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-white/10 px-2 py-0.5 rounded transition-all whitespace-nowrap">
             <ExternalLink className="w-3 h-3" /> Live Page
           </a>
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 py-8">
-        <div className="flex flex-col lg:grid lg:grid-cols-[420px,1fr,300px] gap-8">
-          
+      <div className="max-w-[1600px] mx-auto px-2 sm:px-4 md:px-6 py-4 md:py-8">
+        <div className="flex flex-col lg:grid lg:grid-cols-[420px,1fr,300px] gap-4 md:gap-8">
+
           {/* ── LEFT COLUMN: ARCHITECTURAL EDITOR ── */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 md:gap-6 min-w-0">
              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-sm">
                 <div className="px-4 py-2 border-b border-[#ccd0d4] bg-[#f6f7f7] font-black text-[10px] uppercase tracking-[0.2em] text-gray-500">Core Page Settings</div>
                 <div className="p-4 space-y-4">
@@ -432,15 +432,15 @@ export default function PageBuilder({ initialPage }) {
                       <label className="text-[10px] font-bold text-gray-400 uppercase">Internal Name</label>
                       <input type="text" value={page.title} onChange={(e) => setPage({ ...page, title: e.target.value })} className="w-full text-lg font-bold border-none p-0 focus:ring-0 placeholder:text-gray-200" placeholder="e.g., About Us Page" />
                    </div>
-                   <div className="flex gap-2">
-                      <div className="flex-1 space-y-1">
+                   <div className="flex flex-col xs:flex-row gap-2">
+                      <div className="flex-1 min-w-0 space-y-1">
                          <label className="text-[10px] font-bold text-gray-400 uppercase">URL Slug</label>
                          <div className="flex items-center border border-gray-300 rounded-sm bg-gray-50 px-2">
                             <span className="text-gray-400 text-[11px]">/</span>
-                            <input type="text" value={page.slug} onChange={(e) => setPage({ ...page, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} className="w-full border-none bg-transparent py-1.5 text-[12px] font-medium focus:ring-0" />
+                            <input type="text" value={page.slug} onChange={(e) => setPage({ ...page, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} className="w-full min-w-0 border-none bg-transparent py-1.5 text-[12px] font-medium focus:ring-0" />
                          </div>
                       </div>
-                      <div className="w-24 space-y-1">
+                      <div className="w-full xs:w-24 space-y-1">
                          <label className="text-[10px] font-bold text-gray-400 uppercase">Status</label>
                          <select value={page.status} onChange={(e) => setPage({ ...page, status: e.target.value })} className="w-full border border-gray-300 py-1.5 text-[12px] font-bold rounded-sm focus:ring-0 cursor-pointer">
                             <option value="Draft">Draft</option>
@@ -452,8 +452,8 @@ export default function PageBuilder({ initialPage }) {
              </div>
 
              <div className="flex border border-[#ccd0d4] bg-white shadow-sm rounded-sm overflow-hidden">
-                <button onClick={() => setActiveTab("content")} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] border-b-2 transition-all ${activeTab === 'content' ? 'border-[#2271b1] text-[#2271b1] bg-white' : 'border-transparent text-gray-400 bg-[#f6f7f7]'}`}>Section Manager</button>
-                <button onClick={() => setActiveTab("seo")} className={`flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] border-b-2 transition-all ${activeTab === 'seo' ? 'border-[#2271b1] text-[#2271b1] bg-white' : 'border-transparent text-gray-400 bg-[#f6f7f7]'}`}>SEO & Social</button>
+                <button onClick={() => setActiveTab("content")} className={`flex-1 min-w-0 px-1 py-3 text-[10px] font-black uppercase tracking-widest sm:tracking-[0.2em] border-b-2 transition-all ${activeTab === 'content' ? 'border-[#2271b1] text-[#2271b1] bg-white' : 'border-transparent text-gray-400 bg-[#f6f7f7]'}`}>Section Manager</button>
+                <button onClick={() => setActiveTab("seo")} className={`flex-1 min-w-0 px-1 py-3 text-[10px] font-black uppercase tracking-widest sm:tracking-[0.2em] border-b-2 transition-all ${activeTab === 'seo' ? 'border-[#2271b1] text-[#2271b1] bg-white' : 'border-transparent text-gray-400 bg-[#f6f7f7]'}`}>SEO & Social</button>
              </div>
 
              {activeTab === 'content' ? (
@@ -462,7 +462,7 @@ export default function PageBuilder({ initialPage }) {
                       <SortableContext items={page.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                          <div className="space-y-2">
                             {page.sections.length === 0 && (
-                               <div className="p-12 border-2 border-dashed border-gray-200 rounded text-center space-y-2 bg-white">
+                               <div className="p-6 sm:p-12 border-2 border-dashed border-gray-200 rounded text-center space-y-2 bg-white">
                                   <LayoutGrid className="w-8 h-8 text-gray-200 mx-auto" />
                                   <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">No Sections Added Yet</p>
                                </div>
@@ -475,14 +475,14 @@ export default function PageBuilder({ initialPage }) {
                    </DndContext>
                    <div className="bg-white border border-[#ccd0d4] p-4 rounded-sm shadow-sm">
                       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-4 border-b border-gray-100 pb-2">Add Content Module</h4>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
                          {Object.entries(SECTION_SCHEMAS)
                            .filter(([type]) => {
                              const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
                              return !templateConfig || !templateConfig.allowedSections || templateConfig.allowedSections.includes(type);
                            })
                            .map(([type, s]) => (
-                            <button key={type} onClick={() => addSection(type)} className="text-left px-3 py-2.5 bg-[#f6f7f7] border border-[#ccd0d4] text-[10px] font-bold uppercase tracking-wider hover:bg-white hover:border-[#2271b1] hover:text-[#2271b1] transition-all rounded-sm flex items-center gap-2"><Plus className="w-3 h-3" /> {s.name}</button>
+                            <button key={type} onClick={() => addSection(type)} className="text-left px-3 py-2.5 bg-[#f6f7f7] border border-[#ccd0d4] text-[10px] font-bold uppercase tracking-wider hover:bg-white hover:border-[#2271b1] hover:text-[#2271b1] transition-all rounded-sm flex items-center gap-2 min-w-0"><Plus className="w-3 h-3 shrink-0" /> {s.name}</button>
                          ))}
                       </div>
                    </div>
@@ -510,38 +510,38 @@ export default function PageBuilder({ initialPage }) {
           </div>
 
           {/* ── CENTER COLUMN: PRODUCTION PREVIEW ── */}
-          <div className="flex flex-col h-full bg-gray-200 border border-[#ccd0d4] overflow-hidden rounded-xl shadow-2xl relative min-h-[800px]">
-             <div className="bg-white border-b border-[#ccd0d4] px-5 py-3.5 flex items-center justify-between shrink-0 z-20">
-                <div className="flex items-center gap-4">
-                   <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[9px] uppercase font-black border border-green-200">
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+          <div className="flex flex-col h-full min-w-0 bg-gray-200 border border-[#ccd0d4] overflow-hidden rounded-xl shadow-2xl relative min-h-[500px] lg:min-h-[800px]">
+             <div className="bg-white border-b border-[#ccd0d4] px-3 sm:px-5 py-2 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 shrink-0 z-20">
+                <div className="flex items-center gap-4 min-w-0">
+                   <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[9px] uppercase font-black border border-green-200 whitespace-nowrap">
+                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shrink-0" />
                       Production Sync Active
                    </div>
                 </div>
-                
-                <div className="flex items-center bg-[#f0f0f1] p-1 rounded-lg border border-[#ccd0d4]">
+
+                <div className="flex items-center bg-[#f0f0f1] p-1 rounded-lg border border-[#ccd0d4] max-w-full">
                    {[ 
                        {id:'desktop', icon: Monitor, label: 'Desktop'}, 
                        {id:'tablet', icon: Tablet, label: 'Tablet'}, 
                        {id:'mobile', icon: Smartphone, label: 'Mobile'}
                    ].map(m => (
                       <button key={m.id} onClick={() => setPreviewMode(m.id)} className={`flex items-center gap-2 px-3 py-1.5 rounded transition-all ${previewMode === m.id ? 'bg-white shadow-sm text-[#2271b1]' : 'text-gray-400 hover:text-black'}`}>
-                         <m.icon className="w-4 h-4" />
-                         <span className="text-[10px] font-bold uppercase tracking-tighter">{m.label}</span>
+                         <m.icon className="w-4 h-4 shrink-0" />
+                         <span className="hidden xs:inline text-[10px] font-bold uppercase tracking-tighter">{m.label}</span>
                       </button>
                    ))}
                 </div>
              </div>
 
-             <div className="flex-1 overflow-y-auto bg-[#f0f0f1] p-8 flex justify-center items-start scrollbar-hide">
-                <div className={`bg-white shadow-2xl transition-all duration-700 ease-[0.22, 1, 0.36, 1] origin-top ${previewMode === 'desktop' ? 'w-full' : previewMode === 'tablet' ? 'w-[768px]' : 'w-[375px]'} min-h-full rounded-2xl overflow-hidden ring-1 ring-black/5`}>
+             <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f0f0f1] p-2 sm:p-4 md:p-8 flex justify-center items-start scrollbar-hide">
+                <div className={`bg-white shadow-2xl transition-all duration-700 ease-[0.22, 1, 0.36, 1] origin-top max-w-full ${previewMode === 'desktop' ? 'w-full' : previewMode === 'tablet' ? 'w-[768px]' : 'w-[375px]'} min-h-full rounded-2xl overflow-hidden ring-1 ring-black/5`}>
                    <SectionRenderer sections={page.sections} />
                 </div>
              </div>
           </div>
 
           {/* ── RIGHT COLUMN: SYSTEM METADATA ── */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 min-w-0">
              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-sm">
                 <div className="px-3 py-2 border-b border-[#ccd0d4] bg-[#f6f7f7] font-black text-[10px] uppercase tracking-widest text-gray-500">Publication Information</div>
                 <div className="p-4 space-y-4">
@@ -567,7 +567,7 @@ export default function PageBuilder({ initialPage }) {
 
              <div className="bg-orange-50 border border-orange-200 p-4 rounded-sm flex gap-3">
                 <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0" />
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                    <p className="text-[10px] font-black text-orange-800 uppercase tracking-widest">Enterprise Note</p>
                    <p className="text-[11px] text-orange-700/80 leading-relaxed font-medium">Changes made in the builder are live in the preview but only affect the production site after status is set to <strong>PUBLISHED</strong>.</p>
                 </div>

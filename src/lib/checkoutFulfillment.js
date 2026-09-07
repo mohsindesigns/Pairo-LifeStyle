@@ -6,6 +6,7 @@ import Product from "@/models/Product";
 import Customer from "@/models/Customer";
 import pairoEvents from "@/lib/events";
 import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { resolveAuthoritativePrice } from "@/lib/productPricing";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import {
   buildGuestCheckoutAccountPayload,
@@ -96,7 +97,7 @@ export async function createOrderFromCheckoutPayload(payload, {
           name: product.name,
           sku: product.sku,
           image: item.image || product.images?.[0] || product.image,
-          priceAtPurchase: item.price,
+          priceAtPurchase: resolveAuthoritativePrice(product, item),
           quantity: item.quantity,
           ...(variantTitle ? { selectedVariant: { title: variantTitle, options: selectedOptions } } : {}),
           ...(item.madeToMeasure?.enabled ? { madeToMeasure: item.madeToMeasure } : {}),

@@ -36,7 +36,7 @@ function NavTabs({ activeTab }) {
         : "bg-white border-t-transparent border-x-transparent border-b-[#c3c4c7] text-[#2271b1] hover:text-[#135e96] hover:bg-[#fafafa]"
     }`;
   return (
-    <div className="flex border-b border-[#c3c4c7] mb-6 mt-1 gap-1">
+    <div className="flex flex-wrap border-b border-[#c3c4c7] mb-6 mt-1 gap-1">
       <Link href="/admin/settings/shipping" className={tabClass("shipping")}>Shipping</Link>
       <Link href="/admin/settings/tax" className={tabClass("tax")}>Tax Settings</Link>
       <Link href="/admin/settings/shipping/pickup-locations" className={tabClass("pickup")}>Pickup Locations</Link>
@@ -48,12 +48,12 @@ function NavTabs({ activeTab }) {
 function Postbox({ title, subtitle, children, dim, action }) {
   return (
     <div className={`bg-white border border-[#c3c4c7] shadow-sm mb-5 rounded-none transition-opacity ${dim ? "opacity-55 pointer-events-none select-none" : ""}`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#c3c4c7] bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-[#c3c4c7] bg-white">
         <h2 className="text-[14px] font-bold text-[#1d2327] m-0">{title}</h2>
         {action}
       </div>
       {subtitle && <div className="px-4 py-2 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[12px] text-[#646970] italic">{subtitle}</div>}
-      <div className="p-5">{children}</div>
+      <div className="p-3 sm:p-5">{children}</div>
     </div>
   );
 }
@@ -325,12 +325,12 @@ export default function TaxSettingsPage() {
     <AdminPageLayout title="Tax settings" breadcrumbs={[{ label: "Settings" }, { label: "Tax" }]}>
       <NavTabs activeTab="tax" />
 
-      <div className="space-y-6 pb-28">
+      <div className="space-y-6 pb-36 sm:pb-28">
 
         {/* ── 1. Enable / Disable Section ─────────────────────── */}
         <div className="bg-white border border-[#c3c4c7] shadow-sm p-4 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-[3px] bg-[#f0f6fb] flex items-center justify-center border border-[#c3c4c7]">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 shrink-0 rounded-[3px] bg-[#f0f6fb] flex items-center justify-center border border-[#c3c4c7]">
               <ReceiptText className="w-4 h-4 text-[#2271b1]" />
             </div>
             <div>
@@ -443,7 +443,7 @@ export default function TaxSettingsPage() {
             )}
           </div>
 
-          <div className="p-5">
+          <div className="p-3 sm:p-5">
             {!activeClass ? (
               <p className="text-[13px] text-[#646970]">No tax classes configured.</p>
             ) : (
@@ -494,13 +494,13 @@ export default function TaxSettingsPage() {
 
                 {/* Rate table */}
                 {activeClass.rates.length === 0 ? (
-                  <div className="border border-dashed border-[#c3c4c7] p-8 text-center bg-[#fcfcfc]">
+                  <div className="border border-dashed border-[#c3c4c7] p-4 sm:p-8 text-center bg-[#fcfcfc]">
                     <Info className="w-8 h-8 text-[#ccd0d4] mx-auto mb-2" />
                     <p className="text-[13px] font-bold text-[#1d2327] mb-1">No tax rates in this class yet</p>
                     <p className="text-[11.5px] text-[#646970]">Click Insert Row to add one, or Import CSV to bulk-load rates.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-w-full">
                     <table className="wp-list-table widefat striped posts w-full border border-[#c3c4c7] border-collapse bg-white text-left text-[13px] min-w-[1000px]">
                       <thead>
                         <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338]">
@@ -548,14 +548,14 @@ export default function TaxSettingsPage() {
 
       <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileSelected} />
 
-      <div className="fixed bottom-0 left-[160px] right-0 z-40 bg-white border-t border-[#c3c4c7] shadow-lg">
-        <div className="w-full flex items-center justify-between px-6 py-3.5">
-          <p className="text-[12px] text-[#646970] italic">Make sure to save changes for settings to take effect instantly.</p>
+      <div className="fixed bottom-0 left-0 md:left-[160px] right-0 z-40 bg-white border-t border-[#c3c4c7] shadow-lg">
+        <div className="w-full flex flex-wrap items-center justify-between gap-2 px-3 md:px-6 py-3.5">
+          <p className="text-[12px] text-[#646970] italic min-w-0">Make sure to save changes for settings to take effect instantly.</p>
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2 bg-[#2271b1] border border-[#2271b1] text-white text-[13px] font-bold rounded-[3px] hover:bg-[#135e96] hover:border-[#135e96] shadow-sm disabled:opacity-60 transition-colors cursor-pointer"
+            className="w-full xs:w-auto justify-center flex items-center gap-2 px-5 py-2 bg-[#2271b1] border border-[#2271b1] text-white text-[13px] font-bold rounded-[3px] hover:bg-[#135e96] hover:border-[#135e96] shadow-sm disabled:opacity-60 transition-colors cursor-pointer"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? "Saving Changes…" : "Save Changes"}

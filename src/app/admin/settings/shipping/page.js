@@ -58,7 +58,7 @@ function NavTabs({ activeTab }) {
     </Link>
   );
   return (
-    <div className="flex border-b border-[#c3c4c7] mb-6 mt-1 gap-1">
+    <div className="flex flex-wrap border-b border-[#c3c4c7] mb-6 mt-1 gap-1">
       {tab("/admin/settings/shipping", "shipping", "Shipping")}
       {tab("/admin/settings/tax", "tax", "Tax Settings")}
       {tab("/admin/settings/shipping/pickup-locations", "pickup-locations", "Pickup Locations")}
@@ -141,7 +141,7 @@ function RuleValueEditor({ rule, onUpdate }) {
   if (rule.type === "postal_code_range") {
     const [from = "", to = ""] = rule.values || [];
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
         <div>
           <label className="text-[10px] font-bold text-[#646970] uppercase tracking-wider block mb-1">From</label>
           <input className={inp} value={from} onChange={e => onUpdate({ values: [e.target.value, to] })} placeholder="e.g. 10001" />
@@ -182,8 +182,8 @@ function CoverageRulesEditor({ matchRules, onChange, variant = "edit" }) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <div>
+      <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 mb-2">
+        <div className="min-w-0">
           <label className={lbl}>Coverage Rules</label>
           <p className={hint}>
             {create
@@ -203,8 +203,8 @@ function CoverageRulesEditor({ matchRules, onChange, variant = "edit" }) {
       <div className="space-y-2">
         {rules.map((rule, i) => (
           <div key={i} className={`${rowBg} border border-[#c3c4c7] p-3 space-y-2`}>
-            <div className="flex items-center justify-between gap-2">
-              <div className="w-[180px]">
+            <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2">
+              <div className="w-full xs:w-[180px]">
                 <label className={`text-[10px] font-bold ${labelColor} uppercase tracking-wider block mb-1`}>Rule Type</label>
                 <RuleTypeSelect value={rule.type} onChange={type => updRule(i, { type, values: [] })} />
               </div>
@@ -248,7 +248,7 @@ function ProviderSettings({ provider, settings, onChange }) {
     </div>
   );
   if (provider === "FREE_SHIPPING") return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
         <label className={lbl}>Minimum Order Amount ($)</label>
         <input type="number" min="0" className={`${inp} font-semibold`} value={settings.minimumOrderAmount ?? ""} onChange={e => s("minimumOrderAmount", Number(e.target.value))} placeholder="0 = always free" />
@@ -315,20 +315,20 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white border border-[#c3c4c7] shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden rounded-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 overflow-y-auto" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white border border-[#c3c4c7] shadow-2xl w-full max-w-xl max-h-[calc(100dvh-1rem)] sm:max-h-[90vh] flex flex-col overflow-hidden rounded-none">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#c3c4c7] bg-[#f6f7f7]">
-          <div>
+        <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b border-[#c3c4c7] bg-[#f6f7f7]">
+          <div className="min-w-0">
             <h2 className="text-[14px] font-bold text-[#1d2327] m-0">{m._id ? "Edit" : "Add"} Shipping Method</h2>
           </div>
-          <button onClick={onClose} className="p-1 text-[#646970] hover:text-[#d63638]"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1 shrink-0 text-[#646970] hover:text-[#d63638]"><X className="w-4 h-4" /></button>
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+        <div className="overflow-y-auto flex-1 p-4 sm:p-5 space-y-4 sm:space-y-5">
           {/* Name & description */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Method Name <span className="text-red-500">*</span></label>
               <input className={inp} value={m.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Standard Delivery" />
@@ -342,7 +342,7 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
           {/* Provider selector */}
           <div>
             <label className={lbl}>Shipping Type</label>
-            <div className="grid grid-cols-3 gap-3 mt-1.5">
+            <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 sm:gap-3 mt-1.5">
               {PROVIDERS.map(p => (
                 <button key={p.key} type="button"
                   onClick={() => setM(prev => ({ ...prev, provider: p.key, settings: {} }))}
@@ -362,13 +362,13 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
           </div>
 
           {/* Provider settings */}
-          <div className="bg-[#f6f7f7] border border-[#c3c4c7] p-4">
+          <div className="bg-[#f6f7f7] border border-[#c3c4c7] p-3 sm:p-4">
             <p className="text-[11px] font-bold text-[#646970] uppercase tracking-wider mb-3">Rate Configuration</p>
             <ProviderSettings provider={m.provider} settings={m.settings ?? {}} onChange={v => set("settings", v)} />
           </div>
 
           {/* Schedule & status */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Active From</label>
               <input type="datetime-local" className={inp} value={m.activeFrom || ""} onChange={e => set("activeFrom", e.target.value)} />
@@ -392,9 +392,9 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[#c3c4c7] bg-[#f6f7f7]">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-[12px] text-[#2271b1] border border-[#c3c4c7] bg-white rounded-[3px] hover:bg-[#f6f7f7] font-semibold">Cancel</button>
-          <button type="button" onClick={save} disabled={saving} className="flex items-center gap-1.5 px-4 py-1.5 bg-[#2271b1] border border-[#2271b1] text-white text-[12px] font-bold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 transition-colors">
+        <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2 px-4 sm:px-5 py-3 border-t border-[#c3c4c7] bg-[#f6f7f7]">
+          <button type="button" onClick={onClose} className="w-full xs:w-auto px-3 py-1.5 text-[12px] text-[#2271b1] border border-[#c3c4c7] bg-white rounded-[3px] hover:bg-[#f6f7f7] font-semibold">Cancel</button>
+          <button type="button" onClick={save} disabled={saving} className="w-full xs:w-auto justify-center flex items-center gap-1.5 px-4 py-1.5 bg-[#2271b1] border border-[#2271b1] text-white text-[12px] font-bold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 transition-colors">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {saving ? "Saving…" : "Save Method"}
           </button>
@@ -480,7 +480,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-sm mb-4 rounded-none overflow-hidden">
       {/* Zone header row */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-[#c3c4c7] select-none gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-3 bg-white border-b border-[#c3c4c7] select-none gap-2 sm:gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {dragHandle}
           <div className="flex items-center gap-3 cursor-pointer min-w-0" onClick={toggle}>
@@ -495,7 +495,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
                 <span className="truncate">{zone.name}</span>
                 {zone.isCatchAll && (
                   <span
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold border border-[#dba617] bg-[#fcf9e8] text-[#8a6100] px-1.5 py-0.5 rounded-[2px] shrink-0"
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold border border-[#dba617] bg-[#fcf9e8] text-[#8a6100] px-1.5 py-0.5 rounded-[2px] min-w-0 sm:shrink-0"
                     title="This zone automatically matches any address not covered by another zone."
                   >
                     <ShieldCheck className="w-3 h-3" />Catch-all — matches any other address
@@ -506,7 +506,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
           <span className={`text-[9px] font-bold uppercase border px-2 py-0.5 rounded-[2px] ${
             zone.status === "Active" ? "border-green-300 bg-green-50 text-green-700" : "border-[#c3c4c7] bg-[#f6f7f7] text-[#646970]"
           }`}>{zone.status}</span>
@@ -532,9 +532,9 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
 
       {/* Edit zone inline form */}
       {editing && (
-        <div className="border-b border-[#c3c4c7] bg-[#fafafa] p-5 space-y-4">
+        <div className="border-b border-[#c3c4c7] bg-[#fafafa] p-3 sm:p-5 space-y-4">
           <p className="text-[12px] font-bold text-[#1d2327] uppercase tracking-wider">Zone Configuration</p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label className={lbl}>Zone Name</label><input className={inp} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
             <div><label className={lbl}>Description</label><input className={inp} value={form.description || ""} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} /></div>
             <div><label className={lbl}>Priority (higher wins tie)</label><input type="number" className={inp} value={form.priority ?? 0} onChange={e => setForm(p => ({ ...p, priority: Number(e.target.value) }))} /></div>
@@ -557,7 +557,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
           {/* Coverage rules */}
           <CoverageRulesEditor matchRules={form.matchRules} onChange={matchRules => setForm(p => ({ ...p, matchRules }))} variant="edit" />
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex flex-wrap gap-2 pt-2">
             <button onClick={saveZone} disabled={savingZone} className="flex items-center gap-1.5 px-4 py-1.5 bg-[#2271b1] border border-[#2271b1] text-white text-[12px] font-bold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 transition-colors cursor-pointer">
               {savingZone ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}{savingZone ? "Saving…" : "Save Zone Settings"}
             </button>
@@ -568,10 +568,10 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
 
       {/* Methods panel */}
       {expanded && (
-        <div className="bg-[#f6f7f7] p-4">
-          <div className="flex items-center justify-between mb-3">
+        <div className="bg-[#f6f7f7] p-3 sm:p-4">
+          <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 mb-3">
             <p className="text-[11px] font-bold text-[#50575e] uppercase tracking-wider">Shipping Rates & Methods</p>
-            <button onClick={() => { setEM(null); setSMM(true); }} className="bg-white border border-[#2271b1] text-[#2271b1] hover:bg-[#f0f6fb] px-2.5 py-1 rounded-[3px] text-[11.5px] font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer">
+            <button onClick={() => { setEM(null); setSMM(true); }} className="self-start xs:self-auto shrink-0 bg-white border border-[#2271b1] text-[#2271b1] hover:bg-[#f0f6fb] px-2.5 py-1 rounded-[3px] text-[11.5px] font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer">
               <Plus className="w-3 h-3" />Add Shipping Method
             </button>
           </div>
@@ -579,7 +579,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
           {loadingMethods && <div className="flex items-center gap-2 text-[12px] text-[#646970] py-3"><Loader2 className="w-3.5 h-3.5 animate-spin" />Loading methods…</div>}
 
           {!loadingMethods && methods.length === 0 && (
-            <div className="border border-dashed border-[#c3c4c7] bg-white p-6 text-center">
+            <div className="border border-dashed border-[#c3c4c7] bg-white p-4 sm:p-6 text-center">
               <Truck className="w-8 h-8 text-[#ccd0d4] mx-auto mb-2" />
               <p className="text-[12.5px] font-bold text-[#1d2327]">No shipping methods assigned</p>
               <p className="text-[11.5px] text-[#646970]">Customers matched to this zone will not be able to checkout. Add a method above.</p>
@@ -587,12 +587,12 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
           )}
 
           {methods.length > 0 && (
-            <div className="overflow-x-auto w-full border border-[#c3c4c7] bg-white">
-              <table className="wp-list-table widefat striped posts w-full border-collapse bg-white text-left text-[13px]">
+            <div className="overflow-x-auto w-full max-w-full border border-[#c3c4c7] bg-white">
+              <table className="wp-list-table widefat striped posts w-full min-w-[420px] md:min-w-[540px] border-collapse bg-white text-left text-[13px]">
                 <thead>
                   <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338]">
                     <th className="px-3 py-2 font-bold min-w-[140px] w-[35%]">Method Name</th>
-                    <th className="px-3 py-2 font-bold min-w-[120px] w-[25%]">Provider</th>
+                    <th className="hidden md:table-cell px-3 py-2 font-bold min-w-[120px] w-[25%]">Provider</th>
                     <th className="px-3 py-2 font-bold min-w-[90px] w-[20%]">Cost</th>
                     <th className="px-3 py-2 font-bold min-w-[90px] w-[10%]">Status</th>
                     <th className="px-3 py-2 font-bold min-w-[100px] w-[10%] text-center">Actions</th>
@@ -608,7 +608,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
                           <span className="font-bold text-[#1d2327]">{m.name}</span>
                           {m.description && <p className="text-[11px] text-[#646970] mt-0.5">{m.description}</p>}
                         </td>
-                        <td className="px-3 py-2.5 text-[#646970]">
+                        <td className="hidden md:table-cell px-3 py-2.5 text-[#646970]">
                           {providerLabel[m.provider]}
                         </td>
                         <td className="px-3 py-2.5 font-bold text-[#2271b1]">
@@ -686,10 +686,10 @@ function AddZoneForm({ onCreated }) {
   );
 
   return (
-    <div className="bg-white border-2 border-[#2271b1] shadow-sm p-5 space-y-5 rounded-none">
+    <div className="bg-white border-2 border-[#2271b1] shadow-sm p-3 sm:p-5 space-y-4 sm:space-y-5 rounded-none">
       <p className="text-[14px] font-bold text-[#1d2327] m-0 border-b border-[#f0f0f1] pb-2.5">New Shipping Zone</p>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div><label className={lbl}>Zone Name <span className="text-red-500">*</span></label><input className={inp} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Pakistan" /></div>
         <div><label className={lbl}>Description</label><input className={inp} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional notes" /></div>
         <div><label className={lbl}>Priority</label><input type="number" className={inp} value={form.priority} onChange={e => setForm(p => ({ ...p, priority: Number(e.target.value) }))} /><p className={hint}>Higher priority zones win on ties during checkout.</p></div>
@@ -698,7 +698,7 @@ function AddZoneForm({ onCreated }) {
 
       <CoverageRulesEditor matchRules={form.matchRules} onChange={matchRules => setForm(p => ({ ...p, matchRules }))} variant="create" />
 
-      <div className="flex gap-2 pt-1">
+      <div className="flex flex-wrap gap-2 pt-1">
         <button onClick={create} disabled={saving} className="flex items-center gap-1.5 px-4 py-1.5 bg-[#2271b1] border border-[#2271b1] text-white text-[12px] font-bold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 transition-colors cursor-pointer">
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}{saving ? "Creating…" : "Create Shipping Zone"}
         </button>
@@ -808,7 +808,7 @@ export default function ShippingSettingsPage() {
       ) : (
         <div className="space-y-4 pb-16">
           {zones.length === 0 && (
-            <div className="bg-white border border-[#c3c4c7] p-12 text-center shadow-sm">
+            <div className="bg-white border border-[#c3c4c7] p-6 sm:p-12 text-center shadow-sm">
               <Globe className="w-10 h-10 text-[#ccd0d4] mx-auto mb-3" />
               <p className="text-[14px] font-bold text-[#1d2327] mb-1">No shipping zones configured</p>
               <p className="text-[12px] text-[#646970] max-w-sm mx-auto">Create a shipping zone below to start configuring shipping rates for your customers.</p>
