@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Truck, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { getProductUrl } from "@/lib/routes";
 
 export default function CartPage() {
   const { 
@@ -172,17 +173,27 @@ export default function CartPage() {
                     <div className="col-span-1 md:col-span-7 flex gap-4 sm:gap-6 min-w-0">
                       
                       {/* Image */}
-                      <div className="relative w-16 sm:w-20 aspect-[3/4] rounded-lg overflow-hidden bg-neutral-50 border border-black/5 shrink-0 shadow-sm">
+                      <Link 
+                        href={getProductUrl(item)} 
+                        className="relative w-16 sm:w-20 aspect-[3/4] rounded-lg overflow-hidden bg-neutral-50 border border-black/5 shrink-0 shadow-sm block hover:opacity-85 transition-opacity"
+                        title={item.name}
+                      >
                         <img 
                           src={item.image || "/placeholder.jpg"} 
                           alt={item.name} 
                           className="w-full h-full object-cover" 
                         />
-                      </div>
+                      </Link>
 
                       {/* Details */}
                       <div className="flex-1 flex flex-col justify-center min-w-0 space-y-1.5">
-                        <p className="text-[13px] sm:text-[14px] font-bold text-black uppercase tracking-wide truncate">{item.name}</p>
+                        <Link 
+                          href={getProductUrl(item)} 
+                          className="text-[13px] sm:text-[14px] font-bold text-black uppercase tracking-wide truncate hover:underline hover:text-black/80 transition-all block"
+                          title={item.name}
+                        >
+                          {item.name}
+                        </Link>
                         
                         {/* Selected Options (Size & Color) */}
                         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[10px] text-black font-bold uppercase tracking-wider">

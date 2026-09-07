@@ -43,7 +43,7 @@ export async function GET(req) {
     if (type) query.type = type;
 
     const products = await Product.find(query)
-      .select('name slug price compareAtPrice image images categories primaryCategory rating reviewCount isFeatured type status attributes variantCombinations')
+      .select('name slug price compareAtPrice image images categories primaryCategory rating reviewCount isFeatured type productType status attributes variantCombinations')
       .populate('categories')
       .populate('primaryCategory')
       .sort({ createdAt: -1 })

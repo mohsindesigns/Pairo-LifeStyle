@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Minus, ShoppingBag, Check, Ruler, Palette, Shield, Settings } from "lucide-react";
 
@@ -10,7 +10,7 @@ import SwatchBubble from "@/components/common/SwatchBubble";
 import MadeToMeasureModal from "@/components/product/MadeToMeasureModal";
 import CustomizeProductModal from "@/components/product/CustomizeProductModal";
 import SizeGuideModal from "@/components/product/SizeGuideModal";
-import { usePopup } from "@/context/PopupContext";
+import SelectOptionsPopup from "@/components/product/SelectOptionsPopup";
 
 export default function ClientProductActions({ product, onVariantChange }) {
   const [selectedOptions, setSelectedOptions] = useState({});
@@ -20,13 +20,29 @@ export default function ClientProductActions({ product, onVariantChange }) {
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [missingAttrsModal, setMissingAttrsModal] = useState({ isOpen: false, missing: [] });
+  const [highlightedAttrs, setHighlightedAttrs] = useState([]);
+  const attrRefs = useRef({});
+  const highlightTimeoutRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+  useEffect(() => {
+    return () => window.clearTimeout(highlightTimeoutRef.current);
+  }, []);
   const { addToCart } = useCart();
   const router = useRouter();
-  const { showPopup } = usePopup();
+
+  const focusMissingAttributes = (missing) => {
+    const firstNode = missing[0] && attrRefs.current[missing[0].name];
+    if (firstNode) {
+      firstNode.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    setHighlightedAttrs(missing.map((a) => a.name));
+    window.clearTimeout(highlightTimeoutRef.current);
+    highlightTimeoutRef.current = window.setTimeout(() => setHighlightedAttrs([]), 1600);
+  };
 
   const getResolvedSizeChart = () => {
     const source = product.sizeChartSource || (product.sizeGuide?.enabled ? "product_custom" : "category_default");
@@ -149,13 +165,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
     if (product.productType === "variable") {
       const missingAttrs = attributes.filter(attr => !selectedOptions[attr.name]);
       if (missingAttrs.length > 0) {
-        const missingLabels = missingAttrs.map(a => a.name).join(" and ");
-        showPopup({
-          title: "Select Options Required",
-          message: `Please choose your preferred ${missingLabels} before adding this item to your bag.`,
-          type: "warning",
-          confirmText: "Select Options",
-        });
+        setMissingAttrsModal({ isOpen: true, missing: missingAttrs });
         return;
       }
     }
@@ -197,18 +207,22 @@ export default function ClientProductActions({ product, onVariantChange }) {
     if (product.productType === "variable") {
       const missingAttrs = attributes.filter(attr => !selectedOptions[attr.name]);
       if (missingAttrs.length > 0) {
-        const missingLabels = missingAttrs.map(a => a.name).join(" and ");
-        showPopup({
-          title: "Select Options Required",
-          message: `Please choose your preferred ${missingLabels} before proceeding to checkout.`,
-          type: "warning",
-          confirmText: "Select Options",
-        });
+        setMissingAttrsModal({ isOpen: true, missing: missingAttrs });
         return;
       }
     }
     handleAddToCart(false);
     router.push("/checkout");
+  };
+
+  const handleCloseMissingAttrsModal = () => {
+    setMissingAttrsModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const handleJumpToMissingAttrs = () => {
+    const missing = missingAttrsModal.missing;
+    setMissingAttrsModal({ isOpen: false, missing: [] });
+    focusMissingAttributes(missing);
   };
 
   return (
@@ -218,11 +232,19 @@ export default function ClientProductActions({ product, onVariantChange }) {
           const isColor =
             attr.type === "color" || attr.name.toLowerCase().includes("color");
 
+          const isHighlighted = highlightedAttrs.includes(attr.name);
+
           return (
-            <div key={attr.name} className="space-y-2.5">
+            <div
+              key={attr.name}
+              ref={(el) => { attrRefs.current[attr.name] = el; }}
+              className={`space-y-2.5 -m-2.5 p-2.5 rounded-[var(--radius,0px)] transition-shadow duration-700 ${
+                isHighlighted ? "shadow-[0_0_0_2px_#dc2626] animate-attr-shake" : "shadow-[0_0_0_0px_transparent]"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-[11px] md:text-[12px] font-bold text-black uppercase tracking-[0.25em]">
+                  <p className={`text-[11px] md:text-[12px] font-bold uppercase tracking-[0.25em] transition-colors duration-700 ${isHighlighted ? "text-red-600" : "text-black"}`}>
                     {attr.name}
                   </p>
                   {selectedOptions[attr.name] && (
@@ -399,9 +421,26 @@ export default function ClientProductActions({ product, onVariantChange }) {
             onClose={() => setSizeGuideOpen(false)}
             resolvedSizeChart={resolvedSizeChart}
           />
+          <SelectOptionsPopup
+            product={product}
+            missing={missingAttrsModal.missing}
+            isOpen={missingAttrsModal.isOpen}
+            onClose={handleCloseMissingAttrsModal}
+            onSelectOptions={handleJumpToMissingAttrs}
+          />
         </>,
         document.body
       )}
+
+      <style jsx global>{`
+        @keyframes attrShake {
+          10%, 90% { transform: translateX(-1px); }
+          20%, 80% { transform: translateX(2px); }
+          30%, 50%, 70% { transform: translateX(-3px); }
+          40%, 60% { transform: translateX(3px); }
+        }
+        .animate-attr-shake { animation: attrShake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+      `}</style>
     </>
   );
 }

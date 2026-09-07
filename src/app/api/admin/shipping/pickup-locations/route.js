@@ -37,7 +37,10 @@ export async function POST(req) {
   await dbConnect();
 
   const body = await req.json();
-  const location = await PickupLocation.create({ tenantId: TENANT_ID, ...body });
+  if (!body.name?.trim()) {
+    return NextResponse.json({ error: 'Location name is required.' }, { status: 400 });
+  }
+  const location = await PickupLocation.create({ tenantId: TENANT_ID, ...body, name: body.name.trim() });
 
   return NextResponse.json({ success: true, location }, { status: 201 });
 }
@@ -53,6 +56,8 @@ export async function PUT(req) {
   const { id, ...rest } = body;
 
   if (!id) return NextResponse.json({ error: 'Location id is required.' }, { status: 400 });
+  if (!rest.name?.trim()) return NextResponse.json({ error: 'Location name is required.' }, { status: 400 });
+  rest.name = rest.name.trim();
 
   const location = await PickupLocation.findOneAndUpdate(
     { _id: id, tenantId: TENANT_ID },

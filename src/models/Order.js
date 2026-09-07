@@ -99,15 +99,18 @@ const OrderSchema = new mongoose.Schema({
   customJacketInquiryId: { type: mongoose.Schema.Types.ObjectId, ref: 'CustomJacketInquiry', index: true, sparse: true },
   // Read-only snapshot of the inquiry's specs, captured at conversion time for display on the order
   customJacketSnapshot: {
-    jacketType: String,
-    gender: String,
-    preferredLeather: String,
-    preferredColor: String,
-    size: String,
-    budget: String,
-    deadline: String,
-    referenceImages: [{ type: String }],
-    additionalNotes: String
+    type: {
+      jacketType: String,
+      gender: String,
+      preferredLeather: String,
+      preferredColor: String,
+      size: String,
+      budget: String,
+      deadline: String,
+      referenceImages: [{ type: String }],
+      additionalNotes: String
+    },
+    default: undefined
   },
 
   // Stripe Payment Link generated for admin-initiated (Custom Order) payment collection

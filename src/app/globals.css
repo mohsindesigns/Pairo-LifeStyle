@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300..900;1,300..900&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -23,6 +24,7 @@
   /* Fonts */
   --font-sans: var(--body-font, var(--font-inter)), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--brand-font), sans-serif;
+  --font-montserrat: var(--font-montserrat), 'Montserrat', sans-serif;
 }
 
 :root {
@@ -67,6 +69,9 @@ body {
   .heading-font {
     font-family: var(--brand-font);
     letter-spacing: -0.03em;
+  }
+  .font-montserrat {
+    font-family: var(--font-montserrat), 'Montserrat', sans-serif !important;
   }
 }
 

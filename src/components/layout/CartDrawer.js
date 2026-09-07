@@ -5,6 +5,7 @@ import { X, Plus, Minus, ShoppingBag, ArrowRight, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
+import { getProductUrl } from "@/lib/routes";
 
 export default function CartDrawer() {
   const { isCartOpen, setIsCartOpen, cartItems, updateQuantity, removeFromCart, cartSubtotal, affiliateDiscount, affiliateDiscountAmount } = useCart();
@@ -90,7 +91,12 @@ export default function CartDrawer() {
                       key={uniqueKey + idx}
                       className="flex gap-4 relative group py-2"
                     >
-                      <div className="relative w-16 h-22 rounded-lg overflow-hidden bg-black/[0.02] shrink-0 border border-black/5">
+                      <Link
+                        href={getProductUrl(item)}
+                        onClick={() => setIsCartOpen(false)}
+                        className="relative w-16 h-22 rounded-lg overflow-hidden bg-black/[0.02] shrink-0 border border-black/5 block hover:opacity-85 transition-opacity"
+                        title={item.name}
+                      >
                         <Image
                           src={itemImage}
                           alt={item.name}
@@ -98,14 +104,19 @@ export default function CartDrawer() {
                           className="object-cover"
                           unoptimized={!itemImage.startsWith("http") && !itemImage.includes("cloudinary.com")}
                         />
-                      </div>
+                      </Link>
 
                       <div className="flex-1 flex flex-col justify-between py-0.5 min-w-0">
                         <div className="space-y-1">
                           <div className="flex justify-between items-start gap-2">
-                            <p className="text-xs sm:text-sm font-bold heading-font uppercase tracking-tight truncate">
+                            <Link
+                              href={getProductUrl(item)}
+                              onClick={() => setIsCartOpen(false)}
+                              className="text-xs sm:text-sm font-bold heading-font uppercase tracking-tight truncate hover:underline hover:text-black/80 transition-all block"
+                              title={item.name}
+                            >
                               {item.name}
-                            </p>
+                            </Link>
                             <button
                               onClick={() => removeFromCart(uniqueKey)}
                               className="text-black/40 hover:text-red-500 transition-colors p-1"

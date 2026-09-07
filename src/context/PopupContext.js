@@ -132,32 +132,16 @@ export function PopupProvider({ children }) {
   const getIcon = () => {
     switch (popupState.type) {
       case "error":
-        return <AlertCircle className="w-6 h-6 text-red-600" />;
+        return <AlertCircle className="w-4 h-4 text-white" />;
       case "warning":
-        return <AlertTriangle className="w-6 h-6 text-amber-600" />;
+        return <AlertTriangle className="w-4 h-4 text-white" />;
       case "success":
-        return <CheckCircle2 className="w-6 h-6 text-emerald-600" />;
+        return <CheckCircle2 className="w-4 h-4 text-white" />;
       case "confirm":
-        return <HelpCircle className="w-6 h-6 text-black" />;
+        return <HelpCircle className="w-4 h-4 text-white" />;
       case "info":
       default:
-        return <Info className="w-6 h-6 text-neutral-800" />;
-    }
-  };
-
-  const getBadgeStyle = () => {
-    switch (popupState.type) {
-      case "error":
-        return "bg-red-50 border-red-200 text-red-700";
-      case "warning":
-        return "bg-amber-50 border-amber-200 text-amber-800";
-      case "success":
-        return "bg-emerald-50 border-emerald-200 text-emerald-800";
-      case "confirm":
-        return "bg-neutral-100 border-neutral-200 text-neutral-800";
-      case "info":
-      default:
-        return "bg-neutral-100 border-neutral-200 text-neutral-800";
+        return <Info className="w-4 h-4 text-white" />;
     }
   };
 
@@ -175,65 +159,49 @@ export function PopupProvider({ children }) {
           {/* Backdrop with blur */}
           <div
             onClick={() => closePopup(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-[4px] transition-opacity duration-300 animate-in fade-in"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-300 animate-in fade-in"
           />
 
           {/* Modal Container */}
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-neutral-100 overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95">
-            {/* Top decorative accent bar */}
-            <div
-              className={`h-1.5 w-full ${
-                popupState.type === "error"
-                  ? "bg-red-500"
-                  : popupState.type === "warning"
-                  ? "bg-amber-500"
-                  : popupState.type === "success"
-                  ? "bg-emerald-500"
-                  : "bg-black"
-              }`}
-            />
-
-            {/* Close X Button */}
-            <button
-              onClick={() => closePopup(false)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
-              aria-label="Close modal"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="p-6 sm:p-7">
-              {/* Icon & Badge */}
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center border ${getBadgeStyle()}`}
-                >
+          <div className="relative w-full max-w-md bg-white rounded-[var(--radius,4px)] shadow-2xl border border-black overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-black/10 bg-[#FAF9F6] select-none">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-[var(--radius,4px)] bg-black text-white flex items-center justify-center shrink-0">
                   {getIcon()}
                 </div>
-                <div>
-                  <h3
-                    id="global-popup-title"
-                    className="text-lg font-bold text-neutral-900 tracking-tight leading-snug"
-                  >
-                    {popupState.title}
-                  </h3>
-                </div>
+                <h3
+                  id="global-popup-title"
+                  style={{ fontFamily: "var(--brand-font)" }}
+                  className="text-[13px] sm:text-[14px] font-bold uppercase tracking-wider text-black truncate"
+                >
+                  {popupState.title}
+                </h3>
               </div>
+              <button
+                onClick={() => closePopup(false)}
+                className="w-7 h-7 flex items-center justify-center border border-black/20 rounded-[var(--radius,4px)] hover:border-black hover:bg-black hover:text-white transition-all text-black shrink-0 cursor-pointer ml-3"
+                aria-label="Close modal"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
+            <div className="p-5 sm:p-6 bg-white space-y-5">
               {/* Message */}
-              <div className="mt-2 mb-6">
-                <p className="text-[14px] leading-relaxed text-neutral-600 whitespace-pre-line font-normal">
+              <div>
+                <p className="text-[13px] sm:text-[14px] leading-relaxed text-black/80 font-normal whitespace-pre-line">
                   {popupState.message}
                 </p>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-black/10">
                 {popupState.type === "confirm" && (
                   <button
                     type="button"
                     onClick={() => closePopup(false)}
-                    className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl border border-neutral-300 text-neutral-700 text-xs font-semibold uppercase tracking-wider hover:bg-neutral-50 active:scale-[0.98] transition-all"
+                    className="flex-1 sm:flex-initial px-5 py-2.5 rounded-[var(--radius,4px)] border border-black/25 text-black text-[11px] font-bold uppercase tracking-widest hover:border-black hover:bg-black/5 active:scale-[0.98] transition-all cursor-pointer"
                   >
                     {popupState.cancelText}
                   </button>
@@ -242,7 +210,7 @@ export function PopupProvider({ children }) {
                   type="button"
                   autoFocus
                   onClick={() => closePopup(true)}
-                  className="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl bg-black text-white text-xs font-semibold uppercase tracking-wider hover:bg-neutral-800 active:scale-[0.98] transition-all shadow-sm"
+                  className="flex-1 sm:flex-initial px-6 py-2.5 rounded-[var(--radius,4px)] bg-black text-white text-[11px] font-bold uppercase tracking-widest hover:bg-black/85 active:scale-[0.98] transition-all shadow-sm cursor-pointer"
                 >
                   {popupState.confirmText}
                 </button>
