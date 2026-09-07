@@ -39,9 +39,12 @@ export async function POST(req) {
         }
 
         // 2. Basic Dangerous Pattern Detection
-        const dangerousPatterns = [/document\.write\(/i, /<iframe/i];
+        // Note: <iframe> is intentionally allowed — standard integrations (GTM noscript
+        // fallback, YouTube embeds, payment provider widgets) legitimately require it,
+        // and this endpoint already requires scripts.create/scripts.edit permission.
+        const dangerousPatterns = [/document\.write\(/i];
         if (code && dangerousPatterns.some(p => p.test(code))) {
-            return NextResponse.json({ error: "Script contains prohibited patterns (document.write or iframe)." }, { status: 400 });
+            return NextResponse.json({ error: "Script contains prohibited patterns (document.write)." }, { status: 400 });
         }
 
         if (!name || !type || !location) {

@@ -167,6 +167,48 @@ export default function ClientScriptLoader({ scripts = [], location = "head" }) 
           </Script>
         );
 
+      case 'tiktok_pixel':
+        return (
+          <Script key={scriptId} id={`tiktok-pixel-${scriptId}`} strategy={strategy}>
+            {`
+              !function (w, d, t) {
+                w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie","holdConsent","revokeConsent","grantConsent"],ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<e.length;n++)ttq.setAndDefer(e,e[n]);return e},ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js",o=n&&n.partner;ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};n=document.createElement("script");n.type="text/javascript",n.async=!0,n.src=r+"?sdkid="+e+"&lib="+t;e=document.getElementsByTagName("script")[0];e.parentNode.insertBefore(n,e)};
+                ttq.load('${templateConfig.pixelId}');
+                ttq.page();
+              }(window, document, 'ttq');
+            `}
+          </Script>
+        );
+
+      case 'hotjar':
+        return (
+          <Script key={scriptId} id={`hotjar-${scriptId}`} strategy={strategy}>
+            {`
+              (function(h,o,t,j,a,r){
+                h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+                h._hjSettings={hjid:${templateConfig.trackingId},hjsv:6};
+                a=o.getElementsByTagName('head')[0];
+                r=o.createElement('script');r.async=1;
+                r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+                a.appendChild(r);
+              })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+            `}
+          </Script>
+        );
+
+      case 'clarity':
+        return (
+          <Script key={scriptId} id={`clarity-${scriptId}`} strategy={strategy}>
+            {`
+              (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+              })(window, document, "clarity", "script", "${templateConfig.trackingId}");
+            `}
+          </Script>
+        );
+
       case 'verification':
         const provider = templateConfig.verificationProvider || 'google';
         const nameMap = {
