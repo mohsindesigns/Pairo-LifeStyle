@@ -108,6 +108,11 @@ export default class Validator {
     rules.forEach(rule => {
       if (rule.operator) {
         this.validateConditionGroup(rule, errors, warnings, depth + 1);
+      } else if (rule.op === 'in' && !Array.isArray(rule.value)) {
+        errors.push({
+          field: 'conditions',
+          message: `Rule for field "${rule.field}" uses "is in list" but its value is not a list.`
+        });
       }
     });
   }
@@ -122,12 +127,24 @@ export default class Validator {
       }
     }
 
-    if (action.type === 'percentage_discount' && action.value > 100) {
-      errors.push({ field: `actions.${index}.value`, message: 'Percentage discount cannot exceed 100%.' });
+    if (action.type === 'percentage_discount' && (action.value > 100 || action.value < 0)) {
+      errors.push({ field: `actions.${index}.value`, message: 'Percentage discount must be between 0 and 100.' });
+    }
+
+    if (action.type === 'fixed_discount' && action.value < 0) {
+      errors.push({ field: `actions.${index}.value`, message: 'Fixed discount cannot be negative.' });
     }
 
     if (action.type === 'fixed_product_price' && (!action.value || action.value <= 0)) {
       errors.push({ field: `actions.${index}.value`, message: 'Fixed product price must be greater than 0.' });
+    }
+
+    if (action.type === 'fixed_product_price' && action.target && action.target !== 'product') {
+      errors.push({ field: `actions.${index}.target`, message: 'Fixed Product Price only applies to a specific product target — pick "Product" as the scope.' });
+    }
+
+    if ((action.type === 'percentage_discount' || action.type === 'fixed_discount' || action.type === 'quantity_tier') && action.target === 'shipping') {
+      errors.push({ field: `actions.${index}.target`, message: '"Shipping Fee" is not a valid target for this action type — use the "Free Shipping" action instead.' });
     }
 
     if (action.type === 'quantity_tier') {

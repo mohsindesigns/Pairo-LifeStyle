@@ -8,6 +8,7 @@ import { can } from "@/lib/rbac";
 import mongoose from "mongoose";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { reconcilePaymentLinkOrder } from "@/lib/stripeFulfillment";
+import { reconcilePromotionUsage, isUsageReleasingTransition, isUsageRestoringTransition } from "@/lib/promotionUsageReconciliation";
 
 export async function GET(req, { params }) {
   try {
@@ -103,6 +104,20 @@ export async function PATCH(req, { params }) {
     }
 
     await order.save();
+
+    // Release/restore any usage-limit "slots" this order's promo codes consumed
+    // when it moves into/out of Cancelled or Refunded.
+    if (status && status !== oldStatus) {
+      try {
+        if (isUsageReleasingTransition(oldStatus, status)) {
+          await reconcilePromotionUsage(order, -1);
+        } else if (isUsageRestoringTransition(oldStatus, status)) {
+          await reconcilePromotionUsage(order, 1);
+        }
+      } catch (e) {
+        console.error("[Order Status Promotion Usage Reconciliation Error]", e);
+      }
+    }
 
     // Commission Engine Lifecycle Triggers
     if (status && status !== oldStatus) {

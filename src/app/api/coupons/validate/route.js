@@ -5,12 +5,13 @@ import Order from "@/models/Order";
 import Engine from "@/lib/promotionEngine/Engine";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { validateLegacyDiscount, calculateEligibleSubtotal } from "@/lib/couponValidator";
+import { validateLegacyDiscount, calculateEligibleSubtotal, applyDiscountCap } from "@/lib/couponValidator";
 
 export async function POST(req) {
   try {
     await dbConnect();
     const { code, cartSubtotal, items = [], email: requestEmail } = await req.json();
+    const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id || null;
@@ -74,6 +75,8 @@ export async function POST(req) {
 
         return NextResponse.json({
           success: true,
+          code: couponApplied.code,
+          isAutomatic: false,
           appliedPromotions: engineResults.appliedPromotions,
           discountAmount: engineResults.discountTotal,
           freeShipping: engineResults.freeShipping,
@@ -93,28 +96,32 @@ export async function POST(req) {
             cartSubtotal,
             items,
             userId,
-            email
+            email,
+            ip: ipAddress
           });
 
           if (!validation.valid) {
             return NextResponse.json({ error: validation.error }, { status: 400 });
           }
-      
+
           const eligibleSubtotal = await calculateEligibleSubtotal(discount, items);
-          let discountAmount = discount.type === 'percentage' 
-            ? (eligibleSubtotal * discount.value) / 100 
+          let discountAmount = discount.type === 'percentage'
+            ? (eligibleSubtotal * discount.value) / 100
             : discount.value;
-      
+          discountAmount = applyDiscountCap(discount, Math.min(discountAmount, eligibleSubtotal));
+
           return NextResponse.json({
             success: true,
+            code: discount.code,
+            isAutomatic: false,
             appliedPromotions: [{
               code: discount.code,
               title: `Discount Code: ${discount.code}`,
               type: discount.type,
               value: discount.value,
-              discountAmount: Math.min(discountAmount, eligibleSubtotal)
+              discountAmount
             }],
-            discountAmount: Math.min(discountAmount, eligibleSubtotal),
+            discountAmount,
             isLegacy: true
           });
       }
@@ -125,6 +132,8 @@ export async function POST(req) {
     // If no coupon code was entered, return any applied automatic promotions
     return NextResponse.json({
       success: true,
+      code: null,
+      isAutomatic: true,
       appliedPromotions: engineResults.appliedPromotions,
       discountAmount: engineResults.discountTotal,
       freeShipping: engineResults.freeShipping,

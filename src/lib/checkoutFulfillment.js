@@ -39,9 +39,11 @@ export async function createOrderFromCheckoutPayload(payload, {
         shippingSnapshot,
         mongoSession,
         dryRun: false,
+        ipAddress,
       });
 
       const {
+        authoritativeSubtotal,
         finalAppliedPromotions,
         finalDiscountTotal,
         affiliateId,
@@ -129,7 +131,7 @@ export async function createOrderFromCheckoutPayload(payload, {
         affiliateId,
         affiliateReferralCode,
         financials: {
-          subtotal:              financials.subtotal,
+          subtotal:              authoritativeSubtotal,
           shippingCost:          authoritativeShippingCost,
           tax:                   authoritativeTax,
           discountTotal:         finalDiscountTotal,

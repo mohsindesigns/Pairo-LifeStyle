@@ -5,6 +5,7 @@ import Product from "@/models/Product";
 import pairoEvents from "@/lib/events";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { reconcilePromotionUsage, isUsageReleasingTransition } from "@/lib/promotionUsageReconciliation";
 
 export async function PATCH(req, { params }) {
   try {
@@ -63,6 +64,14 @@ export async function PATCH(req, { params }) {
     });
 
     await order.save();
+
+    if (isUsageReleasingTransition(oldStatus, order.status)) {
+      try {
+        await reconcilePromotionUsage(order, -1);
+      } catch (e) {
+        console.error("[Customer Cancel Promotion Usage Reconciliation Error]", e);
+      }
+    }
 
     // 3. Dispatch Event
     pairoEvents.dispatch('ORDER_CANCELLED', order);

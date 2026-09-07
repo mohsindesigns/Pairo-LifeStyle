@@ -1,5 +1,7 @@
 import Order from "@/models/Order";
 import PendingCheckout from "@/models/PendingCheckout";
+import Promotion from "@/models/Promotion";
+import PromotionCustomerUsage from "@/models/PromotionCustomerUsage";
 import stripe from "@/lib/stripe";
 import { createOrderFromCheckoutPayload } from "@/lib/checkoutFulfillment";
 
@@ -95,6 +97,91 @@ export async function fulfillSucceededPaymentIntent(paymentIntent, log) {
 }
 
 /**
+ * Best-effort reconciliation of a Stripe Payment Link redemption against this
+ * app's own Promotion records. Stripe's own max_redemptions already enforces
+ * the global usage cap on Stripe's side (see StripeSync.js) — but
+ * maxUsesPerCustomer has no Stripe-side equivalent, and none of this reaches
+ * our own Promotion/PromotionCustomerUsage analytics without this step,
+ * meaning the admin's usage analytics would otherwise undercount and a
+ * customer who redeemed here wouldn't be caught by the per-customer check on
+ * a later normal storefront checkout.
+ *
+ * The Checkout Session in the webhook payload doesn't carry which promotion
+ * code was redeemed by default, so the session is re-retrieved here with
+ * `discounts.promotion_code` expanded to find it.
+ *
+ * This can never retroactively block the payment that already completed — it
+ * only catches the customer up for their next order. Never throws: a
+ * promo-tracking hiccup must not break fulfillment for a payment that already
+ * succeeded. Mirrors the $inc/upsert patterns in checkoutPricing.js.
+ */
+async function reconcilePromotionUsageForPaymentLink(order, session, discountAmount, log) {
+  try {
+    const expandedSession = await stripe.checkout.sessions.retrieve(session.id, {
+      expand: ["discounts.promotion_code"],
+    });
+
+    const discountEntry = expandedSession.discounts?.find((d) => d.promotion_code);
+    const stripePromotionCodeId = typeof discountEntry?.promotion_code === "string"
+      ? discountEntry.promotion_code
+      : discountEntry?.promotion_code?.id;
+    if (!stripePromotionCodeId) return;
+
+    const promotion = await Promotion.findOne({ tenantId: order.tenantId, stripePromotionCodeId });
+    if (!promotion) {
+      log?.warn?.({ stripePromotionCodeId, orderId: order._id }, "Payment Link promo code has no matching local Promotion");
+      return;
+    }
+
+    order.financials.appliedPromotions = order.financials.appliedPromotions || [];
+    order.financials.appliedPromotions.push({
+      promotionId: promotion._id,
+      code: promotion.code,
+      title: promotion.title,
+      type: promotion.actions?.[0]?.type || "discount",
+      value: promotion.actions?.[0]?.value,
+      discountAmount,
+      explanation: `Promotion code ${promotion.code} applied via Stripe payment link`,
+      rulesSnapshot: {
+        conditions: promotion.conditions,
+        actions: promotion.actions,
+      },
+    });
+    if (!order.financials.promoCode) order.financials.promoCode = promotion.code;
+
+    await Promotion.updateOne(
+      { _id: promotion._id },
+      {
+        $inc: {
+          "usageLimits.currentTotalUses": 1,
+          "analytics.timesUsed": 1,
+          "analytics.discountDistributed": discountAmount,
+          "analytics.revenueGenerated": order.financials?.subtotal || 0,
+        },
+      }
+    );
+
+    const maxPerCustomer = promotion.usageLimits?.maxUsesPerCustomer;
+    if (maxPerCustomer) {
+      const customerKey = order.customer?.userId
+        ? `user:${order.customer.userId}`
+        : `email:${(order.customer?.email || "").toLowerCase().trim()}`;
+
+      // No $lt guard here (unlike checkoutPricing.js's blocking version) — the
+      // payment already went through and can't be undone, so this only needs
+      // to record the usage for next time, not gate this one.
+      await PromotionCustomerUsage.findOneAndUpdate(
+        { tenantId: order.tenantId, promotionId: promotion._id, customerKey },
+        { $inc: { usageCount: 1 } },
+        { upsert: true }
+      );
+    }
+  } catch (error) {
+    log?.warn?.({ orderId: order._id, sessionId: session.id, error: error.message }, "Failed to reconcile Payment Link promotion usage");
+  }
+}
+
+/**
  * Marks a Custom Order Paid from a completed Stripe Checkout Session created by
  * an admin-generated Payment Link (as opposed to the cart-checkout PaymentIntent
  * flow above). Called from the webhook's checkout.session.completed handler and
@@ -147,6 +234,8 @@ export async function fulfillPaymentLinkSession(session, log) {
     order.financials.discountTotal = (order.financials.discountTotal || 0) + discountAmount;
     order.financials.total = Math.max(0, (order.financials.total || 0) - discountAmount);
     paymentMessage = `Payment received via Stripe payment link (promotion code applied: -${currency} ${discountAmount.toLocaleString()}).`;
+
+    await reconcilePromotionUsageForPaymentLink(order, session, discountAmount, log);
   }
 
   order.timeline.push({

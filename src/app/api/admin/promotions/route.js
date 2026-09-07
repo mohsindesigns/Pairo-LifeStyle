@@ -5,6 +5,7 @@ import Promotion from "@/models/Promotion";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
 import { syncPromotionToStripe } from "@/lib/promotionEngine/StripeSync";
+import { cache } from "@/lib/cache";
 import { can } from "@/lib/rbac";
 
 export async function GET(req) {
@@ -98,14 +99,23 @@ export async function PATCH(req) {
     if (!promotionId || !adminStatus) {
       return NextResponse.json({ error: "promotionId and adminStatus required" }, { status: 400 });
     }
-    const promotion = await Promotion.findByIdAndUpdate(promotionId, { $set: { adminStatus } }, { new: true });
-    if (!promotion) {
+    const oldPromo = await Promotion.findById(promotionId);
+    if (!oldPromo) {
       return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+    }
+    const promotion = await Promotion.findByIdAndUpdate(promotionId, { $set: { adminStatus } }, { new: true });
+
+    const diff = HistoryService.generateDiff(oldPromo.toObject(), promotion.toObject());
+    if (diff.length > 0) {
+      await HistoryService.recordRevision(promotion, { adminName: session.user.name || session.user.email });
+      await HistoryService.logAction('UPDATE', promotionId, { adminName: session.user.name || session.user.email }, diff);
     }
 
     const stripeState = await syncPromotionToStripe(promotion);
     Object.assign(promotion, stripeState);
     await promotion.save();
+
+    await cache.clearActivePromotionCache();
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -124,10 +134,25 @@ export async function DELETE(req) {
   }
   await dbConnect();
   try {
+    const affected = await Promotion.find({ isAutomatic: true, adminStatus: "Active" }).select("_id title");
+
     const result = await Promotion.updateMany(
       { isAutomatic: true, adminStatus: "Active" },
       { $set: { adminStatus: "Draft" } }
     );
+
+    await cache.clearActivePromotionCache();
+
+    for (const promo of affected) {
+      try {
+        await HistoryService.logAction('UPDATE', promo._id, { adminName: session.user.name || session.user.email }, [
+          { field: 'adminStatus', oldValue: 'Active', newValue: 'Draft' }
+        ]);
+      } catch (e) {
+        console.error("[Bulk Deactivate Audit Log Error]", e);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       deactivated: result.modifiedCount,

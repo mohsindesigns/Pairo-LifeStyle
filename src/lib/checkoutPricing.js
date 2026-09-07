@@ -1,12 +1,37 @@
 import Order from "@/models/Order";
 import Discount from "@/models/Discount";
 import Promotion from "@/models/Promotion";
+import PromotionCustomerUsage from "@/models/PromotionCustomerUsage";
 import Affiliate from "@/models/Affiliate";
+import Product from "@/models/Product";
 import Engine from "@/lib/promotionEngine/Engine";
-import { validateLegacyDiscount, calculateEligibleSubtotal } from "@/lib/couponValidator";
+import { validateLegacyDiscount, calculateEligibleSubtotal, hashFingerprint, applyDiscountCap } from "@/lib/couponValidator";
+import { resolveAuthoritativePrice } from "@/lib/productPricing";
 import { shippingService } from "@/services/shipping/ShippingService";
 
 const withSession = (query, mongoSession) => mongoSession ? query.session(mongoSession) : query;
+
+// Recomputes the cart subtotal from real DB prices rather than trusting the
+// client-submitted financials.subtotal (or per-item price fields) — otherwise a
+// forged request can claim any subtotal for a cart of real products, letting
+// every downstream calculation (discount math, affiliate cut, final total)
+// inherit an arbitrarily low number. Resolves per-variant pricing (not just the
+// base product price) since a variant can legitimately cost more or less.
+async function resolveAuthoritativeSubtotal({ items, tenantId, mongoSession }) {
+  const productIds = items.map(item => item.id || item._id).filter(Boolean);
+  const dbProducts = await withSession(Product.find({ _id: { $in: productIds }, tenantId }).select("price variantCombinations attributes"), mongoSession);
+  const productById = new Map(dbProducts.map(p => [p._id.toString(), p]));
+
+  return items.reduce((sum, item) => {
+    const id = (item.id || item._id)?.toString();
+    const product = productById.get(id);
+    // Falls back to the client price only for an item that no longer exists in
+    // the DB (e.g. deleted after being added to cart) — a real product's price
+    // always comes from the DB, never from the request body.
+    const price = product ? resolveAuthoritativePrice(product, item) : item.price;
+    return sum + price * item.quantity;
+  }, 0);
+}
 
 // Recomputes the real shipping cost server-side instead of trusting whatever
 // the client submitted — otherwise a forged request can claim any shipping
@@ -38,6 +63,7 @@ export async function computeAuthoritativeCheckout({
   mongoSession = null,
   dryRun = false,
   log = null,
+  ipAddress = null,
 }) {
   let customerType = 'guest';
   if (orderUserId) customerType = 'logged_in';
@@ -55,8 +81,10 @@ export async function computeAuthoritativeCheckout({
     customerType = orderCount > 0 ? 'returning' : (orderUserId ? 'logged_in' : 'new');
   }
 
+  const authoritativeSubtotal = await resolveAuthoritativeSubtotal({ items, tenantId, mongoSession });
+
   const engineResults = await Engine.evaluate(
-    { subtotal: financials.subtotal, items },
+    { subtotal: authoritativeSubtotal, items },
     {
       couponCodes: financials.promoCode ? [financials.promoCode] : [],
       userId: orderUserId,
@@ -69,10 +97,10 @@ export async function computeAuthoritativeCheckout({
   let finalAppliedPromotions = engineResults.appliedPromotions || [];
   let finalDiscountTotal = engineResults.discountTotal || 0;
 
-  // Enforce per-customer usage limits. Checked on every call (dry run included)
-  // since it's a cheap read — unlike the global maxTotalUses cap below, which
-  // needs an atomic increment to stay race-safe, a single customer can't
-  // realistically place two simultaneous orders so a plain count is sufficient.
+  // Fast pre-check so an over-limit customer (or a dry run pricing preview) fails
+  // early with a friendly error. This plain count is not race-safe on its own —
+  // see the atomic reservation increment near the promotion usage write below,
+  // which is what actually closes the race for concurrent checkout attempts.
   if (checkoutOrConditions.length > 0) {
     for (const applied of finalAppliedPromotions) {
       if (applied.isLegacy) continue;
@@ -104,10 +132,11 @@ export async function computeAuthoritativeCheckout({
     }
 
     const validation = await validateLegacyDiscount(legacyDiscount, {
-      cartSubtotal: financials.subtotal,
+      cartSubtotal: authoritativeSubtotal,
       items,
       userId: orderUserId,
-      email: checkoutEmail
+      email: checkoutEmail,
+      ip: ipAddress
     });
 
     if (!validation.valid) {
@@ -119,16 +148,20 @@ export async function computeAuthoritativeCheckout({
       ? (eligibleSubtotal * legacyDiscount.value) / 100
       : legacyDiscount.value;
 
-    finalDiscountTotal = Math.min(amount, eligibleSubtotal);
+    finalDiscountTotal = applyDiscountCap(legacyDiscount, Math.min(amount, eligibleSubtotal));
 
     if (!dryRun) {
+      const fingerprintUpdate = (legacyDiscount.oneRedemptionPerDevice && ipAddress)
+        ? { $addToSet: { redeemedFingerprints: hashFingerprint(ipAddress) } }
+        : {};
+
       if (legacyDiscount.usageLimit) {
         const updatedDiscount = await Discount.findOneAndUpdate(
           {
             _id: legacyDiscount._id,
             usageCount: { $lt: legacyDiscount.usageLimit }
           },
-          { $inc: { usageCount: 1 } },
+          { $inc: { usageCount: 1 }, ...fingerprintUpdate },
           { session: mongoSession, new: true }
         );
         if (!updatedDiscount) {
@@ -137,7 +170,7 @@ export async function computeAuthoritativeCheckout({
       } else {
         await Discount.updateOne(
           { _id: legacyDiscount._id },
-          { $inc: { usageCount: 1 } },
+          { $inc: { usageCount: 1 }, ...fingerprintUpdate },
           { session: mongoSession }
         );
       }
@@ -158,6 +191,26 @@ export async function computeAuthoritativeCheckout({
   if (!dryRun) {
     for (const applied of finalAppliedPromotions) {
       if (applied.isLegacy) continue;
+
+      const maxPerCustomer = applied.usageLimits?.maxUsesPerCustomer;
+      if (maxPerCustomer && checkoutOrConditions.length > 0) {
+        const customerKey = orderUserId ? `user:${orderUserId}` : `email:${checkoutEmail.toLowerCase().trim()}`;
+        const usageRes = await PromotionCustomerUsage.findOneAndUpdate(
+          {
+            tenantId,
+            promotionId: applied.promotionId,
+            customerKey,
+            usageCount: { $lt: maxPerCustomer }
+          },
+          { $inc: { usageCount: 1 } },
+          { session: mongoSession, new: true, upsert: true }
+        );
+
+        if (!usageRes) {
+          throw new Error(`You've already used the code "${applied.code}" the maximum number of times allowed.`);
+        }
+      }
+
       const promoRes = await Promotion.findOneAndUpdate(
         {
           _id: applied.promotionId,
@@ -172,7 +225,8 @@ export async function computeAuthoritativeCheckout({
           $inc: {
             'usageLimits.currentTotalUses': 1,
             'analytics.timesUsed': 1,
-            'analytics.discountDistributed': applied.discountAmount
+            'analytics.discountDistributed': applied.discountAmount,
+            'analytics.revenueGenerated': authoritativeSubtotal
           }
         },
         { session: mongoSession, new: true }
@@ -232,14 +286,14 @@ export async function computeAuthoritativeCheckout({
     affiliateDiscountValue = activeAffiliate.customerDiscountValue || 0;
 
     if (affiliateDiscountType === 'Percentage' && affiliateDiscountValue > 0) {
-      affiliateDiscountAmount = Math.round((financials.subtotal * (affiliateDiscountValue / 100)) * 100) / 100;
+      affiliateDiscountAmount = Math.round((authoritativeSubtotal * (affiliateDiscountValue / 100)) * 100) / 100;
     } else if (affiliateDiscountType === 'Fixed' && affiliateDiscountValue > 0) {
-      affiliateDiscountAmount = Math.min(affiliateDiscountValue, financials.subtotal);
+      affiliateDiscountAmount = Math.min(affiliateDiscountValue, authoritativeSubtotal);
     }
   }
 
   const authoritativeShippingCost = await resolveAuthoritativeShippingCost({
-    tenantId, shippingAddress, shippingSnapshot, subtotal: financials.subtotal, items, mongoSession,
+    tenantId, shippingAddress, shippingSnapshot, subtotal: authoritativeSubtotal, items, mongoSession,
   });
 
   // Tax is not yet wired into checkout by design (see admin Tax Settings / TaxService) —
@@ -248,12 +302,13 @@ export async function computeAuthoritativeCheckout({
 
   const authoritativeTotal = Math.max(
     0,
-    (financials.subtotal || 0) - finalDiscountTotal - affiliateDiscountAmount +
+    authoritativeSubtotal - finalDiscountTotal - affiliateDiscountAmount +
     authoritativeShippingCost + authoritativeTax
   );
 
   return {
     customerType,
+    authoritativeSubtotal,
     finalAppliedPromotions,
     finalDiscountTotal,
     affiliateId,

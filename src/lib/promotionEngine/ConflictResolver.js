@@ -61,10 +61,11 @@ export default class ConflictResolver {
       }
 
       // Rule: Stacking Logic
-      // If we have applied a non-stackable promotion, we can't apply any more unless THEY are stackable?
-      // Actually, enterprise rule is: To stack, BOTH must be stackable.
-      if (hasAppliedNonStackable && !promotion.stackable) {
-          console.log(`[Engine:ConflictResolver] Skipping "${promotion.title}" - Stacking conflict (Non-stackable already applied).`);
+      // Enterprise rule: To stack, BOTH the already-applied promotion(s) and this
+      // one must be stackable. So once anything has applied, a non-stackable
+      // promotion (already applied or being considered now) blocks combining.
+      if (applied.length > 0 && (hasAppliedNonStackable || !promotion.stackable)) {
+          console.log(`[Engine:ConflictResolver] Skipping "${promotion.title}" - Stacking conflict (Non-stackable already applied or this promotion is not stackable).`);
           continue;
       }
 

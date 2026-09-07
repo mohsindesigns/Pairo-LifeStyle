@@ -61,13 +61,19 @@ export default function ActionBlock({ action, index, onUpdate, onRemove, catalog
     { value: 'bundle', label: 'Product Bundle' },
   ];
 
-  const targets = [
-    { value: 'cart', label: 'Entire Cart' },
-    { value: 'product', label: 'Specific Products' },
-    { value: 'category', label: 'Specific Categories' },
-    { value: 'collection', label: 'Specific Collections' },
-    { value: 'shipping', label: 'Shipping Fee' },
-  ];
+  // "Shipping Fee" is intentionally not offered here: ActionExecutor only ever
+  // reads target as cart/product/category/collection for these action types,
+  // so a "shipping" target silently discounted the entire cart subtotal instead
+  // (or, for quantity_tier, always computed $0). Free Shipping is its own
+  // dedicated action type below, not a target of these actions.
+  const targets = action.type === 'fixed_product_price'
+    ? [{ value: 'product', label: 'Specific Products' }]
+    : [
+        { value: 'cart', label: 'Entire Cart' },
+        { value: 'product', label: 'Specific Products' },
+        { value: 'category', label: 'Specific Categories' },
+        { value: 'collection', label: 'Specific Collections' },
+      ];
 
   const bxgyTargetTypes = [
     { value: 'product', label: 'Specific Products' },
@@ -468,10 +474,12 @@ export default function ActionBlock({ action, index, onUpdate, onRemove, catalog
                 <span className="absolute left-2 top-2 text-gray-400 text-sm">
                   {action.type === 'fixed_discount' || action.type === 'fixed_product_price' ? '$' : '%'}
                 </span>
-                <input 
-                  type="number" 
-                  value={action.value || 0} 
-                  onChange={(e) => onUpdate(index, 'value', parseFloat(e.target.value))}
+                <input
+                  type="number"
+                  min="0"
+                  max={action.type === 'percentage_discount' ? 100 : undefined}
+                  value={action.value || 0}
+                  onChange={(e) => onUpdate(index, 'value', Math.max(0, parseFloat(e.target.value) || 0))}
                   className="w-full text-[13px] border border-gray-300 p-2 pl-6 rounded-sm outline-none focus:border-[#2271b1]"
                 />
               </div>

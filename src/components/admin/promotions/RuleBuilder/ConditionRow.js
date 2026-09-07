@@ -38,15 +38,83 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
         {fields.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
       </select>
 
-      <select 
-        value={rule.op} 
-        onChange={(e) => onUpdate(`${path}.rules.${index}.op`, e.target.value)}
+      <select
+        value={rule.op}
+        onChange={(e) => {
+          const newOp = e.target.value;
+          const isListOp = newOp === 'in';
+          onUpdate(`${path}.rules.${index}.op`, newOp);
+          if (isListOp !== (rule.op === 'in')) {
+            onUpdate(`${path}.rules.${index}.value`, isListOp ? [] : '');
+          }
+        }}
         className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1]"
       >
         {operators.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
 
-      {rule.field === 'customer_type' ? (
+      {rule.op === 'in' ? (
+        rule.field === 'customer_type' ? (
+          <select
+            multiple
+            value={Array.isArray(rule.value) ? rule.value : []}
+            onChange={(e) => onUpdate(`${path}.rules.${index}.value`, Array.from(e.target.selectedOptions, o => o.value))}
+            className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+          >
+            <option value="guest">Guest Customers</option>
+            <option value="logged_in">Logged-in Customers</option>
+            <option value="new">New Customers (0 past orders)</option>
+            <option value="returning">Returning Customers</option>
+          </select>
+        ) : rule.field === 'product_id' ? (
+          <select
+            multiple
+            value={Array.isArray(rule.value) ? rule.value : []}
+            onChange={(e) => onUpdate(`${path}.rules.${index}.value`, Array.from(e.target.selectedOptions, o => o.value))}
+            className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+          >
+            {products.map(p => (
+              <option key={p._id || p.id} value={p._id?.toString() || p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        ) : rule.field === 'category_id' ? (
+          <select
+            multiple
+            value={Array.isArray(rule.value) ? rule.value : []}
+            onChange={(e) => onUpdate(`${path}.rules.${index}.value`, Array.from(e.target.selectedOptions, o => o.value))}
+            className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+          >
+            {categories.map(c => (
+              <option key={c._id} value={c._id?.toString() || c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        ) : rule.field === 'collection_id' ? (
+          <select
+            multiple
+            value={Array.isArray(rule.value) ? rule.value : []}
+            onChange={(e) => onUpdate(`${path}.rules.${index}.value`, Array.from(e.target.selectedOptions, o => o.value))}
+            className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+          >
+            {collections.map(c => (
+              <option key={c._id} value={c._id?.toString() || c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={Array.isArray(rule.value) ? rule.value.join(', ') : ''}
+            onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value.split(',').map(v => v.trim()).filter(Boolean))}
+            placeholder="Comma-separated values"
+            className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"
+          />
+        )
+      ) : rule.field === 'customer_type' ? (
         <select
           value={rule.value || 'guest'}
           onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value)}
@@ -97,9 +165,9 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
           ))}
         </select>
       ) : (
-        <input 
-          type="text" 
-          value={rule.value} 
+        <input
+          type="text"
+          value={rule.value}
           onChange={(e) => onUpdate(`${path}.rules.${index}.value`, e.target.value)}
           placeholder="Value"
           className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] flex-1"

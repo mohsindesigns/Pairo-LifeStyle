@@ -1295,7 +1295,7 @@ export default function CheckoutPage() {
               {appliedPromo && (
                 <div className="flex items-center justify-between px-3 py-2 bg-[#FAF9F6] border border-neutral-200 rounded-[3px]">
                   <span className="text-[10px] font-bold text-black uppercase tracking-wider">
-                    Discount ({appliedPromo.code}) Applied
+                    Discount ({appliedPromo.code || appliedPromo.appliedPromotions?.[0]?.title || "Promotion"}) Applied
                   </span>
                   <button
                     type="button"

@@ -25,7 +25,8 @@ export const RESERVED_ROUTES = [
   "order-tracking",
   "sitemap.xml",
   "robots.txt",
-  "product"
+  "product",
+  "promo"
 ];
 
 export function getProductPrimaryCategorySlug(product) {

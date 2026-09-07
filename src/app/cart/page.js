@@ -333,7 +333,7 @@ export default function CartPage() {
               {promoError && <p className="text-[10px] text-red-600 font-bold ml-1 uppercase tracking-wider">{promoError}</p>}
               {appliedPromo && (
                 <div className="flex items-center justify-between px-3 py-2 bg-[#FAF9F6] rounded border border-neutral-200">
-                   <span className="text-[9px] font-bold text-black uppercase tracking-wider">Discount {appliedPromo.code} Applied</span>
+                   <span className="text-[9px] font-bold text-black uppercase tracking-wider">Discount {appliedPromo.code || appliedPromo.appliedPromotions?.[0]?.title || ""} Applied</span>
                    <button onClick={removePromoCode} className="text-[9px] font-bold text-black hover:underline uppercase tracking-wider">Remove</button>
                 </div>
               )}

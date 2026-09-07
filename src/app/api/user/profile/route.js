@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import Customer from "@/models/Customer";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
+import { reconcilePromotionUsage, isUsageReleasingTransition } from "@/lib/promotionUsageReconciliation";
 
 export async function GET() {
   try {
@@ -204,6 +205,23 @@ export async function POST(req) {
         }
 
         const oldStatus = order.status;
+
+        // Restore stock, matching the dedicated /api/profile/orders/[id]/cancel route.
+        const stockRollbacks = order.items.map((item) => {
+          const variantTitle = item.selectedVariant?.title || "Standard";
+          if (variantTitle !== "Standard") {
+            return Product.updateOne(
+              { _id: item.productId, "variantCombinations.title": variantTitle },
+              { $inc: { "variantCombinations.$.stock": item.quantity, "stock": item.quantity } }
+            );
+          }
+          return Product.updateOne(
+            { _id: item.productId },
+            { $inc: { stock: item.quantity } }
+          );
+        });
+        await Promise.all(stockRollbacks);
+
         order.status = 'Cancelled';
         order.timeline.push({
           status: 'Cancelled',
@@ -211,11 +229,19 @@ export async function POST(req) {
           source: 'Customer'
         });
         await order.save();
-        
+
+        if (isUsageReleasingTransition(oldStatus, order.status)) {
+          try {
+            await reconcilePromotionUsage(order, -1);
+          } catch (e) {
+            console.error("[Profile Cancel Promotion Usage Reconciliation Error]", e);
+          }
+        }
+
         // Dispatch event for listeners (like email)
         const pairoEvents = (await import("@/lib/events")).default;
         pairoEvents.dispatch('ORDER_CANCELLED', order);
-        
+
         return NextResponse.json({ message: "Order cancelled successfully" });
       }
       default:

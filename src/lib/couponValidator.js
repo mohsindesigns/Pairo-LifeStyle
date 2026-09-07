@@ -1,8 +1,63 @@
+import crypto from "crypto";
 import Order from "@/models/Order";
 import Subscriber from "@/models/Subscriber";
 import Customer from "@/models/Customer";
 import Product from "@/models/Product";
-import mongoose from "mongoose";
+
+/**
+ * Hashes an IP address for privacy-safe storage/comparison in redeemedFingerprints.
+ */
+export function hashFingerprint(ip) {
+  if (!ip) return null;
+  return crypto.createHash("sha256").update(String(ip)).digest("hex");
+}
+
+/**
+ * Resolves the real, DB-verified product for each cart line item, keyed by
+ * whatever identifier (Mongo _id or legacy numeric id) the item carries.
+ */
+async function loadDbProductMap(items = []) {
+  const cartProductIds = items.map(item => item.id?.toString() || item.productId?.toString() || item._id?.toString());
+
+  const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
+  const objectIds = [];
+  const numericIds = [];
+  for (const id of cartProductIds) {
+    if (isValidObjectId(id)) {
+      objectIds.push(id);
+    } else {
+      const num = parseInt(id);
+      if (!isNaN(num)) {
+        numericIds.push(num);
+      }
+    }
+  }
+
+  const queryOr = [];
+  if (objectIds.length > 0) queryOr.push({ _id: { $in: objectIds } });
+  if (numericIds.length > 0) queryOr.push({ id: { $in: numericIds } });
+
+  let productsInDb = [];
+  if (queryOr.length > 0) {
+    productsInDb = await Product.find({ $or: queryOr }).select("_id id categories price compareAtPrice");
+  }
+
+  const map = {}; // keyed by both the Mongo _id string AND the legacy numeric id string
+  productsInDb.forEach(p => {
+    const entry = {
+      objectId: p._id.toString(),
+      categories: (p.categories || []).map(c => c.toString()),
+      price: p.price,
+      onSale: p.compareAtPrice != null && p.compareAtPrice > p.price
+    };
+    map[p._id.toString()] = entry;
+    if (p.id !== undefined && p.id !== null) {
+      map[p.id.toString()] = entry;
+    }
+  });
+
+  return map;
+}
 
 /**
  * Validates a legacy Discount coupon document against the user's cart, subtotal, and user session context.
@@ -13,30 +68,69 @@ import mongoose from "mongoose";
  * @param {Array} options.items - Cart items.
  * @param {string} [options.userId] - The user ID if logged in.
  * @param {string} [options.email] - The customer's email address.
+ * @param {string} [options.ip] - The requester's IP address, for device-abuse restrictions.
  * @returns {Promise<{ valid: boolean, error?: string }>} Validation result.
  */
-export async function validateLegacyDiscount(discount, { cartSubtotal, items = [], userId = null, email = null }) {
-  // 1. Expiry Date Check
+export async function validateLegacyDiscount(discount, { cartSubtotal, items = [], userId = null, email = null, ip = null }) {
+  // 1. Start Date Check
+  if (discount.startDate && new Date() < new Date(discount.startDate)) {
+    return { valid: false, error: "This promo code is not active yet." };
+  }
+
+  // 2. Expiry Date Check
   if (discount.endDate && new Date() > new Date(discount.endDate)) {
     return { valid: false, error: "Promo code has expired." };
   }
 
-  // 2. Global Usage Limit Check
+  // 3. Global Usage Limit Check
   if (discount.usageLimit && discount.usageCount >= discount.usageLimit) {
     return { valid: false, error: "Promo code usage limit has been reached." };
   }
 
-  // 3. Minimum Order Amount Check
+  // 4. Minimum Order Amount Check
   if (cartSubtotal < discount.minPurchase) {
     return { valid: false, error: `Minimum purchase of $${discount.minPurchase.toFixed(2)} is required for this promo code.` };
   }
 
-  // 4. Account Registration Check (Logged in users only)
+  // 5. Minimum Item Quantity Check
+  if (discount.minQuantity > 0) {
+    const totalQuantity = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    if (totalQuantity < discount.minQuantity) {
+      return { valid: false, error: `A minimum of ${discount.minQuantity} item(s) is required for this promo code.` };
+    }
+  }
+
+  // 6. Account Registration Check (Logged in users only)
   if (discount.userRegistrationRequired && !userId) {
     return { valid: false, error: "You must register or log in to use this coupon." };
   }
 
-  // 5. First Order Only Check
+  // 7. Specific Customers Check
+  if (discount.specificCustomers && discount.specificCustomers.length > 0) {
+    const allowedIds = discount.specificCustomers.map(c => c.toString());
+    let matched = userId && allowedIds.includes(userId.toString());
+
+    if (!matched && email) {
+      const customer = await Customer.findOne({ email: email.toLowerCase().trim() }).select("_id");
+      if (customer && allowedIds.includes(customer._id.toString())) {
+        matched = true;
+      }
+    }
+
+    if (!matched) {
+      return { valid: false, error: "This coupon is not valid for your account." };
+    }
+  }
+
+  // 8. One Redemption Per Device/IP Check
+  if (discount.oneRedemptionPerDevice) {
+    const fingerprint = hashFingerprint(ip);
+    if (fingerprint && discount.redeemedFingerprints?.includes(fingerprint)) {
+      return { valid: false, error: "This promo code has already been redeemed from this device." };
+    }
+  }
+
+  // 9. First Order Only Check
   if (discount.firstOrderOnly) {
     const previousOrdersQuery = { status: { $nin: ["Cancelled"] } };
     const orConditions = [];
@@ -56,7 +150,7 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
     }
   }
 
-  // 6. Newsletter Subscription Check
+  // 10. Newsletter Subscription Check
   if (discount.newsletterSubscribedOnly) {
     let checkEmail = email;
     if (!checkEmail && userId) {
@@ -67,9 +161,9 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
     }
 
     if (checkEmail) {
-      const subscriber = await Subscriber.findOne({ 
-        email: checkEmail.toLowerCase().trim(), 
-        status: "Subscribed" 
+      const subscriber = await Subscriber.findOne({
+        email: checkEmail.toLowerCase().trim(),
+        status: "Subscribed"
       });
       if (!subscriber) {
         return { valid: false, error: "This coupon is reserved for newsletter subscribers only." };
@@ -79,9 +173,9 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
     }
   }
 
-  // 7. One Use Per Customer Check (or specific user usage limit)
-  const limitPerUser = discount.usagePerUserLimit || 1;
+  // 11. One Use Per Customer Check (or specific user usage limit)
   if (discount.usagePerUserLimit !== undefined && discount.usagePerUserLimit !== null) {
+    const limitPerUser = discount.usagePerUserLimit;
     const userUsageQuery = { "financials.promoCode": discount.code, status: { $nin: ["Cancelled"] } };
     const orConditions = [];
     if (userId) {
@@ -90,7 +184,7 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
     if (email) {
       orConditions.push({ "customer.email": email.toLowerCase().trim() });
     }
-    
+
     if (orConditions.length > 0) {
       userUsageQuery.$or = orConditions;
       const userUsageCount = await Order.countDocuments(userUsageQuery);
@@ -100,82 +194,31 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
     }
   }
 
-  // 8. Specific Product restriction
+  // 12. Specific Product restriction
   if (discount.specificProducts && discount.specificProducts.length > 0) {
+    const dbProductMap = await loadDbProductMap(items);
     const cartProductIds = items.map(item => item.id?.toString() || item.productId?.toString() || item._id?.toString());
-    
-    const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
-    const objectIds = [];
-    const numericIds = [];
-    for (const id of cartProductIds) {
-      if (isValidObjectId(id)) {
-        objectIds.push(id);
-      } else {
-        const num = parseInt(id);
-        if (!isNaN(num)) {
-          numericIds.push(num);
-        }
-      }
-    }
+    const allowedIds = discount.specificProducts.map(p => p.toString());
 
-    const queryOr = [];
-    if (objectIds.length > 0) {
-      queryOr.push({ _id: { $in: objectIds } });
-    }
-    if (numericIds.length > 0) {
-      queryOr.push({ id: { $in: numericIds } });
-    }
-
-    let productsInDb = [];
-    if (queryOr.length > 0) {
-      productsInDb = await Product.find({ $or: queryOr }).select("_id");
-    }
-
-    const dbProductObjectIds = productsInDb.map(p => p._id.toString());
-    const allObjectIds = [...new Set([...dbProductObjectIds, ...objectIds])];
-
-    const matched = allObjectIds.some(id => discount.specificProducts.map(p => p.toString()).includes(id));
+    const matched = cartProductIds.some(id => {
+      const entry = dbProductMap[id];
+      return entry && allowedIds.includes(entry.objectId);
+    });
     if (!matched) {
       return { valid: false, error: "This coupon is only valid for specific products." };
     }
   }
 
-  // 9. Specific Category restriction
+  // 13. Specific Category restriction
   if (discount.specificCategories && discount.specificCategories.length > 0) {
+    const dbProductMap = await loadDbProductMap(items);
     const cartProductIds = items.map(item => item.id?.toString() || item.productId?.toString() || item._id?.toString());
-    
-    const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
-    const objectIds = [];
-    const numericIds = [];
-    for (const id of cartProductIds) {
-      if (isValidObjectId(id)) {
-        objectIds.push(id);
-      } else {
-        const num = parseInt(id);
-        if (!isNaN(num)) {
-          numericIds.push(num);
-        }
-      }
-    }
+    const allowedIds = discount.specificCategories.map(c => c.toString());
 
-    const queryOr = [];
-    if (objectIds.length > 0) {
-      queryOr.push({ _id: { $in: objectIds } });
-    }
-    if (numericIds.length > 0) {
-      queryOr.push({ id: { $in: numericIds } });
-    }
-
-    let productsInDb = [];
-    if (queryOr.length > 0) {
-      productsInDb = await Product.find({ $or: queryOr }).select("categories");
-    }
-
-    const dbCategoryIds = productsInDb.flatMap(p => p.categories || []);
-    
-    const matched = dbCategoryIds.some(catId => 
-      discount.specificCategories.map(c => c.toString()).includes(catId.toString())
-    );
+    const matched = cartProductIds.some(id => {
+      const entry = dbProductMap[id];
+      return entry && entry.categories.some(catId => allowedIds.includes(catId));
+    });
     if (!matched) {
       return { valid: false, error: "This coupon is only valid for specific categories." };
     }
@@ -187,6 +230,10 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
 /**
  * Calculates the subtotal of items eligible for a legacy Discount coupon.
  *
+ * Prices are always re-derived from the DB Product record rather than trusting
+ * the client-supplied `item.price` — otherwise a forged request could claim any
+ * price for a real product and inflate the resulting discount arbitrarily.
+ *
  * @param {Object} discount - The Discount Mongoose document.
  * @param {Array} items - Cart items.
  * @returns {Promise<number>} Eligible subtotal.
@@ -194,82 +241,54 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
 export async function calculateEligibleSubtotal(discount, items = []) {
   const hasProductRestrictions = discount.specificProducts && discount.specificProducts.length > 0;
   const hasCategoryRestrictions = discount.specificCategories && discount.specificCategories.length > 0;
+  const excludeSaleItems = !!discount.excludeSaleItems;
 
-  if (!hasProductRestrictions && !hasCategoryRestrictions) {
-    return items.reduce((total, item) => total + item.price * item.quantity, 0);
-  }
-
-  const cartProductIds = items.map(item => item.id?.toString() || item.productId?.toString() || item._id?.toString());
-  
-  const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
-  const objectIds = [];
-  const numericIds = [];
-  for (const id of cartProductIds) {
-    if (isValidObjectId(id)) {
-      objectIds.push(id);
-    } else {
-      const num = parseInt(id);
-      if (!isNaN(num)) {
-        numericIds.push(num);
-      }
-    }
-  }
-
-  const queryOr = [];
-  if (objectIds.length > 0) {
-    queryOr.push({ _id: { $in: objectIds } });
-  }
-  if (numericIds.length > 0) {
-    queryOr.push({ id: { $in: numericIds } });
-  }
-
-  let productsInDb = [];
-  if (queryOr.length > 0) {
-    productsInDb = await Product.find({ $or: queryOr }).select("categories id");
-  }
-
-  const productCategoryMap = {};
-  const productObjectIdMap = {}; // Maps numeric id or ObjectId to its MongoDB _id string
-  
-  productsInDb.forEach(p => {
-    const cats = p.categories ? p.categories.map(c => c.toString()) : [];
-    const mongoIdStr = p._id.toString();
-    productCategoryMap[mongoIdStr] = cats;
-    productObjectIdMap[mongoIdStr] = mongoIdStr;
-    if (p.id !== undefined && p.id !== null) {
-      productCategoryMap[p.id.toString()] = cats;
-      productObjectIdMap[p.id.toString()] = mongoIdStr;
-    }
-  });
+  const dbProductMap = await loadDbProductMap(items);
+  const allowedProductIds = hasProductRestrictions ? discount.specificProducts.map(p => p.toString()) : null;
+  const allowedCategoryIds = hasCategoryRestrictions ? discount.specificCategories.map(c => c.toString()) : null;
 
   let eligibleSubtotal = 0;
   for (const item of items) {
     const productId = item.id?.toString() || item.productId?.toString() || item._id?.toString();
-    const dbCategories = productCategoryMap[productId] || [];
-    const dbProductObjectId = productObjectIdMap[productId] || productId;
+    const dbEntry = dbProductMap[productId];
+    // Fall back to the client-supplied price only when the product can't be found in the
+    // DB (e.g. a since-deleted product still sitting in someone's cart) — a real, existing
+    // product's price is always taken from the DB, never from the request body.
+    const price = dbEntry ? dbEntry.price : item.price;
 
     let isEligible = true;
 
     if (hasProductRestrictions) {
-      const isProductMatch = discount.specificProducts.map(p => p.toString()).includes(dbProductObjectId);
-      if (!isProductMatch) {
+      if (!dbEntry || !allowedProductIds.includes(dbEntry.objectId)) {
         isEligible = false;
       }
     }
 
     if (hasCategoryRestrictions && isEligible) {
-      const isCategoryMatch = dbCategories.some(catId => 
-        discount.specificCategories.map(c => c.toString()).includes(catId)
-      );
-      if (!isCategoryMatch) {
+      if (!dbEntry || !dbEntry.categories.some(catId => allowedCategoryIds.includes(catId))) {
         isEligible = false;
       }
     }
 
+    if (excludeSaleItems && isEligible && dbEntry?.onSale) {
+      isEligible = false;
+    }
+
     if (isEligible) {
-      eligibleSubtotal += item.price * item.quantity;
+      eligibleSubtotal += price * item.quantity;
     }
   }
 
   return eligibleSubtotal;
+}
+
+/**
+ * Applies a coupon's optional maximum-discount-amount cap (e.g. "20% off, up to $50").
+ * Only meaningful for percentage discounts, but safe to call for any discount type.
+ */
+export function applyDiscountCap(discount, amount) {
+  if (discount.maxDiscountAmount != null && discount.maxDiscountAmount >= 0) {
+    return Math.min(amount, discount.maxDiscountAmount);
+  }
+  return amount;
 }

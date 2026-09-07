@@ -19,22 +19,29 @@ export async function POST(req) {
             ...otherPromos.filter(p => p._id.toString() !== promotion._id?.toString())
         ];
 
-        const results = await Engine.evaluate(cart, { 
+        const context = {
+            customerType: cart.customerType,
+            userId: cart.userId,
+            email: cart.email
+        };
+
+        const results = await Engine.evaluate(cart, {
             activePromotions,
-            skipDb: true 
+            skipDb: true,
+            ...context
         });
 
         // Extract the result for our specific promotion
         // Since we only passed one, it's the only one that could be in appliedPromotions or rejected
         const isEligible = results.appliedPromotions.some(p => p.title === promotion.title);
-        
-        // We need to get the detailed metadata from the ConditionEvaluator directly 
+
+        // We need to get the detailed metadata from the ConditionEvaluator directly
         // because the Engine usually abstracts it away for the final checkout result.
         const { default: ConditionEvaluator } = await import('@/lib/promotionEngine/ConditionEvaluator');
-        const evaluation = ConditionEvaluator.evaluate(promotion, cart, {});
+        const evaluation = ConditionEvaluator.evaluate(promotion, cart, context);
 
         return NextResponse.json({
-            isEligible: evaluation.isEligible,
+            isEligible,
             discountTotal: results.discountTotal,
             appliedPromotions: results.appliedPromotions,
             debugMetadata: evaluation.debugMetadata,

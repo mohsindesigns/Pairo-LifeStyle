@@ -6,6 +6,7 @@ import Order from "@/models/Order";
 import stripe from "@/lib/stripe";
 import { can } from "@/lib/rbac";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
+import { reconcilePromotionUsage, isUsageReleasingTransition } from "@/lib/promotionUsageReconciliation";
 
 export async function POST(req, { params }) {
   try {
@@ -64,11 +65,20 @@ export async function POST(req, { params }) {
       adminUser: session.user.id,
     });
 
+    const oldStatus = order.status;
     if (isFullyRefunded) {
       order.status = 'Refunded';
     }
 
     await order.save();
+
+    if (isFullyRefunded && isUsageReleasingTransition(oldStatus, order.status)) {
+      try {
+        await reconcilePromotionUsage(order, -1);
+      } catch (e) {
+        console.error("[Refund Promotion Usage Reconciliation Error]", e);
+      }
+    }
 
     if (order.affiliateId) {
       try {

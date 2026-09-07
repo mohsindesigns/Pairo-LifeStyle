@@ -62,6 +62,7 @@ export async function POST(req) {
       mongoSession: null,
       dryRun: true,
       log,
+      ipAddress,
     });
 
     const amountCents = Math.round(pricing.authoritativeTotal * 100);

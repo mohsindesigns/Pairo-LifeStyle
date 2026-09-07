@@ -11,6 +11,8 @@ export default function usePromotionEditor(initialData) {
     priority: 0,
     exclusive: false,
     stackable: false,
+    startDate: null,
+    endDate: null,
     usageLimits: { maxTotalUses: null, maxUsesPerCustomer: 1 },
     conditions: { operator: 'AND', rules: [] },
     actions: []

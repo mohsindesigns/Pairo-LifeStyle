@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Discount from "@/models/Discount";
+import Customer from "@/models/Customer";
 import { NextResponse } from "next/server";
 
 // Verify session is staff
@@ -11,6 +12,22 @@ async function checkAuth() {
     return null;
   }
   return session;
+}
+
+// Resolves a comma/newline-separated list of customer emails (the admin-facing
+// input format) into Customer ObjectIds for storage on Discount.specificCustomers.
+async function resolveCustomerIds(emailsInput) {
+  if (!emailsInput || typeof emailsInput !== "string") return [];
+  const emails = emailsInput.split(/[,\n]/).map(e => e.trim().toLowerCase()).filter(Boolean);
+  if (emails.length === 0) return [];
+
+  const customers = await Customer.find({ email: { $in: emails } }).select("_id email");
+  const foundEmails = new Set(customers.map(c => c.email.toLowerCase()));
+  const notFound = emails.filter(e => !foundEmails.has(e));
+  if (notFound.length > 0) {
+    throw new Error(`No customer account found for: ${notFound.join(", ")}`);
+  }
+  return customers.map(c => c._id);
 }
 
 export async function GET(req) {
@@ -40,6 +57,13 @@ export async function GET(req) {
               { endDate: null },
               { endDate: { $gte: now } }
             ]
+          },
+          {
+            $or: [
+              { startDate: { $exists: false } },
+              { startDate: null },
+              { startDate: { $lte: now } }
+            ]
           }
         ];
       } else if (status === "Expired") {
@@ -55,7 +79,7 @@ export async function GET(req) {
       ];
     }
 
-    const discounts = await Discount.find(query).sort({ createdAt: -1 });
+    const discounts = await Discount.find(query).populate("specificCustomers", "email").sort({ createdAt: -1 });
 
     // 3. Stats Calculation
     const [allCount, activeCount, expiredCount, trashCount] = await Promise.all([
@@ -63,10 +87,21 @@ export async function GET(req) {
       Discount.countDocuments({
         isDeleted: { $ne: true },
         isActive: true,
-        $or: [
-          { endDate: { $exists: false } },
-          { endDate: null },
-          { endDate: { $gte: now } }
+        $and: [
+          {
+            $or: [
+              { endDate: { $exists: false } },
+              { endDate: null },
+              { endDate: { $gte: now } }
+            ]
+          },
+          {
+            $or: [
+              { startDate: { $exists: false } },
+              { startDate: null },
+              { startDate: { $lte: now } }
+            ]
+          }
         ]
       }),
       Discount.countDocuments({ isDeleted: { $ne: true }, endDate: { $lt: now } }),
@@ -111,11 +146,20 @@ export async function POST(req) {
       }
     }
 
-    // Expiry date end-of-day timezone normalization (23:59:59.999 UTC)
+    // Expiry date end-of-day normalization — constructed via the local Date
+    // constructor (not setUTCHours) so "2026-09-10" resolves to the end of
+    // that calendar date in the server's own timezone, not an arbitrary UTC
+    // offset that can cut the coupon off hours before the admin's local midnight.
     let expiryDate = null;
     if (body.endDate && body.endDate !== "") {
-      expiryDate = new Date(body.endDate);
-      expiryDate.setUTCHours(23, 59, 59, 999);
+      const [y, m, d] = body.endDate.split("-").map(Number);
+      expiryDate = new Date(y, m - 1, d, 23, 59, 59, 999);
+    }
+
+    let startDate = null;
+    if (body.startDate && body.startDate !== "") {
+      const [y, m, d] = body.startDate.split("-").map(Number);
+      startDate = new Date(y, m - 1, d, 0, 0, 0, 0);
     }
 
     // Valid ObjectId checks
@@ -135,6 +179,13 @@ export async function POST(req) {
       }
     }
 
+    let specificCustomers;
+    try {
+      specificCustomers = await resolveCustomerIds(body.specificCustomerEmails);
+    } catch (err) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+
     // Sanitize values to prevent CastErrors
     const data = {
       code: codeUpper,
@@ -142,6 +193,7 @@ export async function POST(req) {
       value: Number(body.value),
       minPurchase: (body.minPurchase !== "" && body.minPurchase !== null && body.minPurchase !== undefined) ? Number(body.minPurchase) : 0,
       usageLimit: (body.usageLimit && body.usageLimit !== "") ? Number(body.usageLimit) : null,
+      startDate,
       endDate: expiryDate,
       isActive: body.isActive !== undefined ? body.isActive : true,
       firstOrderOnly: body.firstOrderOnly !== undefined ? !!body.firstOrderOnly : false,
@@ -149,7 +201,13 @@ export async function POST(req) {
       newsletterSubscribedOnly: body.newsletterSubscribedOnly !== undefined ? !!body.newsletterSubscribedOnly : false,
       specificProducts,
       specificCategories,
-      usagePerUserLimit: (body.usagePerUserLimit !== undefined && body.usagePerUserLimit !== "") ? Number(body.usagePerUserLimit) : 1
+      // Blank/omitted = unlimited (null); the admin form now surfaces an explicit "Unlimited" toggle
+      usagePerUserLimit: (body.usagePerUserLimit !== undefined && body.usagePerUserLimit !== "" && body.usagePerUserLimit !== null) ? Number(body.usagePerUserLimit) : null,
+      maxDiscountAmount: (body.maxDiscountAmount !== undefined && body.maxDiscountAmount !== "" && body.maxDiscountAmount !== null) ? Number(body.maxDiscountAmount) : null,
+      minQuantity: (body.minQuantity !== undefined && body.minQuantity !== "" && body.minQuantity !== null) ? Number(body.minQuantity) : 0,
+      excludeSaleItems: body.excludeSaleItems !== undefined ? !!body.excludeSaleItems : false,
+      specificCustomers,
+      oneRedemptionPerDevice: body.oneRedemptionPerDevice !== undefined ? !!body.oneRedemptionPerDevice : false
     };
 
     if (data.type === "percentage" && data.value > 100) {
@@ -165,8 +223,17 @@ export async function POST(req) {
     if (data.usageLimit !== null && (isNaN(data.usageLimit) || data.usageLimit <= 0)) {
       return NextResponse.json({ error: "Usage limit must be a positive number." }, { status: 400 });
     }
-    if (isNaN(data.usagePerUserLimit) || data.usagePerUserLimit <= 0) {
+    if (data.usagePerUserLimit !== null && (isNaN(data.usagePerUserLimit) || data.usagePerUserLimit <= 0)) {
       return NextResponse.json({ error: "Usage limit per user must be a positive number." }, { status: 400 });
+    }
+    if (data.maxDiscountAmount !== null && (isNaN(data.maxDiscountAmount) || data.maxDiscountAmount <= 0)) {
+      return NextResponse.json({ error: "Max discount cap must be a positive number." }, { status: 400 });
+    }
+    if (isNaN(data.minQuantity) || data.minQuantity < 0) {
+      return NextResponse.json({ error: "Minimum quantity must be a non-negative number." }, { status: 400 });
+    }
+    if (data.startDate && data.endDate && data.startDate > data.endDate) {
+      return NextResponse.json({ error: "Start date must be before the expiry date." }, { status: 400 });
     }
 
     const discount = await Discount.create(data);
@@ -249,12 +316,24 @@ export async function PUT(req) {
 
     if (body.endDate !== undefined) {
       if (body.endDate && body.endDate !== "") {
-        const expiryDate = new Date(body.endDate);
-        expiryDate.setUTCHours(23, 59, 59, 999);
-        discount.endDate = expiryDate;
+        const [y, m, d] = body.endDate.split("-").map(Number);
+        discount.endDate = new Date(y, m - 1, d, 23, 59, 59, 999);
       } else {
         discount.endDate = null;
       }
+    }
+
+    if (body.startDate !== undefined) {
+      if (body.startDate && body.startDate !== "") {
+        const [y, m, d] = body.startDate.split("-").map(Number);
+        discount.startDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+      } else {
+        discount.startDate = null;
+      }
+    }
+
+    if (discount.startDate && discount.endDate && discount.startDate > discount.endDate) {
+      return NextResponse.json({ error: "Start date must be before the expiry date." }, { status: 400 });
     }
 
     const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
@@ -283,11 +362,39 @@ export async function PUT(req) {
       discount.specificCategories = cats;
     }
     if (body.usagePerUserLimit !== undefined) {
-      const limitPerUser = (body.usagePerUserLimit !== "" && body.usagePerUserLimit !== null) ? Number(body.usagePerUserLimit) : 1;
-      if (isNaN(limitPerUser) || limitPerUser <= 0) {
+      // Blank/null = unlimited, surfaced via the admin form's "Unlimited" toggle
+      const limitPerUser = (body.usagePerUserLimit !== "" && body.usagePerUserLimit !== null) ? Number(body.usagePerUserLimit) : null;
+      if (limitPerUser !== null && (isNaN(limitPerUser) || limitPerUser <= 0)) {
         return NextResponse.json({ error: "Usage limit per user must be a positive number." }, { status: 400 });
       }
       discount.usagePerUserLimit = limitPerUser;
+    }
+
+    if (body.maxDiscountAmount !== undefined) {
+      const cap = (body.maxDiscountAmount !== "" && body.maxDiscountAmount !== null) ? Number(body.maxDiscountAmount) : null;
+      if (cap !== null && (isNaN(cap) || cap <= 0)) {
+        return NextResponse.json({ error: "Max discount cap must be a positive number." }, { status: 400 });
+      }
+      discount.maxDiscountAmount = cap;
+    }
+
+    if (body.minQuantity !== undefined) {
+      const minQty = (body.minQuantity !== "" && body.minQuantity !== null) ? Number(body.minQuantity) : 0;
+      if (isNaN(minQty) || minQty < 0) {
+        return NextResponse.json({ error: "Minimum quantity must be a non-negative number." }, { status: 400 });
+      }
+      discount.minQuantity = minQty;
+    }
+
+    if (body.excludeSaleItems !== undefined) discount.excludeSaleItems = !!body.excludeSaleItems;
+    if (body.oneRedemptionPerDevice !== undefined) discount.oneRedemptionPerDevice = !!body.oneRedemptionPerDevice;
+
+    if (body.specificCustomerEmails !== undefined) {
+      try {
+        discount.specificCustomers = await resolveCustomerIds(body.specificCustomerEmails);
+      } catch (err) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      }
     }
 
     if (body.isActive !== undefined) {

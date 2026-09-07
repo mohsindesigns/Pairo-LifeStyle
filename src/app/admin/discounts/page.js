@@ -1,10 +1,71 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, Suspense } from "react";
-import { ChevronDown, Search, Edit2, X } from "lucide-react";
+import { ChevronDown, Search, Edit2, X, QrCode, Copy, Check } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
+
+const EMPTY_FORM = {
+  code: "",
+  type: "percentage",
+  value: "",
+  minPurchase: "",
+  usageLimit: "",
+  unlimitedUsage: false,
+  usagePerUserLimit: "1",
+  unlimitedPerCustomer: false,
+  startDate: "",
+  endDate: "",
+  isActive: true,
+  firstOrderOnly: false,
+  userRegistrationRequired: false,
+  newsletterSubscribedOnly: false,
+  specificProducts: "",
+  specificCategories: "",
+  maxDiscountAmount: "",
+  minQuantity: "",
+  excludeSaleItems: false,
+  specificCustomerEmails: "",
+  oneRedemptionPerDevice: false
+};
+
+function ShareCouponModal({ discount, onClose }) {
+  const [copied, setCopied] = useState(false);
+  if (!discount) return null;
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const link = `${origin}/promo/${discount.code}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-[4px] border border-[#c3c4c7] shadow-xl w-full max-w-sm p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[14px] font-bold text-[#1d2327]">Share Coupon &quot;{discount.code}&quot;</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="text-[12px] text-[#646970]">Scanning this QR code (or opening the link) automatically applies the coupon and takes the shopper to the store.</p>
+        <div className="flex justify-center bg-white p-4 border border-[#ccd0d4] rounded">
+          <QRCodeSVG value={link} size={180} />
+        </div>
+        <div className="flex items-center gap-2">
+          <input readOnly value={link} className="flex-1 text-xs border border-[#ccd0d4] rounded-[3px] px-2.5 py-1.5 bg-[#f6f7f7] font-mono" onFocus={e => e.target.select()} />
+          <button onClick={handleCopy} className="shrink-0 bg-[#2271b1] hover:bg-[#135e96] text-white text-xs font-semibold px-3 py-1.5 rounded-[3px] flex items-center gap-1.5">
+            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CouponsContent() {
   const searchParams = useSearchParams();
@@ -29,37 +90,14 @@ function CouponsContent() {
   const [successNotice, setSuccessNotice] = useState("");
 
   // Create Form State
-  const [formData, setFormData] = useState({
-    code: "",
-    type: "percentage",
-    value: "",
-    minPurchase: "",
-    usageLimit: "",
-    endDate: "",
-    firstOrderOnly: false,
-    userRegistrationRequired: false,
-    newsletterSubscribedOnly: false,
-    specificProducts: "",
-    specificCategories: "",
-    usagePerUserLimit: "1"
-  });
+  const [formData, setFormData] = useState({ ...EMPTY_FORM });
 
   // Quick Edit State
   const [quickEditingId, setQuickEditingId] = useState(null);
-  const [quickEditData, setQuickEditData] = useState({
-    code: "",
-    type: "percentage",
-    value: "",
-    minPurchase: "",
-    usageLimit: "",
-    endDate: "",
-    firstOrderOnly: false,
-    userRegistrationRequired: false,
-    newsletterSubscribedOnly: false,
-    specificProducts: "",
-    specificCategories: "",
-    usagePerUserLimit: "1"
-  });
+  const [quickEditData, setQuickEditData] = useState({ ...EMPTY_FORM });
+
+  // Share/QR Modal
+  const [sharingDiscount, setSharingDiscount] = useState(null);
 
   const fetchDiscounts = useCallback(async () => {
     setLoading(true);
@@ -91,20 +129,7 @@ function CouponsContent() {
   }, [fetchDiscounts]);
 
   const handleReset = () => {
-    setFormData({ 
-      code: "", 
-      type: "percentage", 
-      value: "", 
-      minPurchase: "", 
-      usageLimit: "", 
-      endDate: "",
-      firstOrderOnly: false,
-      userRegistrationRequired: false,
-      newsletterSubscribedOnly: false,
-      specificProducts: "",
-      specificCategories: "",
-      usagePerUserLimit: "1"
-    });
+    setFormData({ ...EMPTY_FORM });
   };
 
   const handleSubmit = async (e) => {
@@ -119,7 +144,9 @@ function CouponsContent() {
           : [],
         specificCategories: formData.specificCategories
           ? formData.specificCategories.split(",").map(id => id.trim()).filter(id => id && id.length === 24)
-          : []
+          : [],
+        usageLimit: formData.unlimitedUsage ? "" : formData.usageLimit,
+        usagePerUserLimit: formData.unlimitedPerCustomer ? "" : formData.usagePerUserLimit
       };
 
       const res = await fetch("/api/admin/discounts", {
@@ -146,10 +173,11 @@ function CouponsContent() {
     setErrorNotice("");
     setSuccessNotice("");
     try {
-      const { _id, usageCount, createdAt, updatedAt, ...rest } = discount;
+      const { _id, usageCount, createdAt, updatedAt, specificCustomers, redeemedFingerprints, ...rest } = discount;
       const copy = {
         ...rest,
-        code: `${discount.code}_COPY_${Math.floor(Math.random() * 1000)}`
+        code: `${discount.code}_COPY_${Math.floor(Math.random() * 1000)}`,
+        specificCustomerEmails: specificCustomers ? specificCustomers.map(c => c.email).join(", ") : ""
       };
       const res = await fetch("/api/admin/discounts", {
         method: "POST",
@@ -257,10 +285,11 @@ function CouponsContent() {
             } else if (bulkAction === "Duplicate") {
               const d = discounts.find(x => x._id === id);
               if (d) {
-                const { _id, usageCount, createdAt, updatedAt, ...rest } = d;
+                const { _id, usageCount, createdAt, updatedAt, specificCustomers, redeemedFingerprints, ...rest } = d;
                 const copy = {
                   ...rest,
-                  code: `${d.code}_COPY_${Math.floor(Math.random() * 1000)}`
+                  code: `${d.code}_COPY_${Math.floor(Math.random() * 1000)}`,
+                  specificCustomerEmails: specificCustomers ? specificCustomers.map(c => c.email).join(", ") : ""
                 };
                 const res = await fetch("/api/admin/discounts", {
                   method: "POST",
@@ -306,13 +335,22 @@ function CouponsContent() {
       value: discount.value,
       minPurchase: discount.minPurchase || "",
       usageLimit: discount.usageLimit || "",
+      unlimitedUsage: !discount.usageLimit,
+      startDate: discount.startDate ? new Date(discount.startDate).toISOString().split("T")[0] : "",
       endDate: discount.endDate ? new Date(discount.endDate).toISOString().split("T")[0] : "",
+      isActive: discount.isActive !== undefined ? discount.isActive : true,
       firstOrderOnly: !!discount.firstOrderOnly,
       userRegistrationRequired: !!discount.userRegistrationRequired,
       newsletterSubscribedOnly: !!discount.newsletterSubscribedOnly,
       specificProducts: discount.specificProducts ? discount.specificProducts.join(", ") : "",
       specificCategories: discount.specificCategories ? discount.specificCategories.join(", ") : "",
-      usagePerUserLimit: discount.usagePerUserLimit !== undefined && discount.usagePerUserLimit !== null ? discount.usagePerUserLimit.toString() : "1"
+      usagePerUserLimit: discount.usagePerUserLimit !== undefined && discount.usagePerUserLimit !== null ? discount.usagePerUserLimit.toString() : "",
+      unlimitedPerCustomer: discount.usagePerUserLimit === undefined || discount.usagePerUserLimit === null,
+      maxDiscountAmount: discount.maxDiscountAmount !== undefined && discount.maxDiscountAmount !== null ? discount.maxDiscountAmount.toString() : "",
+      minQuantity: discount.minQuantity || "",
+      excludeSaleItems: !!discount.excludeSaleItems,
+      specificCustomerEmails: discount.specificCustomers ? discount.specificCustomers.map(c => c.email).join(", ") : "",
+      oneRedemptionPerDevice: !!discount.oneRedemptionPerDevice
     });
   };
 
@@ -327,7 +365,9 @@ function CouponsContent() {
           : [],
         specificCategories: quickEditData.specificCategories
           ? quickEditData.specificCategories.split(",").map(id => id.trim()).filter(id => id && id.length === 24)
-          : []
+          : [],
+        usageLimit: quickEditData.unlimitedUsage ? "" : quickEditData.usageLimit,
+        usagePerUserLimit: quickEditData.unlimitedPerCustomer ? "" : quickEditData.usagePerUserLimit
       };
 
       const res = await fetch(`/api/admin/discounts?id=${id}`, {
@@ -371,6 +411,7 @@ function CouponsContent() {
   const getCouponStatus = (d) => {
     if (d.isDeleted) return { label: "Trashed", color: "text-red-500 font-bold" };
     if (!d.isActive) return { label: "Inactive", color: "text-gray-400 font-medium" };
+    if (d.startDate && new Date(d.startDate) > new Date()) return { label: "Scheduled", color: "text-blue-600 font-semibold" };
     if (d.endDate && new Date(d.endDate) < new Date()) return { label: "Expired", color: "text-amber-600 font-semibold" };
     return { label: "Active", color: "text-green-600 font-bold" };
   };
@@ -460,19 +501,29 @@ function CouponsContent() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-[13px] font-bold text-[#1d2327]">Usage Limit</label>
-                <input 
+                <input
                   type="number"
                   min="1"
                   placeholder="Unlimited"
-                  className={`${inputClass} font-medium`}
+                  disabled={formData.unlimitedUsage}
+                  className={`${inputClass} font-medium disabled:bg-gray-100 disabled:text-gray-400`}
                   value={formData.usageLimit}
                   onChange={(e) => setFormData({...formData, usageLimit: e.target.value})}
                 />
+                <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[#2c3338] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={formData.unlimitedUsage}
+                    onChange={(e) => setFormData({...formData, unlimitedUsage: e.target.checked, usageLimit: e.target.checked ? "" : formData.usageLimit})}
+                    className="rounded-sm border-gray-300"
+                  />
+                  <span>Unlimited</span>
+                </label>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-[13px] font-bold text-[#1d2327]">Expiry Date</label>
-                <input 
+                <input
                   type="date"
                   className={`${inputClass} py-1 font-medium`}
                   value={formData.endDate}
@@ -481,13 +532,38 @@ function CouponsContent() {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-bold text-[#1d2327]">Start Date</label>
+                <input
+                  type="date"
+                  className={`${inputClass} py-1 font-medium`}
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                />
+                <p className="text-[10px] text-[#646970] italic">Leave blank to activate immediately.</p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-bold text-[#1d2327]">Coupon Status</label>
+                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer select-none h-[30px]">
+                  <input
+                    type="checkbox"
+                    checked={formData.isActive}
+                    onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
+                    className="rounded-sm border-gray-300"
+                  />
+                  <span>{formData.isActive ? "Active" : "Inactive (paused)"}</span>
+                </label>
+              </div>
+            </div>
+
             {/* Advanced Restrictions / Conditions */}
             <div className="border-t border-[#ccd0d4] pt-4 space-y-4">
               <h3 className="text-[14px] font-bold text-[#1d2327]">Usage Restrictions</h3>
-              
+
               <div className="space-y-2 select-none">
                 <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                  <input 
+                  <input
                     type="checkbox"
                     checked={formData.firstOrderOnly}
                     onChange={(e) => setFormData({...formData, firstOrderOnly: e.target.checked})}
@@ -497,7 +573,7 @@ function CouponsContent() {
                 </label>
 
                 <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                  <input 
+                  <input
                     type="checkbox"
                     checked={formData.userRegistrationRequired}
                     onChange={(e) => setFormData({...formData, userRegistrationRequired: e.target.checked})}
@@ -507,7 +583,7 @@ function CouponsContent() {
                 </label>
 
                 <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                  <input 
+                  <input
                     type="checkbox"
                     checked={formData.newsletterSubscribedOnly}
                     onChange={(e) => setFormData({...formData, newsletterSubscribedOnly: e.target.checked})}
@@ -515,24 +591,99 @@ function CouponsContent() {
                   />
                   <span>Newsletter Subscribers Only</span>
                 </label>
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.excludeSaleItems}
+                    onChange={(e) => setFormData({...formData, excludeSaleItems: e.target.checked})}
+                    className="rounded-sm border-gray-300"
+                  />
+                  <span>Exclude Sale Items (full-price items only)</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.oneRedemptionPerDevice}
+                    onChange={(e) => setFormData({...formData, oneRedemptionPerDevice: e.target.checked})}
+                    className="rounded-sm border-gray-300"
+                  />
+                  <span>Limit to One Redemption Per Device/IP</span>
+                </label>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[13px] font-bold text-[#1d2327]">Usage Limit Per Customer</label>
-                  <input 
+                  <input
                     type="number"
                     min="1"
-                    className={`${inputClass} font-medium`}
+                    placeholder="Unlimited"
+                    disabled={formData.unlimitedPerCustomer}
+                    className={`${inputClass} font-medium disabled:bg-gray-100 disabled:text-gray-400`}
                     value={formData.usagePerUserLimit}
                     onChange={(e) => setFormData({...formData, usagePerUserLimit: e.target.value})}
                   />
+                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[#2c3338] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formData.unlimitedPerCustomer}
+                      onChange={(e) => setFormData({...formData, unlimitedPerCustomer: e.target.checked, usagePerUserLimit: e.target.checked ? "" : (formData.usagePerUserLimit || "1")})}
+                      className="rounded-sm border-gray-300"
+                    />
+                    <span>Unlimited</span>
+                  </label>
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[13px] font-bold text-[#1d2327]">Minimum Quantity</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    className={`${inputClass} font-medium`}
+                    value={formData.minQuantity}
+                    onChange={(e) => setFormData({...formData, minQuantity: e.target.value})}
+                  />
+                  <p className="text-[10px] text-[#646970] italic">Minimum total items required in the cart.</p>
+                </div>
+              </div>
+
+              {formData.type === "percentage" && (
+                <div className="space-y-1.5">
+                  <label className="text-[13px] font-bold text-[#1d2327]">Max Discount Cap</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      placeholder="No cap"
+                      className={`${inputClass} pl-6 font-medium`}
+                      value={formData.maxDiscountAmount}
+                      onChange={(e) => setFormData({...formData, maxDiscountAmount: e.target.value})}
+                    />
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[11px] font-medium">$</span>
+                  </div>
+                  <p className="text-[10px] text-[#646970] italic">Caps how much a percentage discount can take off (e.g. 20% off, up to $50).</p>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-bold text-[#1d2327]">Specific Customer Emails (Comma-separated)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. jane@example.com, john@example.com"
+                  className={`${inputClass} font-mono`}
+                  value={formData.specificCustomerEmails}
+                  onChange={(e) => setFormData({...formData, specificCustomerEmails: e.target.value})}
+                />
+                <p className="text-[10px] text-[#646970] italic">Restricts the coupon to these specific customer accounts.</p>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-[13px] font-bold text-[#1d2327]">Specific Product IDs (Comma-separated)</label>
-                <input 
+                <input
                   type="text"
                   placeholder="e.g. 646a7f805a41757ef0c16922"
                   className={`${inputClass} font-mono`}
@@ -544,7 +695,7 @@ function CouponsContent() {
 
               <div className="space-y-1.5">
                 <label className="text-[13px] font-bold text-[#1d2327]">Specific Category IDs (Comma-separated)</label>
-                <input 
+                <input
                   type="text"
                   placeholder="e.g. 646c8b905a41757ef0c16944"
                   className={`${inputClass} font-mono`}
@@ -759,22 +910,53 @@ function CouponsContent() {
                               </div>
                               <div>
                                 <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Limit</label>
-                                <input 
+                                <input
                                   type="number"
-                                  placeholder="Unlimited" 
-                                  className={`${inputClass} p-1`}
+                                  placeholder="Unlimited"
+                                  disabled={quickEditData.unlimitedUsage}
+                                  className={`${inputClass} p-1 disabled:bg-gray-100 disabled:text-gray-400`}
                                   value={quickEditData.usageLimit}
                                   onChange={e => setQuickEditData({ ...quickEditData, usageLimit: e.target.value })}
                                 />
+                                <label className="flex items-center gap-1 text-[10px] font-semibold text-[#2c3338] cursor-pointer select-none mt-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={quickEditData.unlimitedUsage}
+                                    onChange={(e) => setQuickEditData({...quickEditData, unlimitedUsage: e.target.checked, usageLimit: e.target.checked ? "" : quickEditData.usageLimit})}
+                                    className="rounded-sm border-gray-300"
+                                  />
+                                  <span>Unlimited</span>
+                                </label>
                               </div>
                               <div>
                                 <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Expiry</label>
-                                <input 
-                                  type="date" 
+                                <input
+                                  type="date"
                                   className={`${inputClass} p-1`}
                                   value={quickEditData.endDate}
                                   onChange={e => setQuickEditData({ ...quickEditData, endDate: e.target.value })}
                                 />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Start Date</label>
+                                <input
+                                  type="date"
+                                  className={`${inputClass} p-1`}
+                                  value={quickEditData.startDate}
+                                  onChange={e => setQuickEditData({ ...quickEditData, startDate: e.target.value })}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Status</label>
+                                <label className="flex items-center gap-1.5 text-xs font-semibold text-[#2c3338] cursor-pointer select-none h-[26px]">
+                                  <input
+                                    type="checkbox"
+                                    checked={quickEditData.isActive}
+                                    onChange={(e) => setQuickEditData({...quickEditData, isActive: e.target.checked})}
+                                    className="rounded-sm border-gray-300"
+                                  />
+                                  <span>{quickEditData.isActive ? "Active" : "Inactive"}</span>
+                                </label>
                               </div>
                             </div>
 
@@ -782,7 +964,7 @@ function CouponsContent() {
                             <div className="border-t border-gray-200 pt-3 mt-1.5 space-y-2.5">
                               <div className="flex flex-wrap gap-x-6 gap-y-2 select-none">
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                                  <input 
+                                  <input
                                     type="checkbox"
                                     checked={quickEditData.firstOrderOnly}
                                     onChange={(e) => setQuickEditData({...quickEditData, firstOrderOnly: e.target.checked})}
@@ -792,7 +974,7 @@ function CouponsContent() {
                                 </label>
 
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                                  <input 
+                                  <input
                                     type="checkbox"
                                     checked={quickEditData.userRegistrationRequired}
                                     onChange={(e) => setQuickEditData({...quickEditData, userRegistrationRequired: e.target.checked})}
@@ -802,7 +984,7 @@ function CouponsContent() {
                                 </label>
 
                                 <label className="flex items-center gap-1.5 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                                  <input 
+                                  <input
                                     type="checkbox"
                                     checked={quickEditData.newsletterSubscribedOnly}
                                     onChange={(e) => setQuickEditData({...quickEditData, newsletterSubscribedOnly: e.target.checked})}
@@ -810,23 +992,88 @@ function CouponsContent() {
                                   />
                                   <span>Newsletter Subscribers Only</span>
                                 </label>
+
+                                <label className="flex items-center gap-1.5 text-xs font-semibold text-[#2c3338] cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={quickEditData.excludeSaleItems}
+                                    onChange={(e) => setQuickEditData({...quickEditData, excludeSaleItems: e.target.checked})}
+                                    className="rounded-sm border-gray-300"
+                                  />
+                                  <span>Exclude Sale Items</span>
+                                </label>
+
+                                <label className="flex items-center gap-1.5 text-xs font-semibold text-[#2c3338] cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={quickEditData.oneRedemptionPerDevice}
+                                    onChange={(e) => setQuickEditData({...quickEditData, oneRedemptionPerDevice: e.target.checked})}
+                                    className="rounded-sm border-gray-300"
+                                  />
+                                  <span>One Redemption Per Device</span>
+                                </label>
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div>
                                   <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Limit Per Customer</label>
-                                  <input 
+                                  <input
                                     type="number"
                                     min="1"
-                                    className={`${inputClass} p-1`}
+                                    placeholder="Unlimited"
+                                    disabled={quickEditData.unlimitedPerCustomer}
+                                    className={`${inputClass} p-1 disabled:bg-gray-100 disabled:text-gray-400`}
                                     value={quickEditData.usagePerUserLimit}
                                     onChange={(e) => setQuickEditData({...quickEditData, usagePerUserLimit: e.target.value})}
+                                  />
+                                  <label className="flex items-center gap-1 text-[10px] font-semibold text-[#2c3338] cursor-pointer select-none mt-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={quickEditData.unlimitedPerCustomer}
+                                      onChange={(e) => setQuickEditData({...quickEditData, unlimitedPerCustomer: e.target.checked, usagePerUserLimit: e.target.checked ? "" : (quickEditData.usagePerUserLimit || "1")})}
+                                      className="rounded-sm border-gray-300"
+                                    />
+                                    <span>Unlimited</span>
+                                  </label>
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Min Quantity</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className={`${inputClass} p-1`}
+                                    value={quickEditData.minQuantity}
+                                    onChange={(e) => setQuickEditData({...quickEditData, minQuantity: e.target.value})}
+                                  />
+                                </div>
+                                {quickEditData.type === "percentage" && (
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Max Discount Cap ($)</label>
+                                    <input
+                                      type="number"
+                                      min="0.01"
+                                      step="any"
+                                      placeholder="No cap"
+                                      className={`${inputClass} p-1`}
+                                      value={quickEditData.maxDiscountAmount}
+                                      onChange={(e) => setQuickEditData({...quickEditData, maxDiscountAmount: e.target.value})}
+                                    />
+                                  </div>
+                                )}
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Customer Emails (Comma-separated)</label>
+                                  <input
+                                    type="text"
+                                    className={`${inputClass} font-mono p-1`}
+                                    placeholder="Comma separated emails"
+                                    value={quickEditData.specificCustomerEmails}
+                                    onChange={(e) => setQuickEditData({...quickEditData, specificCustomerEmails: e.target.value})}
                                   />
                                 </div>
                                 <div>
                                   <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Product IDs (Comma-separated)</label>
-                                  <input 
-                                    type="text" 
+                                  <input
+                                    type="text"
                                     className={`${inputClass} font-mono p-1`}
                                     placeholder="Comma separated IDs"
                                     value={quickEditData.specificProducts}
@@ -835,8 +1082,8 @@ function CouponsContent() {
                                 </div>
                                 <div>
                                   <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Category IDs (Comma-separated)</label>
-                                  <input 
-                                    type="text" 
+                                  <input
+                                    type="text"
                                     className={`${inputClass} font-mono p-1`}
                                     placeholder="Comma separated IDs"
                                     value={quickEditData.specificCategories}
@@ -885,6 +1132,8 @@ function CouponsContent() {
                               <>
                                 <button onClick={() => handleStartQuickEdit(d)} className="hover:text-[#135e96]">Quick Edit</button>
                                 <span className="text-gray-350 font-normal">|</span>
+                                <button onClick={() => setSharingDiscount(d)} className="hover:text-[#135e96] flex items-center gap-1"><QrCode className="w-3 h-3" />Share</button>
+                                <span className="text-gray-350 font-normal">|</span>
                                 <button onClick={() => handleDuplicate(d)} className="hover:text-[#135e96]">Duplicate</button>
                                 <span className="text-gray-355 font-normal">|</span>
                                 <button onClick={() => handleDelete(d._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
@@ -919,6 +1168,10 @@ function CouponsContent() {
           </table>
         </div>
       </div>
+
+      {sharingDiscount && (
+        <ShareCouponModal discount={sharingDiscount} onClose={() => setSharingDiscount(null)} />
+      )}
     </AdminPageLayout>
   );
 }
