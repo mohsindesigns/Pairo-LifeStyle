@@ -57,6 +57,21 @@ export async function POST(req) {
       );
 
       if (couponApplied) {
+        const maxPerCustomer = couponApplied.usageLimits?.maxUsesPerCustomer;
+        if (maxPerCustomer && orConditions.length > 0) {
+          const priorUses = await Order.countDocuments({
+            $or: orConditions,
+            status: { $nin: ['Cancelled', 'Refunded'] },
+            "financials.appliedPromotions.promotionId": couponApplied.promotionId
+          });
+          if (priorUses >= maxPerCustomer) {
+            return NextResponse.json(
+              { error: `You've already used the code "${couponApplied.code}" the maximum number of times allowed.` },
+              { status: 400 }
+            );
+          }
+        }
+
         return NextResponse.json({
           success: true,
           appliedPromotions: engineResults.appliedPromotions,

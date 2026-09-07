@@ -2,17 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { 
-  Save, 
-  ArrowLeft, 
-  Eye, 
-  Settings, 
-  Zap, 
-  ShieldCheck, 
-  Clock, 
+import {
+  Save,
+  ArrowLeft,
+  Eye,
+  Settings,
+  Zap,
+  ShieldCheck,
+  Clock,
   Info,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  CreditCard
 } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
@@ -250,6 +251,40 @@ export default function PromotionEditor({ isNew = false } = {}) {
                      <p className="text-[11px] text-gray-400">Can be combined with other stackable offers.</p>
                   </div>
                </div>
+
+               <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Max Total Uses</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.usageLimits?.maxTotalUses ?? ""}
+                      onChange={(e) => updateField('usageLimits', {
+                        ...formData.usageLimits,
+                        maxTotalUses: e.target.value === "" ? null : parseInt(e.target.value)
+                      })}
+                      placeholder="Unlimited"
+                      className="w-full border border-gray-300 p-2 text-[14px] outline-none focus:border-[#2271b1] rounded-sm"
+                    />
+                    <p className="text-[11px] text-gray-400">Total redemptions across all customers. Leave blank for unlimited.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Max Uses Per Customer</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.usageLimits?.maxUsesPerCustomer ?? ""}
+                      onChange={(e) => updateField('usageLimits', {
+                        ...formData.usageLimits,
+                        maxUsesPerCustomer: e.target.value === "" ? null : parseInt(e.target.value)
+                      })}
+                      placeholder="Unlimited"
+                      className="w-full border border-gray-300 p-2 text-[14px] outline-none focus:border-[#2271b1] rounded-sm"
+                    />
+                    <p className="text-[11px] text-gray-400">How many times one customer can redeem this. Leave blank for unlimited.</p>
+                    <p className="text-[11px] text-amber-600">Enforced at checkout on this site. Stripe itself can&rsquo;t cap redemptions per customer, so this isn&rsquo;t enforced if someone pays via an admin-generated Payment Link and types the code in directly on Stripe&rsquo;s page.</p>
+                  </div>
+               </div>
             </div>
           )}
 
@@ -284,11 +319,26 @@ export default function PromotionEditor({ isNew = false } = {}) {
                         <span className="text-gray-500 flex items-center gap-2"><Eye className="w-4 h-4" /> Visibility:</span>
                         <span className="font-bold text-[#1d2327]">{formData.code ? 'Code-Required' : 'Automatic'}</span>
                     </div>
+                    <div className="flex items-center justify-between text-[13px]" title={formData.stripeSyncStatus === 'error' ? formData.stripeSyncError : undefined}>
+                        <span className="text-gray-500 flex items-center gap-2"><CreditCard className="w-4 h-4" /> Stripe:</span>
+                        {formData.stripeSyncStatus === 'synced' && (
+                          <span className="font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Synced</span>
+                        )}
+                        {formData.stripeSyncStatus === 'error' && (
+                          <span className="font-bold text-rose-600 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Sync failed</span>
+                        )}
+                        {formData.stripeSyncStatus === 'unsupported' && (
+                          <span className="font-bold text-gray-400 flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Not applicable</span>
+                        )}
+                        {(!formData.stripeSyncStatus || formData.stripeSyncStatus === 'pending') && (
+                          <span className="font-bold text-gray-400">Save to sync</span>
+                        )}
+                    </div>
                     <div className="flex items-center justify-between text-[13px]">
                         <span className="text-gray-500 flex items-center gap-2"><Clock className="w-4 h-4" /> History:</span>
                         <span className="font-bold text-[#1d2327]">No revisions</span>
                     </div>
-                    
+
                     <div className="pt-4 border-t border-gray-100 flex flex-col gap-2">
                         <button 
                           onClick={handleSave}

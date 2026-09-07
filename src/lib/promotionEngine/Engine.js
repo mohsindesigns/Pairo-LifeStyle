@@ -135,6 +135,7 @@ export default class Engine {
         stackable: promotion.stackable,
         exclusive: promotion.exclusive,
         isAutomatic: promotion.isAutomatic,
+        usageLimits: promotion.usageLimits || {},
         rulesSnapshot: {
           conditions: promotion.conditions,
           actions: promotion.actions

@@ -21,6 +21,10 @@ export async function createStripePaymentLinkForOrder(order) {
   });
   const paymentLink = await stripe.paymentLinks.create({
     line_items: [{ price: price.id, quantity: 1 }],
+    // Lets the customer type in one of our synced Promotion codes (see
+    // StripeSync.js) on Stripe's own hosted page for an extra discount on
+    // top of the admin-set amount.
+    allow_promotion_codes: true,
     metadata: {
       orderId: order._id.toString(),
       tenantId: order.tenantId,

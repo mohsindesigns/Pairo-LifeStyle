@@ -136,9 +136,22 @@ export async function fulfillPaymentLinkSession(session, log) {
   order.payment.paidAt = new Date();
   if (order.status === "Pending") order.status = "Confirmed";
 
+  // The customer may have typed one of our synced Promotion codes into
+  // Stripe's own hosted page — reflect what was actually collected rather
+  // than letting the order silently disagree with the real charge.
+  const amountDiscountCents = session.total_details?.amount_discount || 0;
+  let paymentMessage = "Payment received via Stripe payment link.";
+  if (amountDiscountCents > 0) {
+    const discountAmount = amountDiscountCents / 100;
+    const currency = order.financials?.currency || "USD";
+    order.financials.discountTotal = (order.financials.discountTotal || 0) + discountAmount;
+    order.financials.total = Math.max(0, (order.financials.total || 0) - discountAmount);
+    paymentMessage = `Payment received via Stripe payment link (promotion code applied: -${currency} ${discountAmount.toLocaleString()}).`;
+  }
+
   order.timeline.push({
     status: order.status,
-    message: "Payment received via Stripe payment link.",
+    message: paymentMessage,
     source: "System",
   });
 

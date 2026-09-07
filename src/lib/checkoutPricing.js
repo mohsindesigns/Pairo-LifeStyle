@@ -69,6 +69,29 @@ export async function computeAuthoritativeCheckout({
   let finalAppliedPromotions = engineResults.appliedPromotions || [];
   let finalDiscountTotal = engineResults.discountTotal || 0;
 
+  // Enforce per-customer usage limits. Checked on every call (dry run included)
+  // since it's a cheap read — unlike the global maxTotalUses cap below, which
+  // needs an atomic increment to stay race-safe, a single customer can't
+  // realistically place two simultaneous orders so a plain count is sufficient.
+  if (checkoutOrConditions.length > 0) {
+    for (const applied of finalAppliedPromotions) {
+      if (applied.isLegacy) continue;
+      const maxPerCustomer = applied.usageLimits?.maxUsesPerCustomer;
+      if (!maxPerCustomer) continue;
+
+      const priorUses = await withSession(Order.countDocuments({
+        tenantId,
+        $or: checkoutOrConditions,
+        status: { $nin: ['Cancelled', 'Refunded'] },
+        "financials.appliedPromotions.promotionId": applied.promotionId
+      }), mongoSession);
+
+      if (priorUses >= maxPerCustomer) {
+        throw new Error(`You've already used the code "${applied.code}" the maximum number of times allowed.`);
+      }
+    }
+  }
+
   if (finalAppliedPromotions.length === 0 && financials.promoCode) {
     const legacyDiscount = await withSession(Discount.findOne({
       code: financials.promoCode.toUpperCase().trim(),

@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
+import { syncPromotionToStripe, deactivatePromotionStripeCode } from "@/lib/promotionEngine/StripeSync";
 import { cache } from "@/lib/cache";
 import { can } from "@/lib/rbac";
 
@@ -46,7 +47,7 @@ export async function PUT(req, { params }) {
     if (!oldPromo) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const promotion = await Promotion.findByIdAndUpdate(id, data, { new: true, runValidators: true });
-    
+
     // Track History
     const diff = HistoryService.generateDiff(oldPromo.toObject(), promotion.toObject());
     if (diff.length > 0) {
@@ -54,9 +55,13 @@ export async function PUT(req, { params }) {
         await HistoryService.logAction('UPDATE', id, { adminName: session.user.name || session.user.email }, diff);
     }
 
+    const stripeState = await syncPromotionToStripe(promotion);
+    Object.assign(promotion, stripeState);
+    await promotion.save();
+
     // Invalidate Cache
     await cache.clearActivePromotionCache();
-    
+
     return NextResponse.json(promotion);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -77,13 +82,17 @@ export async function PATCH(req, { params }) {
   try {
     const data = await req.json();
     const promotion = await Promotion.findByIdAndUpdate(id, { $set: data }, { new: true });
-    
+
     if (!promotion) {
       return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
     }
 
+    const stripeState = await syncPromotionToStripe(promotion);
+    Object.assign(promotion, stripeState);
+    await promotion.save();
+
     await cache.clearActivePromotionCache();
-    
+
     return NextResponse.json(promotion);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -104,11 +113,12 @@ export async function DELETE(req, { params }) {
   try {
     // Instead of hard delete, we archive
     const promotion = await Promotion.findByIdAndUpdate(id, { adminStatus: 'Archived' }, { new: true });
-    
+
     if (!promotion) {
       return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
     }
 
+    await deactivatePromotionStripeCode(promotion);
     await cache.clearActivePromotionCache();
     
     return NextResponse.json({ success: true, message: "Promotion archived successfully" });

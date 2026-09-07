@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
+import { syncPromotionToStripe } from "@/lib/promotionEngine/StripeSync";
 import { can } from "@/lib/rbac";
 
 export async function GET(req) {
@@ -61,15 +62,19 @@ export async function POST(req) {
     };
 
     const promotion = await Promotion.create(promotionData);
-    
+
     // Initial History
-    await HistoryService.recordRevision(promotion, { 
+    await HistoryService.recordRevision(promotion, {
         adminName: session.user.name || session.user.email,
-        summary: "Initial Creation" 
+        summary: "Initial Creation"
     });
-    await HistoryService.logAction('CREATE', promotion._id, { 
-        adminName: session.user.name || session.user.email 
+    await HistoryService.logAction('CREATE', promotion._id, {
+        adminName: session.user.name || session.user.email
     });
+
+    const stripeState = await syncPromotionToStripe(promotion);
+    Object.assign(promotion, stripeState);
+    await promotion.save();
 
     return NextResponse.json(promotion, { status: 201 });
   } catch (error) {
@@ -93,7 +98,15 @@ export async function PATCH(req) {
     if (!promotionId || !adminStatus) {
       return NextResponse.json({ error: "promotionId and adminStatus required" }, { status: 400 });
     }
-    await Promotion.updateOne({ _id: promotionId }, { $set: { adminStatus } });
+    const promotion = await Promotion.findByIdAndUpdate(promotionId, { $set: { adminStatus } }, { new: true });
+    if (!promotion) {
+      return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+    }
+
+    const stripeState = await syncPromotionToStripe(promotion);
+    Object.assign(promotion, stripeState);
+    await promotion.save();
+
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

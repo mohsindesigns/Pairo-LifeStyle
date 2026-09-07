@@ -75,7 +75,18 @@ const PromotionSchema = new mongoose.Schema({
 
   // Targeting (Phase 2/3)
   customerSegments: [String],
-  
+
+  // Stripe sync — only coupon-code promotions with a single simple cart-wide
+  // percentage_discount/fixed_discount action can be represented as a Stripe
+  // Coupon + PromotionCode (Stripe has no concept of BOGO, bundles, tiers,
+  // free shipping, or product/category targeting). Used so admin-generated
+  // Payment Links can accept these codes on Stripe's own hosted page.
+  stripeCouponId: { type: String, default: null },
+  stripePromotionCodeId: { type: String, default: null },
+  stripeSyncStatus: { type: String, enum: ['synced', 'unsupported', 'error', 'pending'], default: 'pending' },
+  stripeSyncError: { type: String, default: null },
+  stripeSyncKey: { type: String, default: null },
+
   // Metadata & Analytics
   analytics: {
     timesUsed: { type: Number, default: 0 },
