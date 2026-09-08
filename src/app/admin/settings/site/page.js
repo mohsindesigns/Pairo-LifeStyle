@@ -7,10 +7,11 @@ import {
   Save, Globe, Layout, AlignLeft, Share2,
   Plus, GripVertical, X, Eye, EyeOff,
   Camera, MessageSquare, Link2, Users, ChevronDown, ChevronUp,
-  RefreshCw, Trash2, Search
+  RefreshCw, Trash2, Search, Sparkles
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
+import PopupTab from "@/components/admin/settings/PopupTab";
 import { usePopup } from "@/context/PopupContext";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
@@ -1228,12 +1229,21 @@ const TABS = [
   { key: 'header', label: 'Header', Icon: Layout },
   { key: 'footer', label: 'Footer', Icon: AlignLeft },
   { key: 'social', label: 'Social Links', Icon: Share2 },
+  { key: 'popup', label: 'Popup', Icon: Sparkles },
   { key: 'redirects', label: 'Redirects', Icon: RefreshCw },
 ];
 
 export default function SiteSettingsPage() {
   const router = useRouter();
-  const [tab, setTab] = useState('general');
+  const [tab, setTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const initialTab = new URLSearchParams(window.location.search).get("tab");
+      if (initialTab && TABS.some(t => t.key === initialTab)) {
+        return initialTab;
+      }
+    }
+    return 'general';
+  });
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1291,7 +1301,14 @@ export default function SiteSettingsPage() {
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
+            onClick={() => {
+              setTab(key);
+              if (typeof window !== "undefined") {
+                const url = new URL(window.location);
+                url.searchParams.set("tab", key);
+                window.history.replaceState({}, "", url);
+              }
+            }}
             className={`px-4 py-2 text-[13px] font-semibold border-b-[3px] transition-colors whitespace-nowrap shrink-0 ${tab === key
                 ? 'border-[#2271b1] text-[#1d2327]'
                 : 'border-transparent text-[#646970] hover:text-[#135e96]'
@@ -1308,6 +1325,7 @@ export default function SiteSettingsPage() {
         {tab === 'header' && <HeaderTab config={config} onChange={setConfig} dbPages={dbPages} dbCategories={dbCategories} dbProducts={dbProducts} />}
         {tab === 'footer' && <FooterTab config={config} onChange={setConfig} dbCategories={dbCategories} dbBlogs={dbBlogs} dbPages={dbPages} />}
         {tab === 'social' && <SocialLinksTab config={config} onChange={setConfig} />}
+        {tab === 'popup' && <PopupTab config={config} onChange={setConfig} />}
         {tab === 'redirects' && <RedirectsTab />}
       </div>
 

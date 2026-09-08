@@ -87,6 +87,7 @@ export default async function RootLayout({ children }) {
     hero: { slides: [], labels: { viewCollection: "View Collection" } },
     footer: { sections: [{}, { links: [] }] },
     categories: { items: [] },
+    popup: { enabled: false },
     _dbCategories: [],
     _dbPages: [],
     _dbBlogs: [],
@@ -165,7 +166,11 @@ export default async function RootLayout({ children }) {
     });
 
     if (config) {
-      sanitizedConfig = JSON.parse(JSON.stringify(config));
+      sanitizedConfig = {
+        ...sanitizedConfig,
+        ...JSON.parse(JSON.stringify(config)),
+        popup: config.popup || { enabled: false },
+      };
     }
 
     // Inject resolved DB data for Navbar/Footer dynamic rendering

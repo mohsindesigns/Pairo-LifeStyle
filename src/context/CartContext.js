@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { trackAddToCart } from "@/lib/analytics";
 
 const CartContext = createContext();
 
@@ -199,6 +200,9 @@ export function CartProvider({ children }) {
     if (openDrawer) {
       setIsCartOpen(true);
     }
+
+    // GA4 Event: add_to_cart
+    trackAddToCart(product);
   }, []);
 
   const removeFromCart = useCallback((uniqueKey) => {

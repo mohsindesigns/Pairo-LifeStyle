@@ -13,6 +13,7 @@ import { stripePromise } from "@/lib/stripeClient";
 import StripePaymentForm from "@/components/checkout/StripePaymentForm";
 import { usePopup } from "@/context/PopupContext";
 import { getProductUrl } from "@/lib/routes";
+import { trackBeginCheckout } from "@/lib/analytics";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -255,6 +256,15 @@ export default function CheckoutPage() {
       setIdempotencyKey(`pai_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`);
     });
   }, []);
+
+  // GA4 Event: begin_checkout
+  const hasFiredBeginCheckout = useRef(false);
+  useEffect(() => {
+    if (isCartLoaded && cartItems.length > 0 && !hasFiredBeginCheckout.current) {
+      hasFiredBeginCheckout.current = true;
+      trackBeginCheckout(cartItems, cartTotal || cartSubtotal || 0);
+    }
+  }, [isCartLoaded, cartItems, cartTotal, cartSubtotal]);
 
   // Keep the selected payment method valid if the admin disables one
   useEffect(() => {

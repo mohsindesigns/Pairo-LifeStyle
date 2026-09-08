@@ -3,6 +3,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Discount from "@/models/Discount";
 import Customer from "@/models/Customer";
+import Product from "@/models/Product";
+import Category from "@/models/Category";
 import { NextResponse } from "next/server";
 
 // Verify session is staff
@@ -79,7 +81,11 @@ export async function GET(req) {
       ];
     }
 
-    const discounts = await Discount.find(query).populate("specificCustomers", "email").sort({ createdAt: -1 });
+    const discounts = await Discount.find(query)
+      .populate("specificCustomers", "email")
+      .populate("specificProducts", "name image images price sku slug")
+      .populate("specificCategories", "name slug")
+      .sort({ createdAt: -1 });
 
     // 3. Stats Calculation
     const [allCount, activeCount, expiredCount, trashCount] = await Promise.all([
@@ -165,14 +171,16 @@ export async function POST(req) {
     // Valid ObjectId checks
     const isValidObjectId = (id) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
 
-    const specificProducts = Array.isArray(body.specificProducts) ? body.specificProducts : [];
+    const rawSpecificProducts = Array.isArray(body.specificProducts) ? body.specificProducts : [];
+    const specificProducts = rawSpecificProducts.map(p => (typeof p === 'object' && p?._id ? String(p._id) : String(p))).filter(Boolean);
     for (const prodId of specificProducts) {
       if (!isValidObjectId(prodId)) {
         return NextResponse.json({ error: `Product ID "${prodId}" is not a valid 24-character hex ID.` }, { status: 400 });
       }
     }
 
-    const specificCategories = Array.isArray(body.specificCategories) ? body.specificCategories : [];
+    const rawSpecificCategories = Array.isArray(body.specificCategories) ? body.specificCategories : [];
+    const specificCategories = rawSpecificCategories.map(c => (typeof c === 'object' && c?._id ? String(c._id) : String(c))).filter(Boolean);
     for (const catId of specificCategories) {
       if (!isValidObjectId(catId)) {
         return NextResponse.json({ error: `Category ID "${catId}" is not a valid 24-character hex ID.` }, { status: 400 });
@@ -343,7 +351,8 @@ export async function PUT(req) {
     if (body.newsletterSubscribedOnly !== undefined) discount.newsletterSubscribedOnly = !!body.newsletterSubscribedOnly;
     
     if (body.specificProducts !== undefined) {
-      const prods = Array.isArray(body.specificProducts) ? body.specificProducts : [];
+      const rawProds = Array.isArray(body.specificProducts) ? body.specificProducts : [];
+      const prods = rawProds.map(p => (typeof p === 'object' && p?._id ? String(p._id) : String(p))).filter(Boolean);
       for (const prodId of prods) {
         if (!isValidObjectId(prodId)) {
           return NextResponse.json({ error: `Product ID "${prodId}" is not a valid 24-character hex ID.` }, { status: 400 });
@@ -353,7 +362,8 @@ export async function PUT(req) {
     }
     
     if (body.specificCategories !== undefined) {
-      const cats = Array.isArray(body.specificCategories) ? body.specificCategories : [];
+      const rawCats = Array.isArray(body.specificCategories) ? body.specificCategories : [];
+      const cats = rawCats.map(c => (typeof c === 'object' && c?._id ? String(c._id) : String(c))).filter(Boolean);
       for (const catId of cats) {
         if (!isValidObjectId(catId)) {
           return NextResponse.json({ error: `Category ID "${catId}" is not a valid 24-character hex ID.` }, { status: 400 });

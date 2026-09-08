@@ -7,6 +7,7 @@ import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Truck, Spark
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { getProductUrl } from "@/lib/routes";
+import { trackBeginCheckout } from "@/lib/analytics";
 
 export default function CartPage() {
   const { 
@@ -343,6 +344,9 @@ export default function CartPage() {
             <div className="pt-2">
               <Link 
                 href="/checkout"
+                onClick={() => {
+                  trackBeginCheckout(cartItems, cartTotal || cartSubtotal || 0);
+                }}
                 className="w-full bg-black text-white h-12 rounded-[4px] text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-neutral-900 transition-all shadow-sm cursor-pointer"
               >
                 <span>Proceed to Checkout</span>
