@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect, useTransition } from "react";
+import { useState, useMemo, useEffect, useRef, useTransition } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { SlidersHorizontal, ChevronRight, X, Check, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import siteData from "@/lib/data.json";
 import ProductCard from "@/components/home/ProductCard";
+import { trackViewItemList } from "@/lib/analytics";
 import { useSiteData } from "@/context/SiteContext";
 import { getSwatchBackground } from "@/lib/swatchRenderer";
 
@@ -465,6 +466,16 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  // GA4 Event: view_item_list — fire when the visible product grid changes (page/filter).
+  const lastListSig = useRef("");
+  useEffect(() => {
+    if (paginatedProducts.length === 0) return;
+    const sig = paginatedProducts.map((p) => p._id || p.id).join(",");
+    if (sig === lastListSig.current) return;
+    lastListSig.current = sig;
+    trackViewItemList(paginatedProducts, categoryData?.name || "Shop");
+  }, [paginatedProducts, categoryData]);
 
   const goToPage = (page) => {
     scrollToGridTop(() => setCurrentPage(page));

@@ -191,49 +191,37 @@ export default function SitePopup() {
         className="fixed inset-0 z-[99991] flex items-center justify-center p-3 sm:p-4 pointer-events-none"
       >
         <div
-          className="pointer-events-auto relative w-full max-w-[440px] bg-white rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-black/10 overflow-hidden flex flex-col max-h-[90vh]"
+          className={`pointer-events-auto relative w-full ${bannerUrl ? 'max-w-[720px]' : 'max-w-[440px]'} bg-white rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-black/10 overflow-hidden flex flex-col ${bannerUrl ? 'sm:flex-row' : ''} max-h-[90vh]`}
           style={{
             opacity: animating ? 1 : 0,
             transform: animating ? "scale(1) translateY(0)" : "scale(0.95) translateY(12px)",
             transition: "opacity 0.35s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
         >
-          {/* Banner Image (Conditional) */}
+          {/* Close button — anchored to the modal so it sits over the image on mobile and over the content column on desktop */}
+          <button
+            type="button"
+            onClick={dismiss}
+            className="absolute top-3.5 right-3.5 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-md text-white transition-all cursor-pointer shadow-md"
+            aria-label="Close dialog"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          {/* Banner Image — left column on desktop, top on mobile */}
           {bannerUrl && (
-            <div className="relative w-full aspect-[16/9] bg-neutral-100 shrink-0 overflow-hidden">
+            <div className="relative w-full sm:w-[45%] shrink-0 bg-neutral-100 aspect-[16/10] sm:aspect-auto overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={bannerUrl}
                 alt={title || "Announcement"}
                 className="w-full h-full object-cover"
               />
-              <button
-                type="button"
-                onClick={dismiss}
-                className="absolute top-3.5 right-3.5 w-8 h-8 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white transition-all cursor-pointer shadow-md"
-                aria-label="Close dialog"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
           )}
 
-          {/* Modal Content Body */}
-          <div className="p-5 sm:p-8 overflow-y-auto overscroll-contain">
-            {/* Close Button if no banner image */}
-            {!bannerUrl && (
-              <div className="flex justify-end -mt-3 -mr-2 mb-3">
-                <button
-                  type="button"
-                  onClick={dismiss}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-600 transition-colors cursor-pointer"
-                  aria-label="Close dialog"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
+          {/* Modal Content Body — right column on desktop, below on mobile */}
+          <div className="p-5 sm:p-8 overflow-y-auto overscroll-contain flex-1 min-w-0 flex flex-col justify-center">
             {/* Badge (Conditional) */}
             {badgeText && (
               <div className="mb-3.5">

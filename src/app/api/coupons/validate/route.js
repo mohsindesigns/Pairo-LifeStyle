@@ -126,6 +126,22 @@ export async function POST(req) {
           });
       }
 
+      // 3. The engine found a promotion for this exact code but its conditions weren't met
+      // (e.g. minimum spend not reached yet) — tell the shopper why instead of claiming the
+      // code is invalid, and flag it as still-pending so the UI can keep it around.
+      const rejectedMatch = engineResults.rejectedCodeMatches?.find(
+        r => r.code && r.code.toUpperCase() === code.toUpperCase()
+      );
+      if (rejectedMatch) {
+        return NextResponse.json(
+          {
+            error: rejectedMatch.explanation || "This code isn't eligible for your current cart yet.",
+            eligibilityPending: true
+          },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json({ error: "Invalid or expired promo code" }, { status: 404 });
     }
 

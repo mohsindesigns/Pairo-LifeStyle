@@ -194,33 +194,34 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
     }
   }
 
-  // 12. Specific Product restriction
-  if (discount.specificProducts && discount.specificProducts.length > 0) {
+  // 12 & 13. Product / Category restrictions — load the DB product map ONCE and reuse it for
+  // both checks (previously each restriction re-queried the exact same products separately).
+  const hasProductRestriction = discount.specificProducts && discount.specificProducts.length > 0;
+  const hasCategoryRestriction = discount.specificCategories && discount.specificCategories.length > 0;
+  if (hasProductRestriction || hasCategoryRestriction) {
     const dbProductMap = await loadDbProductMap(items);
     const cartProductIds = items.map(item => item.id?.toString() || item.productId?.toString() || item._id?.toString());
-    const allowedIds = discount.specificProducts.map(p => p.toString());
 
-    const matched = cartProductIds.some(id => {
-      const entry = dbProductMap[id];
-      return entry && allowedIds.includes(entry._id.toString());
-    });
-    if (!matched) {
-      return { valid: false, error: "This coupon is only valid for specific products." };
+    if (hasProductRestriction) {
+      const allowedIds = discount.specificProducts.map(p => p.toString());
+      const matched = cartProductIds.some(id => {
+        const entry = dbProductMap[id];
+        return entry && allowedIds.includes(entry._id.toString());
+      });
+      if (!matched) {
+        return { valid: false, error: "This coupon is only valid for specific products." };
+      }
     }
-  }
 
-  // 13. Specific Category restriction
-  if (discount.specificCategories && discount.specificCategories.length > 0) {
-    const dbProductMap = await loadDbProductMap(items);
-    const cartProductIds = items.map(item => item.id?.toString() || item.productId?.toString() || item._id?.toString());
-    const allowedIds = discount.specificCategories.map(c => c.toString());
-
-    const matched = cartProductIds.some(id => {
-      const entry = dbProductMap[id];
-      return entry && (entry.categories || []).some(catId => allowedIds.includes(catId.toString()));
-    });
-    if (!matched) {
-      return { valid: false, error: "This coupon is only valid for specific categories." };
+    if (hasCategoryRestriction) {
+      const allowedIds = discount.specificCategories.map(c => c.toString());
+      const matched = cartProductIds.some(id => {
+        const entry = dbProductMap[id];
+        return entry && (entry.categories || []).some(catId => allowedIds.includes(catId.toString()));
+      });
+      if (!matched) {
+        return { valid: false, error: "This coupon is only valid for specific categories." };
+      }
     }
   }
 

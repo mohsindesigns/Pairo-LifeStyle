@@ -14,6 +14,17 @@ function safeNumber(val, fallback = 0) {
   return fallback;
 }
 
+// Maps a cart-line item to GA4's item shape (shared by cart/checkout funnel events).
+function mapCartItem(item = {}) {
+  return {
+    item_id: String(item.sku || item._id || item.id || item.productId || ""),
+    item_name: String(item.title || item.name || "Product"),
+    price: safeNumber(item.price ?? item.priceAtPurchase),
+    quantity: Math.max(1, safeNumber(item.quantity, 1)),
+    item_variant: [item.selectedSize, item.selectedColor].filter(Boolean).join(" / ") || item.selectedVariant?.title || undefined
+  };
+}
+
 export function trackGAEvent(eventName, params = {}) {
   if (typeof window === "undefined") return;
 
@@ -116,5 +127,98 @@ export function trackPurchase(orderData) {
       quantity: Math.max(1, safeNumber(item.quantity, 1)),
       item_variant: item.selectedVariant?.title || (item.selectedVariant?.options ? Object.values(item.selectedVariant.options).join(" / ") : undefined)
     }))
+  });
+}
+
+// ── Full-funnel events ──────────────────────────────────────────────
+
+// view_item — product detail page view
+export function trackViewItem(product) {
+  if (!product) return;
+  const price = safeNumber(product.price ?? product.priceAtPurchase);
+  trackGAEvent("view_item", {
+    currency: String(product.currency || "USD"),
+    value: price,
+    items: [{
+      item_id: String(product.sku || product._id || product.id || product.item_id || ""),
+      item_name: String(product.title || product.name || product.item_name || "Product"),
+      price,
+      quantity: 1,
+      item_category: product.primaryCategory?.name || product.category || undefined,
+      item_variant: [product.selectedSize, product.selectedColor].filter(Boolean).join(" / ") || product.selectedVariant?.title || undefined
+    }]
+  });
+}
+
+// view_item_list — a list/grid of products was shown (e.g. shop / category page)
+export function trackViewItemList(products = [], listName = "Product List") {
+  if (!Array.isArray(products) || products.length === 0) return;
+  trackGAEvent("view_item_list", {
+    item_list_name: String(listName),
+    items: products.slice(0, 50).map((p, index) => ({
+      item_id: String(p.sku || p._id || p.id || ""),
+      item_name: String(p.title || p.name || "Product"),
+      price: safeNumber(p.price),
+      index,
+      item_list_name: String(listName)
+    }))
+  });
+}
+
+// select_item — a product was clicked within a list
+export function trackSelectItem(product, listName = "Product List") {
+  if (!product) return;
+  trackGAEvent("select_item", {
+    item_list_name: String(listName),
+    items: [{
+      item_id: String(product.sku || product._id || product.id || ""),
+      item_name: String(product.title || product.name || "Product"),
+      price: safeNumber(product.price),
+      item_list_name: String(listName)
+    }]
+  });
+}
+
+// view_cart — the cart was viewed (cart page / drawer opened)
+export function trackViewCart(cartItems = [], totalValue = 0) {
+  if (!Array.isArray(cartItems) || cartItems.length === 0) return;
+  trackGAEvent("view_cart", {
+    currency: String(cartItems[0]?.currency || "USD"),
+    value: safeNumber(totalValue),
+    items: cartItems.map(mapCartItem)
+  });
+}
+
+// remove_from_cart — an item (or units of it) was removed
+export function trackRemoveFromCart(item) {
+  if (!item) return;
+  const price = safeNumber(item.price ?? item.priceAtPurchase);
+  const quantity = Math.max(1, safeNumber(item.quantity, 1));
+  trackGAEvent("remove_from_cart", {
+    currency: String(item.currency || "USD"),
+    value: price * quantity,
+    items: [mapCartItem(item)]
+  });
+}
+
+// add_shipping_info — a shipping method was chosen during checkout
+export function trackAddShippingInfo(cartItems = [], totalValue = 0, shippingTier = undefined) {
+  if (!Array.isArray(cartItems) || cartItems.length === 0) return;
+  trackGAEvent("add_shipping_info", {
+    currency: String(cartItems[0]?.currency || "USD"),
+    value: safeNumber(totalValue),
+    shipping_tier: shippingTier ? String(shippingTier) : undefined,
+    items: cartItems.map(mapCartItem)
+  });
+}
+
+// add_payment_info — payment details were provided during checkout
+export function trackAddPaymentInfo(cartItems = [], totalValue = 0, paymentType = undefined) {
+  if (!Array.isArray(cartItems) || cartItems.length === 0) return;
+  trackGAEvent("add_payment_info", {
+    currency: String(cartItems[0]?.currency || "USD"),
+    value: safeNumber(totalValue),
+    payment_type: paymentType ? String(paymentType) : undefined,
+    items: cartItems.map(mapCartItem)
   });
 }

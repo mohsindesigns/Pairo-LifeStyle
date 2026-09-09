@@ -8,6 +8,19 @@ import { syncPromotionToStripe } from "@/lib/promotionEngine/StripeSync";
 import { cache } from "@/lib/cache";
 import { can } from "@/lib/rbac";
 
+// Fields the server owns — never let a client set them via the request body. Otherwise a
+// staff user could reset a coupon's used-count (usageLimits.currentTotalUses), forge its
+// analytics, or hijack its Stripe linkage. (tenantId is intentionally left writable.)
+function stripServerManagedFields(data) {
+  if (!data || typeof data !== "object") return data;
+  const { _id, analytics, stripeCouponId, stripePromotionCodeId, stripeSyncStatus, stripeSyncError, stripeSyncKey, createdAt, updatedAt, ...safe } = data;
+  if (safe.usageLimits && typeof safe.usageLimits === "object") {
+    const { currentTotalUses, ...restUsage } = safe.usageLimits;
+    safe.usageLimits = restUsage;
+  }
+  return safe;
+}
+
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) {
@@ -58,7 +71,7 @@ export async function POST(req) {
 
     // Ensure tenantId is present (Mandatory for SaaS Hardening)
     const promotionData = {
-        ...data,
+        ...stripServerManagedFields(data),
         tenantId: data.tenantId || "DEFAULT_STORE"
     };
 

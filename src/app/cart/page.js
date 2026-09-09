@@ -5,9 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Truck, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getProductUrl } from "@/lib/routes";
-import { trackBeginCheckout } from "@/lib/analytics";
+import { trackBeginCheckout, trackViewCart } from "@/lib/analytics";
 
 export default function CartPage() {
   const { 
@@ -24,6 +24,15 @@ export default function CartPage() {
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [applying, setApplying] = useState(false);
   const [promoError, setPromoError] = useState("");
+
+  // GA4 Event: view_cart — fire once when the cart page loads with items.
+  const viewCartFired = useRef(false);
+  useEffect(() => {
+    if (isCartLoaded && cartItems.length > 0 && !viewCartFired.current) {
+      viewCartFired.current = true;
+      trackViewCart(cartItems, cartSubtotal);
+    }
+  }, [isCartLoaded, cartItems, cartSubtotal]);
 
   const handleApplyPromo = async () => {
     if (!promoCodeInput) return;

@@ -13,7 +13,7 @@ import { stripePromise } from "@/lib/stripeClient";
 import StripePaymentForm from "@/components/checkout/StripePaymentForm";
 import { usePopup } from "@/context/PopupContext";
 import { getProductUrl } from "@/lib/routes";
-import { trackBeginCheckout } from "@/lib/analytics";
+import { trackBeginCheckout, trackAddShippingInfo, trackAddPaymentInfo } from "@/lib/analytics";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -265,6 +265,18 @@ export default function CheckoutPage() {
       trackBeginCheckout(cartItems, cartTotal || cartSubtotal || 0);
     }
   }, [isCartLoaded, cartItems, cartTotal, cartSubtotal]);
+
+  // GA4 Event: add_shipping_info — fire once when a shipping method is first selected.
+  const hasFiredShipping = useRef(false);
+  useEffect(() => {
+    if (selectedShipping && cartItems.length > 0 && !hasFiredShipping.current) {
+      hasFiredShipping.current = true;
+      trackAddShippingInfo(cartItems, cartTotal || cartSubtotal || 0, selectedShipping.methodName);
+    }
+  }, [selectedShipping, cartItems, cartTotal, cartSubtotal]);
+
+  // GA4 Event: add_payment_info — fired from handlePayment on order submission (see below).
+  const hasFiredPayment = useRef(false);
 
   // Keep the selected payment method valid if the admin disables one
   useEffect(() => {
@@ -677,6 +689,12 @@ export default function CheckoutPage() {
 
   const handlePayment = async () => {
     if (!validateForm()) return;
+
+    // GA4 Event: add_payment_info — the shopper submitted the order with payment details.
+    if (!hasFiredPayment.current) {
+      hasFiredPayment.current = true;
+      trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, paymentMethod === "cod" ? "Cash on Delivery" : "Card");
+    }
 
     setIsProcessing(true);
 

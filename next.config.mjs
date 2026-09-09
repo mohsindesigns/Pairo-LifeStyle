@@ -30,7 +30,7 @@ const nextConfig = {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.googletagmanager.com https://connect.facebook.net https://js.stripe.com https://analytics.ahrefs.com",
       "frame-src 'self' https://challenges.cloudflare.com https://js.stripe.com https://hooks.stripe.com",
-      "connect-src 'self' https://challenges.cloudflare.com https://api.cloudinary.com https://*.mongodb.net https://www.google-analytics.com https://region1.google-analytics.com https://api.stripe.com https://m.stripe.com https://m.stripe.network https://analytics.ahrefs.com",
+      "connect-src 'self' https://challenges.cloudflare.com https://api.cloudinary.com https://*.mongodb.net https://analytics.google.com https://*.google-analytics.com https://*.analytics.google.com https://stats.g.doubleclick.net https://api.stripe.com https://m.stripe.com https://m.stripe.network https://analytics.ahrefs.com",
       "img-src 'self' data: blob: https: http:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",

@@ -6,11 +6,17 @@ import Customer from "@/models/Customer";
 import Product from "@/models/Product";
 import Category from "@/models/Category";
 import { NextResponse } from "next/server";
+import { can } from "@/lib/rbac";
 
-// Verify session is staff
-async function checkAuth() {
+// Verify session is staff AND (when a permission is given) holds that permission.
+// Coupons live under the "promotions" permission module — previously any staff role
+// could create/edit/delete coupons regardless of their assigned permissions.
+async function checkAuth(permission = null) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) {
+    return null;
+  }
+  if (permission && !can(session.user, permission)) {
     return null;
   }
   return session;
@@ -33,7 +39,7 @@ async function resolveCustomerIds(emailsInput) {
 }
 
 export async function GET(req) {
-  const session = await checkAuth();
+  const session = await checkAuth("promotions.view");
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await dbConnect();
@@ -129,7 +135,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
-  const session = await checkAuth();
+  const session = await checkAuth("promotions.manage");
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await dbConnect();
@@ -252,7 +258,7 @@ export async function POST(req) {
 }
 
 export async function PUT(req) {
-  const session = await checkAuth();
+  const session = await checkAuth("promotions.manage");
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await dbConnect();
@@ -419,7 +425,7 @@ export async function PUT(req) {
 }
 
 export async function DELETE(req) {
-  const session = await checkAuth();
+  const session = await checkAuth("promotions.manage");
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await dbConnect();

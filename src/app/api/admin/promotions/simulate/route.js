@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { can } from '@/lib/rbac';
 import Engine from '@/lib/promotionEngine/Engine';
 
 export async function POST(req) {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user.isStaff) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!can(session.user, 'promotions.view')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     try {
         const { promotion, cart } = await req.json();
 

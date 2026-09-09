@@ -1187,10 +1187,10 @@ function CouponsContent() {
                       </td>
                       <td className="px-3 py-3 align-top">
                         <div className="flex flex-col">
-                          <span 
-                            onClick={() => !d.isDeleted && handleStartFullEdit(d)} 
+                          <span
+                            onClick={() => setViewingDiscount(d)}
                             className="text-[13px] font-bold text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer tracking-wide uppercase font-mono"
-                            title="Click to edit full coupon"
+                            title="Click to view this coupon"
                           >
                             {d.code}
                           </span>

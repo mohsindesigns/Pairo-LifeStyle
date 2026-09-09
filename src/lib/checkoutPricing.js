@@ -195,19 +195,31 @@ export async function computeAuthoritativeCheckout({
       const maxPerCustomer = applied.usageLimits?.maxUsesPerCustomer;
       if (maxPerCustomer && checkoutOrConditions.length > 0) {
         const customerKey = orderUserId ? `user:${orderUserId}` : `email:${checkoutEmail.toLowerCase().trim()}`;
-        const usageRes = await PromotionCustomerUsage.findOneAndUpdate(
-          {
-            tenantId,
-            promotionId: applied.promotionId,
-            customerKey,
-            usageCount: { $lt: maxPerCustomer }
-          },
-          { $inc: { usageCount: 1 } },
-          { session: mongoSession, new: true, upsert: true }
-        );
+        const limitError = `You've already used the code "${applied.code}" the maximum number of times allowed.`;
+        let usageRes;
+        try {
+          usageRes = await PromotionCustomerUsage.findOneAndUpdate(
+            {
+              tenantId,
+              promotionId: applied.promotionId,
+              customerKey,
+              usageCount: { $lt: maxPerCustomer }
+            },
+            { $inc: { usageCount: 1 } },
+            { session: mongoSession, new: true, upsert: true }
+          );
+        } catch (e) {
+          // A usage doc already exists at/over the limit: the { usageCount: $lt } filter
+          // misses, so upsert tries to INSERT a duplicate and hits the unique index (E11000).
+          // That's the over-limit case — surface the friendly message, not a raw Mongo error.
+          if (e?.code === 11000) {
+            throw new Error(limitError);
+          }
+          throw e;
+        }
 
         if (!usageRes) {
-          throw new Error(`You've already used the code "${applied.code}" the maximum number of times allowed.`);
+          throw new Error(limitError);
         }
       }
 
@@ -299,6 +311,13 @@ export async function computeAuthoritativeCheckout({
   // Tax is not yet wired into checkout by design (see admin Tax Settings / TaxService) —
   // forced to 0 here rather than trusting a client-submitted financials.tax value.
   const authoritativeTax = 0;
+
+  // The promo discount and the affiliate discount are computed independently, so together
+  // they could exceed the subtotal (worst case the same code is both a Promotion and an
+  // Affiliate coupon). Cap their combined effect to the subtotal so they can never eat into
+  // shipping/tax — only product cost is ever discountable.
+  const combinedDiscountCap = Math.max(0, authoritativeSubtotal - finalDiscountTotal);
+  affiliateDiscountAmount = Math.min(affiliateDiscountAmount, combinedDiscountCap);
 
   const authoritativeTotal = Math.max(
     0,

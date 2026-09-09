@@ -6,6 +6,7 @@ import { Plus, Minus, ShoppingBag, Check, Ruler, Palette, Shield, Settings } fro
 
 import { useCart } from "@/context/CartContext";
 import { useRouter } from "next/navigation";
+import { trackViewItem } from "@/lib/analytics";
 import SwatchBubble from "@/components/common/SwatchBubble";
 import MadeToMeasureModal from "@/components/product/MadeToMeasureModal";
 import CustomizeProductModal from "@/components/product/CustomizeProductModal";
@@ -31,6 +32,16 @@ export default function ClientProductActions({ product, onVariantChange }) {
   useEffect(() => {
     return () => window.clearTimeout(highlightTimeoutRef.current);
   }, []);
+
+  // GA4 Event: view_item — fire once per distinct product detail view.
+  const lastViewedId = useRef(null);
+  useEffect(() => {
+    const pid = product?._id || product?.id;
+    if (pid && lastViewedId.current !== pid) {
+      lastViewedId.current = pid;
+      trackViewItem(product);
+    }
+  }, [product]);
   const { addToCart } = useCart();
   const router = useRouter();
 

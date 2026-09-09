@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { trackAddToCart } from "@/lib/analytics";
+import { trackAddToCart, trackRemoveFromCart } from "@/lib/analytics";
 
 const CartContext = createContext();
 
@@ -206,13 +206,19 @@ export function CartProvider({ children }) {
   }, []);
 
   const removeFromCart = useCallback((uniqueKey) => {
+    // GA4 Event: remove_from_cart — fire with the removed line's details before it's gone.
+    const removed = cartItems.find(
+      (item) => `${item.id}-${item.selectedSize}-${item.selectedColor}` === uniqueKey
+    );
+    if (removed) trackRemoveFromCart(removed);
+
     setCartItems((prevItems) =>
       prevItems.filter((item) => {
         const itemKey = `${item.id}-${item.selectedSize}-${item.selectedColor}`;
         return itemKey !== uniqueKey;
       })
     );
-  }, []);
+  }, [cartItems]);
 
   const updateQuantity = useCallback((uniqueKey, delta) => {
     setCartItems((prevItems) =>
