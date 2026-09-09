@@ -83,6 +83,13 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
       placeholder: "C4A1B2C3D4E5F6G7H8I9",
       field: "pixelId"
     },
+    pinterest: {
+      title: "Pinterest Tag",
+      description: "Loads the Pinterest base tag and auto-fires conversion events (add to cart, checkout) at checkout. Enable/disable here to control all Pinterest tracking.",
+      help: "Enter your Pinterest Tag ID (numeric)",
+      placeholder: "2612345678901",
+      field: "pixelId"
+    },
     hotjar: {
       title: "Hotjar",
       description: "Injects the Hotjar tracking code for heatmaps and session recordings.",
@@ -166,6 +173,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                          <option value="gtm">GTM Template</option>
                          <option value="meta_pixel">Meta Pixel Template</option>
                          <option value="tiktok_pixel">TikTok Pixel Template</option>
+                         <option value="pinterest">Pinterest Tag Template</option>
                          <option value="verification">Verification Meta Tag</option>
                          <option value="hotjar">Hotjar Template</option>
                          <option value="clarity">MS Clarity Template</option>

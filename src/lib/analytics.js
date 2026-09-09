@@ -44,9 +44,53 @@ export function trackGAEvent(eventName, params = {}) {
     if (typeof window.gtag === "function") {
       window.gtag("event", eventName, params);
     }
+
+    // Pinterest conversion tracking — fires ONLY when the Pinterest tag is active (loaded from
+    // the admin Scripts screen). Disabling the Pinterest script there stops these automatically,
+    // so all Pinterest tracking is controlled from the DB with no code change.
+    trackPinterestEvent(eventName, params);
   } catch (err) {
     // Analytics failures must never break customer checkout or navigation
     console.debug("[GA4 Analytics Event Error]", eventName, err);
+  }
+}
+
+// Maps our GA4 ecommerce events to Pinterest's standard conversion events. Only the ones
+// Pinterest actually optimizes on are mapped; page views are already covered by the base
+// tag's pintrk('page'). Everything else simply isn't sent to Pinterest.
+const PINTEREST_EVENTS = {
+  add_to_cart: "addtocart",
+  purchase: "checkout",
+  view_item_list: "viewcategory",
+};
+
+function toPinterestParams(params = {}) {
+  const items = Array.isArray(params.items) ? params.items : [];
+  const data = {
+    value: safeNumber(params.value),
+    order_quantity: items.reduce((sum, i) => sum + Math.max(1, safeNumber(i.quantity, 1)), 0) || 1,
+    currency: String(params.currency || "USD"),
+    line_items: items.map((i) => ({
+      product_id: String(i.item_id || ""),
+      product_name: String(i.item_name || ""),
+      product_price: safeNumber(i.price),
+      product_quantity: Math.max(1, safeNumber(i.quantity, 1)),
+      product_variant: i.item_variant || undefined
+    }))
+  };
+  // order_id lets Pinterest de-duplicate the purchase conversion.
+  if (params.transaction_id) data.order_id = String(params.transaction_id);
+  return data;
+}
+
+function trackPinterestEvent(eventName, params = {}) {
+  if (typeof window === "undefined" || typeof window.pintrk !== "function") return;
+  const pinEvent = PINTEREST_EVENTS[eventName];
+  if (!pinEvent) return;
+  try {
+    window.pintrk("track", pinEvent, toPinterestParams(params));
+  } catch (err) {
+    console.debug("[Pinterest Event Error]", eventName, err);
   }
 }
 
