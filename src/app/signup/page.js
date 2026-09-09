@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { Mail } from "lucide-react";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
+import { trackSignup } from "@/lib/analytics";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
@@ -49,6 +50,7 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (res.ok || data.pendingVerification || data.resent) {
+        trackSignup(); // GA4 sign_up + Pinterest signup
         setSubmitted(true);
       } else {
         setError(data.message || data.error || "Something went wrong");

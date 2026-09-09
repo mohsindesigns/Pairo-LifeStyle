@@ -8,12 +8,28 @@ import { X, Search, ArrowRight, TrendingUp } from "lucide-react";
 import siteData from "@/lib/data.json";
 import { useSiteData } from "@/context/SiteContext";
 import { getProductUrl, getCategoryUrl } from "@/lib/routes";
+import { trackSearch } from "@/lib/analytics";
 
 export default function SearchModal({ isOpen, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [dbProducts, setDbProducts] = useState([]);
   const [results, setResults] = useState({ products: [], categories: [] });
   const inputRef = useRef(null);
+  const lastSearchTracked = useRef("");
+
+  // GA4 search + Pinterest search — fire once per settled query (debounced), not per keystroke.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length <= 1) return;
+    const t = setTimeout(() => {
+      const key = q.toLowerCase();
+      if (lastSearchTracked.current !== key) {
+        lastSearchTracked.current = key;
+        trackSearch(q);
+      }
+    }, 900);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const siteContextData = useSiteData();
   const dbCategories = siteContextData?._dbCategories || [];

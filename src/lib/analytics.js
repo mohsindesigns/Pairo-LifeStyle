@@ -55,18 +55,15 @@ export function trackGAEvent(eventName, params = {}) {
   }
 }
 
-// Maps our GA4 ecommerce events to Pinterest's standard conversion events. Only the ones
-// Pinterest actually optimizes on are mapped; page views are already covered by the base
-// tag's pintrk('page'). Everything else simply isn't sent to Pinterest.
-const PINTEREST_EVENTS = {
-  add_to_cart: "addtocart",
-  purchase: "checkout",
-  view_item_list: "viewcategory",
-};
+// A unique id per event so Pinterest can de-duplicate (and match a future Conversions API).
+function genPinterestEventId() {
+  return `evt_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
-function toPinterestParams(params = {}) {
+// Order-shaped payload for Pinterest's addtocart / checkout events.
+function toPinterestOrderParams(params = {}) {
   const items = Array.isArray(params.items) ? params.items : [];
-  const data = {
+  return {
     value: safeNumber(params.value),
     order_quantity: items.reduce((sum, i) => sum + Math.max(1, safeNumber(i.quantity, 1)), 0) || 1,
     currency: String(params.currency || "USD"),
@@ -78,19 +75,52 @@ function toPinterestParams(params = {}) {
       product_variant: i.item_variant || undefined
     }))
   };
-  // order_id lets Pinterest de-duplicate the purchase conversion.
-  if (params.transaction_id) data.order_id = String(params.transaction_id);
-  return data;
 }
 
+// Fires the matching Pinterest conversion event, in Pinterest's own format — only when the
+// Pinterest tag is active (loaded from the admin Scripts screen), so it's fully DB-controlled.
+// PageVisit is already covered by the base tag's pintrk('page'); signup/search are fired via
+// their own helpers (trackSignup/trackSearch) at those moments.
 function trackPinterestEvent(eventName, params = {}) {
   if (typeof window === "undefined" || typeof window.pintrk !== "function") return;
-  const pinEvent = PINTEREST_EVENTS[eventName];
-  if (!pinEvent) return;
   try {
-    window.pintrk("track", pinEvent, toPinterestParams(params));
+    if (eventName === "add_to_cart") {
+      window.pintrk("track", "addtocart", { event_id: genPinterestEventId(), ...toPinterestOrderParams(params) });
+    } else if (eventName === "purchase") {
+      window.pintrk("track", "checkout", {
+        // Use the order id as the event id so a refresh/retry can't double-count the conversion.
+        event_id: params.transaction_id ? `checkout_${params.transaction_id}` : genPinterestEventId(),
+        order_id: params.transaction_id ? String(params.transaction_id) : undefined,
+        ...toPinterestOrderParams(params)
+      });
+    } else if (eventName === "view_item_list") {
+      window.pintrk("track", "viewcategory", {
+        event_id: genPinterestEventId(),
+        line_items: [{ product_category: String(params.item_list_name || "Products") }]
+      });
+    }
   } catch (err) {
     console.debug("[Pinterest Event Error]", eventName, err);
+  }
+}
+
+// signup — call on successful account registration. Fires GA4 sign_up (+ GTM dataLayer) and
+// Pinterest's signup event.
+export function trackSignup(method = "email") {
+  trackGAEvent("sign_up", { method: String(method || "email") });
+  if (typeof window !== "undefined" && typeof window.pintrk === "function") {
+    try { window.pintrk("track", "signup", { event_id: genPinterestEventId() }); } catch (e) {}
+  }
+}
+
+// search — call when a customer runs a search. Fires GA4 search (+ GTM dataLayer) and
+// Pinterest's search event.
+export function trackSearch(query) {
+  const q = String(query || "").trim();
+  if (!q) return;
+  trackGAEvent("search", { search_term: q });
+  if (typeof window !== "undefined" && typeof window.pintrk === "function") {
+    try { window.pintrk("track", "search", { event_id: genPinterestEventId(), search_query: q }); } catch (e) {}
   }
 }
 
