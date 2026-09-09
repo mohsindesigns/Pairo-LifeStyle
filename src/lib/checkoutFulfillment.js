@@ -9,6 +9,7 @@ import pairoEvents from "@/lib/events";
 import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
+import { sendPinterestPurchaseEvent } from "@/lib/pinterestCapi";
 import {
   buildGuestCheckoutAccountPayload,
   resolveGuestCheckoutCustomerAction,
@@ -47,6 +48,7 @@ export async function createOrderFromCheckoutPayload(payload, {
   isGuestSession = true,
   ipAddress = "unknown",
   paymentInfo = null,
+  clientUserAgent = null,
 } = {}) {
   const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode } = payload;
 
@@ -281,6 +283,10 @@ export async function createOrderFromCheckoutPayload(payload, {
 
   if (checkoutResult) {
     pairoEvents.dispatch('ORDER_CREATED', checkoutResult);
+    // Server-side Pinterest purchase conversion (Conversions API). Fire-and-forget — never
+    // awaited so it can't slow or break checkout; no-ops unless PINTEREST_* env vars are set.
+    // Dedupes with the browser pixel via a shared event_id (`checkout_<orderNumber>`).
+    sendPinterestPurchaseEvent(checkoutResult, { clientIp: ipAddress, clientUserAgent }).catch(() => {});
   }
 
   return checkoutResult;
