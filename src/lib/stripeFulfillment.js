@@ -86,6 +86,32 @@ export async function fulfillSucceededPaymentIntent(paymentIntent, log) {
   }
 
   if (order) {
+    // Reconcile what Stripe actually captured against the total we recomputed at fulfillment.
+    // Any drift (a price/shipping/promo change between PaymentIntent creation and this webhook)
+    // means the order total disagrees with what the customer was charged. The charge already
+    // happened and can't be undone here, so flag the order for admin review rather than shipping
+    // a silently-mismatched order.
+    const chargedCents = paymentIntent.amount_received ?? paymentIntent.amount ?? 0;
+    const orderTotalCents = Math.round((order.financials?.total || 0) * 100);
+    if (Math.abs(chargedCents - orderTotalCents) > 1) {
+      log?.error?.(
+        { orderNumber: order.orderNumber, chargedCents, orderTotalCents, paymentIntentId: paymentIntent.id },
+        "PAYMENT RECONCILIATION MISMATCH: amount charged differs from order total — manual review required"
+      );
+      try {
+        await Order.updateOne(
+          { _id: order._id },
+          { $push: { timeline: {
+            status: order.status,
+            message: `Payment reconciliation mismatch: charged $${(chargedCents / 100).toFixed(2)} vs order total $${(orderTotalCents / 100).toFixed(2)}. Review required.`,
+            source: "System",
+          } } }
+        );
+      } catch (e) {
+        log?.warn?.({ orderId: order._id, error: e.message }, "Failed to record reconciliation mismatch on timeline");
+      }
+    }
+
     await PendingCheckout.updateOne(
       { _id: pending._id, status: { $ne: "consumed" } },
       { $set: { status: "consumed", consumedOrderId: order._id } }

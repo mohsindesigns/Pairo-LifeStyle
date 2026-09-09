@@ -1201,6 +1201,12 @@ export default function CheckoutPage() {
                         returnUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/checkout/success?idempotencyKey=${idempotencyKey}`}
                         idempotencyKey={idempotencyKey}
                         onValidate={validateForm}
+                        onBeforeSubmit={() => {
+                          if (!hasFiredPayment.current) {
+                            hasFiredPayment.current = true;
+                            trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, "Card");
+                          }
+                        }}
                         disabled={loadingClientSecret}
                       />
                     </Elements>

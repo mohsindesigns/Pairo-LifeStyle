@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import Customer from "@/models/Customer";
+import Counter from "@/models/Counter";
 import pairoEvents from "@/lib/events";
 import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
@@ -12,6 +13,32 @@ import {
   buildGuestCheckoutAccountPayload,
   resolveGuestCheckoutCustomerAction,
 } from "@/lib/guestCheckoutAccount";
+
+/**
+ * Ensures the per-tenant order-number counter exists, seeded from the highest existing
+ * order number so numbering stays continuous with any orders created before this counter
+ * was introduced. Idempotent and safe to call concurrently (a duplicate-key from a racing
+ * seed is harmless). Runs OUTSIDE the order transaction so first-ever concurrent orders
+ * don't collide on the counter's insert.
+ */
+async function ensureOrderCounter(tenantId) {
+  const counterId = `order:${tenantId}`;
+  const existing = await Counter.findById(counterId);
+  if (existing) return;
+
+  const lastOrder = await Order.findOne({ tenantId }).sort({ createdAt: -1 }).select("orderNumber");
+  const lastSeq = parseInt(String(lastOrder?.orderNumber || "").match(/(\d+)\s*$/)?.[1] || "1000", 10);
+  try {
+    await Counter.updateOne(
+      { _id: counterId },
+      { $setOnInsert: { seq: Number.isFinite(lastSeq) ? lastSeq : 1000 } },
+      { upsert: true }
+    );
+  } catch (e) {
+    // Another concurrent checkout seeded it first — that's fine.
+    if (e?.code !== 11000) throw e;
+  }
+}
 
 export async function createOrderFromCheckoutPayload(payload, {
   tenantId,
@@ -24,6 +51,7 @@ export async function createOrderFromCheckoutPayload(payload, {
   const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode } = payload;
 
   await dbConnect();
+  await ensureOrderCounter(tenantId);
   const mongoSession = await mongoose.startSession();
   let checkoutResult = null;
 
@@ -105,8 +133,15 @@ export async function createOrderFromCheckoutPayload(payload, {
         });
       }
 
-      const count = await Order.countDocuments({ tenantId }, { session: mongoSession });
-      const orderNumber = `PAI-${1000 + count + 1}`;
+      // Atomic, race-safe order number. Two concurrent checkouts $inc the same counter doc,
+      // which produces a WriteConflict (retried by withTransaction / the checkout route's
+      // retry loop) rather than the duplicate order numbers that countDocuments+1 allowed.
+      const bumped = await Counter.findByIdAndUpdate(
+        `order:${tenantId}`,
+        { $inc: { seq: 1 } },
+        { session: mongoSession, new: true, upsert: true }
+      );
+      const orderNumber = `PAI-${bumped.seq}`;
 
       // Shipping cost is no longer taken from the client at all — computeAuthoritativeCheckout
       // above already re-derived it from the real ShippingZone/ShippingMethod config and threw

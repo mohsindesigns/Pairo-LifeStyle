@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { can } from "@/lib/rbac";
 import dbConnect from "@/lib/db";
 import CustomJacketInquiry from "@/models/CustomJacketInquiry";
 
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!can(session.user, "submissions.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   await dbConnect();
@@ -23,6 +25,7 @@ export async function GET(req, { params }) {
 export async function PATCH(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!can(session.user, "submissions.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   await dbConnect();
@@ -49,6 +52,7 @@ export async function PATCH(req, { params }) {
 export async function DELETE(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!can(session.user, "submissions.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   await dbConnect();

@@ -6,7 +6,7 @@ import { useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js"
 import { Loader2, ArrowRight } from "lucide-react";
 import { IDEMPOTENCY_STORAGE_KEY } from "@/lib/checkoutStorage";
 
-export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidate, disabled = false }) {
+export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidate, onBeforeSubmit, disabled = false }) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
@@ -24,6 +24,9 @@ export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidat
     }
 
     if (!isReady) return;
+
+    // GA4 add_payment_info (card path) — after validation, before confirming payment.
+    if (typeof onBeforeSubmit === "function") onBeforeSubmit();
 
     setIsSubmitting(true);
 

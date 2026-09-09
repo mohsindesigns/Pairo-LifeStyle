@@ -84,6 +84,17 @@ export async function POST(req) {
         continue;
       }
 
+      // Duplicate key = this idempotencyKey was already turned into an order by a racing
+      // or double-clicked request. The order exists and is correct — return it as success
+      // instead of showing the customer a scary duplicate-key error.
+      if (error.code === 11000 && idempotencyKey) {
+        const existingOrder = await Order.findOne({ idempotencyKey, tenantId }).catch(() => null);
+        if (existingOrder) {
+          log.warn({ idempotencyKey, orderNumber: existingOrder.orderNumber }, "Duplicate submit resolved to existing order");
+          return NextResponse.json({ success: true, orderNumber: existingOrder.orderNumber, orderId: existingOrder._id });
+        }
+      }
+
       log.error({ category: LogCategory.CHECKOUT_TRANSACTION, error: error.message }, "Checkout failed");
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

@@ -4,10 +4,12 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import SiteConfig from "@/models/SiteConfig";
+import { can } from "@/lib/rbac";
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!can(session.user, "pages.create")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await dbConnect();
   try {

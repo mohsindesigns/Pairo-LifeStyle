@@ -59,6 +59,11 @@ export async function POST(req) {
       checkoutEmail,
       orderUserId,
       tenantId,
+      // Must pass shipping context so the PaymentIntent amount includes the real shipping
+      // cost — otherwise card orders are charged subtotal-minus-discounts with NO shipping,
+      // while the webhook fulfillment (which does pass these) records the full total.
+      shippingAddress,
+      shippingSnapshot,
       mongoSession: null,
       dryRun: true,
       log,

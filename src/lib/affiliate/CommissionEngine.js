@@ -136,9 +136,27 @@ export class CommissionEngine {
         // Calculate the ratio of the refund relative to the order subtotal
         const originalSubtotal = commission.subtotal || 1;
         const refundRatio = Math.min(1, Number(refundAmount) / originalSubtotal);
-        const reversalAmount = Math.round((commission.commissionAmount * refundRatio) * 100) / 100;
+        const targetReversal = Math.round((commission.commissionAmount * refundRatio) * 100) / 100;
+
+        // Cap cumulative reversals at the commission actually earned, so a duplicate or
+        // repeated refund event can never drive the affiliate's balance more negative than
+        // the original commission. Also marks the commission Reversed once fully clawed back
+        // (previously the partial path never updated status, so it stayed 'Approved' forever).
+        const alreadyReversed = commission.reversedAmount || 0;
+        const remaining = Math.max(0, Math.round((commission.commissionAmount - alreadyReversed) * 100) / 100);
+        const reversalAmount = Math.min(targetReversal, remaining);
 
         if (reversalAmount <= 0) continue;
+
+        commission.reversedAmount = Math.round((alreadyReversed + reversalAmount) * 100) / 100;
+        if (commission.reversedAmount >= commission.commissionAmount - 0.005) {
+          commission.status = 'Reversed';
+        }
+        if (session) {
+          await commission.save({ session });
+        } else {
+          await commission.save();
+        }
 
         // Record a Debit in the Immutable Ledger (deducts from balance)
         await AffiliateLedger.record({

@@ -76,6 +76,7 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
   const { products = [], categories = [], collections = [] } = catalogData || {};
   const base = `${path}.rules.${index}`;
   const config = FIELD_CONFIG[rule.field] || FIELD_CONFIG.subtotal;
+  const isKnownField = Object.prototype.hasOwnProperty.call(FIELD_CONFIG, rule.field);
 
   // Picking a field auto-sets the right comparison + resets the value to the correct
   // empty shape (blank number vs empty list), so the admin never touches an operator.
@@ -92,6 +93,19 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
   const toOptions = (list) => list.map((x) => ({ id: x._id?.toString() || x.id, label: x.name }));
 
   const renderValue = () => {
+    // A legacy/unknown field saved before this friendly rebuild (e.g. user_id) — preserve its
+    // raw value as plain text instead of misbinding it to a money/checkbox control.
+    if (!isKnownField) {
+      return (
+        <input
+          type="text"
+          value={typeof rule.value === "string" ? rule.value : (Array.isArray(rule.value) ? rule.value.join(", ") : "")}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Value"
+          className="flex-1 min-w-0 text-[13px] border border-gray-300 px-2 py-1 rounded-sm outline-none focus:border-[#2271b1]"
+        />
+      );
+    }
     switch (config.kind) {
       case 'money':
         return (
@@ -144,6 +158,9 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
         onChange={(e) => handleFieldChange(e.target.value)}
         className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] bg-white shrink-0"
       >
+        {!isKnownField && rule.field && (
+          <option value={rule.field}>{`Legacy: ${rule.field}`}</option>
+        )}
         {Object.entries(FIELD_CONFIG).map(([value, c]) => (
           <option key={value} value={value}>{c.label}</option>
         ))}

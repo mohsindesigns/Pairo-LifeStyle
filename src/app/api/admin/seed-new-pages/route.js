@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { can } from "@/lib/rbac";
 import dbConnect from "@/lib/db";
 import mongoose from "mongoose";
 
@@ -105,6 +106,9 @@ export async function POST(req) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "pages.create")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {

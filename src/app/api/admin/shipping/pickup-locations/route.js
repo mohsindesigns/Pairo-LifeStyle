@@ -3,10 +3,16 @@ import dbConnect         from '@/lib/db';
 import PickupLocation    from '@/models/PickupLocation';
 import { getServerSession } from 'next-auth';
 import { authOptions }      from '@/app/api/auth/[...nextauth]/route';
+import { can }              from '@/lib/rbac';
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) {
+    return null;
+  }
+  // Pickup locations are part of shipping settings — gate on the settings permission
+  // rather than letting any staff role manage them.
+  if (!can(session.user, 'settings.manage')) {
     return null;
   }
   return session;
