@@ -29,15 +29,20 @@ export function trackGAEvent(eventName, params = {}) {
   if (typeof window === "undefined") return;
 
   try {
+    // Always push to the dataLayer in GA4 ecommerce format so Google Tag Manager can pick up,
+    // transform, fix, enable/disable, and manage every event visually in its own UI — no code
+    // change or redeploy needed to adjust events later. Initialising the array means events
+    // still fire if they happen before GTM finishes loading; GTM replays the queued events.
+    // (Add your GTM container under Admin → Settings → Scripts → "GTM Template".)
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ ecommerce: null }); // reset the ecommerce object between events
+    window.dataLayer.push({ event: eventName, ecommerce: params });
+
+    // Also fire directly to GA4 when a direct gtag tag is loaded (i.e. you're NOT using GTM to
+    // forward to GA4). If you manage GA4 through GTM instead, do not also add a direct GA4
+    // script in the Scripts screen, or these events will be counted twice.
     if (typeof window.gtag === "function") {
       window.gtag("event", eventName, params);
-    } else if (Array.isArray(window.dataLayer)) {
-      window.dataLayer.push({ ecommerce: null });
-      window.dataLayer.push({
-        event: eventName,
-        ...params,
-        ecommerce: params
-      });
     }
   } catch (err) {
     // Analytics failures must never break customer checkout or navigation
