@@ -18,7 +18,18 @@ const DiscountSchema = new mongoose.Schema({
   userRegistrationRequired: { type: Boolean, default: false },
   newsletterSubscribedOnly: { type: Boolean, default: false },
   specificProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
-  specificCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }]
+  specificCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
+
+  // Stripe sync — mirrors Promotion's stripe fields. Only coupons Stripe can
+  // fully enforce on its own (simple percent/fixed off, optional minimum
+  // spend, optional first-purchase-only) are pushed to Stripe; codes scoped
+  // to specific products/categories, registered/newsletter customers, or a
+  // per-user limit above 1 have no Stripe equivalent and are left local-only.
+  stripeCouponId: { type: String, default: null },
+  stripePromotionCodeId: { type: String, default: null },
+  stripeSyncStatus: { type: String, enum: ['synced', 'unsupported', 'error', 'pending'], default: 'pending' },
+  stripeSyncError: { type: String, default: null },
+  stripeSyncKey: { type: String, default: null }
 }, { timestamps: true });
 
 export default mongoose.models.Discount || mongoose.model('Discount', DiscountSchema);
