@@ -6,9 +6,9 @@ import Customer from "@/models/Customer";
 import Product from "@/models/Product";
 import Category from "@/models/Category";
 import { NextResponse } from "next/server";
-
 import { can } from "@/lib/rbac";
 import { syncDiscountToStripe, deactivateDiscountStripeCode } from "@/lib/discountStripeSync";
+
 // Verify session is staff AND (when a permission is given) holds that permission.
 // Coupons live under the "promotions" permission module — previously any staff role
 // could create/edit/delete coupons regardless of their assigned permissions.
