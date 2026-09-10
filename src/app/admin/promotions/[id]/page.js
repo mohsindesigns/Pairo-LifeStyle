@@ -104,12 +104,25 @@ export default function PromotionEditor({ isNew = false } = {}) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData)
       });
-      
+
       if (res.ok) {
-        router.push("/admin/promotions");
+        const saved = await res.json();
+        if (saved.stripeSyncStatus === "error") {
+          // Promotion saved fine in the app, but the Stripe Coupon/PromotionCode
+          // create call failed — surface it instead of silently navigating away,
+          // otherwise the admin has no way to know Stripe never got the code.
+          setFormData(saved);
+          toast.error(`Saved, but Stripe sync failed: ${saved.stripeSyncError || "unknown error"}`);
+        } else {
+          router.push("/admin/promotions");
+        }
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        toast.error(errBody.error || "Failed to save promotion.");
       }
     } catch (err) {
       console.error("Save failed:", err);
+      toast.error("Failed to save promotion.");
     } finally {
       setSaving(false);
     }
