@@ -4,17 +4,26 @@ import stripe from "@/lib/stripe";
  * Maps a "Coupons" (Discount model) code onto Stripe's coupon model, if it's
  * representable there. Stripe can enforce a flat percent_off/amount_off plus
  * a minimum spend and/or first-purchase-only restriction on its own — but it
- * has no concept of this app's product/category scoping, registered-customer
- * or newsletter-subscriber gating, or a per-customer redemption cap above 1.
+ * has no concept of this app's product/category/customer scoping,
+ * registered-customer or newsletter-subscriber gating, a capped max discount
+ * on a percentage coupon, a minimum cart quantity, excluding sale items, or
+ * per-device redemption limiting. A discount using any of those would let a
+ * customer get a bigger or less-restricted discount through Stripe Checkout
+ * than the app intends, so those are left local-only rather than synced.
  * Returns null when the discount can't be safely represented in Stripe.
  */
 function getStripeDiscountSpec(discount) {
   if (!discount.code) return null;
   if (Array.isArray(discount.specificProducts) && discount.specificProducts.length > 0) return null;
   if (Array.isArray(discount.specificCategories) && discount.specificCategories.length > 0) return null;
+  if (Array.isArray(discount.specificCustomers) && discount.specificCustomers.length > 0) return null;
   if (discount.userRegistrationRequired) return null;
   if (discount.newsletterSubscribedOnly) return null;
   if (discount.usagePerUserLimit && Number(discount.usagePerUserLimit) !== 1) return null;
+  if (discount.maxDiscountAmount) return null;
+  if (discount.minQuantity && Number(discount.minQuantity) > 0) return null;
+  if (discount.excludeSaleItems) return null;
+  if (discount.oneRedemptionPerDevice) return null;
 
   if (discount.type === "percentage") {
     const percent = Number(discount.value);
@@ -61,7 +70,14 @@ async function deactivatePromotionCode(stripePromotionCodeId) {
  */
 export async function syncDiscountToStripe(discount) {
   const spec = getStripeDiscountSpec(discount);
-  const isActive = !!discount.isActive && !discount.isDeleted;
+  // Stripe has no "not valid until" restriction (only expires_at, which
+  // endDate already maps to below) — a future startDate is enforced here by
+  // keeping the Stripe-side code inactive until that date has passed. This is
+  // only re-evaluated on save, so a scheduled coupon won't flip active in
+  // Stripe the instant its start date arrives unless the record is saved again.
+  const scheduledStart = discount.startDate ? new Date(discount.startDate) : null;
+  const hasStarted = !scheduledStart || scheduledStart <= new Date();
+  const isActive = !!discount.isActive && !discount.isDeleted && hasStarted;
 
   if (!spec) {
     await deactivatePromotionCode(discount.stripePromotionCodeId);
