@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, Suspense } from "react";
-import { ChevronDown, Search, Edit2, X, QrCode, Copy, Check, Eye, Package, FolderTree } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { ChevronDown, Search, Edit2, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
@@ -281,11 +280,7 @@ function CouponsContent() {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccessNotice(
-          editingDiscountId
-            ? `Coupon "${data.code || formData.code}" updated successfully.`
-            : `Coupon "${data.code || formData.code}" created successfully.`
-        );
+        setSuccessNotice(`Coupon "${data.code}" created successfully.`);
         handleReset();
         router.push("/admin/discounts");
         fetchDiscounts();
@@ -318,6 +313,9 @@ function CouponsContent() {
       const data = await res.json();
       if (res.ok) {
         setSuccessNotice(`Coupon duplicated successfully as "${data.code}".`);
+        if (data.stripeSyncStatus === "error") {
+          setErrorNotice(`Stripe sync failed: ${data.stripeSyncError || "unknown error"}`);
+        }
         fetchDiscounts();
       } else {
         setErrorNotice(data.error || "Duplicate failed.");
@@ -360,6 +358,9 @@ function CouponsContent() {
       const data = await res.json();
       if (res.ok) {
         setSuccessNotice(`Coupon "${data.code}" restored successfully.`);
+        if (data.stripeSyncStatus === "error") {
+          setErrorNotice(`Stripe sync failed: ${data.stripeSyncError || "unknown error"}`);
+        }
         fetchDiscounts();
       } else {
         setErrorNotice(data.error || "Restore failed.");
@@ -523,6 +524,9 @@ function CouponsContent() {
       const data = await res.json();
       if (res.ok) {
         setSuccessNotice(`Coupon "${data.code}" updated successfully.`);
+        if (data.stripeSyncStatus === "error") {
+          setErrorNotice(`Stripe sync failed: ${data.stripeSyncError || "unknown error"}`);
+        }
         setQuickEditingId(null);
         fetchDiscounts();
       } else {
@@ -1187,16 +1191,8 @@ function CouponsContent() {
                       </td>
                       <td className="px-3 py-3 align-top">
                         <div className="flex flex-col">
-                          <span
-                            onClick={() => setViewingDiscount(d)}
-                            className="text-[13px] font-bold text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer tracking-wide uppercase font-mono"
-                            title="Click to view this coupon"
-                          >
-                            {d.code}
-                          </span>
-
-                          {/* Row Actions */}
-                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-semibold select-none">
+                          <span onClick={() => !d.isDeleted && handleStartQuickEdit(d)} className="text-[13px] font-bold text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer tracking-wide uppercase">{d.code}</span>
+                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-0.5 font-semibold select-none">
                             {d.isDeleted ? (
                               <>
                                 <button onClick={() => handleRestore(d._id)} className="hover:text-[#135e96] cursor-pointer">Restore</button>
