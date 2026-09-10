@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import { trackAddToCart, trackRemoveFromCart } from "@/lib/analytics";
 
 const CartContext = createContext();
 
@@ -48,6 +49,45 @@ export function CartProvider({ children }) {
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [selectedShipping, setSelectedShipping] = useState(null);
   const [affiliateDiscount, setAffiliateDiscount] = useState({ type: 'None', value: 0, code: null });
+
+  // A promo code picked up from a shared/QR link (see /promo/[code]) that hasn't
+  // applied yet — e.g. the shopper's cart was empty or below the minimum spend
+  // at the time. Kept separate from appliedPromo (which the empty-cart effect
+  // below clears) so it survives until the cart actually qualifies.
+  const PENDING_PROMO_KEY = "pairo-pending-promo";
+  const [pendingPromoCode, setPendingPromoCodeState] = useState(null);
+
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      try {
+        const stored = localStorage.getItem(PENDING_PROMO_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.code && parsed.expiresAt > Date.now()) {
+            setPendingPromoCodeState(parsed.code);
+          } else {
+            localStorage.removeItem(PENDING_PROMO_KEY);
+          }
+        }
+      } catch (e) {}
+    });
+  }, []);
+
+  const setPendingPromoCode = useCallback((code) => {
+    if (!code) {
+      localStorage.removeItem(PENDING_PROMO_KEY);
+      setPendingPromoCodeState(null);
+      return;
+    }
+    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+    localStorage.setItem(PENDING_PROMO_KEY, JSON.stringify({ code, expiresAt }));
+    setPendingPromoCodeState(code);
+  }, []);
+
+  const clearPendingPromoCode = useCallback(() => {
+    localStorage.removeItem(PENDING_PROMO_KEY);
+    setPendingPromoCodeState(null);
+  }, []);
 
   // Read affiliate referral cookie/localStorage on mount and whenever storage changes
   const readAffiliateCookie = useCallback(() => {
@@ -160,16 +200,25 @@ export function CartProvider({ children }) {
     if (openDrawer) {
       setIsCartOpen(true);
     }
+
+    // GA4 Event: add_to_cart
+    trackAddToCart(product);
   }, []);
 
   const removeFromCart = useCallback((uniqueKey) => {
+    // GA4 Event: remove_from_cart — fire with the removed line's details before it's gone.
+    const removed = cartItems.find(
+      (item) => `${item.id}-${item.selectedSize}-${item.selectedColor}` === uniqueKey
+    );
+    if (removed) trackRemoveFromCart(removed);
+
     setCartItems((prevItems) =>
       prevItems.filter((item) => {
         const itemKey = `${item.id}-${item.selectedSize}-${item.selectedColor}`;
         return itemKey !== uniqueKey;
       })
     );
-  }, []);
+  }, [cartItems]);
 
   const updateQuantity = useCallback((uniqueKey, delta) => {
     setCartItems((prevItems) =>
@@ -192,14 +241,17 @@ export function CartProvider({ children }) {
   // Re-validate coupon code and evaluate automatic promotions automatically when cart items or subtotal changes
   useEffect(() => {
     if (cartItems.length > 0) {
+      const hasManualCode = appliedPromo && !appliedPromo.isAutomatic && !appliedPromo.appliedPromotions?.[0]?.isAutomatic;
+      const codeToTry = hasManualCode ? appliedPromo.code : (pendingPromoCode || "");
+
       const evaluatePromotions = async () => {
         try {
           const res = await fetch("/api/coupons/validate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              code: (appliedPromo && !appliedPromo.isAutomatic && !appliedPromo.appliedPromotions?.[0]?.isAutomatic) ? appliedPromo.code : "", 
-              cartSubtotal, 
+            body: JSON.stringify({
+              code: codeToTry,
+              cartSubtotal,
               items: cartItems,
               email: session?.user?.email || null
             })
@@ -208,11 +260,17 @@ export function CartProvider({ children }) {
           if (data.success) {
             if (data.appliedPromotions && data.appliedPromotions.length > 0) {
               setAppliedPromo(data);
+              // The pending (QR/link) code just applied for real — stop tracking it separately.
+              if (!hasManualCode && codeToTry && pendingPromoCode) {
+                clearPendingPromoCode();
+              }
             } else {
               setAppliedPromo(null);
             }
           } else {
             setAppliedPromo(null);
+            // Leave a pending code in place — it may still qualify once the cart
+            // grows (e.g. a minimum-spend or minimum-quantity coupon).
           }
         } catch (err) {
           console.error("Failed to evaluate promotions on cart change", err);
@@ -222,7 +280,7 @@ export function CartProvider({ children }) {
     } else {
       setAppliedPromo(null);
     }
-  }, [cartItems, cartSubtotal, session]);
+  }, [cartItems, cartSubtotal, session, pendingPromoCode]);
 
   // Dynamic promo discount calculation
   const discountTotal = (() => {
@@ -276,7 +334,8 @@ export function CartProvider({ children }) {
 
   const removePromoCode = useCallback(() => {
     setAppliedPromo(null);
-  }, []);
+    clearPendingPromoCode();
+  }, [clearPendingPromoCode]);
 
   const clearCart = useCallback(() => {
     setCartItems([]);
@@ -302,6 +361,8 @@ export function CartProvider({ children }) {
         discountTotal,
         applyPromoCode,
         removePromoCode,
+        pendingPromoCode,
+        setPendingPromoCode,
         selectedShipping,
         setSelectedShipping,
         affiliateDiscount,

@@ -6,6 +6,7 @@ const AffiliateCommissionSchema = new mongoose.Schema({
   orderNumber: { type: String, required: true, index: true },
   subtotal: { type: Number, required: true }, // Order subtotal at purchase
   commissionAmount: { type: Number, required: true }, // Calculated payout amount
+  reversedAmount: { type: Number, default: 0 }, // Cumulative amount reversed via refunds (never exceeds commissionAmount)
   commissionType: { type: String, enum: ['Percentage', 'Fixed'], default: 'Percentage' },
   status: { 
     type: String, 

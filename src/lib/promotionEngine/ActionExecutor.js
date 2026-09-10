@@ -62,17 +62,19 @@ export default class ActionExecutor {
           console.warn(`[Engine:Executor] Action type ${action.type} not supported.`);
       }
 
-      appliedActions.push({ 
-        ...action, 
-        calculatedValue: parseFloat(currentActionDiscount.toFixed(2)) 
+      // Guardrail: a misconfigured or directly-DB-edited negative action value
+      // must never turn a "discount" into a surcharge that increases the total.
+      currentActionDiscount = Math.max(0, currentActionDiscount);
+
+      appliedActions.push({
+        ...action,
+        calculatedValue: parseFloat(currentActionDiscount.toFixed(2))
       });
       discountAmount += currentActionDiscount;
     }
 
-    // Guardrail: Cannot discount more than the subtotal
-    if (discountAmount > cart.subtotal) {
-      discountAmount = cart.subtotal;
-    }
+    // Guardrail: Cannot discount more than the subtotal, and never negative.
+    discountAmount = Math.max(0, Math.min(discountAmount, cart.subtotal));
 
     return {
       discountAmount: parseFloat(discountAmount.toFixed(2)),

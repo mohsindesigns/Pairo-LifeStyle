@@ -13,6 +13,7 @@ import { stripePromise } from "@/lib/stripeClient";
 import StripePaymentForm from "@/components/checkout/StripePaymentForm";
 import { usePopup } from "@/context/PopupContext";
 import { getProductUrl } from "@/lib/routes";
+import { trackBeginCheckout, trackAddShippingInfo, trackAddPaymentInfo } from "@/lib/analytics";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -255,6 +256,27 @@ export default function CheckoutPage() {
       setIdempotencyKey(`pai_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`);
     });
   }, []);
+
+  // GA4 Event: begin_checkout
+  const hasFiredBeginCheckout = useRef(false);
+  useEffect(() => {
+    if (isCartLoaded && cartItems.length > 0 && !hasFiredBeginCheckout.current) {
+      hasFiredBeginCheckout.current = true;
+      trackBeginCheckout(cartItems, cartTotal || cartSubtotal || 0);
+    }
+  }, [isCartLoaded, cartItems, cartTotal, cartSubtotal]);
+
+  // GA4 Event: add_shipping_info — fire once when a shipping method is first selected.
+  const hasFiredShipping = useRef(false);
+  useEffect(() => {
+    if (selectedShipping && cartItems.length > 0 && !hasFiredShipping.current) {
+      hasFiredShipping.current = true;
+      trackAddShippingInfo(cartItems, cartTotal || cartSubtotal || 0, selectedShipping.methodName);
+    }
+  }, [selectedShipping, cartItems, cartTotal, cartSubtotal]);
+
+  // GA4 Event: add_payment_info — fired from handlePayment on order submission (see below).
+  const hasFiredPayment = useRef(false);
 
   // Keep the selected payment method valid if the admin disables one
   useEffect(() => {
@@ -667,6 +689,12 @@ export default function CheckoutPage() {
 
   const handlePayment = async () => {
     if (!validateForm()) return;
+
+    // GA4 Event: add_payment_info — the shopper submitted the order with payment details.
+    if (!hasFiredPayment.current) {
+      hasFiredPayment.current = true;
+      trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, paymentMethod === "cod" ? "Cash on Delivery" : "Card");
+    }
 
     setIsProcessing(true);
 
@@ -1173,6 +1201,12 @@ export default function CheckoutPage() {
                         returnUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/checkout/success?idempotencyKey=${idempotencyKey}`}
                         idempotencyKey={idempotencyKey}
                         onValidate={validateForm}
+                        onBeforeSubmit={() => {
+                          if (!hasFiredPayment.current) {
+                            hasFiredPayment.current = true;
+                            trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, "Card");
+                          }
+                        }}
                         disabled={loadingClientSecret}
                       />
                     </Elements>
@@ -1295,7 +1329,7 @@ export default function CheckoutPage() {
               {appliedPromo && (
                 <div className="flex items-center justify-between px-3 py-2 bg-[#FAF9F6] border border-neutral-200 rounded-[3px]">
                   <span className="text-[10px] font-bold text-black uppercase tracking-wider">
-                    Discount ({appliedPromo.code}) Applied
+                    Discount ({appliedPromo.code || appliedPromo.appliedPromotions?.[0]?.title || "Promotion"}) Applied
                   </span>
                   <button
                     type="button"

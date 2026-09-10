@@ -267,6 +267,29 @@ export default function PromotionEditor({ isNew = false } = {}) {
 
                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-100">
                   <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Start Date</label>
+                    <input
+                      type="date"
+                      value={formData.startDate ? new Date(formData.startDate).toISOString().slice(0, 10) : ""}
+                      onChange={(e) => updateField('startDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                      className="w-full border border-gray-300 p-2 text-[14px] outline-none focus:border-[#2271b1] rounded-sm"
+                    />
+                    <p className="text-[11px] text-gray-400">Leave blank to start immediately.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">End Date</label>
+                    <input
+                      type="date"
+                      value={formData.endDate ? new Date(formData.endDate).toISOString().slice(0, 10) : ""}
+                      onChange={(e) => updateField('endDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                      className="w-full border border-gray-300 p-2 text-[14px] outline-none focus:border-[#2271b1] rounded-sm"
+                    />
+                    <p className="text-[11px] text-gray-400">Leave blank to run indefinitely.</p>
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+                  <div className="space-y-2">
                     <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Max Total Uses</label>
                     <input
                       type="number"

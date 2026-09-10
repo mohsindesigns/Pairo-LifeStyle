@@ -224,10 +224,10 @@ export default function AdminProducts() {
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2.5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm font-sans">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 shadow-sm font-sans">
+          <div className="flex flex-wrap items-center gap-1.5 xs:gap-2">
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1]" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={bulkAction} 
               onChange={(e) => setBulkAction(e.target.value)}
             >
@@ -244,13 +244,13 @@ export default function AdminProducts() {
             <button 
               type="button"
               onClick={handleBulkAction} 
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
+              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
             >
               Apply
             </button>
             
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] ml-2" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={selectedCategory} 
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
@@ -259,7 +259,7 @@ export default function AdminProducts() {
             </select>
 
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] ml-1" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={selectedStock} 
               onChange={(e) => setSelectedStock(e.target.value)}
             >
@@ -270,7 +270,7 @@ export default function AdminProducts() {
             </select>
 
             <select 
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] ml-1" 
+              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
               value={selectedType} 
               onChange={(e) => setSelectedType(e.target.value)}
             >
@@ -281,43 +281,43 @@ export default function AdminProducts() {
 
             <button 
               type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
+              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
             >
               Filter
             </button>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto">
             <input 
               type="text" 
               placeholder="Search products..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="border border-[#8c8f94] outline-none px-3 py-1.5 text-[13px] flex-1 md:w-48 bg-white focus:border-[#2271b1] rounded-[3px]"
+              className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 xs:py-1.5 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-48 bg-white focus:border-[#2271b1] rounded-[3px]"
             />
             <button 
               type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer"
+              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer shrink-0 whitespace-nowrap"
             >
-              Search Products
+              Search
             </button>
           </div>
         </div>
 
         {/* Data Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse table-fixed min-w-[950px] text-[13px] font-sans">
+        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
+          <table className="w-full text-left border-collapse table-fixed min-w-[640px] md:min-w-[800px] lg:min-w-[950px] text-[13px] font-sans">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#2c3539]">
                 <th className="px-3 py-2.5 w-9 text-center align-middle"><input type="checkbox" checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length} onChange={toggleSelectAll} className="rounded-[2px] border-gray-300" /></th>
                 <th className="px-3 py-2.5 w-16 text-center align-middle"><ImageIcon className="w-4 h-4 text-[#8c8f94] mx-auto" /></th>
                 <th className="px-3 py-2.5 font-bold text-[#1d2327] w-auto">Name</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-36">Categories</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-28">SKU</th>
+                <th className="hidden md:table-cell px-3 py-2.5 font-bold text-[#1d2327] w-36">Categories</th>
+                <th className="hidden md:table-cell px-3 py-2.5 font-bold text-[#1d2327] w-28">SKU</th>
                 <th className="px-3 py-2.5 font-bold text-[#1d2327] w-32 text-center">Stock</th>
                 <th className="px-3 py-2.5 font-bold text-[#1d2327] w-24">Price</th>
                 <th className="px-3 py-2.5 font-bold text-[#1d2327] w-24">Status</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-32">Date</th>
+                <th className="hidden lg:table-cell px-3 py-2.5 font-bold text-[#1d2327] w-32">Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f0f0f1] text-[#2c3539]">
@@ -336,7 +336,7 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-3 py-3 align-top pt-3.5">
                       <Link href={`/admin/products/${p._id}`} className="text-[#2271b1] font-bold hover:text-[#135e96] text-[14px] block mb-0.5 leading-tight">{p.name}</Link>
-                      <div className="flex flex-wrap items-center gap-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium mt-1">
+                      <div className="flex flex-wrap items-center gap-x-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium mt-1">
                         {view === "trash" ? (
                           <>
                             <button onClick={() => handleRestoreProduct(p._id)} className="hover:text-[#135e96] cursor-pointer">Restore</button>
@@ -362,7 +362,7 @@ export default function AdminProducts() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-top pt-3.5">
+                    <td className="hidden md:table-cell px-3 py-3 align-top pt-3.5">
                       <div className="flex flex-wrap gap-1 leading-normal">
                         {p.categories?.length > 0 ? (
                           p.categories.map((catId, idx) => {
@@ -379,7 +379,7 @@ export default function AdminProducts() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 align-top pt-3.5 text-[#646970] font-mono leading-normal">{p.sku || "—"}</td>
+                    <td className="hidden md:table-cell px-3 py-3 align-top pt-3.5 text-[#646970] font-mono leading-normal break-all">{p.sku || "—"}</td>
                     <td className="px-3 py-3 align-top pt-3 text-center">
                       <span className={`inline-block font-semibold text-[11.5px] ${
                         !p.manageStock 
@@ -417,7 +417,7 @@ export default function AdminProducts() {
                         {p.status}
                       </button>
                     </td>
-                    <td className="px-3 py-3 align-top pt-3.5 text-[#646970] leading-normal">
+                    <td className="hidden lg:table-cell px-3 py-3 align-top pt-3.5 text-[#646970] leading-normal">
                       {new Date(p.createdAt).toLocaleDateString()}
                     </td>
                   </tr>
@@ -429,13 +429,13 @@ export default function AdminProducts() {
 
         {/* Quick Edit Overlay */}
         {quickEditId && (
-          <div className="fixed inset-0 bg-black/10 backdrop-blur-[1px] z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-[#ccd0d4] shadow-2xl w-full max-w-2xl rounded-[3px] overflow-hidden animate-in fade-in zoom-in duration-150">
-              <div className="bg-[#f6f7f7] border-b border-[#ccd0d4] px-4 py-3 flex items-center justify-between">
-                <h3 className="text-[14px] font-bold text-[#1d2327]">Quick Edit — {quickEditData.name}</h3>
-                <button onClick={() => setQuickEditId(null)} className="text-gray-400 hover:text-black"><X className="w-5 h-5" /></button>
+          <div className="fixed inset-0 bg-black/10 backdrop-blur-[1px] z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+            <div className="bg-white border border-[#ccd0d4] shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-[3px] animate-in fade-in zoom-in duration-150">
+              <div className="bg-[#f6f7f7] border-b border-[#ccd0d4] px-4 py-3 flex items-center justify-between gap-2">
+                <h3 className="text-[14px] font-bold text-[#1d2327] min-w-0 break-words">Quick Edit — {quickEditData.name}</h3>
+                <button onClick={() => setQuickEditId(null)} className="text-gray-400 hover:text-black shrink-0"><X className="w-5 h-5" /></button>
               </div>
-              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5 font-sans">
+              <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 font-sans">
                 <div className="space-y-4">
                   <div>
                     <label className="block text-[12px] font-bold mb-1 text-gray-700">Title</label>
@@ -447,7 +447,7 @@ export default function AdminProducts() {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[12px] font-bold mb-1 text-gray-700">Price ($)</label>
                       <input type="number" className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1]" value={quickEditData.price} onChange={e => setQuickEditData({...quickEditData, price: parseFloat(e.target.value)})} />
@@ -466,7 +466,7 @@ export default function AdminProducts() {
                   </div>
                 </div>
               </div>
-              <div className="bg-[#f6f7f7] border-t border-[#ccd0d4] px-4 py-3 flex items-center justify-between">
+              <div className="bg-[#f6f7f7] border-t border-[#ccd0d4] px-4 py-3 flex flex-col-reverse xs:flex-row xs:items-center xs:justify-between gap-2">
                 <button onClick={() => setQuickEditId(null)} className="text-[13px] text-[#2271b1] hover:text-[#135e96] underline font-medium">Cancel</button>
                 <button 
                   onClick={async () => {
@@ -480,7 +480,7 @@ export default function AdminProducts() {
                       fetchProducts();
                     }
                   }}
-                  className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold text-[13px] hover:bg-[#135e96] cursor-pointer"
+                  className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold text-[13px] hover:bg-[#135e96] cursor-pointer w-full xs:w-auto"
                 >
                   Update
                 </button>
@@ -490,7 +490,7 @@ export default function AdminProducts() {
         )}
 
         {/* Pagination */}
-        <div className="flex items-center justify-between text-[13px] text-[#646970] font-sans">
+        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 text-[13px] text-[#646970] font-sans">
           <div>{filteredProducts.length} items</div>
           <div className="flex items-center gap-1">
             <button className="p-1 border border-[#ccd0d4] bg-[#f6f7f7] hover:bg-[#f0f0f1] rounded disabled:opacity-50 cursor-pointer"><ChevronLeft className="w-4 h-4 text-gray-600" /></button>

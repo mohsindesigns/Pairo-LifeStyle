@@ -221,10 +221,10 @@ export default function AdminSizeCharts() {
       <div className="bg-white border border-[#ccd0d4] rounded-[4px] shadow-sm">
         
         {/* Filters and Search Bar */}
-        <div className="p-4 border-b border-[#ccd0d4] flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+        <div className="p-3 sm:p-4 border-b border-[#ccd0d4] flex flex-col md:flex-row gap-2 md:gap-4 items-stretch md:items-center justify-between">
           <div className="flex flex-wrap gap-2 items-center">
             {/* Search */}
-            <div className="relative min-w-[240px]">
+            <div className="relative w-full sm:w-auto min-w-0 sm:min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -239,7 +239,7 @@ export default function AdminSizeCharts() {
             <select
               value={selectedStatus}
               onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer"
+              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer w-full sm:w-auto min-w-0"
             >
               <option>All statuses</option>
               <option>Published</option>
@@ -250,7 +250,7 @@ export default function AdminSizeCharts() {
             <select
               value={selectedAssignment}
               onChange={(e) => { setSelectedAssignment(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer"
+              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer w-full sm:w-auto min-w-0"
             >
               <option>All assignments</option>
               <option>Category</option>
@@ -259,12 +259,12 @@ export default function AdminSizeCharts() {
             </select>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {/* Bulk Actions */}
             <select
               value={bulkAction}
               onChange={(e) => setBulkAction(e.target.value)}
-              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer"
+              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer flex-1 sm:flex-none min-w-0"
             >
               <option>Bulk actions</option>
               <option value="publish">Publish</option>
@@ -273,7 +273,7 @@ export default function AdminSizeCharts() {
             </select>
             <button
               onClick={handleBulkSubmit}
-              className="bg-white border border-[#8c8f94] text-[#2c3338] px-4 py-1.5 rounded-[3px] text-[13px] font-bold hover:bg-[#f6f7f7] transition-all cursor-pointer h-[34px]"
+              className="bg-white border border-[#8c8f94] text-[#2c3338] px-4 py-1.5 rounded-[3px] text-[13px] font-bold hover:bg-[#f6f7f7] transition-all cursor-pointer h-[34px] shrink-0"
             >
               Apply
             </button>
@@ -281,7 +281,7 @@ export default function AdminSizeCharts() {
         </div>
 
         {/* Table Content */}
-        <div className="w-full overflow-x-auto">
+        <div className="w-full max-w-full overflow-x-auto">
           {loading ? (
             <div className="text-center py-12">
               <span className="text-[13px] text-gray-500 font-medium">Loading size charts...</span>
@@ -295,7 +295,7 @@ export default function AdminSizeCharts() {
               </Link>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse text-[13px]">
+            <table className="w-full min-w-[640px] text-left border-collapse text-[13px]">
               <thead>
                 <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#2c3338] font-bold">
                   <th className="p-3 w-10 text-center">
@@ -307,8 +307,8 @@ export default function AdminSizeCharts() {
                   </th>
                   <th className="p-3 font-semibold">Label</th>
                   <th className="p-3 font-semibold">Assigned To</th>
-                  <th className="p-3 font-semibold text-center">Products Using</th>
-                  <th className="p-3 font-semibold">Last Updated</th>
+                  <th className="p-3 font-semibold text-center hidden md:table-cell">Products Using</th>
+                  <th className="p-3 font-semibold hidden lg:table-cell">Last Updated</th>
                   <th className="p-3 font-semibold">Status</th>
                   <th className="p-3 font-semibold text-right">Actions</th>
                 </tr>
@@ -337,7 +337,7 @@ export default function AdminSizeCharts() {
                       </td>
                       <td className="p-3">
                         {chart.assignedTo ? (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 border border-blue-200 text-blue-700">
                               {chart.assignedTo.type}
                             </span>
@@ -347,8 +347,8 @@ export default function AdminSizeCharts() {
                           <span className="text-[12px] text-gray-400 italic">Unassigned</span>
                         )}
                       </td>
-                      <td className="p-3 text-center font-bold text-[#2c3338]">{chart.usageCount}</td>
-                      <td className="p-3 text-gray-500">{formatDate(chart.updatedAt)}</td>
+                      <td className="p-3 text-center font-bold text-[#2c3338] hidden md:table-cell">{chart.usageCount}</td>
+                      <td className="p-3 text-gray-500 hidden lg:table-cell">{formatDate(chart.updatedAt)}</td>
                       <td className="p-3">
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[12px] text-[11px] font-medium leading-none ${
@@ -403,7 +403,7 @@ export default function AdminSizeCharts() {
 
         {/* Pagination Footer */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-[#ccd0d4] flex items-center justify-between text-[13px] text-gray-500 bg-[#f6f7f7]/30">
+          <div className="p-3 sm:p-4 border-t border-[#ccd0d4] flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 text-[13px] text-gray-500 bg-[#f6f7f7]/30">
             <span>
               Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredCharts.length)} of{" "}
               {filteredCharts.length} items
@@ -431,28 +431,28 @@ export default function AdminSizeCharts() {
 
       {/* Preview Modal */}
       {previewChart && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPreviewChart(null)}>
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border border-black" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={() => setPreviewChart(null)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] flex flex-col overflow-hidden border border-black" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-black shrink-0">
-              <span className="text-[13px] font-bold uppercase tracking-widest text-black">
+            <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-4 border-b border-black shrink-0">
+              <span className="text-[13px] font-bold uppercase tracking-widest text-black min-w-0 break-words">
                 {previewChart.publicHeading}
               </span>
               <button
                 onClick={() => setPreviewChart(null)}
-                className="w-8 h-8 flex items-center justify-center border border-black hover:bg-black hover:text-white transition-all text-black"
+                className="w-8 h-8 shrink-0 flex items-center justify-center border border-black hover:bg-black hover:text-white transition-all text-black"
               >
                 ×
               </button>
             </div>
             
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 space-y-4 sm:space-y-6">
               {previewChart.description && (
                 <p className="text-xs text-neutral-500 leading-relaxed italic">{previewChart.description}</p>
               )}
               
-              <div className="w-full overflow-x-auto border border-black rounded">
+              <div className="w-full max-w-full overflow-x-auto border border-black rounded">
                 <table className="w-full text-left border-collapse text-[11px] sm:text-[12px]">
                   <thead>
                     <tr className="bg-black/5 border-b border-black font-bold uppercase text-black">

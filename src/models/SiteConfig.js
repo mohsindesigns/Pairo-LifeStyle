@@ -113,6 +113,20 @@ const SiteConfigSchema = new mongoose.Schema({
   // ─── Social Links ──────────────────────────────────────────
   socialLinks: [SocialLinkSchema],
 
+  // ─── Site Popup Configuration ──────────────────────────────
+  popup: {
+    enabled: { type: Boolean, default: false },
+    bannerUrl: { type: String, default: '' },
+    badgeText: { type: String, default: '' },
+    title: { type: String, default: '' },
+    description: { type: String, default: '' },
+    buttonLabel: { type: String, default: '' },
+    buttonLink: { type: String, default: '' },
+    openInNewTab: { type: Boolean, default: false },
+    delaySeconds: { type: Number, default: 1 },
+    frequency: { type: String, enum: ['session', 'daily', 'always'], default: 'session' },
+  },
+
   // ─── Store Commerce Settings ───────────────────────────────────────────────
   // Global defaults used by the shipping engine, tax service, and checkout
   commerce: {

@@ -8,6 +8,19 @@ import { syncPromotionToStripe, deactivatePromotionStripeCode } from "@/lib/prom
 import { cache } from "@/lib/cache";
 import { can } from "@/lib/rbac";
 
+// Fields the server owns — never let a client set them via the request body. Otherwise a
+// staff user could reset a coupon's used-count (usageLimits.currentTotalUses), forge its
+// analytics, or hijack its Stripe linkage. (tenantId is intentionally left writable.)
+function stripServerManagedFields(data) {
+  if (!data || typeof data !== "object") return data;
+  const { _id, analytics, stripeCouponId, stripePromotionCodeId, stripeSyncStatus, stripeSyncError, stripeSyncKey, createdAt, updatedAt, ...safe } = data;
+  if (safe.usageLimits && typeof safe.usageLimits === "object") {
+    const { currentTotalUses, ...restUsage } = safe.usageLimits;
+    safe.usageLimits = restUsage;
+  }
+  return safe;
+}
+
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) {
@@ -46,7 +59,7 @@ export async function PUT(req, { params }) {
     const oldPromo = await Promotion.findById(id);
     if (!oldPromo) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const promotion = await Promotion.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+    const promotion = await Promotion.findByIdAndUpdate(id, stripServerManagedFields(data), { new: true, runValidators: true });
 
     // Track History
     const diff = HistoryService.generateDiff(oldPromo.toObject(), promotion.toObject());
@@ -81,10 +94,18 @@ export async function PATCH(req, { params }) {
   await dbConnect();
   try {
     const data = await req.json();
-    const promotion = await Promotion.findByIdAndUpdate(id, { $set: data }, { new: true });
+    const oldPromo = await Promotion.findById(id);
+    if (!oldPromo) return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
 
-    if (!promotion) {
-      return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+    const promotion = await Promotion.findByIdAndUpdate(id, { $set: stripServerManagedFields(data) }, { new: true });
+
+    // Track History — same as PUT, so a Pause/Activate toggle (or any other
+    // partial update) leaves an audit trail instead of silently changing a
+    // live, customer-facing promotion with no record of who/when.
+    const diff = HistoryService.generateDiff(oldPromo.toObject(), promotion.toObject());
+    if (diff.length > 0) {
+      await HistoryService.recordRevision(promotion, { adminName: session.user.name || session.user.email });
+      await HistoryService.logAction('UPDATE', id, { adminName: session.user.name || session.user.email }, diff);
     }
 
     const stripeState = await syncPromotionToStripe(promotion);

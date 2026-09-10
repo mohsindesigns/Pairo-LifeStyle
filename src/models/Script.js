@@ -8,7 +8,7 @@ const ScriptSchema = new mongoose.Schema({
   // type: 'custom', 'template_ga4', 'template_gtm', 'template_pixel', etc.
   type: { 
     type: String, 
-    enum: ['custom', 'ga4', 'gtm', 'meta_pixel', 'tiktok_pixel', 'hotjar', 'clarity', 'verification'],
+    enum: ['custom', 'ga4', 'gtm', 'meta_pixel', 'tiktok_pixel', 'pinterest', 'hotjar', 'clarity', 'verification'],
     default: 'custom' 
   },
   

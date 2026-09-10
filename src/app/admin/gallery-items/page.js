@@ -73,19 +73,19 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="font-bold text-[15px] text-[#1d2327]">{isNew ? "Add Gallery Item" : "Edit Gallery Item"}</h2>
+        <div className="flex items-center justify-between p-3 sm:p-5 border-b border-gray-100">
+          <h2 className="font-bold text-[14px] sm:text-[15px] text-[#1d2327]">{isNew ? "Add Gallery Item" : "Edit Gallery Item"}</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-3 sm:p-5 space-y-3 sm:space-y-4">
           {/* Image */}
           <div>
             <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-2">Image *</label>
@@ -177,9 +177,9 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
           </div>
         </div>
 
-        <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
-          <button onClick={onClose} className="border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] flex items-center gap-2 disabled:opacity-60">
+        <div className="p-3 sm:p-5 border-t border-gray-100 flex flex-wrap justify-end gap-2 sm:gap-3">
+          <button onClick={onClose} className="border border-[#8c8f94] text-[#3c434a] px-3 sm:px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="bg-[#2271b1] text-white px-3 sm:px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] flex items-center gap-2 disabled:opacity-60">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {saving ? "Saving..." : "Save Item"}
           </button>
@@ -275,7 +275,7 @@ export default function GalleryItemsPage() {
         </div>
 
         {/* Items Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
+        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
           <table className="w-full text-left border-collapse text-[13px] min-w-[700px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
@@ -316,7 +316,7 @@ export default function GalleryItemsPage() {
                       <button onClick={() => handleToggleEnabled(item)} className={`w-7 h-4 rounded-full transition-colors ${item.enabled ? "bg-[#2271b1]" : "bg-gray-300"}`} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button onClick={() => { setEditingItem(item); setFormOpen(true); }} className="text-[#2271b1] text-[12px] font-medium hover:text-[#135e96] flex items-center gap-1">
                           <Pencil className="w-3.5 h-3.5" /> Edit
                         </button>

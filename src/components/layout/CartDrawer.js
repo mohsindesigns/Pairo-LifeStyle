@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import Link from "next/link";
 import { getProductUrl } from "@/lib/routes";
+import { trackBeginCheckout } from "@/lib/analytics";
 
 export default function CartDrawer() {
   const { isCartOpen, setIsCartOpen, cartItems, updateQuantity, removeFromCart, cartSubtotal, affiliateDiscount, affiliateDiscountAmount } = useCart();
@@ -193,7 +194,10 @@ export default function CartDrawer() {
                 <div className="space-y-2">
                   <Link
                     href="/checkout"
-                    onClick={() => setIsCartOpen(false)}
+                    onClick={() => {
+                      setIsCartOpen(false);
+                      trackBeginCheckout(cartItems, cartSubtotal || 0);
+                    }}
                     className="w-full bg-black text-white h-12 rounded-lg font-bold uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-2 hover:bg-black/90 active:scale-[0.98] transition-all"
                   >
                     Checkout

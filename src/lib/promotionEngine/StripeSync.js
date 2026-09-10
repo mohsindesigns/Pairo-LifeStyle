@@ -46,9 +46,13 @@ async function deactivatePromotionCode(stripePromotionCodeId) {
  * rather than blocking the promotion from being saved in the app.
  *
  * Stripe Coupons are immutable once created (percent_off/amount_off can't be
- * edited), and a PromotionCode's `code` text can't be renamed either — so any
- * change to the code string or discount value/type recreates both objects
- * fresh, deactivating the old PromotionCode first to free up the code text.
+ * edited), and a PromotionCode's `code` text can't be renamed either. Its
+ * `max_redemptions`/`expires_at` are also set-once-at-creation and cannot be
+ * changed via update (see PromotionCodeUpdateParams in the Stripe Node SDK —
+ * only `active`, `metadata`, and `restrictions` are updatable). So any change
+ * to the code string, discount value/type, usage limit, or expiry recreates
+ * both objects fresh, deactivating the old PromotionCode first to free up the
+ * code text.
  */
 export async function syncPromotionToStripe(promotion) {
   const spec = getStripeDiscountSpec(promotion);
@@ -66,7 +70,13 @@ export async function syncPromotionToStripe(promotion) {
   }
 
   const code = promotion.code.toUpperCase().trim();
-  const newSyncKey = JSON.stringify({ code, ...spec });
+  // maxTotalUses/endDate map onto Stripe's max_redemptions/expires_at, which
+  // (like percent_off/amount_off) can only be set at creation — so they must
+  // be part of the sync key too, or a post-first-sync edit to either would
+  // compare equal here and never reach the recreate path below.
+  const maxTotalUses = promotion.usageLimits?.maxTotalUses ?? null;
+  const endDate = promotion.endDate ? new Date(promotion.endDate).toISOString() : null;
+  const newSyncKey = JSON.stringify({ code, ...spec, maxTotalUses, endDate });
 
   try {
     if (newSyncKey === promotion.stripeSyncKey && promotion.stripePromotionCodeId) {

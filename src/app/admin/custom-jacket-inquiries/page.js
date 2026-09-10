@@ -75,27 +75,27 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <div>
-            <h2 className="font-bold text-lg text-[#1d2327]">
+        <div className="flex items-center justify-between p-3 sm:p-6 border-b border-gray-100 gap-2">
+          <div className="min-w-0">
+            <h2 className="font-bold text-base sm:text-lg text-[#1d2327] truncate">
               {inquiry.firstName} {inquiry.lastName}
             </h2>
-            <p className="text-[13px] text-[#646970]">{inquiry.email}</p>
+            <p className="text-[12px] sm:text-[13px] text-[#646970] truncate">{inquiry.email}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center">
+          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center shrink-0">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-3 sm:p-6 space-y-4 sm:space-y-5">
           {/* Personal Info */}
-          <div className="grid grid-cols-2 gap-4 text-[13px]">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4 text-[13px]">
             {[
               ["Phone", inquiry.phone],
               ["Country", inquiry.country],
@@ -104,7 +104,7 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
             ].map(([label, val]) => val ? (
               <div key={label}>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-                <p className="text-[#1d2327] font-medium mt-0.5">{val}</p>
+                <p className="text-[#1d2327] font-medium mt-0.5 break-words">{val}</p>
               </div>
             ) : null)}
           </div>
@@ -112,7 +112,7 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
           <hr className="border-gray-100" />
 
           {/* Jacket Specs */}
-          <div className="grid grid-cols-2 gap-4 text-[13px]">
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4 text-[13px]">
             {[
               ["Jacket Type", inquiry.jacketType],
               ["Gender", inquiry.gender],
@@ -124,7 +124,7 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
             ].map(([label, val]) => val ? (
               <div key={label}>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-                <p className="text-[#1d2327] font-medium mt-0.5">{val}</p>
+                <p className="text-[#1d2327] font-medium mt-0.5 break-words">{val}</p>
               </div>
             ) : null)}
           </div>
@@ -222,11 +222,11 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
           </div>
         </div>
 
-        <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
-          <button onClick={onClose} className="border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">
+        <div className="p-3 sm:p-6 border-t border-gray-100 flex flex-col-reverse xs:flex-row xs:justify-end gap-2 sm:gap-3">
+          <button onClick={onClose} className="border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] w-full xs:w-auto">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] disabled:opacity-60">
+          <button onClick={handleSave} disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] disabled:opacity-60 w-full xs:w-auto">
             {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
@@ -311,22 +311,22 @@ export default function CustomJacketInquiriesPage() {
         </ul>
 
         {/* Search */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex items-center gap-2 shadow-sm">
+        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex items-center gap-2 shadow-sm">
           <input
             type="text"
             placeholder="Search by name, email, jacket type..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] w-full max-w-sm bg-white focus:border-[#2271b1] rounded-[3px]"
+            className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] w-full max-w-sm bg-white focus:border-[#2271b1] rounded-[3px]"
           />
-          <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">
+          <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">
             <Search className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[800px]">
+        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
+          <table className="w-full text-left border-collapse text-[13px] min-w-[500px] md:min-w-[800px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                 <th className="px-4 py-2 font-bold text-[#1d2327]">Name</th>
@@ -353,7 +353,7 @@ export default function CustomJacketInquiriesPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-[#646970]">{inq.email}</td>
+                    <td className="px-4 py-3 text-[#646970] break-all">{inq.email}</td>
                     <td className="px-4 py-3 text-[#646970]">{inq.jacketType || "—"}</td>
                     <td className="px-4 py-3">
                       <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${STATUS_COLORS[inq.status] || "bg-gray-100 text-gray-600"}`}>
@@ -364,7 +364,7 @@ export default function CustomJacketInquiriesPage() {
                       {new Date(inq.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setSelectedInquiry(inq)}
                           className="flex items-center gap-1 text-[#2271b1] hover:text-[#135e96] text-[12px] font-medium"

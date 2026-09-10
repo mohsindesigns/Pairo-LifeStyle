@@ -127,18 +127,18 @@ export default function AdminProductQuestionsPage() {
       <div className="space-y-5">
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
           {[
             { label: "Pending Review", value: stats.pendingCount, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", icon: AlertCircle },
             { label: "Approved & Public", value: stats.approvedCount, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200", icon: Check },
             { label: "Hidden", value: stats.hiddenCount, color: "text-gray-500", bg: "bg-gray-50", border: "border-gray-200", icon: EyeOff },
           ].map(({ label, value, color, bg, border, icon: Icon }) => (
-            <div key={label} className={`${bg} border ${border} rounded-[3px] p-4 flex items-center justify-between`}>
+            <div key={label} className={`${bg} border ${border} rounded-[3px] p-3 sm:p-4 flex items-center justify-between`}>
               <div>
                 <p className="text-[11px] font-bold text-[#646970] uppercase tracking-wider">{label}</p>
-                <p className={`text-2xl font-bold ${color} mt-0.5`}>{value}</p>
+                <p className={`text-xl sm:text-2xl font-bold ${color} mt-0.5`}>{value}</p>
               </div>
-              <Icon className={`w-7 h-7 ${color} opacity-25`} />
+              <Icon className={`w-6 h-6 sm:w-7 sm:h-7 ${color} opacity-25`} />
             </div>
           ))}
         </div>
@@ -192,7 +192,7 @@ export default function AdminProductQuestionsPage() {
               return (
                 <div key={q._id} className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-sm overflow-hidden">
                   {/* Card Header */}
-                  <div className="flex items-start gap-3 p-4">
+                  <div className="flex flex-wrap sm:flex-nowrap items-start gap-2.5 sm:gap-3 p-3 sm:p-4">
                     {/* Status dot */}
                     <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
                       q.status === "Approved" ? "bg-emerald-500" : q.status === "Pending" ? "bg-amber-500" : "bg-gray-400"
@@ -209,9 +209,9 @@ export default function AdminProductQuestionsPage() {
                             href={`/product/${q.productId.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[11px] font-bold text-[#2271b1] hover:underline flex items-center gap-1"
+                            className="text-[11px] font-bold text-[#2271b1] hover:underline flex items-center gap-1 truncate"
                           >
-                            {q.productId.name}
+                            <span className="truncate">{q.productId.name}</span>
                             <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                           </a>
                         </div>
@@ -220,7 +220,7 @@ export default function AdminProductQuestionsPage() {
                       )}
 
                       {/* Question */}
-                      <p className="text-[14px] font-semibold text-[#1d2327] leading-snug">
+                      <p className="text-[13px] sm:text-[14px] font-semibold text-[#1d2327] leading-snug break-words">
                         &ldquo;{q.question}&rdquo;
                       </p>
 
@@ -237,7 +237,7 @@ export default function AdminProductQuestionsPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-0.5 shrink-0">
+                    <div className="flex items-center gap-0.5 shrink-0 ml-auto sm:ml-0">
                       <button
                         onClick={() => toggleExpand(q._id)}
                         className="p-2 hover:bg-[#f0f0f1] rounded text-[#646970] transition-colors"
@@ -315,9 +315,9 @@ export default function AdminProductQuestionsPage() {
 
       {/* Reply Modal */}
       {replyingQuestion && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-xl max-w-lg w-full overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3.5 bg-[#f6f7f7] border-b border-[#ccd0d4]">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white border border-[#ccd0d4] rounded-[3px] shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 bg-[#f6f7f7] border-b border-[#ccd0d4] shrink-0">
               <h3 className="text-[14px] font-bold text-[#1d2327] flex items-center gap-2">
                 <Reply className="w-4 h-4 text-[#2271b1]" />
                 Reply to Question
@@ -326,34 +326,34 @@ export default function AdminProductQuestionsPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-5 space-y-4">
-              <div className="bg-[#f9f9fa] border border-[#e2e4e7] rounded p-3.5">
+            <div className="p-3 sm:p-5 space-y-3 sm:space-y-4 overflow-y-auto flex-1">
+              <div className="bg-[#f9f9fa] border border-[#e2e4e7] rounded p-3 sm:p-3.5">
                 <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1.5">Customer Question</p>
-                <p className="text-[13px] text-[#1d2327] font-medium italic">&ldquo;{replyingQuestion.question}&rdquo;</p>
+                <p className="text-[12px] sm:text-[13px] text-[#1d2327] font-medium italic break-words">&ldquo;{replyingQuestion.question}&rdquo;</p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-[12px] font-bold text-[#1d2327]">Your Answer</label>
                 <textarea
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  rows={5}
+                  rows={4}
                   placeholder="Type your official store response here..."
-                  className="w-full bg-[#f6f7f7] border border-[#dcdcde] px-3 py-2.5 text-[13px] focus:outline-none focus:border-[#2271b1] focus:bg-white transition-all rounded-[3px] resize-none"
+                  className="w-full bg-[#f6f7f7] border border-[#dcdcde] px-3 py-2 text-[13px] focus:outline-none focus:border-[#2271b1] focus:bg-white transition-all rounded-[3px] resize-none"
                 />
                 <p className="text-[11px] text-[#646970]">Replying will auto-approve the question and email your response to the customer.</p>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-[#f6f7f7] border-t border-[#ccd0d4]">
+            <div className="flex flex-wrap items-center justify-end gap-2 px-3 sm:px-5 py-2.5 sm:py-3.5 bg-[#f6f7f7] border-t border-[#ccd0d4] shrink-0">
               <button
                 onClick={() => setReplyingQuestion(null)}
-                className="bg-white border border-[#dcdcde] text-[#3c434a] hover:bg-[#f6f7f7] px-4 py-2 rounded-[3px] text-[12px] font-bold cursor-pointer"
+                className="bg-white border border-[#dcdcde] text-[#3c434a] hover:bg-[#f6f7f7] px-3 sm:px-4 py-1.5 sm:py-2 rounded-[3px] text-[12px] font-bold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSendReply}
                 disabled={replying}
-                className="bg-[#2271b1] text-white hover:bg-[#135e96] px-5 py-2 rounded-[3px] text-[12px] font-bold disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                className="bg-[#2271b1] text-white hover:bg-[#135e96] px-4 sm:px-5 py-1.5 sm:py-2 rounded-[3px] text-[12px] font-bold disabled:opacity-50 cursor-pointer flex items-center gap-2"
               >
                 <Check className="w-3.5 h-3.5" />
                 {replying ? "Submitting..." : "Submit Answer"}

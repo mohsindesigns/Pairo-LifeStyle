@@ -331,10 +331,10 @@ export default function SizeChartForm({ initialId = null }) {
   }
 
   return (
-    <div className="space-y-6">
-      
+    <div className="space-y-4 md:space-y-6">
+
       {/* Editor Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 border border-[#ccd0d4] rounded-[4px] shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 sm:p-4 border border-[#ccd0d4] rounded-[4px] shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           {/* CSV Import */}
           <label className="flex items-center gap-1.5 px-3 py-1.5 border border-[#8c8f94] hover:bg-neutral-50 text-[13px] font-bold rounded-[3px] cursor-pointer text-gray-700">
@@ -364,7 +364,7 @@ export default function SizeChartForm({ initialId = null }) {
           </button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => router.push("/admin/products/size-charts")}
@@ -384,13 +384,13 @@ export default function SizeChartForm({ initialId = null }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6 items-start">
         
         {/* Left Column: Spreadsheet Table Builder */}
-        <div className="lg:col-span-2 bg-white border border-[#ccd0d4] rounded-[4px] p-6 shadow-sm space-y-6">
-          <div className="flex items-center justify-between border-b border-[#ccd0d4] pb-3.5">
-            <h2 className="text-[14px] font-bold text-[#1d2327]">Size Measurements Spreadsheet</h2>
-            <div className="flex gap-2">
+        <div className="lg:col-span-2 min-w-0 bg-white border border-[#ccd0d4] rounded-[4px] p-3 sm:p-4 md:p-6 shadow-sm space-y-4 md:space-y-6">
+          <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 border-b border-[#ccd0d4] pb-3.5">
+            <h2 className="text-[14px] font-bold text-[#1d2327] min-w-0 break-words">Size Measurements Spreadsheet</h2>
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={handleAddColumn}
@@ -409,7 +409,7 @@ export default function SizeChartForm({ initialId = null }) {
           </div>
 
           {/* Spreadsheet Table */}
-          <div className="w-full overflow-x-auto border border-[#ccd0d4] rounded bg-gray-50">
+          <div className="w-full max-w-full overflow-x-auto border border-[#ccd0d4] rounded bg-gray-50">
             <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="bg-neutral-100 border-b border-[#ccd0d4]">
@@ -431,7 +431,7 @@ export default function SizeChartForm({ initialId = null }) {
                             <button
                               type="button"
                               onClick={() => handleMoveColumn(idx, "left")}
-                              className="p-0.5 hover:bg-gray-200 rounded text-gray-500"
+                              className="p-1.5 md:p-0.5 hover:bg-gray-200 rounded text-gray-500"
                             >
                               <ArrowLeft className="w-3 h-3" />
                             </button>
@@ -440,7 +440,7 @@ export default function SizeChartForm({ initialId = null }) {
                             <button
                               type="button"
                               onClick={() => handleMoveColumn(idx, "right")}
-                              className="p-0.5 hover:bg-gray-200 rounded text-gray-500"
+                              className="p-1.5 md:p-0.5 hover:bg-gray-200 rounded text-gray-500"
                             >
                               <ArrowRight className="w-3 h-3" />
                             </button>
@@ -448,7 +448,7 @@ export default function SizeChartForm({ initialId = null }) {
                           <button
                             type="button"
                             onClick={() => handleDeleteColumn(idx)}
-                            className="p-0.5 hover:bg-red-100 rounded text-red-500"
+                            className="p-1.5 md:p-0.5 hover:bg-red-100 rounded text-red-500"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -479,7 +479,7 @@ export default function SizeChartForm({ initialId = null }) {
                           <button
                             type="button"
                             onClick={() => handleMoveRow(rIdx, "up")}
-                            className="p-1 hover:bg-gray-100 rounded text-gray-500"
+                            className="p-1.5 md:p-1 hover:bg-gray-100 rounded text-gray-500"
                           >
                             <ArrowUp className="w-3 h-3" />
                           </button>
@@ -488,7 +488,7 @@ export default function SizeChartForm({ initialId = null }) {
                           <button
                             type="button"
                             onClick={() => handleMoveRow(rIdx, "down")}
-                            className="p-1 hover:bg-gray-100 rounded text-gray-500"
+                            className="p-1.5 md:p-1 hover:bg-gray-100 rounded text-gray-500"
                           >
                             <ArrowDown className="w-3 h-3" />
                           </button>
@@ -496,7 +496,7 @@ export default function SizeChartForm({ initialId = null }) {
                         <button
                           type="button"
                           onClick={() => handleDeleteRow(rIdx)}
-                          className="p-1 hover:bg-red-50 rounded text-red-500"
+                          className="p-1.5 md:p-1 hover:bg-red-50 rounded text-red-500"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -516,10 +516,10 @@ export default function SizeChartForm({ initialId = null }) {
         </div>
 
         {/* Right Column: Size Chart Details & Assignments */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-4 md:space-y-6">
           
           {/* General Configuration */}
-          <div className="bg-white border border-[#ccd0d4] rounded-[4px] p-5 shadow-sm space-y-4">
+          <div className="bg-white border border-[#ccd0d4] rounded-[4px] p-3 sm:p-5 shadow-sm space-y-4">
             <h2 className="text-[14px] font-bold text-[#1d2327] border-b border-[#ccd0d4] pb-2.5 mb-2">General Settings</h2>
             
             {/* Label (Admin Name) */}
@@ -581,7 +581,7 @@ export default function SizeChartForm({ initialId = null }) {
           </div>
 
           {/* Assignment Rules */}
-          <div className="bg-white border border-[#ccd0d4] rounded-[4px] p-5 shadow-sm space-y-4">
+          <div className="bg-white border border-[#ccd0d4] rounded-[4px] p-3 sm:p-5 shadow-sm space-y-4">
             <h2 className="text-[14px] font-bold text-[#1d2327] border-b border-[#ccd0d4] pb-2.5 mb-2">Assignment Rules</h2>
             
             {/* Apply Size Chart To */}
@@ -622,7 +622,7 @@ export default function SizeChartForm({ initialId = null }) {
                         key={cat._id}
                         type="button"
                         onClick={() => { setAssignmentTargetId(cat._id); setSearchTarget(cat.name); }}
-                        className={`w-full text-left px-3 py-2 text-[13px] hover:bg-neutral-50 ${assignmentTargetId === cat._id ? "bg-blue-50 font-bold text-[#2271b1]" : "text-gray-700"}`}
+                        className={`w-full text-left break-words px-3 py-2 text-[13px] hover:bg-neutral-50 ${assignmentTargetId === cat._id ? "bg-blue-50 font-bold text-[#2271b1]" : "text-gray-700"}`}
                       >
                         {cat.name}
                       </button>
@@ -659,7 +659,7 @@ export default function SizeChartForm({ initialId = null }) {
                         key={prod._id}
                         type="button"
                         onClick={() => { setAssignmentTargetId(prod._id); setSearchTarget(prod.name); }}
-                        className={`w-full text-left px-3 py-2 text-[13px] hover:bg-neutral-50 ${assignmentTargetId === prod._id ? "bg-blue-50 font-bold text-[#2271b1]" : "text-gray-700"}`}
+                        className={`w-full text-left break-words px-3 py-2 text-[13px] hover:bg-neutral-50 ${assignmentTargetId === prod._id ? "bg-blue-50 font-bold text-[#2271b1]" : "text-gray-700"}`}
                       >
                         {prod.name}
                       </button>
@@ -680,28 +680,28 @@ export default function SizeChartForm({ initialId = null }) {
 
       {/* Preview Modal Component */}
       {showPreview && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPreview(false)}>
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border border-black animate-sg-in" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={() => setShowPreview(false)}>
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] flex flex-col overflow-hidden border border-black animate-sg-in" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-black shrink-0">
-              <span className="text-[13px] font-bold uppercase tracking-widest text-black">
+            <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-4 border-b border-black shrink-0">
+              <span className="text-[13px] font-bold uppercase tracking-widest text-black min-w-0 break-words">
                 {publicHeading || "Preview Size Guide"}
               </span>
               <button
                 onClick={() => setShowPreview(false)}
-                className="w-8 h-8 flex items-center justify-center border border-black hover:bg-black hover:text-white transition-all text-black font-medium"
+                className="w-8 h-8 shrink-0 flex items-center justify-center border border-black hover:bg-black hover:text-white transition-all text-black font-medium"
               >
                 ×
               </button>
             </div>
             
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 space-y-4 sm:space-y-6">
               {description && (
                 <p className="text-xs text-neutral-500 leading-relaxed italic">{description}</p>
               )}
               
-              <div className="w-full overflow-x-auto border border-black rounded">
+              <div className="w-full max-w-full overflow-x-auto border border-black rounded">
                 <table className="w-full text-left border-collapse text-[11px] sm:text-[12px]">
                   <thead>
                     <tr className="bg-black/5 border-b border-black font-bold uppercase text-black">

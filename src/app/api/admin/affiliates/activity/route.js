@@ -5,11 +5,15 @@ import AffiliateCommission from "@/models/AffiliateCommission";
 import AffiliateClick from "@/models/AffiliateClick";
 import Order from "@/models/Order";
 import { NextResponse } from "next/server";
+import { can } from "@/lib/rbac";
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!can(session.user, "affiliates.view")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   await dbConnect();

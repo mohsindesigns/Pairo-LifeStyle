@@ -71,22 +71,22 @@ export default function CustomJacketOrdersPage() {
         </ul>
 
         {/* Search */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex items-center gap-2 shadow-sm">
+        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex items-center gap-2 shadow-sm">
           <input
             type="text"
             placeholder="Search by order #, name, email, jacket type..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] w-full max-w-sm bg-white focus:border-[#2271b1] rounded-[3px]"
+            className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] w-full max-w-sm bg-white focus:border-[#2271b1] rounded-[3px]"
           />
-          <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">
+          <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">
             <Search className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[900px]">
+        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
+          <table className="w-full text-left border-collapse text-[13px] min-w-[650px] md:min-w-[900px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                 <th className="px-4 py-2 font-bold text-[#1d2327]">Order</th>
@@ -115,7 +115,7 @@ export default function CustomJacketOrdersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-[#1d2327]">{order.shippingAddress?.fullName || "—"}</p>
-                      <p className="text-[#646970] text-[12px]">{order.customer?.email || "—"}</p>
+                      <p className="text-[#646970] text-[12px] break-all">{order.customer?.email || "—"}</p>
                     </td>
                     <td className="px-4 py-3 text-[#646970]">
                       {order.customJacketSnapshot?.jacketType || order.items?.[0]?.name || "—"}
@@ -146,7 +146,7 @@ export default function CustomJacketOrdersPage() {
                     <td className="px-4 py-3">
                       <Link
                         href={`/admin/orders/${order._id}`}
-                        className="flex items-center gap-1 text-[#2271b1] hover:text-[#135e96] text-[12px] font-medium opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="flex items-center gap-1 text-[#2271b1] hover:text-[#135e96] text-[12px] font-medium opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                       >
                         <Eye className="w-3.5 h-3.5" /> View
                       </Link>

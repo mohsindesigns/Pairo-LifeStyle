@@ -130,8 +130,8 @@ export default function StaffManagement() {
         </div>
 
         {/* Toolbar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-           <div className="relative w-full md:w-96">
+        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-4 shadow-sm">
+           <div className="relative w-full min-w-0 md:w-96">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8c8f94]" />
               <input 
                 type="text" 
@@ -141,8 +141,8 @@ export default function StaffManagement() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
            </div>
-           <div className="flex items-center gap-2">
-              <select className="border border-[#8c8f94] text-[13px] px-3 py-1.5 outline-none focus:border-[#2271b1]">
+           <div className="flex flex-wrap items-center gap-2">
+              <select className="min-w-0 border border-[#8c8f94] text-[13px] px-3 py-1.5 outline-none focus:border-[#2271b1]">
                  <option>All Roles</option>
                  <option>Super Admin</option>
                  <option>Admin</option>
@@ -154,13 +154,14 @@ export default function StaffManagement() {
 
         {/* Staff Table */}
         <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden">
-          <table className="w-full text-left border-collapse text-[13px]">
+          <div className="overflow-x-auto max-w-full">
+          <table className="w-full min-w-[560px] text-left border-collapse text-[13px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
                 <th className="px-4 py-3 font-bold uppercase text-[11px]">Staff Member</th>
                 <th className="px-4 py-3 font-bold uppercase text-[11px]">Role</th>
                 <th className="px-4 py-3 font-bold uppercase text-[11px]">Status</th>
-                <th className="px-4 py-3 font-bold uppercase text-[11px]">Last Login</th>
+                <th className="hidden md:table-cell px-4 py-3 font-bold uppercase text-[11px]">Last Login</th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
             </thead>
@@ -177,7 +178,7 @@ export default function StaffManagement() {
                          <div className="w-10 h-10 bg-[#f0f6fb] border border-[#2271b1]/10 rounded-full flex items-center justify-center text-[#2271b1] font-bold">
                             {s.name?.charAt(0)}
                          </div>
-                         <div className="flex flex-col">
+                         <div className="flex flex-col min-w-0">
                             <span className="font-bold text-[#1d2327]">{s.name}</span>
                             <div className="flex items-center gap-2 text-[11px] text-[#646970]">
                                <Mail className="w-3 h-3" /> {s.email}
@@ -210,11 +211,11 @@ export default function StaffManagement() {
                           </button>
                        )}
                     </td>
-                    <td className="px-4 py-4 text-[#646970]">
+                    <td className="hidden md:table-cell px-4 py-4 text-[#646970]">
                        {s.security?.lastLogin ? new Date(s.security.lastLogin).toLocaleString() : "Never"}
                     </td>
                      <td className="px-4 py-4 text-center">
-                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
+                        <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
                             {s.roleId?.slug !== 'super-admin' && s._id !== session?.user?.id && (
                                <button 
                                  title="Delete Staff Member" 
@@ -250,23 +251,24 @@ export default function StaffManagement() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Delete Confirmation Modal */}
         {deleteTarget.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
             <div 
               className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
               onClick={() => !deleteTarget.loading && setDeleteTarget({ open: false, id: null, name: "", loading: false })} 
             />
-            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden z-10 animate-in zoom-in-95">
+            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 max-h-[calc(100dvh-1rem)] overflow-y-auto z-10 animate-in zoom-in-95">
               <div className="h-1 bg-red-500 w-full" />
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                  <div className="w-10 h-10 shrink-0 rounded-full bg-red-50 flex items-center justify-center text-red-600">
                     <Trash2 className="w-5 h-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="text-base font-bold text-neutral-900">Delete Staff Member</h3>
                     <p className="text-xs text-neutral-500">Revoke administrative access</p>
                   </div>
@@ -274,12 +276,12 @@ export default function StaffManagement() {
                 <p className="text-sm text-neutral-600 mb-6">
                   Are you sure you want to delete <span className="font-semibold text-neutral-900">{deleteTarget.name}</span>? This action cannot be undone and will revoke their access immediately.
                 </p>
-                <div className="flex items-center justify-end gap-2.5">
+                <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5">
                   <button
                     type="button"
                     disabled={deleteTarget.loading}
                     onClick={() => setDeleteTarget({ open: false, id: null, name: "", loading: false })}
-                    className="px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
+                    className="w-full xs:w-auto px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
                   >
                     Cancel
                   </button>
@@ -287,7 +289,7 @@ export default function StaffManagement() {
                     type="button"
                     disabled={deleteTarget.loading}
                     onClick={confirmDeleteStaff}
-                    className="px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 active:scale-[0.98] transition-all flex items-center gap-2"
+                    className="w-full xs:w-auto justify-center px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 active:scale-[0.98] transition-all flex items-center gap-2"
                   >
                     {deleteTarget.loading ? "Deleting..." : "Delete Member"}
                   </button>
@@ -299,19 +301,19 @@ export default function StaffManagement() {
 
         {/* Reset Password Modal */}
         {passwordTarget.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
             <div 
               className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
               onClick={() => !passwordTarget.loading && setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })} 
             />
-            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden z-10 animate-in zoom-in-95">
+            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 max-h-[calc(100dvh-1rem)] overflow-y-auto z-10 animate-in zoom-in-95">
               <div className="h-1 bg-[#2271b1] w-full" />
-              <form onSubmit={submitResetPassword} className="p-6">
+              <form onSubmit={submitResetPassword} className="p-4 sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-[#f0f6fb] flex items-center justify-center text-[#2271b1]">
+                  <div className="w-10 h-10 shrink-0 rounded-full bg-[#f0f6fb] flex items-center justify-center text-[#2271b1]">
                     <Key className="w-5 h-5" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="text-base font-bold text-neutral-900">Update Password</h3>
                     <p className="text-xs text-neutral-500">For {passwordTarget.name}</p>
                   </div>
@@ -340,19 +342,19 @@ export default function StaffManagement() {
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-end gap-2.5">
+                <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5">
                   <button
                     type="button"
                     disabled={passwordTarget.loading}
                     onClick={() => setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })}
-                    className="px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
+                    className="w-full xs:w-auto px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={passwordTarget.loading}
-                    className="px-4 py-2 rounded-lg bg-[#2271b1] text-white text-xs font-semibold hover:bg-[#135e96] active:scale-[0.98] transition-all flex items-center gap-2"
+                    className="w-full xs:w-auto justify-center px-4 py-2 rounded-lg bg-[#2271b1] text-white text-xs font-semibold hover:bg-[#135e96] active:scale-[0.98] transition-all flex items-center gap-2"
                   >
                     {passwordTarget.loading ? "Saving..." : "Update Password"}
                   </button>

@@ -48,7 +48,8 @@ export const authOptions = {
 
                 const isMatch = await bcrypt.compare(password, staff.password);
                 if (isMatch) {
-                    const ip = "127.0.0.1";
+                    const fwd = req?.headers?.["x-forwarded-for"] || (typeof req?.headers?.get === "function" ? req.headers.get("x-forwarded-for") : "");
+                    const ip = String(fwd || "").split(",")[0].trim() || "unknown";
                     await Staff.updateOne(
                         { _id: staff._id },
                         { 
@@ -68,7 +69,7 @@ export const authOptions = {
                         isAffiliate: false
                     };
                 }
-                throw new Error("Invalid staff credentials");
+                throw new Error("Invalid email or password");
             }
         }
 
@@ -90,7 +91,7 @@ export const authOptions = {
                         isAffiliate: true
                     };
                 }
-                throw new Error("Invalid affiliate credentials");
+                throw new Error("Invalid email or password");
             }
         }
 
@@ -112,11 +113,11 @@ export const authOptions = {
                         isAffiliate: false
                     };
                 }
-                throw new Error("Invalid customer credentials");
+                throw new Error("Invalid email or password");
             }
         }
 
-        throw new Error("No account found with this email");
+        throw new Error("Invalid email or password");
       }
     })
   ],
@@ -131,16 +132,18 @@ export const authOptions = {
         }
       }
 
-      // Security: Re-verify staff status from DB to prevent suspended users from staying logged in
+      // Security: Re-verify staff status AND role/permissions from DB on every request, so
+      // suspending a user OR changing their role/permissions takes effect on live sessions
+      // immediately — not just at next login. (Previously only status was re-checked, so a
+      // demoted admin kept their old elevated permissions until they logged out.)
       if (token?.isStaff && token.id) {
           try {
               await dbConnect();
-              const staff = await Staff.findById(token.id).select('status');
-              console.log("[NextAuth] Re-verifying staff:", token.id, "Found:", !!staff, "Status:", staff?.status);
+              const staff = await Staff.findById(token.id).select('status roleId').populate('roleId');
               if (!staff || staff.status !== 'Active') {
-                  console.log("[NextAuth] Clearing token because staff is missing or inactive!");
                   return {};
               }
+              token.role = staff.roleId || token.role;
           } catch (e) {
               console.error("JWT Status Check Error:", e.message);
           }

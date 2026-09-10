@@ -12,7 +12,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
   };
 
   return (
-    <div className={`mt-2 ml-${depth > 0 ? '6' : '0'} border-l-2 pl-4 py-2 relative`} style={{ borderLeftColor: group.operator === 'OR' ? '#fbbf24' : '#2271b1' }}>
+    <div className={`mt-2 ml-${depth > 0 ? '6' : '0'} border-l-2 pl-4 py-2 relative group`} style={{ borderLeftColor: group.operator === 'OR' ? '#fbbf24' : '#2271b1' }}>
       {/* Group Header */}
       <div className="flex items-center gap-2 mb-2">
         <button 
@@ -62,7 +62,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
 
       {/* Group Content */}
       {!isCollapsed && (
-        <div className="space-y-2 group">
+        <div className="space-y-2">
           {group.rules?.map((rule, idx) => {
             const currentPath = `${path}${path ? '.' : ''}rules.${idx}`;
             if (rule.rules) {

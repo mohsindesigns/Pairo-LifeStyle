@@ -87,14 +87,14 @@ export default function CategoryFiltersPage() {
     <AdminPageLayout title="Category Filters" subtitle="Manage which product categories appear in the shop filter tab">
       <div className="bg-white border border-[#c3c4c7] rounded shadow-sm max-w-5xl">
         {/* Header toolbar */}
-        <div className="p-4 border-b border-[#f0f0f1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#f6f7f7]">
+        <div className="p-3 sm:p-4 border-b border-[#f0f0f1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 bg-[#f6f7f7]">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-foreground/60" />
             <span className="font-bold text-[14px] text-[#1d2327]">Shop Filter Settings</span>
           </div>
 
           {/* Search */}
-          <div className="relative max-w-xs w-full">
+          <div className="relative min-w-0 sm:max-w-xs w-full">
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-[#646970]" />
             </span>
@@ -110,24 +110,24 @@ export default function CategoryFiltersPage() {
 
         {/* Content Table */}
         {loading ? (
-          <div className="p-12 flex items-center justify-center gap-3">
+          <div className="p-6 md:p-12 flex items-center justify-center gap-3">
             <Loader2 className="w-6 h-6 animate-spin text-[#2271b1]" />
             <span className="text-[13px] text-[#646970]">Loading categories...</span>
           </div>
         ) : filteredCategories.length === 0 ? (
-          <div className="p-12 text-center text-[#646970] text-[13px]">
+          <div className="p-6 md:p-12 text-center text-[#646970] text-[13px]">
             No categories found matching your query.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-[13px] text-[#2c3338]">
+          <div className="overflow-x-auto max-w-full">
+            <table className="w-full min-w-[520px] md:min-w-[760px] border-collapse text-left text-[13px] text-[#2c3338]">
               <thead>
                 <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7]">
                   <th className="px-4 py-3 font-semibold text-[#1d2327] w-24">Image</th>
                   <th className="px-4 py-3 font-semibold text-[#1d2327]">Category Name</th>
-                  <th className="px-4 py-3 font-semibold text-[#1d2327] w-48">Slug</th>
+                  <th className="hidden md:table-cell px-4 py-3 font-semibold text-[#1d2327] w-48">Slug</th>
                   <th className="px-4 py-3 font-semibold text-[#1d2327] w-28">Status</th>
-                  <th className="px-4 py-3 font-semibold text-[#1d2327] w-28">Products</th>
+                  <th className="hidden md:table-cell px-4 py-3 font-semibold text-[#1d2327] w-28">Products</th>
                   <th className="px-4 py-3 font-semibold text-[#1d2327] text-center w-40">Show in Filters</th>
                 </tr>
               </thead>
@@ -154,7 +154,7 @@ export default function CategoryFiltersPage() {
                       <td className="px-4 py-3.5 align-middle font-bold text-[#1d2327]">
                         {cat.name}
                       </td>
-                      <td className="px-4 py-3.5 align-middle text-[#646970] font-mono text-[12px]">
+                      <td className="hidden md:table-cell px-4 py-3.5 align-middle text-[#646970] font-mono text-[12px]">
                         {cat.slug}
                       </td>
                       <td className="px-4 py-3.5 align-middle">
@@ -166,7 +166,7 @@ export default function CategoryFiltersPage() {
                           {cat.status || "Published"}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 align-middle font-bold text-foreground/75">
+                      <td className="hidden md:table-cell px-4 py-3.5 align-middle font-bold text-foreground/75">
                         {cat.productCount || 0}
                       </td>
                       <td className="px-4 py-3.5 align-middle text-center">

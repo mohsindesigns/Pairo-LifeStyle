@@ -32,13 +32,13 @@ export default function EditScriptPage() {
 
   if (loading) return (
      <AdminPageLayout title="Edit Script" breadcrumbs={[]}>
-        <div className="p-20 text-center italic text-gray-400">Loading script configuration...</div>
+        <div className="p-6 md:p-20 text-center italic text-gray-400">Loading script configuration...</div>
      </AdminPageLayout>
   );
 
   if (!script) return (
      <AdminPageLayout title="Script Not Found" breadcrumbs={[]}>
-        <div className="p-20 text-center text-red-500">The requested script configuration could not be found.</div>
+        <div className="p-6 md:p-20 text-center text-red-500">The requested script configuration could not be found.</div>
      </AdminPageLayout>
   );
 

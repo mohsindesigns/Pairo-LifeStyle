@@ -5,6 +5,7 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import CartDrawer from "@/components/layout/CartDrawer";
 import ReferralDiscountPopup from "@/components/common/ReferralDiscountPopup";
+import SitePopup from "@/components/common/SitePopup";
 
 export default function LayoutWrapper({ children }) {
   const pathname = usePathname();
@@ -22,6 +23,7 @@ export default function LayoutWrapper({ children }) {
     <div className="relative w-full overflow-x-clip min-h-screen flex flex-col">
       <Navbar />
       <ReferralDiscountPopup />
+      <SitePopup />
       <CartDrawer />
       <main className="flex-1 flex flex-col">{children}</main>
       <Footer />

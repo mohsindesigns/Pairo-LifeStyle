@@ -222,7 +222,7 @@ export default function AdminContact() {
     >
       <div className="space-y-4">
         {/* --- 1. Filter Links (EXACT UI PRESERVED) --- */}
-        <ul className="flex items-center gap-2 text-[13px] text-[#2271b1]">
+        <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
           <li className={`${status === 'all' ? 'text-[#1d2327] font-bold' : 'cursor-pointer hover:text-[#135e96]'} transition-colors`} onClick={() => setStatus('all')}>
             All <span className="text-[#646970] font-normal">({counts.all})</span>
           </li>
@@ -255,12 +255,12 @@ export default function AdminContact() {
         </ul>
 
         {/* --- 2. Action Bar (EXACT UI PRESERVED) --- */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-          <div className="flex items-center gap-2">
+        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <select 
               value={bulkAction}
               onChange={(e) => setBulkAction(e.target.value)}
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none"
+              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none max-w-full"
             >
               <option>Bulk actions</option>
               <option>Mark as read</option>
@@ -300,8 +300,8 @@ export default function AdminContact() {
         </div>
 
         {/* --- 3. WP List Table (EXACT UI PRESERVED) --- */}
-        <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-x-auto rounded-[2px]">
-          <table className="w-full text-left border-collapse text-[13px]">
+        <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-x-auto max-w-full rounded-[2px]">
+          <table className="w-full text-left border-collapse min-w-[750px] text-[13px]">
             <thead>
               <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                 <th className="px-3 py-2 w-10 text-center">
@@ -350,7 +350,7 @@ export default function AdminContact() {
                         <p className="text-[13px] leading-relaxed mb-2 text-[#3c434a] max-w-xl line-clamp-2">{s.message}</p>
                         
                         {/* Action Links (WP-Style Hover) */}
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-medium text-[#2271b1]">
+                        <div className="flex flex-wrap items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] font-medium text-[#2271b1]">
                           <button onClick={() => { setSelectedItem(s); setIsDetailOpen(true); }} className="hover:text-[#135e96]">View Detail</button>
                           <span className="text-[#c3c4c7]">|</span>
                           {s.status === 'New' ? (
@@ -432,25 +432,25 @@ export default function AdminContact() {
         <div className="fixed inset-0 z-[100] flex justify-end bg-black/20 backdrop-blur-[2px]">
           <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-[#f6f7f7]">
+            <div className="p-3 sm:px-6 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-[#f6f7f7]">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white border border-gray-200 rounded flex items-center justify-center text-[#2271b1] font-bold text-lg shadow-sm">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white border border-gray-200 rounded flex items-center justify-center text-[#2271b1] font-bold text-base sm:text-lg shadow-sm shrink-0">
                   {selectedItem.name?.charAt(0).toUpperCase()}
                 </div>
-                <div>
-                  <h2 className="text-[16px] font-bold text-[#1d2327]">{selectedItem.name}</h2>
-                  <p className="text-[12px] text-[#2271b1]">{selectedItem.email}</p>
+                <div className="min-w-0">
+                  <h2 className="text-[14px] sm:text-[16px] font-bold text-[#1d2327] truncate">{selectedItem.name}</h2>
+                  <p className="text-[11px] sm:text-[12px] text-[#2271b1] truncate">{selectedItem.email}</p>
                 </div>
               </div>
-              <button onClick={() => setIsDetailOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+              <button onClick={() => setIsDetailOpen(false)} className="p-1.5 sm:p-2 hover:bg-gray-200 rounded-full transition-colors shrink-0">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
             {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6 sm:space-y-8">
               {/* Status & Actions Bar */}
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <select 
                   className="text-[12px] border border-gray-300 rounded px-3 py-1.5 outline-none focus:border-[#2271b1]"
                   value={selectedItem.status}
@@ -475,21 +475,21 @@ export default function AdminContact() {
 
                 <button 
                   onClick={() => { setReplyMode(!replyMode); setReplyData({ subject: `Re: ${selectedItem.subject || 'Your Inquiry'}`, message: "" }); }}
-                  className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] flex items-center gap-2"
+                  className="bg-[#2271b1] text-white px-3 sm:px-4 py-1.5 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] flex items-center gap-2"
                 >
                   <Send className="w-3.5 h-3.5" /> {replyMode ? "Cancel Reply" : "Reply to Customer"}
                 </button>
               </div>
 
               {/* Message Content */}
-              <div className="bg-[#fcfcfc] border border-gray-100 p-6 rounded-lg shadow-sm">
+              <div className="bg-[#fcfcfc] border border-gray-100 p-3 sm:p-6 rounded-lg shadow-sm">
                 <div className="flex items-center gap-2 text-[11px] text-gray-400 uppercase tracking-widest font-bold mb-4">
                   <MessageSquare className="w-3.5 h-3.5" /> Submission Content
                 </div>
-                {selectedItem.subject && <h4 className="text-[15px] font-bold text-gray-800 mb-2">{selectedItem.subject}</h4>}
-                <p className="text-[14px] text-gray-600 leading-relaxed whitespace-pre-wrap">{selectedItem.message}</p>
+                {selectedItem.subject && <h4 className="text-[14px] sm:text-[15px] font-bold text-gray-800 mb-2">{selectedItem.subject}</h4>}
+                <p className="text-[13px] sm:text-[14px] text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{selectedItem.message}</p>
                 
-                <div className="mt-6 pt-4 border-t border-gray-100 flex items-center gap-6 text-[11px] text-gray-400">
+                <div className="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-3 sm:gap-6 text-[11px] text-gray-400">
                   <div className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Received: {new Date(selectedItem.createdAt).toLocaleString()}</div>
                   {selectedItem.sourcePage && <div className="flex items-center gap-1.5"><Eye className="w-3 h-3" /> Page: {selectedItem.sourcePage}</div>}
                 </div>
@@ -497,7 +497,7 @@ export default function AdminContact() {
 
               {/* Reply Interface */}
               {replyMode && (
-                <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-lg space-y-4 animate-in fade-in duration-300">
+                <div className="bg-blue-50/50 border border-blue-100 p-3 sm:p-6 rounded-lg space-y-4 animate-in fade-in duration-300">
                   <h4 className="text-[13px] font-bold text-blue-900 flex items-center gap-2">
                     <Send className="w-4 h-4" /> Send Email Reply
                   </h4>

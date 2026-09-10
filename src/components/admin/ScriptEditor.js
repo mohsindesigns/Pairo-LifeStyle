@@ -83,6 +83,13 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
       placeholder: "C4A1B2C3D4E5F6G7H8I9",
       field: "pixelId"
     },
+    pinterest: {
+      title: "Pinterest Tag",
+      description: "Loads the Pinterest base tag and auto-fires conversion events (add to cart, checkout) at checkout. Enable/disable here to control all Pinterest tracking.",
+      help: "Enter your Pinterest Tag ID (numeric)",
+      placeholder: "2612345678901",
+      field: "pixelId"
+    },
     hotjar: {
       title: "Hotjar",
       description: "Injects the Hotjar tracking code for heatmaps and session recordings.",
@@ -129,10 +136,10 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6">
       {/* Primary Configuration */}
-      <div className="lg:col-span-2 space-y-6">
-        <form id="script-form" onSubmit={handleSave} className="space-y-6">
+      <div className="lg:col-span-2 min-w-0 space-y-4 md:space-y-6">
+        <form id="script-form" onSubmit={handleSave} className="space-y-4 md:space-y-6">
           
           {/* General Details */}
           <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden">
@@ -140,7 +147,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                 <Settings2 className="w-4 h-4 text-[#1d2327]" />
                 <h3 className="text-[13px] font-bold text-[#1d2327] uppercase">Script Configuration</h3>
              </div>
-             <div className="p-6 space-y-4">
+             <div className="p-3 sm:p-4 md:p-6 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    <div className="space-y-1.5">
                       <label className="text-[13px] font-bold text-[#1d2327]">Script Name</label>
@@ -166,6 +173,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                          <option value="gtm">GTM Template</option>
                          <option value="meta_pixel">Meta Pixel Template</option>
                          <option value="tiktok_pixel">TikTok Pixel Template</option>
+                         <option value="pinterest">Pinterest Tag Template</option>
                          <option value="verification">Verification Meta Tag</option>
                          <option value="hotjar">Hotjar Template</option>
                          <option value="clarity">MS Clarity Template</option>
@@ -177,7 +185,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
 
           {/* Content Editor */}
           <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden">
-             <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
+             <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                    <Code2 className="w-4 h-4 text-[#1d2327]" />
                    <h3 className="text-[13px] font-bold text-[#1d2327] uppercase">Script Content</h3>
@@ -188,34 +196,34 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                   </span>
                 )}
              </div>
-             <div className="p-6">
+             <div className="p-3 sm:p-4 md:p-6">
                 {formData.type === 'custom' ? (
                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
                          <label className="text-[13px] font-bold text-[#1d2327]">Raw Snippet</label>
                          <span className="text-[11px] font-mono text-gray-400 bg-gray-50 px-2 py-0.5 rounded">Supports &lt;script&gt;, &lt;style&gt;, &lt;meta&gt;</span>
                       </div>
-                      <textarea 
+                      <textarea
                         value={formData.code}
                         onChange={(e) => setFormData({...formData, code: e.target.value})}
                         placeholder="<!-- Paste your tracking script here -->"
-                        className="w-full h-64 font-mono text-[12px] p-4 border border-[#8c8f94] outline-none focus:border-[#2271b1] rounded-[3px] bg-[#1e1e1e] text-[#d4d4d4] leading-relaxed shadow-inner"
+                        className="w-full max-w-full h-64 font-mono text-[12px] p-3 sm:p-4 border border-[#8c8f94] outline-none focus:border-[#2271b1] rounded-[3px] bg-[#1e1e1e] text-[#d4d4d4] leading-relaxed shadow-inner whitespace-pre overflow-auto lg:whitespace-pre-wrap"
                       />
                    </div>
                 ) : (
-                   <div className="bg-[#f0f6fb] border border-[#d1e4f3] p-6 rounded-[3px]">
+                   <div className="bg-[#f0f6fb] border border-[#d1e4f3] p-3 sm:p-4 md:p-6 rounded-[3px]">
                       {templates[formData.type] ? (
                         <div className="space-y-4">
                            <div className="flex items-start gap-3">
-                              <div className="w-10 h-10 bg-white rounded shadow-sm flex items-center justify-center text-blue-600">
+                              <div className="w-10 h-10 shrink-0 bg-white rounded shadow-sm flex items-center justify-center text-blue-600">
                                  <CheckCircle2 className="w-6 h-6" />
                               </div>
-                              <div>
-                                 <h4 className="text-[15px] font-bold text-[#1d2327]">{templates[formData.type].title}</h4>
+                              <div className="min-w-0">
+                                 <h4 className="text-[15px] font-bold text-[#1d2327] break-words">{templates[formData.type].title}</h4>
                                  <p className="text-[13px] text-[#646970] mt-1">{templates[formData.type].description}</p>
                               </div>
                            </div>
-                            <div className="bg-white p-4 border border-[#d1e4f3] rounded space-y-3 shadow-inner">
+                            <div className="bg-white p-3 sm:p-4 border border-[#d1e4f3] rounded space-y-3 shadow-inner">
                                {formData.type === 'verification' && (
                                  <div className="space-y-1.5 mb-3">
                                     <label className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider">Verification Provider</label>
@@ -249,7 +257,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                                      [templates[formData.type].field]: e.target.value
                                    }
                                  })}
-                                 className="w-full border border-[#8c8f94] px-4 py-3 text-[14px] outline-none focus:border-[#2271b1] rounded-[3px] font-mono"
+                                 className="w-full min-w-0 border border-[#8c8f94] px-3 sm:px-4 py-3 text-[14px] outline-none focus:border-[#2271b1] rounded-[3px] font-mono"
                                />
                             </div>
                         </div>
@@ -269,9 +277,9 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                 <Globe className="w-4 h-4 text-[#1d2327]" />
                 <h3 className="text-[13px] font-bold text-[#1d2327] uppercase">Route Targeting</h3>
              </div>
-             <div className="p-6">
+             <div className="p-3 sm:p-4 md:p-6">
                 <div className="space-y-4">
-                   <div className="flex items-center gap-6">
+                   <div className="flex flex-wrap items-center gap-3 sm:gap-6">
                       <label className="flex items-center gap-2 cursor-pointer group">
                          <input 
                            type="radio" 
@@ -297,7 +305,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                            placeholder="/checkout\n/cart\n/products/*"
                            value={formData.targeting.routes.join('\n')}
                            onChange={(e) => setFormData({...formData, targeting: {...formData.targeting, routes: e.target.value.split('\n')}})}
-                           className="w-full h-24 border border-[#8c8f94] p-3 text-[13px] outline-none focus:border-[#2271b1] rounded-[3px] font-mono"
+                           className="w-full max-w-full h-24 border border-[#8c8f94] p-3 text-[13px] outline-none focus:border-[#2271b1] rounded-[3px] font-mono"
                         />
                         <p className="text-[11px] text-[#646970]">Enter one route per line. Use * for wildcards (e.g., /blog/*).</p>
                      </div>
@@ -309,7 +317,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
       </div>
 
       {/* Sidebar Controls */}
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-4 md:space-y-6">
          {/* Publishing Panel */}
          <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden">
             <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7]">
@@ -328,15 +336,15 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                </div>
                <hr className="border-[#f0f0f1]" />
                 <div className="space-y-3">
-                   <div className="flex items-center justify-between p-3 bg-[#f6f7f7] border border-[#ccd0d4] rounded-[3px]">
-                      <div className="flex flex-col">
+                   <div className="flex items-center justify-between gap-3 p-3 bg-[#f6f7f7] border border-[#ccd0d4] rounded-[3px]">
+                      <div className="flex flex-col min-w-0">
                          <span className="text-[13px] font-bold text-[#1d2327]">Script Status</span>
                          <span className="text-[11px] text-[#646970]">{formData.isActive ? 'Active on store' : 'Currently paused'}</span>
                       </div>
                       <button 
                         type="button"
                         onClick={() => setFormData({...formData, isActive: !formData.isActive})}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${
                            formData.isActive ? 'bg-green-600' : 'bg-gray-300'
                         }`}
                       >
@@ -349,7 +357,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                    </div>
                 </div>
             </div>
-            <div className="p-4 bg-[#f6f7f7] border-t border-[#ccd0d4] flex items-center justify-between">
+            <div className="p-4 bg-[#f6f7f7] border-t border-[#ccd0d4] flex flex-wrap items-center justify-between gap-2">
                <button 
                  onClick={() => router.back()}
                  className="text-[#d63638] text-[13px] hover:underline"
@@ -360,7 +368,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                  type="submit" 
                  form="script-form"
                  disabled={loading}
-                 className="bg-[#2271b1] hover:bg-[#135e96] text-white px-4 py-2 rounded-[3px] text-[13px] font-bold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                 className="bg-[#2271b1] hover:bg-[#135e96] text-white px-4 py-2 rounded-[3px] text-[13px] font-bold flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
                >
                   {loading ? "Saving..." : <><Save className="w-4 h-4" /> {isEdit ? 'Update' : 'Publish'}</>}
                </button>

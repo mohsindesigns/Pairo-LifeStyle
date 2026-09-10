@@ -7,10 +7,11 @@ import {
   Save, Globe, Layout, AlignLeft, Share2,
   Plus, GripVertical, X, Eye, EyeOff,
   Camera, MessageSquare, Link2, Users, ChevronDown, ChevronUp,
-  RefreshCw, Trash2, Search
+  RefreshCw, Trash2, Search, Sparkles
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
+import PopupTab from "@/components/admin/settings/PopupTab";
 import { usePopup } from "@/context/PopupContext";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
@@ -496,24 +497,24 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
   return (
     <div className="bg-white border border-[#c3c4c7] rounded-[3px] overflow-hidden">
       {/* Column Card Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7]">
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] font-bold text-[#646970] uppercase tracking-wider">Col {idx + 1}</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 sm:px-4 sm:py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 flex-1 min-w-0">
+          <span className="text-[11px] font-bold text-[#646970] uppercase tracking-wider shrink-0">Col {idx + 1}</span>
           <input
-            className={`${inputClass} w-48 text-[13px] font-semibold`}
+            className={`${inputClass} w-full xs:w-44 text-[13px] font-semibold`}
             value={col.heading}
             onChange={e => onChange({ heading: e.target.value })}
             placeholder="Column Heading"
           />
           <select
-            className={`${inputClass} w-40 text-[12px]`}
+            className={`${inputClass} w-full xs:w-36 text-[12px]`}
             value={col.type}
             onChange={e => onChange({ type: e.target.value })}
           >
             {COLUMN_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-1 shrink-0">
           <button type="button" disabled={idx === 0} onClick={() => onMove(idx, -1)}
             className="p-1.5 rounded-[3px] text-[#646970] hover:bg-[#e5e5e5] disabled:opacity-30 transition-colors" title="Move Up">
             <ChevronUp className="w-3.5 h-3.5" />
@@ -1228,12 +1229,21 @@ const TABS = [
   { key: 'header', label: 'Header', Icon: Layout },
   { key: 'footer', label: 'Footer', Icon: AlignLeft },
   { key: 'social', label: 'Social Links', Icon: Share2 },
+  { key: 'popup', label: 'Popup', Icon: Sparkles },
   { key: 'redirects', label: 'Redirects', Icon: RefreshCw },
 ];
 
 export default function SiteSettingsPage() {
   const router = useRouter();
-  const [tab, setTab] = useState('general');
+  const [tab, setTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const initialTab = new URLSearchParams(window.location.search).get("tab");
+      if (initialTab && TABS.some(t => t.key === initialTab)) {
+        return initialTab;
+      }
+    }
+    return 'general';
+  });
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1286,13 +1296,20 @@ export default function SiteSettingsPage() {
   return (
     <AdminPageLayout title="Site Settings" breadcrumbs={[{ label: "Settings" }, { label: "Site Settings" }]}>
       {/* WP-style sub-navigation tabs */}
-      <nav className="flex gap-0 border-b border-[#c3c4c7] mb-6 -mt-2">
+      <nav className="flex gap-0 border-b border-[#c3c4c7] mb-6 -mt-2 overflow-x-auto max-w-full scrollbar-none">
         {TABS.map(({ key, label }) => (
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
-            className={`px-4 py-2 text-[13px] font-semibold border-b-[3px] transition-colors ${tab === key
+            onClick={() => {
+              setTab(key);
+              if (typeof window !== "undefined") {
+                const url = new URL(window.location);
+                url.searchParams.set("tab", key);
+                window.history.replaceState({}, "", url);
+              }
+            }}
+            className={`px-4 py-2 text-[13px] font-semibold border-b-[3px] transition-colors whitespace-nowrap shrink-0 ${tab === key
                 ? 'border-[#2271b1] text-[#1d2327]'
                 : 'border-transparent text-[#646970] hover:text-[#135e96]'
               }`}
@@ -1308,18 +1325,19 @@ export default function SiteSettingsPage() {
         {tab === 'header' && <HeaderTab config={config} onChange={setConfig} dbPages={dbPages} dbCategories={dbCategories} dbProducts={dbProducts} />}
         {tab === 'footer' && <FooterTab config={config} onChange={setConfig} dbCategories={dbCategories} dbBlogs={dbBlogs} dbPages={dbPages} />}
         {tab === 'social' && <SocialLinksTab config={config} onChange={setConfig} />}
+        {tab === 'popup' && <PopupTab config={config} onChange={setConfig} />}
         {tab === 'redirects' && <RedirectsTab />}
       </div>
 
       {/* WordPress-style sticky publish bar */}
       {tab !== 'redirects' && (
-        <div className="fixed bottom-0 left-[160px] right-0 z-40 bg-white border-t border-[#c3c4c7] px-6 py-3 flex items-center justify-between">
-          <p className="text-[12px] text-[#646970]">Changes apply immediately after saving.</p>
+        <div className="fixed bottom-0 left-0 md:left-[160px] right-0 z-40 bg-white border-t border-[#c3c4c7] px-3 sm:px-6 py-2.5 sm:py-3 flex flex-col xs:flex-row xs:items-center justify-between gap-2 shadow-lg">
+          <p className="text-[11px] sm:text-[12px] text-[#646970]">Changes apply immediately after saving.</p>
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="bg-[#2271b1] text-white px-5 py-[6px] text-[13px] font-semibold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 flex items-center gap-2"
+            className="bg-[#2271b1] text-white px-4 sm:px-5 py-1.5 sm:py-[6px] text-[13px] font-semibold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 flex items-center justify-center gap-2 w-full xs:w-auto"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Changes'}

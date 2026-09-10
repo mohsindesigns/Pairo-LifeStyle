@@ -105,10 +105,10 @@ const IconPicker = ({ value, onChange }) => {
    return (
       <div className="flex flex-col gap-2 border border-[#c3c4c7] bg-[#f6f7f7] p-2">
          <div className="flex items-center gap-3 p-2 bg-white border border-[#c3c4c7]">
-            <div className="w-10 h-10 bg-gray-50 border border-gray-100 flex items-center justify-center text-[#2271b1]">
+            <div className="w-10 h-10 shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center text-[#2271b1]">
                <Icon className="w-6 h-6" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
                <input
                   type="text"
                   placeholder="Search icons..."
@@ -118,7 +118,7 @@ const IconPicker = ({ value, onChange }) => {
                />
             </div>
          </div>
-         <div className="grid grid-cols-7 gap-1 p-1 max-h-[140px] overflow-y-auto bg-white border border-[#c3c4c7]">
+         <div className="grid grid-cols-5 xs:grid-cols-7 gap-1 p-1 max-h-[140px] overflow-y-auto bg-white border border-[#c3c4c7]">
             {filteredIcons.map(iconName => {
                const ItemIcon = LucideIcons[iconName];
                if (!ItemIcon) return null;
@@ -162,18 +162,18 @@ const SectionMetaBox = ({
 
    return (
       <div ref={setNodeRef} style={style} className={`bg-white border border-[#c3c4c7] mb-3 shadow-sm ${!section.enabled ? 'opacity-60' : ''}`}>
-         <div className="px-3 py-2 border-b border-[#c3c4c7] flex items-center justify-between bg-[#f6f7f7] hover:bg-white transition-colors">
-            <div className="flex items-center gap-3 flex-1">
-               <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-[#2271b1]">
+         <div className="px-2 sm:px-3 py-2 border-b border-[#c3c4c7] flex items-center justify-between gap-1 bg-[#f6f7f7] hover:bg-white transition-colors">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+               <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-[#2271b1] shrink-0">
                   <GripVertical className="w-4 h-4" />
                </div>
-               <div className="flex items-center gap-2 select-none cursor-pointer" onClick={() => onToggleExpand(section.id)}>
-                  <h3 className="text-[13px] font-bold text-gray-700">{schema.name}</h3>
+               <div className="flex flex-wrap items-center gap-2 select-none cursor-pointer min-w-0" onClick={() => onToggleExpand(section.id)}>
+                  <h3 className="text-[13px] font-bold text-gray-700 break-words">{schema.name}</h3>
                   {!section.enabled && <span className="text-[9px] bg-gray-200 px-1.5 py-0.5 rounded uppercase font-black">Hidden</span>}
                </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                <button type="button" onClick={() => onUpdate(section.id, null, !section.enabled)} className={`p-1.5 rounded hover:bg-gray-100 ${section.enabled ? 'text-green-600' : 'text-gray-400'}`}>
                   {section.enabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                </button>
@@ -190,7 +190,7 @@ const SectionMetaBox = ({
          </div>
 
          {isExpanded && (
-            <div className="p-5 bg-white space-y-6">
+            <div className="p-3 sm:p-5 bg-white space-y-4 sm:space-y-6">
                {schema.fields.filter(field => {
                    if (!field.dependsOn) return true;
                    const val = config[field.dependsOn] !== undefined ? config[field.dependsOn] : (field.dependsOn === 'showType' ? 'collection' : undefined);
@@ -201,8 +201,8 @@ const SectionMetaBox = ({
                      {renderField(field, config[field.name], (val) => onUpdate(section.id, { [field.name]: val }), onOpenMediaPicker)}
                   </div>
                ))}
-               <div className="pt-3 border-t border-gray-100 flex justify-between items-center opacity-30 text-[9px] font-mono">
-                  <span>TYPE: {section.type}</span>
+               <div className="pt-3 border-t border-gray-100 flex flex-wrap justify-between items-center gap-1 opacity-30 text-[9px] font-mono">
+                  <span className="break-all">TYPE: {section.type}</span>
                   <span>ID: {section.id.slice(0, 8)}</span>
                </div>
             </div>
@@ -404,9 +404,9 @@ export default function PageForm({ pageId }) {
          case "image":
             return (
                <div className="flex flex-col gap-2">
-                  <div className="flex gap-2">
-                     <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} placeholder="URL or Pick Asset..." />
-                     <button type="button" onClick={() => onOpenMediaPicker(onChange)} className="h-9 px-4 bg-white border border-[#c3c4c7] text-[12px] font-bold hover:bg-[#f6f7f7] shrink-0">Select Image</button>
+                  <div className="flex flex-col xs:flex-row gap-2">
+                     <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} min-w-0`} placeholder="URL or Pick Asset..." />
+                     <button type="button" onClick={() => onOpenMediaPicker(onChange)} className="h-9 px-4 bg-white border border-[#c3c4c7] text-[12px] font-bold hover:bg-[#f6f7f7] shrink-0 w-full xs:w-auto">Select Image</button>
                   </div>
                   {value ? (
                      <div
@@ -472,10 +472,10 @@ export default function PageForm({ pageId }) {
          case "repeater":
             const items = value || [];
             return (
-               <div className="space-y-3 bg-[#f6f7f7] p-4 border border-[#c3c4c7]">
+               <div className="space-y-3 bg-[#f6f7f7] p-2 sm:p-4 border border-[#c3c4c7]">
                   {items.map((item, index) => (
-                     <div key={index} className="bg-white border border-[#c3c4c7] p-4 relative shadow-sm">
-                        <div className="flex items-center justify-between border-b border-[#f0f0f1] pb-2 mb-4">
+                     <div key={index} className="bg-white border border-[#c3c4c7] p-3 sm:p-4 relative shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f0f0f1] pb-2 mb-4">
                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Item {index + 1}</span>
                            <button type="button" onClick={() => { const n = [...items]; n.splice(index, 1); onChange(n); }} className="text-[#d63638] text-[11px] font-bold hover:underline">Remove</button>
                         </div>
@@ -517,12 +517,12 @@ export default function PageForm({ pageId }) {
       }
    };
 
-   if (loading) return <div className="p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading WordPress-style editor...</div>;
+   if (loading) return <div className="p-4 sm:p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading WordPress-style editor...</div>;
 
    if (!page) {
       return (
-         <div className="p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
-            <div className="bg-white p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
+         <div className="p-4 sm:p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
+            <div className="bg-white p-4 sm:p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
                <h2 className="text-[#d63638] font-bold text-[16px] mb-2 flex items-center gap-2">
                   Failed to load page data
                </h2>
@@ -562,15 +562,15 @@ export default function PageForm({ pageId }) {
          addNewLabel="Add New"
          breadcrumbs={[{ label: "Pages", href: "/admin/pages" }, { label: "Edit" }]}
       >
-         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start pb-40">
+         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start pb-40 min-w-0">
             {/* Main Column */}
-            <div className="lg:col-span-3 space-y-4">
+            <div className="lg:col-span-3 space-y-4 min-w-0">
                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-start sm:flex-row sm:items-center gap-2">
                      <input
                         required
                         placeholder="Enter title here"
-                        className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-4 py-2.5 text-[20px] bg-white shadow-sm font-semibold transition-all"
+                        className="w-full min-w-0 border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-4 py-2.5 text-[20px] bg-white shadow-sm font-semibold transition-all"
                         value={page.title}
                         onChange={(e) => {
                            const val = e.target.value;
@@ -585,9 +585,9 @@ export default function PageForm({ pageId }) {
                            }
                         }}
                      />
-                     {page.isSystem && <span className="bg-amber-100 text-amber-700 text-[9px] font-black uppercase px-2 py-1 rounded">System Page</span>}
+                     {page.isSystem && <span className="bg-amber-100 text-amber-700 text-[9px] font-black uppercase px-2 py-1 rounded shrink-0 whitespace-nowrap">System Page</span>}
                      {pageId === "new" ? (
-                        <div className="flex items-center gap-1.5 shrink-0 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[3px]">
+                        <div className="flex items-center gap-1.5 shrink-0 max-w-full bg-white border border-[#c3c4c7] px-2 py-1 rounded-[3px]">
                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-tight">Template:</span>
                            <select
                               value={page.template || "default"}
@@ -607,7 +607,7 @@ export default function PageForm({ pageId }) {
                                     sections: defaultSecs
                                  }));
                               }}
-                              className="text-[11px] font-bold text-[#2271b1] bg-transparent outline-none cursor-pointer border-none p-0 focus:ring-0"
+                              className="text-[11px] font-bold text-[#2271b1] bg-transparent outline-none cursor-pointer border-none p-0 focus:ring-0 min-w-0"
                            >
                               <option value="default">Default Template</option>
                               <option value="home">Homepage Template</option>
@@ -616,19 +616,19 @@ export default function PageForm({ pageId }) {
                            </select>
                         </div>
                      ) : (
-                        <span className="bg-blue-50 text-blue-700 text-[9px] font-black uppercase px-2 py-1 rounded select-none border border-blue-200">
+                        <span className="bg-blue-50 text-blue-700 text-[9px] font-black uppercase px-2 py-1 rounded select-none border border-blue-200 shrink-0 max-w-full break-words">
                            Template: {TEMPLATE_REGISTRY[page.template || "default"]?.name || page.template || "Default"}
                         </span>
                      )}
                   </div>
-                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex items-center gap-1">
+                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1">
                      Permalink: <span className="text-gray-400">pairo.store/</span>
-                     <input className="border-b border-dashed border-[#2271b1]/30 bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px] focus:border-[#2271b1]" value={page.slug} onChange={(e) => setPage({ ...page, slug: e.target.value })} />
+                     <input className="border-b border-dashed border-[#2271b1]/30 bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px] max-w-full focus:border-[#2271b1]" value={page.slug} onChange={(e) => setPage({ ...page, slug: e.target.value })} />
                   </div>
                </div>
 
                 {/* Content / SEO Tabs */}
-                <div className="flex border-b border-[#ccd0d4] gap-6 select-none pb-0">
+                <div className="flex flex-wrap border-b border-[#ccd0d4] gap-x-4 sm:gap-x-6 gap-y-1 select-none pb-0">
                    <button
                       type="button"
                       onClick={() => setActiveFormTab("content")}
@@ -656,13 +656,13 @@ export default function PageForm({ pageId }) {
                {activeFormTab === "content" ? (
                   /* Section Manager Meta Box */
                   <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-4 py-2 flex items-center justify-between">
+                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2">
                         <span className="text-[13px] font-bold text-gray-700 uppercase tracking-tighter">Page Sections</span>
                         <div className="relative group">
-                           <button type="button" className="text-[11px] font-bold text-[#2271b1] hover:text-black flex items-center gap-1">
+                           <button type="button" className="text-[11px] font-bold text-[#2271b1] hover:text-black flex items-center gap-1 whitespace-nowrap">
                               <Plus className="w-3.5 h-3.5" /> Add Section
                            </button>
-                           <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-[#c3c4c7] shadow-xl z-50 hidden group-hover:block py-1">
+                           <div className="absolute right-0 top-full mt-1 w-48 max-w-[calc(100vw-1rem)] bg-white border border-[#c3c4c7] shadow-xl z-50 hidden group-hover:block py-1">
                               {Object.entries(SECTION_SCHEMAS)
                                  .filter(([type]) => {
                                     const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
@@ -686,7 +686,7 @@ export default function PageForm({ pageId }) {
                            </div>
                         </div>
                      </div>
-                     <div className="p-4 bg-[#f0f2f1]/30">
+                     <div className="p-2 sm:p-4 bg-[#f0f2f1]/30">
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                            <SortableContext items={page.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                               <div className="space-y-1">
@@ -727,19 +727,19 @@ export default function PageForm({ pageId }) {
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0">
                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Publish</div>
                   <div className="p-3 space-y-4 text-[13px]">
-                     <div className="flex justify-between items-center">
+                     <div className="flex flex-wrap justify-between items-center gap-2">
                         <button type="button" onClick={handleSave} className="border border-[#c3c4c7] px-3 py-1.5 rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[12px] font-medium">Save Draft</button>
                         <Link href={`/${page.slug}`} target="_blank" className="text-[#2271b1] underline">Preview</Link>
                      </div>
                      <div className="space-y-3 py-3 border-y border-gray-100">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                            <p><span className="text-gray-400">Status:</span> <strong>{page.status}</strong></p>
                            <select
-                              className="text-[11px] border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#2271b1]"
+                              className="text-[11px] border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#2271b1] max-w-full"
                               value={page.status}
                               onChange={(e) => setPage({ ...page, status: e.target.value })}
                            >
@@ -749,7 +749,7 @@ export default function PageForm({ pageId }) {
                         </div>
                         <p><span className="text-gray-400">Last Modified:</span> <strong>{new Date(page.updatedAt).toLocaleDateString()}</strong></p>
                      </div>
-                     <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex justify-between items-center">
+                     <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex flex-wrap justify-between items-center gap-2">
                         <div>
                            {!page.isSystem && pageId !== "new" && (
                               <button type="button" onClick={handleDelete} className="text-[#d63638] underline hover:text-red-800 transition-colors">

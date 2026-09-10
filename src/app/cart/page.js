@@ -5,8 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Truck, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getProductUrl } from "@/lib/routes";
+import { trackBeginCheckout, trackViewCart } from "@/lib/analytics";
 
 export default function CartPage() {
   const { 
@@ -23,6 +24,15 @@ export default function CartPage() {
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [applying, setApplying] = useState(false);
   const [promoError, setPromoError] = useState("");
+
+  // GA4 Event: view_cart — fire once when the cart page loads with items.
+  const viewCartFired = useRef(false);
+  useEffect(() => {
+    if (isCartLoaded && cartItems.length > 0 && !viewCartFired.current) {
+      viewCartFired.current = true;
+      trackViewCart(cartItems, cartSubtotal);
+    }
+  }, [isCartLoaded, cartItems, cartSubtotal]);
 
   const handleApplyPromo = async () => {
     if (!promoCodeInput) return;
@@ -333,7 +343,7 @@ export default function CartPage() {
               {promoError && <p className="text-[10px] text-red-600 font-bold ml-1 uppercase tracking-wider">{promoError}</p>}
               {appliedPromo && (
                 <div className="flex items-center justify-between px-3 py-2 bg-[#FAF9F6] rounded border border-neutral-200">
-                   <span className="text-[9px] font-bold text-black uppercase tracking-wider">Discount {appliedPromo.code} Applied</span>
+                   <span className="text-[9px] font-bold text-black uppercase tracking-wider">Discount {appliedPromo.code || appliedPromo.appliedPromotions?.[0]?.title || ""} Applied</span>
                    <button onClick={removePromoCode} className="text-[9px] font-bold text-black hover:underline uppercase tracking-wider">Remove</button>
                 </div>
               )}
@@ -343,6 +353,9 @@ export default function CartPage() {
             <div className="pt-2">
               <Link 
                 href="/checkout"
+                onClick={() => {
+                  trackBeginCheckout(cartItems, cartTotal || cartSubtotal || 0);
+                }}
                 className="w-full bg-black text-white h-12 rounded-[4px] text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-neutral-900 transition-all shadow-sm cursor-pointer"
               >
                 <span>Proceed to Checkout</span>

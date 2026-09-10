@@ -4,13 +4,18 @@ import ActionExecutor from './ActionExecutor.js';
 import ConflictResolver from './ConflictResolver.js';
 import dbConnect from '../db.js';
 import Product from '../../models/Product.js';
+import { resolveAuthoritativePrice } from '../productPricing.js';
 
 /**
  * The main entry point for the Promotion Engine.
  * Orchestrates the loading, evaluation, and execution of promotions.
  */
 export default class Engine {
-  static EVAL_TIMEOUT_MS = 50;
+  // Must comfortably cover dbConnect + Product.find + (optional Redis) + Promotion.find under
+  // real network/DB latency. 50ms tripped on nearly every request — the race rejected and the
+  // engine silently returned ZERO discounts, so valid coupons randomly failed and automatic
+  // promotions vanished non-deterministically. This is the root cause of "coupons don't apply".
+  static EVAL_TIMEOUT_MS = 4000;
 
   /**
    * Main entry point for evaluation.
@@ -34,6 +39,7 @@ export default class Engine {
                 discountTotal: 0,
                 total: cart.subtotal,
                 appliedPromotions: [],
+                rejectedCodeMatches: [],
                 items: cart.items.map(item => ({ ...item, discountAmount: 0, finalPrice: item.price }))
             };
         }
@@ -60,7 +66,7 @@ export default class Engine {
 
     const enrichedItems = cart.items?.map(item => {
       const dbProduct = productsMap.get(item.productId?.toString() || item.id?.toString() || item._id?.toString());
-      const basePrice = dbProduct ? dbProduct.price : item.price;
+      const basePrice = dbProduct ? resolveAuthoritativePrice(dbProduct, item) : item.price;
       return {
         ...item,
         price: basePrice,
@@ -87,12 +93,17 @@ export default class Engine {
     
     // 2. Collection Phase (Evaluation & Execution Math)
     const eligiblePromotions = [];
+    // Promotions that match a requested coupon code by name but fail their conditions — kept
+    // so callers can tell "this code doesn't exist" from "this code exists but your cart
+    // doesn't qualify yet" instead of collapsing both into a generic not-found error.
+    const rejectedCodeMatches = [];
+    const requestedCodes = (couponCodes || []).map(c => c.toUpperCase());
     const evaluationCache = new Map(); // Memoization cache for this evaluation cycle
-    
+
     for (const promo of promotions) {
       let evaluation;
       const promoKey = (promo._id || promo.title || Math.random()).toString();
-      
+
       if (evaluationCache.has(promoKey)) {
         console.log(`[Engine:Main] Memoization HIT for: ${promo.title}`);
         evaluation = evaluationCache.get(promoKey);
@@ -100,7 +111,7 @@ export default class Engine {
         evaluation = ConditionEvaluator.evaluate(promo, enrichedCart, context);
         evaluationCache.set(promoKey, evaluation);
       }
-      
+
       if (evaluation.isEligible) {
         const execution = ActionExecutor.execute(promo, enrichedCart);
         eligiblePromotions.push({
@@ -108,6 +119,8 @@ export default class Engine {
           evaluation,
           execution
         });
+      } else if (promo.code && requestedCodes.includes(promo.code.toUpperCase())) {
+        rejectedCodeMatches.push({ code: promo.code, explanation: evaluation.explanation });
       }
     }
 
@@ -117,6 +130,7 @@ export default class Engine {
     // 4. Finalization Phase (Construct Results)
     const results = {
       appliedPromotions: [],
+      rejectedCodeMatches,
       discountTotal: 0,
       freeShipping: false,
       cartTotal: enrichedCart.subtotal,
@@ -146,7 +160,10 @@ export default class Engine {
       if (execution.isFreeShipping) results.freeShipping = true;
     }
 
-    results.discountTotal = parseFloat(results.discountTotal.toFixed(2));
+    // Each promo's discount is individually capped to subtotal, but the SUM of stacked
+    // promotions can still exceed it — cap the combined total too, or checkout's
+    // `subtotal - discountTotal + shipping` can go negative enough to wipe out shipping/tax.
+    results.discountTotal = Math.min(parseFloat(results.discountTotal.toFixed(2)), enrichedCart.subtotal);
     results.cartTotal = Math.max(0, enrichedCart.subtotal - results.discountTotal);
     
     console.log(`[Engine:Main] Evaluation complete. Total Discount: $${results.discountTotal}`);

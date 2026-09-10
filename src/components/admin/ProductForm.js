@@ -449,12 +449,12 @@ export default function ProductForm({ productId = null }) {
       }
    };
 
-   if (loading) return <div className="p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
+   if (loading) return <div className="p-4 sm:p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
 
    if (productId && !formData.name) {
       return (
-         <div className="p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
-            <div className="bg-white p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
+         <div className="p-4 sm:p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
+            <div className="bg-white p-4 sm:p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
                <h2 className="text-[#d63638] font-bold text-[16px] mb-2">
                   Failed to load product data
                </h2>
@@ -496,12 +496,12 @@ export default function ProductForm({ productId = null }) {
     >
          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
             {/* Main Column */}
-            <div className="lg:col-span-3 space-y-4">
+            <div className="lg:col-span-3 space-y-4 min-w-0">
                <div className="space-y-1">
                   <input
                      required
                      placeholder="Enter title here"
-                     className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-4 py-2.5 text-[20px] bg-white shadow-sm font-semibold transition-all"
+                     className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-3 xs:px-4 py-2 xs:py-2.5 text-[16px] xs:text-[18px] sm:text-[20px] bg-white shadow-sm font-semibold transition-all"
                      value={formData.name}
                       onChange={(e) => {
                          const newName = e.target.value;
@@ -513,14 +513,14 @@ export default function ProductForm({ productId = null }) {
                       }}
                   />
                   {/* Permalink / Slug Row */}
-                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5">
+                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5 break-words">
                      <span>Permalink:</span>
-                     <span className="text-gray-400 font-mono">pairolifestyle.com/product/</span>
+                     <span className="text-gray-400 font-mono break-all">pairolifestyle.com/product/</span>
 
                      {slugLocked ? (
                         // Read-only view with pencil edit button
                         <>
-                           <span className="font-mono text-[#2271b1] font-semibold">{formData.slug || <span className="text-gray-300 italic">auto-generated</span>}</span>
+                           <span className="font-mono text-[#2271b1] font-semibold break-all">{formData.slug || <span className="text-gray-300 italic">auto-generated</span>}</span>
                            <button
                               type="button"
                               title="Edit permalink"
@@ -529,7 +529,7 @@ export default function ProductForm({ productId = null }) {
                                  setSlugCheckState(null);
                                  setSlugLocked(false);
                               }}
-                              className="ml-1 p-0.5 rounded hover:bg-gray-100 transition text-gray-400 hover:text-[#2271b1]"
+                              className="ml-1 p-1.5 md:p-0.5 rounded hover:bg-gray-100 transition text-gray-400 hover:text-[#2271b1]"
                            >
                               <Pencil className="w-3.5 h-3.5" />
                            </button>
@@ -542,7 +542,7 @@ export default function ProductForm({ productId = null }) {
                         <>
                            <input
                               autoFocus
-                              className="border border-[#2271b1] bg-white rounded-[3px] outline-none px-2 py-0.5 text-[#2271b1] font-mono min-w-[120px] focus:ring-1 focus:ring-[#2271b1]/30"
+                              className="border border-[#2271b1] bg-white rounded-[3px] outline-none px-2 py-0.5 text-[#2271b1] font-mono min-w-[120px] max-w-full focus:ring-1 focus:ring-[#2271b1]/30"
                               value={slugDraftValue}
                               onChange={async (e) => {
                                  const raw = toSlug(e.target.value);
@@ -607,7 +607,7 @@ export default function ProductForm({ productId = null }) {
                </div>
 
                {/* Content / SEO Tabs */}
-               <div className="flex border-b border-[#ccd0d4] gap-6 select-none pb-0">
+               <div className="flex flex-wrap border-b border-[#ccd0d4] gap-4 sm:gap-6 select-none pb-0">
                   <button
                      type="button"
                      onClick={() => setActiveFormTab("content")}
@@ -636,8 +636,8 @@ export default function ProductForm({ productId = null }) {
                   <>
                      {/* Long Description Meta Box with Tiptap */}
                      <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-1 flex items-center justify-between">
-                           <div className="flex gap-2">
+                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-1 flex flex-wrap items-center justify-between gap-2">
+                           <div className="flex flex-wrap gap-2">
                               <button type="button" className="p-1 px-3 bg-white border border-[#c3c4c7] border-b-white -mb-[5px] text-[12px] font-bold z-10">Visual</button>
                               <button type="button" className="p-1 px-3 text-[12px] text-gray-400">Text</button>
                            </div>
@@ -651,10 +651,10 @@ export default function ProductForm({ productId = null }) {
 
                      {/* Product Data Meta Box */}
                      <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-4 py-2 flex items-center justify-between gap-4">
-                           <div className="flex items-center gap-3">
+                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+                           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                               <span className="text-[13px] font-bold text-gray-700">Product Data —</span>
-                              <div className="relative">
+                              <div className="relative min-w-0">
                                  <select 
                                     className="appearance-none bg-white border border-[#c3c4c7] pl-3 pr-8 py-1 rounded-[3px] text-[13px] font-medium text-[#2271b1] focus:outline-none focus:border-[#2271b1] cursor-pointer"
                                     value={formData.productType}
@@ -671,9 +671,9 @@ export default function ProductForm({ productId = null }) {
                               </div>
                            </div>
                         </div>
-                        <div className="flex min-h-[400px]">
+                        <div className="flex flex-col md:flex-row min-h-[400px]">
                            {/* Vertical Tabs */}
-                           <div className="w-44 bg-[#f6f7f7] border-r border-[#c3c4c7] flex flex-col shrink-0">
+                           <div className="w-full md:w-44 bg-[#f6f7f7] border-b md:border-b-0 md:border-r border-[#c3c4c7] flex flex-row md:flex-col overflow-x-auto md:overflow-visible shrink-0">
                               {[
                                  { id: "general", label: "General", icon: Zap },
                                  { id: "inventory", label: "Inventory", icon: Package },
@@ -686,7 +686,7 @@ export default function ProductForm({ productId = null }) {
                                     key={tab.id}
                                     type="button"
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`p-3 text-[13px] text-left border-b border-[#c3c4c7]/30 flex items-center gap-3 transition-all ${activeTab === tab.id 
+                                    className={`p-3 text-[13px] text-left border-b border-[#c3c4c7]/30 flex items-center gap-2 md:gap-3 shrink-0 whitespace-nowrap md:whitespace-normal transition-all ${activeTab === tab.id
                                        ? "bg-white text-black font-bold -mr-[1px] border-l-[3px] border-l-[#2271b1] z-10" 
                                        : "text-[#2271b1] hover:bg-[#f0f0f1]"
                                        }`}
@@ -697,45 +697,45 @@ export default function ProductForm({ productId = null }) {
                            </div>
 
                            {/* Tab Panels */}
-                           <div className="flex-1 p-8 bg-white overflow-y-auto">
+                           <div className="flex-1 min-w-0 p-3 sm:p-4 md:p-8 bg-white overflow-y-auto">
                               {activeTab === "general" && (
                                  <div className="space-y-4 max-w-xl">
-                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Regular price</label>
-                                       <div className="flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Regular price</label>
+                                       <div className="w-full min-w-0 flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
                                           <span className="text-gray-400 text-[13px]">$</span>
                                           <input className="w-full bg-transparent text-[14px] outline-none" placeholder="0.00" value={formData.compareAtPrice} onChange={(e) => setFormData({ ...formData, compareAtPrice: e.target.value })} />
                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Sale price</label>
-                                       <div className="flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Sale price</label>
+                                       <div className="w-full min-w-0 flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
                                           <span className="text-gray-400 text-[13px] font-bold">$</span>
                                           <input id="sale-price-input" className="w-full bg-transparent text-[14px] outline-none font-bold" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} />
                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Shipping Type</label>
-                                       <select className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" value={formData.shippingType} onChange={(e) => setFormData({ ...formData, shippingType: e.target.value })}>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Shipping Type</label>
+                                       <select className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" value={formData.shippingType} onChange={(e) => setFormData({ ...formData, shippingType: e.target.value })}>
                                           <option value="Express">Express Shipping</option>
                                           <option value="Standard">Standard Shipping</option>
                                           <option value="Free">Free Shipping</option>
                                           <option value="Priority">Priority Mail</option>
                                        </select>
                                     </div>
-                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Color</label>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Color</label>
                                        <input 
-                                          className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
+                                          className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
                                           placeholder="e.g. Black, Navy Blue, Crimson" 
                                           value={formData.color || ""} 
                                           onChange={(e) => setFormData({ ...formData, color: e.target.value })} 
                                        />
                                     </div>
-                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Gender</label>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Gender</label>
                                        <select 
-                                          className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
+                                          className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
                                           value={formData.gender || "unisex"} 
                                           onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                                        >
@@ -744,10 +744,10 @@ export default function ProductForm({ productId = null }) {
                                           <option value="female">Female</option>
                                        </select>
                                     </div>
-                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Age Group</label>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Age Group</label>
                                        <select 
-                                          className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
+                                          className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
                                           value={formData.ageGroup || "adult"} 
                                           onChange={(e) => setFormData({ ...formData, ageGroup: e.target.value })}
                                        >
@@ -763,20 +763,20 @@ export default function ProductForm({ productId = null }) {
 
                               {activeTab === "inventory" && (
                                  <div className="space-y-4 max-w-xl">
-                                    <div className="flex items-center gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">SKU</label>
-                                       <input className="flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm uppercase focus:border-[#2271b1]" placeholder="e.g. PR-001" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} />
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">SKU</label>
+                                       <input className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm uppercase focus:border-[#2271b1]" placeholder="e.g. PR-001" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} />
                                     </div>
-                                    <div className="flex items-center gap-6 py-4 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Track Stock</label>
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-4 border-b border-gray-50">
+                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Track Stock</label>
                                        <div className="flex items-center gap-3">
                                           <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1]" checked={formData.manageStock} onChange={(e) => setFormData({ ...formData, manageStock: e.target.checked })} />
                                           <span className="text-[12px] text-gray-500 font-medium">Enable inventory tracking for this product</span>
                                        </div>
                                     </div>
                                     {formData.manageStock && (
-                                       <div className="flex items-center gap-6 py-2">
-                                          <label className="text-[12px] font-bold text-gray-400 uppercase w-40">Stock Quantity</label>
+                                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2">
+                                          <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Stock Quantity</label>
                                           <input id="stock-input" type="number" className="w-32 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} />
                                        </div>
                                     )}
@@ -785,9 +785,9 @@ export default function ProductForm({ productId = null }) {
 
                               {activeTab === "variants" && (
                                  <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2">
                                        <p className="text-[13px] font-bold text-gray-700">Variant Attributes</p>
-                                       <div className="flex gap-2">
+                                       <div className="flex flex-wrap gap-2">
                                           <button type="button" onClick={() => addTemplate("color")} className="text-[11px] font-bold border border-gray-200 px-3 py-1.5 bg-white hover:bg-gray-50 rounded">+ Color</button>
                                           <button type="button" onClick={() => addTemplate("size")} className="text-[11px] font-bold border border-gray-200 px-3 py-1.5 bg-white hover:bg-gray-50 rounded">+ Size</button>
                                           <button type="button" onClick={addAttribute} className="bg-[#2271b1] text-white px-3 py-1.5 rounded font-bold text-[11px] hover:bg-[#135e96]">+ Custom</button>
@@ -801,20 +801,20 @@ export default function ProductForm({ productId = null }) {
 
                                        return (
                                           <div key={aIdx} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-                                             <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border-b border-gray-200">
-                                                <input className="border border-gray-200 rounded px-2 py-1 text-[12px] font-bold w-32 outline-none focus:border-[#2271b1] bg-white" value={attr.name} onChange={e=>updateAttr("name",e.target.value)} />
+                                             <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 bg-gray-50 border-b border-gray-200">
+                                                <input className="border border-gray-200 rounded px-2 py-1 text-[12px] font-bold w-32 min-w-0 outline-none focus:border-[#2271b1] bg-white" value={attr.name} onChange={e=>updateAttr("name",e.target.value)} />
                                                 <select className="border border-gray-200 rounded px-2 py-1 text-[11px] font-bold outline-none text-[#2271b1] bg-white" value={attr.type} onChange={e=>updateAttr("type",e.target.value)}>
                                                    <option value="color">Color</option>
                                                    <option value="size">Size</option>
                                                    <option value="custom">Custom</option>
                                                 </select>
-                                                <button type="button" onClick={()=>setFormData({...formData,attributes:formData.attributes.filter((_,i)=>i!==aIdx)})} className="ml-auto text-gray-300 hover:text-red-500 p-0.5"><X className="w-3.5 h-3.5" /></button>
+                                                <button type="button" onClick={()=>setFormData({...formData,attributes:formData.attributes.filter((_,i)=>i!==aIdx)})} className="ml-auto text-gray-300 hover:text-red-500 p-1.5 md:p-0.5"><X className="w-3.5 h-3.5" /></button>
                                              </div>
                                              <div className="divide-y divide-gray-50">
                                                 {(attr.values||[]).map((val,vIdx)=>{
                                                     const swatchType = val.swatchType || "color";
                                                     return (
-                                                    <div key={vIdx} className="flex items-start gap-3 px-3 py-2.5 border-b border-gray-50 last:border-0">
+                                                    <div key={vIdx} className="flex flex-wrap items-start gap-3 px-3 py-2.5 border-b border-gray-50 last:border-0">
                                                        {/* Swatch Config — only for color attributes */}
                                                        {attr.type==="color" && (
                                                           <div className="flex flex-col gap-1.5 shrink-0">
@@ -847,7 +847,7 @@ export default function ProductForm({ productId = null }) {
                                                              </div>
                                                              {/* Swatch preview + picker */}
                                                              {swatchType==="color" ? (
-                                                                <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded border border-gray-100 shrink-0 min-w-[160px]">
+                                                                <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded border border-gray-100 w-full xs:w-auto shrink-0 min-w-0 max-w-full xs:min-w-[160px]">
                                                                    <div className="flex items-center gap-2">
                                                                       {/* Final preview bubble */}
                                                                       <div
@@ -949,13 +949,13 @@ export default function ProductForm({ productId = null }) {
                                                           </div>
                                                        )}
                                                        {/* Value label */}
-                                                       <input className="flex-1 border border-gray-200 rounded px-2 py-1 text-[12px] mt-0.5" placeholder="Label" value={val.label} onChange={e=>updateVal(vIdx,"label",e.target.value)} />
+                                                       <input className="flex-1 min-w-[120px] border border-gray-200 rounded px-2 py-1 text-[12px] mt-0.5" placeholder="Label" value={val.label} onChange={e=>updateVal(vIdx,"label",e.target.value)} />
                                                        {/* Variant product image (separate from swatch) */}
                                                        <div className="flex flex-col items-center gap-0.5 shrink-0">
                                                           <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wide">Product img</span>
                                                           <InlinePick value={val.variantImage} onChange={url=>updateVal(vIdx,"variantImage",url)} label="+" />
                                                        </div>
-                                                       <button type="button" onClick={()=>removeVal(vIdx)} className="text-gray-300 hover:text-red-500 mt-0.5 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                                                       <button type="button" onClick={()=>removeVal(vIdx)} className="text-gray-300 hover:text-red-500 mt-0.5 shrink-0 p-1.5 md:p-0"><X className="w-3.5 h-3.5" /></button>
                                                     </div>
                                                  );})}
                                              </div>
@@ -969,8 +969,8 @@ export default function ProductForm({ productId = null }) {
                                     <div className="pt-4 border-t border-gray-100">
                                        <button type="button" onClick={generateCombinations} className="bg-white border border-[#2271b1] text-[#2271b1] px-4 py-1.5 rounded-[3px] text-[11px] font-bold hover:bg-[#f0f6fb]">Generate All Combinations</button>
                                        {formData.variantCombinations?.length > 0 && (
-                                          <div className="mt-4 border border-gray-200 rounded-lg overflow-x-auto">
-                                             <table className="w-full text-left text-[11px]">
+                                          <div className="mt-4 border border-gray-200 rounded-lg overflow-x-auto max-w-full">
+                                             <table className="w-full min-w-[480px] text-left text-[11px]">
                                                 <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase font-bold">
                                                    <tr>
                                                       <th className="px-4 py-3 w-16">IMG</th>
@@ -1013,7 +1013,7 @@ export default function ProductForm({ productId = null }) {
                                                                }}
                                                             />
                                                          </td>
-                                                         <td className="px-4 py-2"><button type="button" onClick={()=>setFormData({...formData,variantCombinations:formData.variantCombinations.filter((_,i)=>i!==cIdx)})}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button></td>
+                                                         <td className="px-4 py-2"><button type="button" className="p-1.5 md:p-0" onClick={()=>setFormData({...formData,variantCombinations:formData.variantCombinations.filter((_,i)=>i!==cIdx)})}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button></td>
                                                       </tr>
                                                    ))}
                                                 </tbody>
@@ -1028,10 +1028,10 @@ export default function ProductForm({ productId = null }) {
                                  <div className="space-y-6">
                                     <button type="button" onClick={() => setFormData({ ...formData, stats: [...(formData.stats || []), { label: "", value: "", icon: "Shield" }] })} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-sm text-[11px] font-bold">+ Add Stat</button>
                                     {(formData.stats || []).map((stat, sIdx) => (
-                                       <div key={sIdx} className="flex items-center gap-4 bg-white p-4 border border-gray-100 rounded shadow-sm">
-                                          <input className="flex-1 border-b border-gray-100 p-1.5 text-[13px]" placeholder="Label" value={stat.label} onChange={e=>{ const n=[...formData.stats]; n[sIdx].label=e.target.value; setFormData({...formData,stats:n}); }} />
-                                          <input className="flex-1 border-b border-gray-100 p-1.5 text-[13px]" placeholder="Value" value={stat.value} onChange={e=>{ const n=[...formData.stats]; n[sIdx].value=e.target.value; setFormData({...formData,stats:n}); }} />
-                                          <button type="button" onClick={()=>setFormData({...formData,stats:formData.stats.filter((_,i)=>i!==sIdx)})}><X className="w-4 h-4 text-gray-300" /></button>
+                                       <div key={sIdx} className="flex flex-wrap items-center gap-2 sm:gap-4 bg-white p-3 sm:p-4 border border-gray-100 rounded shadow-sm">
+                                          <input className="flex-1 min-w-[100px] border-b border-gray-100 p-1.5 text-[13px]" placeholder="Label" value={stat.label} onChange={e=>{ const n=[...formData.stats]; n[sIdx].label=e.target.value; setFormData({...formData,stats:n}); }} />
+                                          <input className="flex-1 min-w-[100px] border-b border-gray-100 p-1.5 text-[13px]" placeholder="Value" value={stat.value} onChange={e=>{ const n=[...formData.stats]; n[sIdx].value=e.target.value; setFormData({...formData,stats:n}); }} />
+                                          <button type="button" className="p-1.5 md:p-0" onClick={()=>setFormData({...formData,stats:formData.stats.filter((_,i)=>i!==sIdx)})}><X className="w-4 h-4 text-gray-300" /></button>
                                        </div>
                                     ))}
                                  </div>
@@ -1052,7 +1052,7 @@ export default function ProductForm({ productId = null }) {
 
                                {activeTab === "sizeguide" && (
                                    <div className="space-y-6">
-                                      <div className="bg-white border border-gray-100 p-6 rounded shadow-sm space-y-4 max-w-xl">
+                                      <div className="bg-white border border-gray-100 p-4 sm:p-6 rounded shadow-sm space-y-4 max-w-xl">
                                          <h3 className="text-[14px] font-bold text-gray-700 border-b border-gray-100 pb-2">Size Chart Configuration</h3>
                                          
                                          {/* Size Chart Source */}
@@ -1119,7 +1119,7 @@ export default function ProductForm({ productId = null }) {
                                       {formData.sizeChartSource === "product_custom" && (
                                          <div className="space-y-6 animate-in fade-in duration-300">
                                             {/* Size Name & Video */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 max-w-4xl">
                                                <div className="bg-white border border-[#c3c4c7] p-4 rounded space-y-3 shadow-sm">
                                                   <label className="block text-[11px] font-bold text-gray-400 uppercase">Size Column Name</label>
                                                   <input
@@ -1181,7 +1181,7 @@ export default function ProductForm({ productId = null }) {
                                                   <div className="bg-white border border-[#c3c4c7] p-4 rounded max-w-4xl shadow-sm">
                                                      <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
                                                         <h4 className="text-[13px] font-bold text-gray-700">Size Chart (CM)</h4>
-                                                        <div className="flex gap-2">
+                                                        <div className="flex flex-wrap gap-2">
                                                            <button type="button" onClick={addColCm}
                                                               className="border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded text-[11px] font-bold hover:bg-[#2271b1] hover:text-white transition">
                                                               + Add Column
@@ -1199,8 +1199,8 @@ export default function ProductForm({ productId = null }) {
                                                            </button>
                                                         </div>
                                                      </div>
-                                                     <div className="overflow-x-auto">
-                                                        <table className="w-full text-left text-[11px] border-collapse">
+                                                     <div className="overflow-x-auto max-w-full">
+                                                        <table className="w-full min-w-[400px] text-left text-[11px] border-collapse">
                                                            <thead>
                                                               <tr className="bg-gray-50 border-b border-gray-200">
                                                                  {colsCm.map((col, cIdx) => (
@@ -1213,7 +1213,7 @@ export default function ProductForm({ productId = null }) {
                                                                           />
                                                                           {colsCm.length > 1 && (
                                                                              <button type="button" onClick={() => removeColCm(cIdx)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition flex-shrink-0">
+                                                                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition flex-shrink-0 p-1 md:p-0">
                                                                                 <X className="w-3 h-3" />
                                                                              </button>
                                                                           )}
@@ -1240,7 +1240,7 @@ export default function ProductForm({ productId = null }) {
                                                                        </td>
                                                                     ))}
                                                                     <td className="p-1 text-center">
-                                                                       <button type="button" onClick={() => {
+                                                                       <button type="button" className="p-1.5 md:p-0" onClick={() => {
                                                                           const cm = (formData.sizeGuide?.sizesCm || []).filter((_, i) => i !== rIdx);
                                                                           setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesCm: cm } });
                                                                        }}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button>
@@ -1281,7 +1281,7 @@ export default function ProductForm({ productId = null }) {
                                                   <div className="bg-white border border-[#c3c4c7] p-4 rounded max-w-4xl shadow-sm">
                                                      <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
                                                         <h4 className="text-[13px] font-bold text-gray-700">Size Chart (INCHES)</h4>
-                                                        <div className="flex gap-2">
+                                                        <div className="flex flex-wrap gap-2">
                                                            <button type="button" onClick={addColIn}
                                                               className="border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded text-[11px] font-bold hover:bg-[#2271b1] hover:text-white transition">
                                                               + Add Column
@@ -1299,8 +1299,8 @@ export default function ProductForm({ productId = null }) {
                                                            </button>
                                                         </div>
                                                      </div>
-                                                     <div className="overflow-x-auto">
-                                                        <table className="w-full text-left text-[11px] border-collapse">
+                                                     <div className="overflow-x-auto max-w-full">
+                                                        <table className="w-full min-w-[400px] text-left text-[11px] border-collapse">
                                                            <thead>
                                                               <tr className="bg-gray-50 border-b border-gray-200">
                                                                  {colsIn.map((col, cIdx) => (
@@ -1313,7 +1313,7 @@ export default function ProductForm({ productId = null }) {
                                                                           />
                                                                           {colsIn.length > 1 && (
                                                                              <button type="button" onClick={() => removeColIn(cIdx)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition flex-shrink-0">
+                                                                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition flex-shrink-0 p-1 md:p-0">
                                                                                 <X className="w-3 h-3" />
                                                                              </button>
                                                                           )}
@@ -1340,7 +1340,7 @@ export default function ProductForm({ productId = null }) {
                                                                        </td>
                                                                     ))}
                                                                     <td className="p-1 text-center">
-                                                                       <button type="button" onClick={() => {
+                                                                       <button type="button" className="p-1.5 md:p-0" onClick={() => {
                                                                           const inches = (formData.sizeGuide?.sizesIn || []).filter((_, i) => i !== rIdx);
                                                                           setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesIn: inches } });
                                                                        }}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button>
@@ -1377,7 +1377,7 @@ export default function ProductForm({ productId = null }) {
                                                      };
                                                      return (
                                                         <div key={rIdx} className="border border-gray-100 p-3 rounded bg-gray-50/50 flex gap-4 items-start">
-                                                           <div className="flex-1 space-y-2">
+                                                           <div className="flex-1 min-w-0 space-y-2">
                                                               <input
                                                                  className="w-full border border-gray-200 p-1.5 text-[12px] font-bold bg-white"
                                                                  placeholder="e.g. Sleeve Length"
@@ -1398,7 +1398,7 @@ export default function ProductForm({ productId = null }) {
                                                                  const inst = (formData.sizeGuide?.instructions || []).filter((_, idx) => idx !== rIdx);
                                                                  setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), instructions: inst } });
                                                               }}
-                                                              className="text-gray-300 hover:text-red-500 mt-1"
+                                                              className="text-gray-300 hover:text-red-500 mt-1 shrink-0 p-1.5 md:p-0"
                                                            >
                                                               <X className="w-4 h-4" />
                                                            </button>
@@ -1430,16 +1430,16 @@ export default function ProductForm({ productId = null }) {
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0">
                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Publish</div>
                   <div className="p-3 space-y-4 text-[13px]">
-                     <div className="flex justify-between items-center">
+                     <div className="flex flex-wrap justify-between items-center gap-2">
                         <button type="button" onClick={handleSubmit} className="border border-[#c3c4c7] px-3 py-1.5 rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[12px] font-medium">Save Draft</button>
                         <button type="button" onClick={() => formData.slug && window.open(`/product/${formData.slug}`, '_blank')} className="text-[#2271b1] underline text-[12px]" title={formData.slug ? `Preview /product/${formData.slug}` : 'Save first to preview'}>Preview</button>
                      </div>
                      <div className="space-y-3 py-3 border-y border-gray-100">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                             <p><span className="text-gray-400">Status:</span> <strong>{formData.status}</strong></p>
                             <select 
                                 className="text-[11px] border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#2271b1]"
@@ -1461,7 +1461,7 @@ export default function ProductForm({ productId = null }) {
                         </div>
                         <p><span className="text-gray-400">Visibility:</span> <strong>Public</strong></p>
                      </div>
-                     <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex justify-between items-center">
+                     <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex flex-wrap justify-between items-center gap-2">
                         <button type="button" className="text-red-600 underline">Move to Trash</button>
                         <button type="submit" disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold hover:bg-[#135e96]">
                            {saving ? "Saving..." : (productId ? "Update" : "Publish")}

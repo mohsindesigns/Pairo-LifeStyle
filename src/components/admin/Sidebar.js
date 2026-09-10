@@ -39,7 +39,7 @@ const NavLink = ({ href, icon: Icon, children, exact = false, isSubmenu = false 
     return (
       <Link
         href={href}
-        className={`block py-[6px] pr-3 pl-10 text-[13px] leading-5 transition-colors ${isActive
+        className={`block py-2 md:py-[6px] pr-3 pl-10 text-[14px] md:text-[13px] leading-5 transition-colors ${isActive
             ? "text-white font-semibold"
             : "text-[#c3c4c7] hover:text-[#72aee6]"
           }`}
@@ -52,7 +52,7 @@ const NavLink = ({ href, icon: Icon, children, exact = false, isSubmenu = false 
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2 px-3 py-2 text-[13px] transition-all group ${isActive
+      className={`flex items-center gap-2 px-3 py-2.5 md:py-2 text-[14px] md:text-[13px] transition-all group ${isActive
           ? "bg-[#2271b1] text-white font-medium"
           : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"
         }`}
@@ -68,7 +68,7 @@ const AccordionMenu = ({ title, icon: Icon, children, isOpen, onToggle }) => {
     <div className="mb-0">
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between px-3 py-2 text-[13px] transition-all group ${isOpen
+        className={`w-full flex items-center justify-between px-3 py-2.5 md:py-2 text-[14px] md:text-[13px] transition-all group ${isOpen
             ? "bg-[#2271b1] text-white font-medium"
             : "hover:bg-[#2c3338] hover:text-[#72aee6] text-[#a7aaad]"
           }`}
@@ -88,9 +88,25 @@ const AccordionMenu = ({ title, icon: Icon, children, isOpen, onToggle }) => {
   );
 };
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ open = false, onClose }) {
   const pathname = usePathname();
   const [openAccordion, setOpenAccordion] = useState("");
+
+  // Close the mobile drawer whenever navigation happens
+  useEffect(() => {
+    if (open && typeof onClose === "function") onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // Escape key closes the mobile drawer
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape" && typeof onClose === "function") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   // Determine initial open accordion based on path
   useEffect(() => {
@@ -113,7 +129,18 @@ export default function AdminSidebar() {
   const isDashboardActive = pathname === "/admin" || pathname === "/admin/analytics";
 
   return (
-    <aside className="w-[160px] bg-[#1d2327] text-[#f0f0f1] h-screen flex flex-col fixed left-0 top-0 z-50 font-sans border-r border-white/5 select-none shrink-0">
+    <>
+      {/* Mobile backdrop */}
+      <div
+        aria-hidden="true"
+        onClick={onClose}
+        className={`fixed inset-x-0 top-11 bottom-0 bg-black/50 z-[90] md:hidden transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      />
+    <aside
+      id="admin-sidebar"
+      aria-label="Admin navigation"
+      className={`w-[min(260px,85vw)] md:w-[160px] bg-[#1d2327] text-[#f0f0f1] flex flex-col fixed left-0 top-11 md:top-0 h-[calc(100dvh-2.75rem)] md:h-screen z-[95] md:z-50 font-sans border-r border-white/5 select-none shrink-0 transition-transform duration-200 ease-out ${open ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0 md:shadow-none"}`}
+    >
       {/* Scrollable Nav */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pb-10 mt-2">
         <nav className="py-2 flex flex-col gap-0.5">
@@ -293,5 +320,6 @@ export default function AdminSidebar() {
         }
       `}</style>
     </aside>
+    </>
   );
 }

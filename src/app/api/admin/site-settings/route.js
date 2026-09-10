@@ -31,6 +31,20 @@ export async function GET(req) {
       });
       config = config.toObject();
     }
+    if (!config.popup) {
+      config.popup = {
+        enabled: false,
+        bannerUrl: '',
+        badgeText: '',
+        title: '',
+        description: '',
+        buttonLabel: '',
+        buttonLink: '',
+        openInNewTab: false,
+        delaySeconds: 1,
+        frequency: 'session',
+      };
+    }
     return NextResponse.json(JSON.parse(JSON.stringify(config)));
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

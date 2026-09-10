@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Check, ArrowRight, Printer, PhoneCall, HelpCircle, Loader2, Calendar, MapPin, CreditCard, ShoppingBag, Truck, Mail, ChevronDown, AlertTriangle, Clock, ExternalLink } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { IDEMPOTENCY_STORAGE_KEY } from "@/lib/checkoutStorage";
+import { trackPurchase } from "@/lib/analytics";
 
 const POLL_INTERVAL_MS = 1500;
 const POLL_MAX_ATTEMPTS = 20;
@@ -18,6 +19,18 @@ export default function SuccessPage() {
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [pollStatus, setPollStatus] = useState(null); // null | "polling" | "failed" | "timeout"
   const [pollError, setPollError] = useState("");
+
+  // GA4 Event: purchase
+  const hasFiredPurchase = useRef(false);
+  useEffect(() => {
+    if (order && !hasFiredPurchase.current) {
+      hasFiredPurchase.current = true;
+      trackPurchase({
+        ...order,
+        orderNumber: order.orderNumber || orderNumber
+      });
+    }
+  }, [order, orderNumber]);
 
   useEffect(() => {
     let cancelled = false;

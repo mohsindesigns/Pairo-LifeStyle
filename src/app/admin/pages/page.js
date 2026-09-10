@@ -137,7 +137,7 @@ export default function PagesManagementPage() {
     >
       <div className="space-y-4">
         {/* View Tabs */}
-        <ul className="flex items-center gap-2 text-[13px] text-[#2271b1]">
+        <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
            <li className="text-[#1d2327] font-semibold cursor-pointer">
               All <span className="text-[#646970] font-normal">({pages.length})</span>
            </li>
@@ -148,9 +148,9 @@ export default function PagesManagementPage() {
         </ul>
 
         {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-           <div className="flex items-center gap-2">
-              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 shadow-sm">
+           <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <select className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none min-w-0 max-w-full" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
                  <option>Bulk actions</option>
                  <option>Duplicate</option>
                  <option>Move to Trash</option>
@@ -158,26 +158,26 @@ export default function PagesManagementPage() {
               </select>
               <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
            </div>
-           <div className="flex items-center gap-2 w-full md:w-auto">
-              <input 
-                type="text" 
-                placeholder="Search pages..." 
+           <div className="flex items-center gap-2 w-full md:w-auto min-w-0">
+              <input
+                type="text"
+                placeholder="Search pages..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
+                className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
               />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Search Pages</button>
+              <button className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shrink-0 whitespace-nowrap">Search Pages</button>
            </div>
         </div>
 
         {/* WP Data Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto shadow-sm">
-           <table className="w-full text-left border-collapse text-[13px] min-w-[800px]">
+        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
+           <table className="w-full text-left border-collapse text-[13px] min-w-[420px] md:min-w-[800px]">
               <thead>
                  <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
                     <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredPages.filter(p => !p.isSystem).length} onChange={toggleSelectAll} /></th>
                     <th className="px-3 py-2 font-bold text-[#1d2327]">Title</th>
-                    <th className="px-3 py-2 font-bold text-[#1d2327]">Author</th>
+                    <th className="px-3 py-2 font-bold text-[#1d2327] hidden md:table-cell">Author</th>
                     <th className="px-3 py-2 font-bold text-[#1d2327]">Date</th>
                  </tr>
               </thead>
@@ -193,15 +193,15 @@ export default function PagesManagementPage() {
                              <input type="checkbox" checked={selectedIds.includes(p._id)} onChange={() => toggleSelect(p._id, p.isSystem)} disabled={p.isSystem} className={p.isSystem ? 'opacity-30 cursor-not-allowed' : ''} />
                           </td>
                           <td className="px-3 py-4 align-top">
-                             <div className="flex items-center gap-2 mb-1">
-                                <Link href={`/admin/pages/${p._id}`} className="font-bold text-[#2271b1] hover:underline text-[14px]">
+                             <div className="flex flex-wrap items-center gap-2 mb-1 min-w-0">
+                                <Link href={`/admin/pages/${p._id}`} className="font-bold text-[#2271b1] hover:underline text-[14px] break-words">
                                    {p.title}
                                 </Link>
                                 {p.status === 'Draft' && <span className="text-[#1d2327] font-bold">— Draft</span>}
                                 {p.isSystem && <span className="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-tight">System Page</span>}
                              </div>
                              
-                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
+                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
                                 <Link href={`/admin/pages/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
                                 {!p.isSystem && (
                                    <>
@@ -215,7 +215,7 @@ export default function PagesManagementPage() {
                                 <Link href={p.slug === 'home' ? '/' : `/${p.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
                              </div>
                           </td>
-                          <td className="px-3 py-4 align-top text-[#2271b1] hover:underline cursor-pointer">
+                          <td className="px-3 py-4 align-top text-[#2271b1] hover:underline cursor-pointer hidden md:table-cell">
                              Admin
                           </td>
                           <td className="px-3 py-4 align-top text-[#646970]">
