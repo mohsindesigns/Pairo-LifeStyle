@@ -7,6 +7,7 @@ import Product from "@/models/Product";
 import Category from "@/models/Category";
 import { NextResponse } from "next/server";
 import { can } from "@/lib/rbac";
+import { syncDiscountToStripe, deactivateDiscountStripeCode } from "@/lib/discountStripeSync";
 
 // Verify session is staff AND (when a permission is given) holds that permission.
 // Coupons live under the "promotions" permission module — previously any staff role
@@ -251,6 +252,11 @@ export async function POST(req) {
     }
 
     const discount = await Discount.create(data);
+
+    const stripeState = await syncDiscountToStripe(discount);
+    Object.assign(discount, stripeState);
+    await discount.save();
+
     return NextResponse.json(discount, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -275,6 +281,8 @@ export async function PUT(req) {
     // Handle Restore
     if (body.restore) {
       discount.isDeleted = false;
+      const stripeState = await syncDiscountToStripe(discount);
+      Object.assign(discount, stripeState);
       await discount.save();
       return NextResponse.json(discount);
     }
@@ -417,6 +425,8 @@ export async function PUT(req) {
       discount.isActive = body.isActive;
     }
 
+    const stripeState = await syncDiscountToStripe(discount);
+    Object.assign(discount, stripeState);
     await discount.save();
     return NextResponse.json(discount);
   } catch (error) {
@@ -444,6 +454,7 @@ export async function DELETE(req) {
     } else {
       // Soft delete
       discount.isDeleted = true;
+      await deactivateDiscountStripeCode(discount);
       await discount.save();
       return NextResponse.json({ success: true, message: "Coupon moved to Trash." });
     }

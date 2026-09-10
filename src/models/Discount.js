@@ -30,7 +30,20 @@ const DiscountSchema = new mongoose.Schema({
   specificCustomers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Customer' }],
   // Anti-abuse: caps redemption to one per device/IP, tracked via hashed IP fingerprints
   oneRedemptionPerDevice: { type: Boolean, default: false },
-  redeemedFingerprints: [{ type: String }]
+  redeemedFingerprints: [{ type: String }],
+
+  // Stripe sync — mirrors Promotion's stripe fields. Only coupons Stripe can
+  // fully enforce on its own (simple percent/fixed off, optional minimum
+  // spend, optional first-purchase-only) are pushed to Stripe; codes scoped
+  // to specific products/categories/customers, registered/newsletter
+  // customers, a capped max discount, a minimum quantity, sale-item
+  // exclusion, per-device limiting, or a per-user limit above 1 have no
+  // Stripe equivalent and are left local-only.
+  stripeCouponId: { type: String, default: null },
+  stripePromotionCodeId: { type: String, default: null },
+  stripeSyncStatus: { type: String, enum: ['synced', 'unsupported', 'error', 'pending'], default: 'pending' },
+  stripeSyncError: { type: String, default: null },
+  stripeSyncKey: { type: String, default: null }
 }, { timestamps: true });
 
 export default mongoose.models.Discount || mongoose.model('Discount', DiscountSchema);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, Suspense } from "react";
-import { ChevronDown, Search, Edit2, X, QrCode, Copy, Check, Eye, Package, FolderTree } from "lucide-react";
+import { ChevronDown, Search, Edit2, X, QrCode, Copy, Check, Eye, Package, FolderTree, CreditCard, AlertTriangle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
@@ -286,6 +286,9 @@ function CouponsContent() {
             ? `Coupon "${data.code || formData.code}" updated successfully.`
             : `Coupon "${data.code || formData.code}" created successfully.`
         );
+        if (data.stripeSyncStatus === "error") {
+          setErrorNotice(`Stripe sync failed: ${data.stripeSyncError || "unknown error"}`);
+        }
         handleReset();
         router.push("/admin/discounts");
         fetchDiscounts();
@@ -318,6 +321,9 @@ function CouponsContent() {
       const data = await res.json();
       if (res.ok) {
         setSuccessNotice(`Coupon duplicated successfully as "${data.code}".`);
+        if (data.stripeSyncStatus === "error") {
+          setErrorNotice(`Stripe sync failed: ${data.stripeSyncError || "unknown error"}`);
+        }
         fetchDiscounts();
       } else {
         setErrorNotice(data.error || "Duplicate failed.");
@@ -360,6 +366,9 @@ function CouponsContent() {
       const data = await res.json();
       if (res.ok) {
         setSuccessNotice(`Coupon "${data.code}" restored successfully.`);
+        if (data.stripeSyncStatus === "error") {
+          setErrorNotice(`Stripe sync failed: ${data.stripeSyncError || "unknown error"}`);
+        }
         fetchDiscounts();
       } else {
         setErrorNotice(data.error || "Restore failed.");
@@ -523,6 +532,9 @@ function CouponsContent() {
       const data = await res.json();
       if (res.ok) {
         setSuccessNotice(`Coupon "${data.code}" updated successfully.`);
+        if (data.stripeSyncStatus === "error") {
+          setErrorNotice(`Stripe sync failed: ${data.stripeSyncError || "unknown error"}`);
+        }
         setQuickEditingId(null);
         fetchDiscounts();
       } else {
@@ -1187,13 +1199,21 @@ function CouponsContent() {
                       </td>
                       <td className="px-3 py-3 align-top">
                         <div className="flex flex-col">
-                          <span
-                            onClick={() => setViewingDiscount(d)}
-                            className="text-[13px] font-bold text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer tracking-wide uppercase font-mono"
-                            title="Click to view this coupon"
-                          >
-                            {d.code}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              onClick={() => setViewingDiscount(d)}
+                              className="text-[13px] font-bold text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer tracking-wide uppercase font-mono"
+                              title="Click to view this coupon"
+                            >
+                              {d.code}
+                            </span>
+                            {d.stripeSyncStatus === "synced" && (
+                              <span title="Synced to Stripe" className="text-emerald-600"><CreditCard className="w-3 h-3" /></span>
+                            )}
+                            {d.stripeSyncStatus === "error" && (
+                              <span title={`Stripe sync failed: ${d.stripeSyncError || "unknown error"}`} className="text-rose-600"><AlertTriangle className="w-3 h-3" /></span>
+                            )}
+                          </div>
 
                           {/* Row Actions */}
                           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-semibold select-none">
