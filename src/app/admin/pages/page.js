@@ -15,8 +15,10 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
+import { useRBAC } from "@/hooks/useRBAC";
 
 export default function PagesManagementPage() {
+  const { can } = useRBAC();
   const router = useRouter();
   const { showConfirm } = usePopup();
   const [pages, setPages] = useState([]);
@@ -30,8 +32,16 @@ export default function PagesManagementPage() {
     try {
       const res = await fetch("/api/admin/pages", { cache: "no-store" });
       const data = await res.json();
-      if (res.ok) setPages(data);
+      if (res.ok && Array.isArray(data)) {
+        setPages(data);
+      } else {
+        setPages([]);
+        if (!res.ok) {
+          toast.error(data?.error || "Failed to load pages");
+        }
+      }
     } catch (err) {
+      setPages([]);
       toast.error("Failed to load pages");
     } finally {
       setLoading(false);
@@ -123,9 +133,9 @@ export default function PagesManagementPage() {
      else setSelectedIds(selectable.map(p => p._id));
   };
 
-  const filteredPages = pages.filter(p => 
-    p.title.toLowerCase().includes(search.toLowerCase()) ||
-    p.slug.toLowerCase().includes(search.toLowerCase())
+  const filteredPages = (Array.isArray(pages) ? pages : []).filter(p => 
+    (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.slug || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -138,11 +148,11 @@ export default function PagesManagementPage() {
         {/* View Tabs */}
         <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
            <li className="text-[#1d2327] font-semibold cursor-pointer">
-              All <span className="text-[#646970] font-normal">({pages.length})</span>
+              All <span className="text-[#646970] font-normal">({Array.isArray(pages) ? pages.length : 0})</span>
            </li>
            <span className="text-[#c3c4c7]">|</span>
            <li className="cursor-pointer hover:text-[#135e96]">
-              Published <span className="text-[#646970] font-normal">({pages.filter(p => p.status === 'Published').length})</span>
+              Published <span className="text-[#646970] font-normal">({(Array.isArray(pages) ? pages : []).filter(p => p.status === 'Published').length})</span>
            </li>
         </ul>
 
@@ -218,8 +228,8 @@ export default function PagesManagementPage() {
                              Admin
                           </td>
                           <td className="px-3 py-4 align-top text-[#646970]">
-                             {p.status === 'Published' ? 'Published' : 'Last Modified'}<br />
-                             {new Date(p.updatedAt).toLocaleDateString()}
+                              {p.status === 'Published' ? 'Published' : 'Last Modified'}<br />
+                              {p.updatedAt || p.createdAt ? new Date(p.updatedAt || p.createdAt).toLocaleDateString() : "—"}
                           </td>
                        </tr>
                     ))
