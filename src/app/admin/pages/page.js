@@ -17,7 +17,6 @@ import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
 
 export default function PagesManagementPage() {
-  const { can } = useRBAC();
   const router = useRouter();
   const { showConfirm } = usePopup();
   const [pages, setPages] = useState([]);
