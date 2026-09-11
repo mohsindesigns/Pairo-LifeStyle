@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { User, Bell, Search, LogOut, ChevronDown, Plus, X, Globe, Menu } from "lucide-react";
+import { User, Bell, Search, LogOut, ChevronDown, Plus, X, Globe, Menu, CheckCheck, Check, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -33,6 +33,24 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [dismissedIds, setDismissedIds] = useState([]);
+  const [noticeFilter, setNoticeFilter] = useState("unread"); // "unread" | "all"
+
+  // Load read notification IDs from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("admin_read_notifications");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setDismissedIds(parsed);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to read notification states from localStorage", err);
+      }
+    }
+  }, []);
 
   // Refs for outside click dismissals
   const searchRef = useRef(null);
@@ -233,11 +251,53 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
     }
   };
 
-  const dismissNotice = (id) => {
-    setDismissedIds(prev => [...prev, id]);
+  const saveDismissedIds = (newIds) => {
+    setDismissedIds(newIds);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("admin_read_notifications", JSON.stringify(newIds.slice(-200)));
+      } catch (err) {
+        console.error("Failed to save read notification states", err);
+      }
+    }
   };
 
-  const visibleNotices = notifications.filter(n => !dismissedIds.includes(n.id));
+  const dismissNotice = (id) => {
+    if (dismissedIds.includes(id)) return;
+    const updated = [...dismissedIds, id];
+    saveDismissedIds(updated);
+  };
+
+  const unmarkNotice = (id) => {
+    const updated = dismissedIds.filter(i => i !== id);
+    saveDismissedIds(updated);
+  };
+
+  const markAllAsRead = () => {
+    if (notifications.length === 0) return;
+    const allIds = notifications.map(n => n.id);
+    const updated = Array.from(new Set([...dismissedIds, ...allIds]));
+    saveDismissedIds(updated);
+    toast.success("All notifications marked as read");
+  };
+
+  const resetAllRead = () => {
+    saveDismissedIds([]);
+    toast.success("Notification read history cleared");
+  };
+
+  const unreadNotices = useMemo(() => {
+    return notifications.filter(n => !dismissedIds.includes(n.id));
+  }, [notifications, dismissedIds]);
+
+  const visibleNotices = unreadNotices;
+
+  const displayedNotices = useMemo(() => {
+    if (noticeFilter === "all") {
+      return notifications;
+    }
+    return unreadNotices;
+  }, [noticeFilter, notifications, unreadNotices]);
 
   // Advanced Search & Action Dispatch Filter
   const searchResults = useMemo(() => {
@@ -668,41 +728,131 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
             }`}
           >
             <Bell className="w-4 h-4 md:w-3.5 md:h-3.5" />
-            {visibleNotices.length > 0 && (
-              <span className="bg-[#d63638] text-white text-[9px] font-black px-1 py-0.5 rounded-full leading-none shrink-0">
-                {visibleNotices.length}
+            {unreadNotices.length > 0 && (
+              <span className="bg-[#d63638] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none shrink-0 min-w-[16px] text-center">
+                {unreadNotices.length > 99 ? "99+" : unreadNotices.length}
               </span>
             )}
           </button>
 
           {showNotifications && (
             <div className="fixed md:absolute left-1 right-1 top-11 md:top-full md:left-auto md:right-0 md:w-96 max-w-[calc(100vw-0.5rem)] bg-white border border-[#c3c4c7] shadow-xl py-0 z-[110] text-[13px] text-gray-700 rounded-none border-t-transparent text-left">
+              {/* Header */}
               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-[#1d2327] uppercase tracking-wider">Admin Notices</span>
-                {visibleNotices.length > 0 && (
-                  <span className="bg-[#d63638] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-[2px]">
-                    {visibleNotices.length} Pending
-                  </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-[#1d2327] uppercase tracking-wider">Admin Notices</span>
+                  {unreadNotices.length > 0 ? (
+                    <span className="bg-[#d63638] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-[2px]">
+                      {unreadNotices.length} Pending
+                    </span>
+                  ) : (
+                    <span className="bg-[#00a32a] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-[2px]">
+                      All Caught Up
+                    </span>
+                  )}
+                </div>
+
+                {unreadNotices.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={markAllAsRead}
+                    className="text-[11px] text-[#2271b1] hover:text-[#135e96] font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                    title="Mark all notifications as read"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Read all
+                  </button>
                 )}
               </div>
-              <div className="max-h-[min(260px,calc(100dvh-6rem))] overflow-y-auto divide-y divide-[#f0f0f1]">
-                {visibleNotices.length === 0 ? (
-                  <div className="p-4 text-center text-gray-400 text-xs italic">
-                    No active notifications.
+
+              {/* Filter Tabs */}
+              <div className="flex items-center bg-[#f0f0f1] border-b border-[#c3c4c7] px-3 py-1 text-[11px] gap-3">
+                <button
+                  type="button"
+                  onClick={() => setNoticeFilter("unread")}
+                  className={`font-semibold pb-0.5 border-b-2 transition-all cursor-pointer ${
+                    noticeFilter === "unread"
+                      ? "text-[#1d2327] border-[#2271b1]"
+                      : "text-[#646970] border-transparent hover:text-[#1d2327]"
+                  }`}
+                >
+                  Unread ({unreadNotices.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNoticeFilter("all")}
+                  className={`font-semibold pb-0.5 border-b-2 transition-all cursor-pointer ${
+                    noticeFilter === "all"
+                      ? "text-[#1d2327] border-[#2271b1]"
+                      : "text-[#646970] border-transparent hover:text-[#1d2327]"
+                  }`}
+                >
+                  All ({notifications.length})
+                </button>
+
+                {noticeFilter === "all" && dismissedIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={resetAllRead}
+                    className="ml-auto text-[10px] text-[#646970] hover:text-[#d63638] hover:underline flex items-center gap-0.5 cursor-pointer"
+                    title="Unmark all read notifications"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    Reset
+                  </button>
+                )}
+              </div>
+
+              {/* Notice Items */}
+              <div className="max-h-[min(280px,calc(100dvh-7rem))] overflow-y-auto divide-y divide-[#f0f0f1]">
+                {displayedNotices.length === 0 ? (
+                  <div className="p-6 text-center text-gray-400 text-xs flex flex-col items-center justify-center gap-1.5">
+                    <Check className="w-5 h-5 text-[#00a32a]" />
+                    <span>
+                      {noticeFilter === "unread"
+                        ? "No unread notifications."
+                        : "No active notifications."}
+                    </span>
+                    {noticeFilter === "unread" && notifications.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setNoticeFilter("all")}
+                        className="text-[#2271b1] hover:underline text-[11px] mt-1 cursor-pointer"
+                      >
+                        View all notices ({notifications.length})
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  visibleNotices.map((notice) => {
-                    let borderClass = "border-l-[#72aee6]";
-                    if (notice.type === "warning") borderClass = "border-l-[#dba617]";
-                    if (notice.type === "error") borderClass = "border-l-[#d63638]";
+                  displayedNotices.map((notice) => {
+                    const isRead = dismissedIds.includes(notice.id);
+                    let borderClass = isRead ? "border-l-gray-300 opacity-60" : "border-l-[#72aee6]";
+                    if (!isRead) {
+                      if (notice.type === "warning") borderClass = "border-l-[#dba617]";
+                      if (notice.type === "error") borderClass = "border-l-[#d63638]";
+                    }
 
                     const isUpdating = updatingId === notice.id;
 
                     return (
-                      <div key={notice.id} className={`p-2.5 xs:p-3 pl-3 border-l-4 ${borderClass} hover:bg-[#f6f7f7] relative flex flex-col gap-1.5 transition-all`}>
-                        <div className="pr-5">
-                          <span className="font-bold text-[#1d2327] text-[11px] uppercase mr-1.5">[{notice.label}]</span>
-                          <span className="text-[12px] text-[#2c3338] leading-normal">{notice.text}</span>
+                      <div
+                        key={notice.id}
+                        className={`p-2.5 xs:p-3 pl-3 border-l-4 ${borderClass} hover:bg-[#f6f7f7] relative flex flex-col gap-1.5 transition-all ${
+                          isRead ? "bg-gray-50/60" : ""
+                        }`}
+                      >
+                        <div className="pr-10">
+                          <span className="font-bold text-[#1d2327] text-[11px] uppercase mr-1.5">
+                            [{notice.label}]
+                          </span>
+                          <span className="text-[12px] text-[#2c3338] leading-normal">
+                            {notice.text}
+                          </span>
+                          {isRead && (
+                            <span className="ml-2 text-[10px] text-gray-400 italic">
+                              (Read)
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3">
                           {notice.actions.map((act, i) => {
@@ -711,7 +861,10 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                                 <Link
                                   key={i}
                                   href={act.href}
-                                  onClick={() => setShowNotifications(false)}
+                                  onClick={() => {
+                                    dismissNotice(notice.id);
+                                    setShowNotifications(false);
+                                  }}
                                   className="text-[#2271b1] hover:text-[#135e96] underline text-[11px] font-semibold"
                                 >
                                   {act.label}
@@ -723,7 +876,10 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                                 key={i}
                                 type="button"
                                 disabled={isUpdating}
-                                onClick={act.action}
+                                onClick={async () => {
+                                  dismissNotice(notice.id);
+                                  await act.action();
+                                }}
                                 className="text-[#2271b1] hover:text-[#135e96] underline text-[11px] font-semibold cursor-pointer disabled:opacity-50"
                               >
                                 {isUpdating ? "Processing..." : act.label}
@@ -731,17 +887,53 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                             );
                           })}
                         </div>
-                        <button
-                          onClick={() => dismissNotice(notice.id)}
-                          className="absolute right-1.5 top-1.5 text-[#8c8f94] hover:text-black p-0.5 rounded-full cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="absolute right-1.5 top-1.5">
+                          {isRead ? (
+                            <button
+                              type="button"
+                              onClick={() => unmarkNotice(notice.id)}
+                              className="text-[#8c8f94] hover:text-[#2271b1] p-1 rounded transition-colors cursor-pointer text-[10px]"
+                              title="Mark as unread"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => dismissNotice(notice.id)}
+                              className="text-[#8c8f94] hover:text-black p-0.5 rounded-full cursor-pointer"
+                              title="Mark as read"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })
                 )}
               </div>
+
+              {/* Footer */}
+              {displayedNotices.length > 0 && (
+                <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] px-3 py-1.5 flex items-center justify-between text-[11px]">
+                  {unreadNotices.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={markAllAsRead}
+                      className="text-[#2271b1] hover:text-[#135e96] font-medium flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      Mark all as read
+                    </button>
+                  ) : (
+                    <span className="text-gray-500 text-[10px]">All notices read</span>
+                  )}
+                  <span className="text-gray-400 text-[10px]">
+                    {unreadNotices.length} unread of {notifications.length}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>

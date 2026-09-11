@@ -2,13 +2,27 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { X, Check, AlertTriangle, ShieldCheck } from "lucide-react";
+import { X, Check, AlertTriangle, ShieldCheck, CheckCheck } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 export default function AdminNotices() {
   const [notices, setNotices] = useState([]);
   const [updatingId, setUpdatingId] = useState(null);
   const [dismissedIds, setDismissedIds] = useState([]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("admin_read_notifications");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) setDismissedIds(parsed);
+        }
+      } catch (err) {
+        console.error("Failed to load read notifications", err);
+      }
+    }
+  }, []);
 
   // Fetch notices safely
   const fetchNotices = useCallback(async () => {
@@ -122,8 +136,29 @@ export default function AdminNotices() {
     }
   };
 
+  const saveDismissedIds = (newIds) => {
+    setDismissedIds(newIds);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("admin_read_notifications", JSON.stringify(newIds.slice(-200)));
+      } catch (err) {
+        console.error("Failed to save read notification states", err);
+      }
+    }
+  };
+
   const dismissNotice = (id) => {
-    setDismissedIds(prev => [...prev, id]);
+    if (dismissedIds.includes(id)) return;
+    const updated = [...dismissedIds, id];
+    saveDismissedIds(updated);
+  };
+
+  const markAllAsRead = () => {
+    if (notices.length === 0) return;
+    const allIds = notices.map(n => n.id);
+    const updated = Array.from(new Set([...dismissedIds, ...allIds]));
+    saveDismissedIds(updated);
+    toast.success("All notices marked as read");
   };
 
   const visibleNotices = notices.filter(n => !dismissedIds.includes(n.id));
@@ -132,6 +167,16 @@ export default function AdminNotices() {
 
   return (
     <div className="space-y-3 mb-6 pr-4">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={markAllAsRead}
+          className="text-[12px] text-[#2271b1] hover:text-[#135e96] font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+        >
+          <CheckCheck className="w-3.5 h-3.5" />
+          Mark all as read
+        </button>
+      </div>
       {visibleNotices.map((notice) => {
         let borderClass = "border-l-[#72aee6]"; // info / blue
         if (notice.type === "warning") borderClass = "border-l-[#dba617]"; // warning / orange
