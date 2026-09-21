@@ -747,7 +747,7 @@ export default function PageForm({ pageId }) {
                               <option value="Published">Published</option>
                            </select>
                         </div>
-                        <p><span className="text-gray-400">Last Modified:</span> <strong>{new Date(page.updatedAt).toLocaleDateString()}</strong></p>
+                        <p><span className="text-gray-400">Last Modified:</span> <strong>{page.updatedAt ? new Date(page.updatedAt).toLocaleDateString() : "Not saved yet"}</strong></p>
                      </div>
                      <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex flex-wrap justify-between items-center gap-2">
                         <div>
