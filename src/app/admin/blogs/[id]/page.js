@@ -1,6 +1,10 @@
-import BlogForm from "@/components/admin/BlogForm";
+"use client";
 
-export default async function EditBlogPage({ params }) {
-   const { id } = await params;
+import BlogForm from "@/components/admin/BlogForm";
+import { useParams } from "next/navigation";
+
+export default function EditBlogPage({ params: propParams }) {
+   const routeParams = useParams();
+   const id = routeParams?.id || propParams?.id;
    return <BlogForm blogId={id} />;
 }

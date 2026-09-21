@@ -71,47 +71,52 @@ export default function BlogForm({ blogId }) {
       const fetchData = async () => {
          try {
             const [catsRes, prodsRes] = await Promise.all([
-               fetch("/api/admin/categories?type=blog"),
-               fetch("/api/admin/products")
+               fetch("/api/admin/categories?type=blog").catch(() => null),
+               fetch("/api/admin/products").catch(() => null)
             ]);
 
-            if (!catsRes.ok || !prodsRes.ok) {
-               throw new Error("Authentication failed or server returned an error.");
+            if (catsRes?.ok) {
+               const cats = await catsRes.json().catch(() => []);
+               setCategories(Array.isArray(cats) ? cats : []);
+            } else {
+               setCategories([]);
             }
 
-            const cats = await catsRes.json();
-            const prods = await prodsRes.json();
-
-            setCategories(Array.isArray(cats) ? cats : []);
-            setProducts(Array.isArray(prods) ? prods : (prods.products || []));
+            if (prodsRes?.ok) {
+               const prods = await prodsRes.json().catch(() => []);
+               setProducts(Array.isArray(prods) ? prods : (prods?.products || []));
+            } else {
+               setProducts([]);
+            }
 
             if (blogId) {
-               const blogRes = await fetch(`/api/admin/blogs?id=${blogId}`);
-               if (!blogRes.ok) {
-                  throw new Error("Failed to fetch blog post details.");
+               const blogRes = await fetch(`/api/admin/blogs?id=${blogId}`).catch(() => null);
+               if (blogRes?.ok) {
+                  const data = await blogRes.json().catch(() => null);
+                  if (data && typeof data === "object" && data._id) {
+                     setFormData(prev => ({
+                         ...prev,
+                         showFeaturedProduct: data.showFeaturedProduct !== false,
+                         showSidebarIndex: data.showSidebarIndex !== false,
+                         ...data,
+                         category: data.category === "Uncategorized" ? "" : (data.category || ""),
+                         publishedAt: data.publishedAt ? new Date(data.publishedAt).toISOString().split('T')[0] : (data.createdAt ? new Date(data.createdAt).toISOString().split('T')[0] : prev.publishedAt),
+                         seo: {
+                           title: "", description: "", keywords: [], focusKeyword: "",
+                           canonicalUrl: "", noIndex: false, noFollow: false,
+                           ogTitle: "", ogDescription: "", ogImage: "",
+                           twitterTitle: "", twitterDescription: "", twitterImage: "",
+                           structuredData: "",
+                           ...(data.seo || {})
+                         },
+                         faqs: Array.isArray(data.faqs) ? data.faqs : []
+                      }));
+                  }
                }
-               const data = await blogRes.json();
-               setFormData(prev => ({
-                   ...prev,
-                   showFeaturedProduct: data.showFeaturedProduct !== false,
-                   showSidebarIndex: data.showSidebarIndex !== false,
-                   ...data,
-                   category: data.category === "Uncategorized" ? "" : (data.category || ""),
-                   publishedAt: data.publishedAt ? new Date(data.publishedAt).toISOString().split('T')[0] : (data.createdAt ? new Date(data.createdAt).toISOString().split('T')[0] : prev.publishedAt),
-                   seo: {
-                     title: "", description: "", keywords: [], focusKeyword: "",
-                     canonicalUrl: "", noIndex: false, noFollow: false,
-                     ogTitle: "", ogDescription: "", ogImage: "",
-                     twitterTitle: "", twitterDescription: "", twitterImage: "",
-                     structuredData: "",
-                     ...(data.seo || {})
-                   },
-                   faqs: data.faqs || []
-                }));
             }
-            setLoading(false);
          } catch (err) {
             console.error("Fetch failed", err);
+         } finally {
             setLoading(false);
          }
       };

@@ -302,11 +302,15 @@ export default function PageForm({ pageId }) {
             ]);
 
             // Normalize sections productIds from slugs to ObjectIds
-            if (pageData && pageData.sections) {
+            const prodsList = Array.isArray(prods) ? prods : [];
+            const catsList = Array.isArray(cats) ? cats : [];
+            const blogsList = Array.isArray(blogs) ? blogs : [];
+
+            if (pageData && pageData.sections && Array.isArray(pageData.sections)) {
                pageData.sections.forEach(s => {
-                  if (s.config && s.config.productIds && Array.isArray(s.config.productIds)) {
+                  if (s?.config?.productIds && Array.isArray(s.config.productIds)) {
                      s.config.productIds = s.config.productIds.map(idOrSlug => {
-                        const found = prods.find(p => p._id === idOrSlug || p.slug === idOrSlug);
+                        const found = prodsList.find(p => p?._id === idOrSlug || p?.slug === idOrSlug);
                         return found ? found._id : idOrSlug;
                      });
                   }
@@ -315,9 +319,9 @@ export default function PageForm({ pageId }) {
 
             setPage(pageData);
             setDynamicOptions({
-               categories: Array.isArray(cats) ? cats.filter(c => c.status === 'Published').map(c => ({ label: c.name, value: c._id })) : [],
-               products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p._id })) : [],
-               blogs: Array.isArray(blogs) ? blogs.filter(b => b.status === 'Published').map(b => ({ label: b.title, value: b._id })) : []
+               categories: catsList.filter(c => c && c.status === 'Published').map(c => ({ label: c.name, value: c._id })),
+               products: prodsList.map(p => ({ label: p.name, value: p._id })),
+               blogs: blogsList.filter(b => b && b.status === 'Published').map(b => ({ label: b.title, value: b._id }))
             });
             setLoading(false);
          } catch (err) {

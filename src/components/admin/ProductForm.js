@@ -119,12 +119,13 @@ export default function ProductForm({ productId = null }) {
    const [sizeCharts, setSizeCharts] = useState([]);
 
    const getPreviewCategorySlug = () => {
+      const catsList = Array.isArray(categories) ? categories : [];
       if (formData.primaryCategory) {
-         const match = categories.find(c => c._id === formData.primaryCategory);
+         const match = catsList.find(c => c?._id === formData.primaryCategory);
          if (match && match.slug) return match.slug;
       }
-      if (formData.categories && formData.categories.length > 0) {
-         const match = categories.find(c => c._id === formData.categories[0]);
+      if (formData.categories && Array.isArray(formData.categories) && formData.categories.length > 0) {
+         const match = catsList.find(c => c?._id === formData.categories[0]);
          if (match && match.slug) return match.slug;
       }
       return "shop";
@@ -185,75 +186,80 @@ export default function ProductForm({ productId = null }) {
    useEffect(() => {
       const fetchData = async () => {
          try {
-            const catsRes = await fetch("/api/admin/categories?type=product");
-            if (!catsRes.ok) {
-               throw new Error("Failed to fetch product categories.");
+            // Fetch categories safely
+            const catsRes = await fetch("/api/admin/categories?type=product").catch(() => null);
+            if (catsRes?.ok) {
+               const data = await catsRes.json().catch(() => []);
+               setCategories(Array.isArray(data) ? data : []);
+            } else {
+               setCategories([]);
             }
-            const data = await catsRes.json();
-            setCategories(Array.isArray(data) ? data : []);
 
-            // Fetch size charts
-            const scRes = await fetch("/api/admin/size-charts");
-            if (scRes.ok) {
-               const scData = await scRes.json();
-               setSizeCharts(scData.filter(sc => sc.status === "Published" && !sc.isDeleted));
+            // Fetch size charts safely
+            const scRes = await fetch("/api/admin/size-charts").catch(() => null);
+            if (scRes?.ok) {
+               const scData = await scRes.json().catch(() => []);
+               if (Array.isArray(scData)) {
+                  setSizeCharts(scData.filter(sc => sc && sc.status === "Published" && !sc.isDeleted));
+               }
             }
 
             if (productId) {
-               const prodRes = await fetch(`/api/admin/products?id=${productId}`);
-               if (!prodRes.ok) {
-                  throw new Error("Failed to fetch product details.");
-               }
-               const prodData = await prodRes.json();
-               setSlugManuallyEdited(!!prodData.slugManuallyEdited);
-               setFormData({
-                  ...prodData,
-                  productType: prodData.productType || "simple",
-                  images: prodData.images || [],
-                  categories: prodData.categories || [],
-                  primaryCategory: prodData.primaryCategory || "",
-                  sizeChartSource: prodData.sizeChartSource || "category_default",
-                  sizeChart: prodData.sizeChart || "",
-                  color: prodData.color || "",
-                  gender: prodData.gender || "unisex",
-                  ageGroup: prodData.ageGroup || "adult",
-                  seo: {
-                     title: "", description: "", keywords: [], focusKeyword: "",
-                     canonicalUrl: "", noIndex: false, noFollow: false,
-                     ogTitle: "", ogDescription: "", ogImage: "",
-                     twitterTitle: "", twitterDescription: "", twitterImage: "",
-                     structuredData: "",
-                     ...(prodData.seo || {})
-                   },
-                  attributes: prodData.attributes || prodData.variants?.map(v => ({
-                     name: v.name,
-                     type: v.name.toLowerCase().includes("color") ? "color" : v.name.toLowerCase().includes("size") ? "size" : "custom",
-                     values: v.values.map(val => ({
-                        label: val.name || val,
-                        value: val.name || val,
-                        hex: val.hex || "",
-                        image: val.image || "",
-                        variantImage: ""
-                     }))
-                  })) || [],
-                  variantCombinations: prodData.variantCombinations || [],
-                  stats: prodData.stats || [],
-                  faqs: prodData.faqs || [],
-                  overview: prodData.overview || "",
-                  shippingType: prodData.shippingType || "Express",
-                  sizeGuide: {
-                     enabled: prodData.sizeGuide?.enabled || false,
-                     chartImage: prodData.sizeGuide?.chartImage || "",
-                     videoUrl: prodData.sizeGuide?.videoUrl || "https://www.youtube.com/watch?v=ipyhV51zUWk",
-                     sizesCm: prodData.sizeGuide?.sizesCm?.length > 0 ? prodData.sizeGuide.sizesCm : DEFAULT_SIZES_CM,
-                     sizesIn: prodData.sizeGuide?.sizesIn?.length > 0 ? prodData.sizeGuide.sizesIn : DEFAULT_SIZES_IN,
-                     instructions: prodData.sizeGuide?.instructions?.length > 0 ? prodData.sizeGuide.instructions : DEFAULT_INSTRUCTIONS
+               const prodRes = await fetch(`/api/admin/products?id=${productId}`).catch(() => null);
+               if (prodRes?.ok) {
+                  const prodData = await prodRes.json().catch(() => null);
+                  if (prodData && typeof prodData === "object" && prodData._id) {
+                     setSlugManuallyEdited(!!prodData.slugManuallyEdited);
+                     setFormData({
+                        ...prodData,
+                        productType: prodData.productType || "simple",
+                        images: Array.isArray(prodData.images) ? prodData.images : [],
+                        categories: Array.isArray(prodData.categories) ? prodData.categories : [],
+                        primaryCategory: prodData.primaryCategory || "",
+                        sizeChartSource: prodData.sizeChartSource || "category_default",
+                        sizeChart: prodData.sizeChart || "",
+                        color: prodData.color || "",
+                        gender: prodData.gender || "unisex",
+                        ageGroup: prodData.ageGroup || "adult",
+                        seo: {
+                           title: "", description: "", keywords: [], focusKeyword: "",
+                           canonicalUrl: "", noIndex: false, noFollow: false,
+                           ogTitle: "", ogDescription: "", ogImage: "",
+                           twitterTitle: "", twitterDescription: "", twitterImage: "",
+                           structuredData: "",
+                           ...(prodData.seo || {})
+                         },
+                        attributes: prodData.attributes || (Array.isArray(prodData.variants) ? prodData.variants.map(v => ({
+                           name: v?.name || "",
+                           type: v?.name?.toLowerCase().includes("color") ? "color" : v?.name?.toLowerCase().includes("size") ? "size" : "custom",
+                           values: Array.isArray(v?.values) ? v.values.map(val => ({
+                              label: val?.name || val || "",
+                              value: val?.name || val || "",
+                              hex: val?.hex || "",
+                              image: val?.image || "",
+                              variantImage: ""
+                           })) : []
+                        })) : []),
+                        variantCombinations: Array.isArray(prodData.variantCombinations) ? prodData.variantCombinations : [],
+                        stats: Array.isArray(prodData.stats) ? prodData.stats : [],
+                        faqs: Array.isArray(prodData.faqs) ? prodData.faqs : [],
+                        overview: prodData.overview || "",
+                        shippingType: prodData.shippingType || "Express",
+                        sizeGuide: {
+                           enabled: prodData.sizeGuide?.enabled || false,
+                           chartImage: prodData.sizeGuide?.chartImage || "",
+                           videoUrl: prodData.sizeGuide?.videoUrl || "https://www.youtube.com/watch?v=ipyhV51zUWk",
+                           sizesCm: prodData.sizeGuide?.sizesCm?.length > 0 ? prodData.sizeGuide.sizesCm : DEFAULT_SIZES_CM,
+                           sizesIn: prodData.sizeGuide?.sizesIn?.length > 0 ? prodData.sizeGuide.sizesIn : DEFAULT_SIZES_IN,
+                           instructions: prodData.sizeGuide?.instructions?.length > 0 ? prodData.sizeGuide.instructions : DEFAULT_INSTRUCTIONS
+                        }
+                     });
                   }
-               });
+               }
             }
-            setLoading(false);
          } catch (err) {
             console.error("Fetch failed", err);
+         } finally {
             setLoading(false);
          }
       };

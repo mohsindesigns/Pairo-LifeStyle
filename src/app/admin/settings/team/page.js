@@ -19,19 +19,34 @@ export default function StaffManagement() {
   const fetchStaff = async () => {
     try {
       const res = await fetch("/api/admin/staff");
-      const data = await res.json();
-      if (res.ok) setStaff(data);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setStaff(data);
+        } else if (Array.isArray(data?.staff)) {
+          setStaff(data.staff);
+        } else {
+          setStaff([]);
+        }
+      } else {
+        setStaff([]);
+      }
     } catch (err) {
       console.error(err);
+      setStaff([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    let active = true;
     Promise.resolve().then(() => {
-      fetchStaff();
+      if (active) fetchStaff();
     });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const toggleStatus = async (id, currentStatus) => {
@@ -43,7 +58,7 @@ export default function StaffManagement() {
         body: JSON.stringify({ status: newStatus })
       });
       if (res.ok) {
-        setStaff(staff.map(s => s._id === id ? { ...s, status: newStatus } : s));
+        setStaff(prev => (Array.isArray(prev) ? prev : []).map(s => s._id === id ? { ...s, status: newStatus } : s));
       }
     } catch (err) {
       console.error(err);
@@ -56,7 +71,7 @@ export default function StaffManagement() {
     try {
       const res = await fetch(`/api/admin/staff/${deleteTarget.id}`, { method: 'DELETE' });
       if (res.ok) {
-        setStaff(staff.filter(s => s._id !== deleteTarget.id));
+        setStaff(prev => (Array.isArray(prev) ? prev : []).filter(s => s._id !== deleteTarget.id));
         toast.success(`Staff member "${deleteTarget.name}" deleted successfully.`);
         setDeleteTarget({ open: false, id: null, name: "", loading: false });
       } else {
@@ -100,10 +115,26 @@ export default function StaffManagement() {
     }
   };
 
-  const filteredStaff = staff.filter(s => 
-    s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const staffList = Array.isArray(staff) ? staff : [];
+  const currentUserId = session?.user?.id || session?.user?._id;
+
+  const filteredStaff = staffList.filter(s => {
+    if (!s) return false;
+    const nameStr = s.name ? String(s.name).toLowerCase() : "";
+    const emailStr = s.email ? String(s.email).toLowerCase() : "";
+    const search = searchTerm.toLowerCase();
+    return nameStr.includes(search) || emailStr.includes(search);
+  });
+
+  const formatDate = (dateVal) => {
+    if (!dateVal) return "Never";
+    try {
+      const d = new Date(dateVal);
+      return isNaN(d.getTime()) ? "Never" : d.toLocaleDateString();
+    } catch {
+      return "Never";
+    }
+  };
 
   return (
     <AdminPageLayout 
@@ -117,15 +148,15 @@ export default function StaffManagement() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
             <div className="p-3 bg-[#f0f6fb] text-[#2271b1] rounded-full"><Shield className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Total Admins</p><p className="text-xl font-bold">{staff.length}</p></div>
+            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Total Admins</p><p className="text-xl font-bold">{staffList.length}</p></div>
           </div>
           <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
             <div className="p-3 bg-[#f6f7f7] text-[#1d2327] rounded-full"><UserCheck className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Active Sessions</p><p className="text-xl font-bold">{staff.filter(s => s.status === 'Active').length}</p></div>
+            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Active Sessions</p><p className="text-xl font-bold">{staffList.filter(s => s?.status === 'Active').length}</p></div>
           </div>
           <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
             <div className="p-3 bg-red-50 text-red-600 rounded-full"><UserX className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Suspended</p><p className="text-xl font-bold text-red-600">{staff.filter(s => s.status !== 'Active').length}</p></div>
+            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Suspended</p><p className="text-xl font-bold text-red-600">{staffList.filter(s => s?.status && s.status !== 'Active').length}</p></div>
           </div>
         </div>
 
@@ -171,83 +202,89 @@ export default function StaffManagement() {
               ) : filteredStaff.length === 0 ? (
                 <tr><td colSpan={5} className="p-10 text-center italic text-gray-400">No staff members found.</td></tr>
               ) : (
-                filteredStaff.map((s) => (
-                  <tr key={s._id} className="hover:bg-[#fbfbfb] group transition-colors">
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 bg-[#f0f6fb] border border-[#2271b1]/10 rounded-full flex items-center justify-center text-[#2271b1] font-bold">
-                            {s.name?.charAt(0)}
-                         </div>
-                         <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-[#1d2327]">{s.name}</span>
-                            <div className="flex items-center gap-2 text-[11px] text-[#646970]">
-                               <Mail className="w-3 h-3" /> {s.email}
-                            </div>
-                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
-                        s.roleId?.slug === 'super-admin' ? 'bg-[#2271b1] text-white' : 'bg-[#d9ebf5] text-[#1a4a6e]'
-                      }`}>
-                        {s.roleId?.name || "No Role"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                       {s.roleId?.slug === 'super-admin' || s._id === session?.user?.id ? (
-                          <div className="flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 text-gray-400 cursor-default">
-                             <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                             {s.status}
-                          </div>
-                       ) : (
-                          <button 
-                            onClick={() => toggleStatus(s._id, s.status)}
-                            className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded transition-colors ${
-                              s.status === 'Active' ? 'text-green-600 hover:bg-green-50' : 'text-red-600 hover:bg-red-50'
-                            }`}
-                          >
-                             <div className={`w-1.5 h-1.5 rounded-full ${s.status === 'Active' ? 'bg-green-600' : 'bg-red-600'}`} />
-                             {s.status}
-                          </button>
-                       )}
-                    </td>
-                    <td className="hidden md:table-cell px-4 py-4 text-[#646970]">
-                       {s.security?.lastLogin ? new Date(s.security.lastLogin).toLocaleString() : "Never"}
-                    </td>
-                     <td className="px-4 py-4 text-center">
-                        <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
-                            {s.roleId?.slug !== 'super-admin' && s._id !== session?.user?.id && (
-                               <button 
-                                 title="Delete Staff Member" 
-                                 onClick={() => setDeleteTarget({ open: true, id: s._id, name: s.name, loading: false })}
-                                 className="p-1.5 text-[#646970] hover:text-red-600 hover:bg-red-50 rounded"
-                               >
-                                 <UserX className="w-4 h-4" />
-                               </button>
-                            )}
-                            {s.roleId?.slug === 'super-admin' && (
-                               <div title="System Protected" className="p-1.5 text-gray-300">
-                                  <Lock className="w-4 h-4" />
-                               </div>
-                            )}
-                            <button 
-                              title="Reset Password" 
-                              onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
-                              className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
-                            >
-                              <Key className="w-4 h-4" />
-                            </button>
-                            <button 
-                              title="Edit Member" 
-                              onClick={() => router.push(`/admin/settings/team/${s._id}`)}
-                              className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                         </div>
+                filteredStaff.map((s, index) => {
+                  const isSuperAdmin = s?.roleId?.slug === 'super-admin';
+                  const isSelf = currentUserId && s?._id === currentUserId;
+                  const roleName = s?.roleId?.name || (typeof s?.roleId === 'string' ? 'Assigned' : 'No Role');
+
+                  return (
+                    <tr key={s?._id || index} className="hover:bg-[#fbfbfb] group transition-colors">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 bg-[#f0f6fb] border border-[#2271b1]/10 rounded-full flex items-center justify-center text-[#2271b1] font-bold">
+                              {(s?.name || "U").charAt(0).toUpperCase()}
+                           </div>
+                           <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-[#1d2327]">{s?.name || "Unnamed"}</span>
+                              <div className="flex items-center gap-2 text-[11px] text-[#646970]">
+                                 <Mail className="w-3 h-3" /> {s?.email || "No email"}
+                              </div>
+                           </div>
+                        </div>
                       </td>
-                   </tr>
-                 ))
+                      <td className="px-4 py-4">
+                        <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
+                          isSuperAdmin ? 'bg-[#2271b1] text-white' : 'bg-[#d9ebf5] text-[#1a4a6e]'
+                        }`}>
+                          {roleName}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                         {isSuperAdmin || isSelf ? (
+                            <div className="flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 text-gray-400 cursor-default">
+                               <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                               {s?.status || "Active"}
+                            </div>
+                         ) : (
+                            <button 
+                              onClick={() => toggleStatus(s._id, s.status)}
+                              className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded transition-colors ${
+                                s?.status === 'Active' ? 'text-green-600 hover:bg-green-50' : 'text-red-600 hover:bg-red-50'
+                              }`}
+                            >
+                               <div className={`w-1.5 h-1.5 rounded-full ${s?.status === 'Active' ? 'bg-green-600' : 'bg-red-600'}`} />
+                               {s?.status || "Active"}
+                            </button>
+                         )}
+                      </td>
+                      <td className="hidden md:table-cell px-4 py-4 text-[#646970]" suppressHydrationWarning>
+                         {formatDate(s?.security?.lastLogin)}
+                      </td>
+                       <td className="px-4 py-4 text-center">
+                          <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
+                              {!isSuperAdmin && !isSelf && (
+                                 <button 
+                                   title="Delete Staff Member" 
+                                   onClick={() => setDeleteTarget({ open: true, id: s._id, name: s.name, loading: false })}
+                                   className="p-1.5 text-[#646970] hover:text-red-600 hover:bg-red-50 rounded"
+                                 >
+                                   <UserX className="w-4 h-4" />
+                                 </button>
+                              )}
+                              {isSuperAdmin && (
+                                 <div title="System Protected" className="p-1.5 text-gray-300">
+                                    <Lock className="w-4 h-4" />
+                                 </div>
+                              )}
+                              <button 
+                                title="Reset Password" 
+                                onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
+                                className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
+                              >
+                                <Key className="w-4 h-4" />
+                              </button>
+                              <button 
+                                title="Edit Member" 
+                                onClick={() => router.push(`/admin/settings/team/${s._id}`)}
+                                className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                           </div>
+                        </td>
+                     </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

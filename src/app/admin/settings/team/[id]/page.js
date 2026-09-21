@@ -32,14 +32,10 @@ export default function EditStaff() {
           fetch(`/api/admin/staff/${id}`),
         ]);
 
-        if (!rolesRes.ok || !staffRes.ok) {
-          throw new Error("Failed to fetch data");
-        }
+        const rolesData = rolesRes.ok ? await rolesRes.json().catch(() => []) : [];
+        const staffData = staffRes.ok ? await staffRes.json().catch(() => ({})) : {};
 
-        const rolesData = await rolesRes.json();
-        const staffData = await staffRes.json();
-
-        setRoles(rolesData);
+        setRoles(Array.isArray(rolesData) ? rolesData : []);
         setFormData({
           name: staffData.name || "",
           email: staffData.email || "",

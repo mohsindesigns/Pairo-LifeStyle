@@ -381,31 +381,26 @@ export default function PopupTab({ config, onChange }) {
             {/* Preview Box Simulation */}
             <div className="bg-neutral-900/80 p-4 sm:p-6 rounded-xl flex items-center justify-center min-h-[360px]">
               {hasAnyContent ? (
-                <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden border border-black/10 transition-all">
-                  {/* Top Image if present */}
+                <div className={`w-full ${hasBanner ? 'max-w-lg' : 'max-w-sm'} bg-white rounded-2xl shadow-2xl overflow-hidden border border-black/10 transition-all flex flex-col ${hasBanner ? 'sm:flex-row' : ''}`}>
+                  {/* Left Image if present */}
                   {hasBanner && (
-                    <div className="relative w-full aspect-[16/9] bg-neutral-100 overflow-hidden">
+                    <div className="relative w-full sm:w-[45%] shrink-0 bg-neutral-100 min-h-[160px] sm:min-h-0 sm:self-stretch overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={bannerUrl}
                         alt="Preview"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-center sm:absolute sm:inset-0"
                       />
-                      <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white/90">
-                        <X className="w-3.5 h-3.5" />
-                      </div>
                     </div>
                   )}
 
-                  <div className="p-6">
-                    {/* Close button if no banner */}
-                    {!hasBanner && (
-                      <div className="flex justify-end -mt-2 -mr-2 mb-2">
-                        <div className="w-7 h-7 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500">
-                          <X className="w-3.5 h-3.5" />
-                        </div>
+                  <div className="p-5 flex-1 min-w-0 flex flex-col justify-center relative">
+                    {/* Close button indicator */}
+                    <div className="flex justify-end -mt-1 -mr-1 mb-2">
+                      <div className="w-6 h-6 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500">
+                        <X className="w-3 h-3" />
                       </div>
-                    )}
+                    </div>
 
                     {/* Badge if present */}
                     {hasBadge && (
@@ -488,41 +483,30 @@ export default function PopupTab({ config, onChange }) {
           />
 
           {/* Dialog Container */}
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-black/10 overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
-            {/* Banner Image */}
+          <div className={`relative w-full ${hasBanner ? 'max-w-[720px]' : 'max-w-md'} bg-white rounded-2xl shadow-2xl border border-black/10 overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95 max-h-[90vh] flex flex-col ${hasBanner ? 'sm:flex-row' : ''}`}>
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setTestModalOpen(false)}
+              className="absolute top-3.5 right-3.5 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 sm:bg-black/10 hover:bg-black/20 text-neutral-800 transition-all cursor-pointer shadow-sm"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Banner Image — Left Column */}
             {hasBanner && (
-              <div className="relative w-full aspect-[16/9] bg-neutral-100 shrink-0">
+              <div className="relative w-full sm:w-[45%] shrink-0 bg-neutral-100 min-h-[200px] sm:min-h-0 sm:self-stretch overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={bannerUrl}
                   alt="Banner"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover object-center sm:absolute sm:inset-0"
                 />
-                <button
-                  type="button"
-                  onClick={() => setTestModalOpen(false)}
-                  className="absolute top-3.5 right-3.5 w-8 h-8 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md text-white transition-all cursor-pointer shadow-lg"
-                  aria-label="Close"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             )}
 
-            <div className="p-6 sm:p-8 overflow-y-auto">
-              {/* Close Button if no image */}
-              {!hasBanner && (
-                <div className="flex justify-end -mt-3 -mr-2 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => setTestModalOpen(false)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-600 transition-colors cursor-pointer"
-                    aria-label="Close"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+            <div className="p-6 sm:p-8 flex-1 min-w-0 overflow-y-auto flex flex-col justify-center">
 
               {/* Badge */}
               {hasBadge && (

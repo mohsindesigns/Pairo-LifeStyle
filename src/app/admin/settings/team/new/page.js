@@ -21,9 +21,17 @@ export default function InviteStaff() {
 
   useEffect(() => {
     const fetchRoles = async () => {
-      const res = await fetch("/api/admin/roles");
-      const data = await res.json();
-      if (res.ok) setRoles(data);
+      try {
+        const res = await fetch("/api/admin/roles");
+        if (res.ok) {
+          const data = await res.json();
+          setRoles(Array.isArray(data) ? data : []);
+        } else {
+          setRoles([]);
+        }
+      } catch {
+        setRoles([]);
+      }
     };
     fetchRoles();
   }, []);

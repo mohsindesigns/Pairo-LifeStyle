@@ -5,6 +5,7 @@ const CategorySchema = new mongoose.Schema({
   slug: { type: String, required: true },
   image: { type: String },
   banner: { type: String },
+  showBannerOverlay: { type: Boolean, default: false },
   description: { type: String }, // Short description
   content: { type: String }, // Full description
   status: { type: String, enum: ['Draft', 'Published'], default: 'Published' },

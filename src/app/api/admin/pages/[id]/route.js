@@ -17,7 +17,10 @@ export async function GET(req, { params }) {
 
     await dbConnect();
     try {
-        const page = await Page.findById(id).lean();
+        const mongoose = (await import("mongoose")).default;
+        const page = mongoose.isValidObjectId(id)
+            ? await Page.findById(id).lean()
+            : await Page.findOne({ slug: id }).lean();
         if (!page) return NextResponse.json({ error: "Page not found" }, { status: 404 });
         return NextResponse.json(page);
     } catch (error) {
@@ -34,12 +37,13 @@ export async function PUT(req, { params }) {
 
     await dbConnect();
     try {
+        const mongoose = (await import("mongoose")).default;
         const body = await req.json();
-        
+
         // --- PRODUCTION DATA VALIDATION ---
         if (!body.title || typeof body.title !== 'string') return NextResponse.json({ error: "Invalid Title" }, { status: 400 });
         if (!Array.isArray(body.sections)) return NextResponse.json({ error: "Sections must be an array" }, { status: 400 });
-        
+
         // Validate section structure
         for (const section of body.sections) {
             if (!section.id || !section.type) {
@@ -47,7 +51,9 @@ export async function PUT(req, { params }) {
             }
         }
 
-        const existing = await Page.findById(id);
+        const existing = mongoose.isValidObjectId(id)
+            ? await Page.findById(id)
+            : await Page.findOne({ slug: id });
         if (!existing) return NextResponse.json({ error: "Page not found" }, { status: 404 });
 
         // Enforce Template Immutability (locked template check)

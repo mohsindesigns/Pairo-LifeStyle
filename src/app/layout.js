@@ -111,7 +111,7 @@ export default async function RootLayout({ children }) {
     // Run remaining DB reads in parallel
     const [catsResult, pagesResult, blogsResult, prodsResult] = await Promise.allSettled([
       Category.find({ status: 'Published', isDeleted: { $in: [false, null] } })
-        .select('name slug image banner description content type faqs faqSchemaCustom showInFilters')
+        .select('name slug image banner showBannerOverlay description content type faqs faqSchemaCustom showInFilters')
         .sort({ name: 1 })
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),

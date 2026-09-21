@@ -212,7 +212,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
   const selectClass = "text-[12px] border border-[#c3c4c7] bg-white px-2 py-1.5 rounded-[2px] outline-none hover:border-[#8c8f94] transition-all cursor-pointer font-medium text-gray-700 h-[32px] flex items-center";
 
   return (
-    <div className="border-b border-[#c3c4c7] bg-[#f6f7f7] px-1.5 xs:px-3 py-2 sticky top-0 z-10 select-none max-w-full overflow-hidden">
+    <div className="bg-[#f6f7f7] px-1.5 xs:px-3 py-2 select-none max-w-full">
       <div className="flex flex-wrap items-center gap-1 xs:gap-1.5 tiptap-toolbar max-w-full min-w-0">
         {/* Block / Headings Type */}
         <select 
@@ -711,7 +711,7 @@ export default function TiptapEditor({ content, onChange }) {
     },
     editorProps: {
       attributes: {
-        class: 'focus:outline-none min-h-[450px] p-8 text-[15px] leading-[1.6] max-w-none font-sans bg-white text-gray-800',
+        class: 'focus:outline-none min-h-[450px] p-8 text-[15px] leading-[1.6] max-w-none font-sans bg-white text-gray-800 editorial-content-rich',
       },
       handleClick(view, pos, event) {
         const target = event.target;
@@ -863,27 +863,29 @@ export default function TiptapEditor({ content, onChange }) {
   };
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-inner overflow-hidden relative">
-      <MenuBar 
-        editor={editor} 
-        onInsertImage={() => handleOpenMedia(false)}
-        selectedImage={selectedImage}
-        onOpenImageEditor={() => {}}
-      />
-      
-      {/* Comprehensive Image Editing Panel */}
-      <ImageEditPanel 
-        selectedImage={selectedImage}
-        onUpdate={updateSelectedImage}
-        onReplace={() => handleOpenMedia(true)}
-        onRemove={handleRemoveImage}
-        onClose={() => setSelectedImage(null)}
-      />
+    <div className="bg-white border border-[#c3c4c7] shadow-inner relative">
+      <div className="sticky top-[44px] md:top-[32px] z-20 bg-[#f6f7f7] border-b border-[#c3c4c7] shadow-sm">
+        <MenuBar 
+          editor={editor} 
+          onInsertImage={() => handleOpenMedia(false)}
+          selectedImage={selectedImage}
+          onOpenImageEditor={() => {}}
+        />
+        
+        {/* Comprehensive Image Editing Panel */}
+        <ImageEditPanel 
+          selectedImage={selectedImage}
+          onUpdate={updateSelectedImage}
+          onReplace={() => handleOpenMedia(true)}
+          onRemove={handleRemoveImage}
+          onClose={() => setSelectedImage(null)}
+        />
+      </div>
 
       <div 
         ref={editorContainerRef} 
         onClick={handleWrapperClick}
-        className="tiptap-wrapper"
+        className="tiptap-wrapper editorial-content-rich"
       >
          <EditorContent editor={editor} />
       </div>
