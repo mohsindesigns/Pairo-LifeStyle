@@ -29,6 +29,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     content: "",
     image: "",
     banner: "",
+    showBannerOverlay: false,
     status: "Published",
     isFeatured: false,
     seo: { title: "", description: "", keywords: [], canonicalUrl: "", ogTitle: "", ogDescription: "", ogImage: "", noIndex: false, noFollow: false },
@@ -50,6 +51,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
           ...prev,
           ...cat,
           sizeChart: cat.sizeChart || "",
+          showBannerOverlay: Boolean(cat.showBannerOverlay),
           faqs: cat.faqs || [],
           faqSchemaCustom: cat.faqSchemaCustom || "",
           seo: { ...prev.seo, ...(cat.seo || {}) }
@@ -499,12 +501,26 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
 
             <div className="bg-white border border-[#c3c4c7] shadow-sm">
                <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Category Banner Image</div>
-               <div className="p-3">
+               <div className="p-3 space-y-3">
                   <MediaPicker 
                      value={formData.banner || ""} 
                      onChange={(url) => setFormData({...formData, banner: url})}
                      label="Set banner image"
                   />
+                  <div className="pt-2 border-t border-[#f0f0f1]">
+                     <label className="flex items-center gap-2 cursor-pointer text-[13px] text-gray-700 select-none">
+                        <input 
+                           type="checkbox" 
+                           checked={Boolean(formData.showBannerOverlay)} 
+                           onChange={(e) => setFormData({...formData, showBannerOverlay: e.target.checked})} 
+                           className="border border-[#8c8f94] rounded-[3px]"
+                        />
+                        <span>Show Banner Overlay Effect</span>
+                     </label>
+                     <p className="text-[11px] text-gray-400 mt-1 pl-5">
+                        If checked, displays the dark gradient overlay effect over the banner image.
+                     </p>
+                  </div>
                </div>
             </div>
          </div>

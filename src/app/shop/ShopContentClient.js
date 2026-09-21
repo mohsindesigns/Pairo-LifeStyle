@@ -808,12 +808,12 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/20" />
+              {currentDbCategory.showBannerOverlay && (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/20" />
+              )}
 
-              {/* Banner content — all 
-              
-              at bottom */}
-              <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 text-white z-10">
+              {/* Banner content — all at bottom */}
+              <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 text-white z-10 [text-shadow:_0_1px_6px_rgb(0_0_0_/_60%)]">
                 {/* Breadcrumbs — above category name */}
                 <div className="flex items-center gap-2 text-white/60 text-[9px] font-bold uppercase tracking-widest mb-3">
                   <Link href="/" className="hover:text-white transition-colors">Home</Link>
