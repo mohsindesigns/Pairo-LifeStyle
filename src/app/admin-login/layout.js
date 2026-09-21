@@ -1,7 +1,5 @@
-import AdminLayoutClient from "./AdminLayoutClient";
-
 export const metadata = {
-  title: "Admin Panel",
+  title: "Admin Login",
   robots: {
     index: false,
     follow: false,
@@ -17,6 +15,6 @@ export const metadata = {
   },
 };
 
-export default function AdminLayout({ children }) {
-  return <AdminLayoutClient>{children}</AdminLayoutClient>;
+export default function AdminLoginLayout({ children }) {
+  return children;
 }

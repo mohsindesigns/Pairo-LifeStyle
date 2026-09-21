@@ -102,6 +102,14 @@ export async function GET() {
       function addUrl(type, slug, lastmod = null, changefreq = "weekly", priority = 0.5) {
         if (slug === undefined || slug === null) return;
         const normalized = normalizeSitemapUrl(siteUrl, type, slug);
+        const lowerUrl = normalized.toLowerCase();
+        if (
+          lowerUrl.includes("/admin") ||
+          lowerUrl.includes("/admin-login") ||
+          lowerUrl.includes("/api/")
+        ) {
+          return;
+        }
         if (!urlMap.has(normalized)) {
           urlMap.set(normalized, {
             loc: normalized,
@@ -173,6 +181,8 @@ export async function GET() {
         if (
           cleanSlug &&
           !["home", "shop", "blog", "collections", "sitemap", "test", "temp"].includes(cleanSlug) &&
+          !cleanSlug.startsWith("admin") &&
+          !cleanSlug.includes("admin") &&
           !cleanSlug.includes("test") &&
           !cleanSlug.includes("temp")
         ) {

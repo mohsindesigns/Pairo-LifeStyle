@@ -28,6 +28,16 @@ function mapCartItem(item = {}) {
 export function trackGAEvent(eventName, params = {}) {
   if (typeof window === "undefined") return;
 
+  // Never track on admin, staff login, or internal admin routes
+  try {
+    const currentPath = window.location?.pathname || "";
+    if (currentPath.startsWith("/admin") || currentPath.startsWith("/admin-login")) {
+      return;
+    }
+  } catch (e) {
+    // ignore
+  }
+
   try {
     // Always push to the dataLayer in GA4 ecommerce format so Google Tag Manager can pick up,
     // transform, fix, enable/disable, and manage every event visually in its own UI — no code

@@ -17,9 +17,15 @@ export async function GET() {
 Disallow: /
 `;
   } else {
+    const adminDisallows = `Disallow: /admin
+Disallow: /admin/
+Disallow: /admin-login
+Disallow: /api/admin
+Disallow: /api/admin/`;
+
     robots = `User-agent: *
 Allow: /feed.xml
-Disallow: /admin
+${adminDisallows}
 Disallow: /feed
 Disallow: /cart
 Disallow: /orders
@@ -29,50 +35,69 @@ Disallow: /profile
 Disallow: /?*
 Disallow: /*?add-to-cart=
 
-User-agent: AhrefsBot
+User-agent: Googlebot
 Allow: /
-
-User-agent: GPTBot
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: ClaudeBot
-Allow: /
-
-User-agent: Claude-Web
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Perplexity-User
-Allow: /
+${adminDisallows}
 
 User-agent: Google-Extended
 Allow: /
+${adminDisallows}
 
 User-agent: GoogleOther
 Allow: /
+${adminDisallows}
+
+User-agent: AhrefsBot
+Allow: /
+${adminDisallows}
+
+User-agent: GPTBot
+Allow: /
+${adminDisallows}
+
+User-agent: ChatGPT-User
+Allow: /
+${adminDisallows}
+
+User-agent: OAI-SearchBot
+Allow: /
+${adminDisallows}
+
+User-agent: ClaudeBot
+Allow: /
+${adminDisallows}
+
+User-agent: Claude-Web
+Allow: /
+${adminDisallows}
+
+User-agent: PerplexityBot
+Allow: /
+${adminDisallows}
+
+User-agent: Perplexity-User
+Allow: /
+${adminDisallows}
 
 User-agent: Applebot
 Allow: /
+${adminDisallows}
 
 User-agent: Applebot-Extended
 Allow: /
+${adminDisallows}
 
 User-agent: Bytespider
 Allow: /
+${adminDisallows}
 
 User-agent: Meta-ExternalAgent
 Allow: /
+${adminDisallows}
 
 User-agent: Meta-ExternalFetcher
 Allow: /
+${adminDisallows}
 
 Sitemap: ${siteUrl}/sitemap.xml
 `;

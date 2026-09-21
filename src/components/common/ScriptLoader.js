@@ -1,5 +1,6 @@
 import React from "react";
 import Script from "next/script";
+import { headers } from "next/headers";
 import dbConnect from "@/lib/db";
 import ScriptModel from "@/models/Script";
 import SiteConfig from "@/models/SiteConfig";
@@ -69,6 +70,18 @@ const parseHtmlToReact = (html, keyPrefix) => {
 
 export default async function ScriptLoader({ location = "head" }) {
   try {
+    // 0. Disable all scripts completely on admin and admin-login routes
+    try {
+      const headerList = await headers();
+      const isAdmin = headerList.get("x-is-admin") === "true";
+      const pathname = headerList.get("x-pathname") || "";
+      if (isAdmin || pathname.startsWith("/admin") || pathname.startsWith("/admin-login")) {
+        return null;
+      }
+    } catch (e) {
+      // In case headers() is invoked in contexts where it's unavailable, safely continue
+    }
+
     await dbConnect();
     
     // 1. Check for Global Emergency Kill Switch
