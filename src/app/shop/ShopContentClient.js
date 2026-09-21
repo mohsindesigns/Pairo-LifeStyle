@@ -808,7 +808,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 />
               )}
-              {currentDbCategory.showBannerOverlay && (
+              {Boolean(currentDbCategory.showBannerOverlay) && (
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/20" />
               )}
 

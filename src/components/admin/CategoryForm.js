@@ -530,19 +530,38 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                      onChange={(url) => setFormData({...formData, banner: url})}
                      label="Set banner image"
                   />
-                  <div className="pt-2 border-t border-[#f0f0f1]">
-                     <label className="flex items-center gap-2 cursor-pointer text-[13px] text-gray-700 select-none">
-                        <input 
-                           type="checkbox" 
-                           checked={Boolean(formData.showBannerOverlay)} 
-                           onChange={(e) => setFormData({...formData, showBannerOverlay: e.target.checked})} 
-                           className="border border-[#8c8f94] rounded-[3px]"
-                        />
-                        <span>Show Banner Overlay Effect</span>
-                     </label>
-                     <p className="text-[11px] text-gray-400 mt-1 pl-5">
-                        If checked, displays the dark gradient overlay effect over the banner image.
-                     </p>
+                  <div className="pt-3 border-t border-[#f0f0f1] space-y-2">
+                     <div className="flex items-center justify-between gap-2">
+                        <span className="text-[12px] font-bold text-gray-700">Banner Overlay Effect</span>
+                        <button
+                           type="button"
+                           onClick={() => setFormData({ ...formData, showBannerOverlay: !formData.showBannerOverlay })}
+                           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              formData.showBannerOverlay ? 'bg-[#2271b1]' : 'bg-gray-300'
+                           }`}
+                           role="switch"
+                           aria-checked={Boolean(formData.showBannerOverlay)}
+                           title="Toggle banner overlay effect"
+                        >
+                           <span className="sr-only">Toggle banner overlay effect</span>
+                           <span
+                              aria-hidden="true"
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                 formData.showBannerOverlay ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                           />
+                        </button>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                           formData.showBannerOverlay ? 'bg-blue-50 text-[#2271b1] border border-blue-200' : 'bg-gray-100 text-gray-500 border border-gray-200'
+                        }`}>
+                           {formData.showBannerOverlay ? 'Overlay: ON' : 'Overlay: OFF'}
+                        </span>
+                        <span className="text-[11px] text-gray-400">
+                           {formData.showBannerOverlay ? 'Dark gradient overlay will show over banner' : 'No overlay applied on banner'}
+                        </span>
+                     </div>
                   </div>
                </div>
             </div>

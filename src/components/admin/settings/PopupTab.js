@@ -381,15 +381,15 @@ export default function PopupTab({ config, onChange }) {
             {/* Preview Box Simulation */}
             <div className="bg-neutral-900/80 p-4 sm:p-6 rounded-xl flex items-center justify-center min-h-[360px]">
               {hasAnyContent ? (
-                <div className={`w-full ${hasBanner ? 'max-w-lg' : 'max-w-sm'} bg-white rounded-2xl shadow-2xl overflow-hidden border border-black/10 transition-all flex flex-col ${hasBanner ? 'sm:flex-row' : ''}`}>
+                <div className={`w-full ${hasBanner ? 'max-w-lg' : 'max-w-sm'} bg-white rounded-2xl shadow-2xl overflow-hidden border border-black/10 transition-all flex ${hasBanner ? 'flex-row' : 'flex-col'}`}>
                   {/* Left Image if present */}
                   {hasBanner && (
-                    <div className="relative w-full sm:w-[45%] shrink-0 bg-neutral-100 min-h-[160px] sm:min-h-0 sm:self-stretch overflow-hidden">
+                    <div className="relative w-[40%] sm:w-[45%] shrink-0 bg-neutral-100 self-stretch overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={bannerUrl}
                         alt="Preview"
-                        className="w-full h-full object-cover object-center sm:absolute sm:inset-0"
+                        className="absolute inset-0 w-full h-full object-cover object-center"
                       />
                     </div>
                   )}
@@ -483,30 +483,30 @@ export default function PopupTab({ config, onChange }) {
           />
 
           {/* Dialog Container */}
-          <div className={`relative w-full ${hasBanner ? 'max-w-[720px]' : 'max-w-md'} bg-white rounded-2xl shadow-2xl border border-black/10 overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95 max-h-[90vh] flex flex-col ${hasBanner ? 'sm:flex-row' : ''}`}>
+          <div className={`relative w-full ${hasBanner ? 'max-w-[720px]' : 'max-w-md'} bg-white rounded-2xl shadow-2xl border border-black/10 overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95 max-h-[90vh] flex ${hasBanner ? 'flex-row' : 'flex-col'}`}>
             {/* Close Button */}
             <button
               type="button"
               onClick={() => setTestModalOpen(false)}
-              className="absolute top-3.5 right-3.5 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 sm:bg-black/10 hover:bg-black/20 text-neutral-800 transition-all cursor-pointer shadow-sm"
+              className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5 z-20 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-black/10 hover:bg-black/20 text-neutral-800 transition-all cursor-pointer shadow-sm"
               aria-label="Close"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
 
             {/* Banner Image — Left Column */}
             {hasBanner && (
-              <div className="relative w-full sm:w-[45%] shrink-0 bg-neutral-100 min-h-[200px] sm:min-h-0 sm:self-stretch overflow-hidden">
+              <div className="relative w-[36%] xs:w-[40%] sm:w-[45%] shrink-0 bg-neutral-100 self-stretch overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={bannerUrl}
                   alt="Banner"
-                  className="w-full h-full object-cover object-center sm:absolute sm:inset-0"
+                  className="absolute inset-0 w-full h-full object-cover object-center"
                 />
               </div>
             )}
 
-            <div className="p-6 sm:p-8 flex-1 min-w-0 overflow-y-auto flex flex-col justify-center">
+            <div className="p-4 xs:p-6 sm:p-8 flex-1 min-w-0 overflow-y-auto flex flex-col justify-center">
 
               {/* Badge */}
               {hasBadge && (

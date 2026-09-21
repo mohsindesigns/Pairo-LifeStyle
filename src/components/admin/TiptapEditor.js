@@ -136,10 +136,10 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
   const handleHeadingChange = (e) => {
     const val = e.target.value;
     if (val === 'p') {
-      editor.chain().focus().setParagraph().run();
+      editor.chain().focus().unsetFontSize().setParagraph().run();
     } else {
       const level = parseInt(val.replace('h', ''));
-      editor.chain().focus().toggleHeading({ level }).run();
+      editor.chain().focus().unsetFontSize().toggleHeading({ level }).run();
     }
   };
 
@@ -713,6 +713,26 @@ export default function TiptapEditor({ content, onChange }) {
       attributes: {
         class: 'focus:outline-none min-h-[450px] p-8 text-[15px] leading-[1.6] max-w-none font-sans bg-white text-gray-800 editorial-content-rich',
       },
+      transformPastedHTML(html) {
+        if (!html) return html;
+        // Clean out pasted Google Docs & Word inline font-size, font-family, and normal font-weights that break editor heading formatting
+        return html.replace(/style="([^"]*)"/gi, (match, styles) => {
+          const cleaned = styles
+            .split(';')
+            .map(s => s.trim())
+            .filter(s => {
+              if (!s) return false;
+              const lower = s.toLowerCase();
+              if (lower.startsWith('font-size:')) return false;
+              if (lower.startsWith('font-family:')) return false;
+              if (lower.startsWith('line-height:')) return false;
+              if (lower.replace(/\s+/g, '').includes('font-weight:400') || lower.replace(/\s+/g, '').includes('font-weight:normal')) return false;
+              return true;
+            })
+            .join('; ');
+          return cleaned ? `style="${cleaned}"` : '';
+        });
+      },
       handleClick(view, pos, event) {
         const target = event.target;
         if (target && target.tagName === 'IMG') {
@@ -864,7 +884,7 @@ export default function TiptapEditor({ content, onChange }) {
 
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-inner relative">
-      <div className="sticky top-[44px] md:top-[32px] z-20 bg-[#f6f7f7] border-b border-[#c3c4c7] shadow-sm">
+      <div className="tiptap-sticky-header bg-[#f6f7f7] border-b border-[#c3c4c7] shadow-sm">
         <MenuBar 
           editor={editor} 
           onInsertImage={() => handleOpenMedia(false)}
@@ -916,12 +936,12 @@ export default function TiptapEditor({ content, onChange }) {
         }
         .tiptap-wrapper .ProseMirror > * { margin-top: 0; margin-bottom: 1rem; }
         .tiptap-wrapper .ProseMirror > *:last-child { margin-bottom: 0; }
-        .tiptap-wrapper .ProseMirror h1 { font-size: 2rem; font-weight: 800; line-height: 1.2; margin-top: 2rem; color: #111; }
-        .tiptap-wrapper .ProseMirror h2 { font-size: 1.6rem; font-weight: 700; line-height: 1.3; margin-top: 1.75rem; color: #222; }
-        .tiptap-wrapper .ProseMirror h3 { font-size: 1.35rem; font-weight: 700; line-height: 1.3; margin-top: 1.5rem; color: #333; }
-        .tiptap-wrapper .ProseMirror h4 { font-size: 1.15rem; font-weight: 700; line-height: 1.4; margin-top: 1.25rem; color: #444; }
-        .tiptap-wrapper .ProseMirror h5 { font-size: 1rem; font-weight: 700; line-height: 1.4; margin-top: 1.25rem; color: #555; }
-        .tiptap-wrapper .ProseMirror h6 { font-size: 0.875rem; font-weight: 700; line-height: 1.4; margin-top: 1.25rem; color: #666; }
+        .tiptap-wrapper .ProseMirror h1, .tiptap-wrapper .ProseMirror h1 * { font-size: 2.1rem !important; font-weight: 800 !important; line-height: 1.25 !important; margin-top: 1.75rem; color: #111; }
+        .tiptap-wrapper .ProseMirror h2, .tiptap-wrapper .ProseMirror h2 * { font-size: 1.65rem !important; font-weight: 750 !important; line-height: 1.3 !important; margin-top: 1.5rem; color: #222; }
+        .tiptap-wrapper .ProseMirror h3, .tiptap-wrapper .ProseMirror h3 * { font-size: 1.35rem !important; font-weight: 700 !important; line-height: 1.35 !important; margin-top: 1.25rem; color: #333; }
+        .tiptap-wrapper .ProseMirror h4, .tiptap-wrapper .ProseMirror h4 * { font-size: 1.15rem !important; font-weight: 700 !important; line-height: 1.4 !important; margin-top: 1rem; color: #444; }
+        .tiptap-wrapper .ProseMirror h5, .tiptap-wrapper .ProseMirror h5 * { font-size: 1.02rem !important; font-weight: 650 !important; line-height: 1.4 !important; margin-top: 1rem; color: #555; }
+        .tiptap-wrapper .ProseMirror h6, .tiptap-wrapper .ProseMirror h6 * { font-size: 0.9rem !important; font-weight: 650 !important; line-height: 1.4 !important; margin-top: 0.75rem; color: #666; }
         .tiptap-wrapper .ProseMirror p { margin-bottom: 0.75rem; }
         .tiptap-wrapper .ProseMirror ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.75rem; }
         .tiptap-wrapper .ProseMirror ol { list-style-type: decimal; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.75rem; }

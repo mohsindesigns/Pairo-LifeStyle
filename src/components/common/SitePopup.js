@@ -191,7 +191,7 @@ export default function SitePopup() {
         className="fixed inset-0 z-[99991] flex items-center justify-center p-3 sm:p-4 pointer-events-none"
       >
         <div
-          className={`pointer-events-auto relative w-full ${bannerUrl ? 'max-w-[760px]' : 'max-w-[440px]'} bg-white rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-black/10 overflow-hidden flex flex-col ${bannerUrl ? 'sm:flex-row' : ''} max-h-[90vh]`}
+          className={`pointer-events-auto relative w-full ${bannerUrl ? 'max-w-[760px]' : 'max-w-[440px]'} bg-white rounded-2xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-black/10 overflow-hidden flex ${bannerUrl ? 'flex-row' : 'flex-col'} max-h-[90vh]`}
           style={{
             opacity: animating ? 1 : 0,
             transform: animating ? "scale(1) translateY(0)" : "scale(0.95) translateY(12px)",
@@ -202,30 +202,30 @@ export default function SitePopup() {
           <button
             type="button"
             onClick={dismiss}
-            className="absolute top-3.5 right-3.5 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-black/5 sm:bg-black/10 hover:bg-black/20 text-neutral-800 transition-all cursor-pointer shadow-sm"
+            className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5 z-20 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-black/10 hover:bg-black/20 text-neutral-800 transition-all cursor-pointer shadow-sm"
             aria-label="Close dialog"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
-          {/* Banner Image — left column on desktop */}
+          {/* Banner Image — left column */}
           {bannerUrl && (
-            <div className="relative w-full sm:w-[46%] shrink-0 bg-neutral-100 min-h-[200px] sm:min-h-0 sm:self-stretch overflow-hidden">
+            <div className="relative w-[36%] xs:w-[40%] sm:w-[46%] shrink-0 bg-neutral-100 self-stretch overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={bannerUrl}
                 alt={title || "Announcement"}
-                className="w-full h-full object-cover object-center sm:absolute sm:inset-0"
+                className="absolute inset-0 w-full h-full object-cover object-center"
               />
             </div>
           )}
 
           {/* Modal Content Body — right column */}
-          <div className="p-6 sm:p-8 md:p-10 overflow-y-auto overscroll-contain flex-1 min-w-0 flex flex-col justify-center">
+          <div className="p-4 xs:p-6 sm:p-8 md:p-10 overflow-y-auto overscroll-contain flex-1 min-w-0 flex flex-col justify-center">
             {/* Badge (Conditional) */}
             {badgeText && (
-              <div className="mb-3.5">
-                <span className="inline-block px-3 py-1 rounded-full bg-black text-white text-[10px] font-bold tracking-[0.2em] uppercase max-w-full truncate">
+              <div className="mb-2 sm:mb-3.5">
+                <span className="inline-block px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-black text-white text-[9px] sm:text-[10px] font-bold tracking-[0.15em] sm:tracking-[0.2em] uppercase max-w-full truncate">
                   {badgeText}
                 </span>
               </div>
@@ -235,7 +235,7 @@ export default function SitePopup() {
             {title && (
               <h2
                 id="site-popup-title"
-                className="text-xl sm:text-2xl font-bold uppercase tracking-tight text-neutral-900 mb-2.5 leading-tight break-words"
+                className="text-base xs:text-lg sm:text-2xl font-bold uppercase tracking-tight text-neutral-900 mb-1.5 sm:mb-2.5 leading-tight break-words"
               >
                 {title}
               </h2>
@@ -243,21 +243,21 @@ export default function SitePopup() {
 
             {/* Description (Conditional) */}
             {description && (
-              <p className="text-sm text-neutral-600 leading-relaxed mb-6 whitespace-pre-line break-words">
+              <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed mb-4 sm:mb-6 whitespace-pre-line break-words">
                 {description}
               </p>
             )}
 
             {/* Action Button (Conditional) */}
             {hasButton && (
-              <div className="space-y-3 pt-1">
+              <div className="space-y-2 sm:space-y-3 pt-1">
                 {isExternal ? (
                   <a
                     href={resolvedLink}
                     target={openInNewTab ? "_blank" : "_self"}
                     rel={openInNewTab ? "noopener noreferrer" : undefined}
                     onClick={dismiss}
-                    className="w-full h-12 bg-black text-white rounded-xl text-xs font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm px-4"
+                    className="w-full h-10 sm:h-12 bg-black text-white rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] hover:bg-neutral-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm px-3 sm:px-4"
                   >
                     <span className="truncate">{buttonLabel}</span>
                     <ArrowRight className="w-3.5 h-3.5 shrink-0" />
@@ -268,7 +268,7 @@ export default function SitePopup() {
                     target={openInNewTab ? "_blank" : "_self"}
                     rel={openInNewTab ? "noopener noreferrer" : undefined}
                     onClick={dismiss}
-                    className="w-full h-12 bg-black text-white rounded-xl text-xs font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm px-4"
+                    className="w-full h-10 sm:h-12 bg-black text-white rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] hover:bg-neutral-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm px-3 sm:px-4"
                   >
                     <span className="truncate">{buttonLabel}</span>
                     <ArrowRight className="w-3.5 h-3.5 shrink-0" />
@@ -278,7 +278,7 @@ export default function SitePopup() {
                 <button
                   type="button"
                   onClick={dismiss}
-                  className="w-full text-center text-xs text-neutral-400 hover:text-neutral-700 py-1 transition-colors cursor-pointer"
+                  className="w-full text-center text-[10px] sm:text-xs text-neutral-400 hover:text-neutral-700 py-1 transition-colors cursor-pointer"
                 >
                   Maybe later
                 </button>
