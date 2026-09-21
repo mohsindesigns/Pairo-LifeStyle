@@ -84,7 +84,7 @@ export default async function RootLayout({ children }) {
     headerConfig: { logoUrl: '', navItems: [], megaCategoryIds: [], topOffers: ["Welcome to Pairo Store"] },
     footerConfig: { logoUrl: '', newsletterHeading: 'Elite List', newsletterPlaceholder: 'JOIN THE LIST', footerCategoryIds: [], footerBlogIds: [], footerCustomLinks: [], footerCustomLinksHeading: 'Information' },
     socialLinks: [],
-    hero: { slides: [], labels: { viewCollection: "View Collection" } },
+    hero: { slides: [], badge: "", labels: { viewCollection: "View Collection" } },
     footer: { sections: [{}, { links: [] }] },
     categories: { items: [] },
     popup: { enabled: false },

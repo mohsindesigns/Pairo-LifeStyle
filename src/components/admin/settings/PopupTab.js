@@ -381,20 +381,20 @@ export default function PopupTab({ config, onChange }) {
             {/* Preview Box Simulation */}
             <div className="bg-neutral-900/80 p-4 sm:p-6 rounded-xl flex items-center justify-center min-h-[360px]">
               {hasAnyContent ? (
-                <div className={`w-full ${hasBanner ? 'max-w-lg' : 'max-w-sm'} bg-white rounded-2xl shadow-2xl overflow-hidden border border-black/10 transition-all flex ${hasBanner ? 'flex-row' : 'flex-col'}`}>
-                  {/* Left Image if present */}
+                <div className={`w-full ${hasBanner ? 'max-w-md' : 'max-w-xs'} bg-white rounded-2xl shadow-2xl overflow-hidden border border-black/10 transition-all flex flex-col`}>
+                  {/* Banner Image */}
                   {hasBanner && (
-                    <div className="relative w-[40%] sm:w-[45%] shrink-0 bg-neutral-100 self-stretch overflow-hidden">
+                    <div className="relative w-full h-36 shrink-0 bg-neutral-100 overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={bannerUrl}
                         alt="Preview"
-                        className="absolute inset-0 w-full h-full object-cover object-center"
+                        className="w-full h-full object-cover object-center"
                       />
                     </div>
                   )}
 
-                  <div className="p-5 flex-1 min-w-0 flex flex-col justify-center relative">
+                  <div className="p-4 flex-1 min-w-0 flex flex-col justify-between relative">
                     {/* Close button indicator */}
                     <div className="flex justify-end -mt-1 -mr-1 mb-2">
                       <div className="w-6 h-6 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500">
@@ -402,35 +402,37 @@ export default function PopupTab({ config, onChange }) {
                       </div>
                     </div>
 
-                    {/* Badge if present */}
-                    {hasBadge && (
-                      <div className="mb-3">
-                        <span className="inline-block px-2.5 py-1 rounded-full bg-black text-white text-[9px] font-bold tracking-[0.2em] uppercase max-w-full truncate">
-                          {badgeText}
-                        </span>
-                      </div>
-                    )}
+                    <div>
+                      {/* Badge if present */}
+                      {hasBadge && (
+                        <div className="mb-2">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full bg-black text-white text-[9px] font-bold tracking-[0.2em] uppercase max-w-full truncate">
+                            {badgeText}
+                          </span>
+                        </div>
+                      )}
 
-                    {/* Title if present */}
-                    {hasTitle && (
-                      <h3 className="text-lg sm:text-xl font-bold uppercase tracking-tight text-neutral-900 mb-2 leading-tight break-words">
-                        {title}
-                      </h3>
-                    )}
+                      {/* Title if present */}
+                      {hasTitle && (
+                        <h3 className="text-base font-bold uppercase tracking-tight text-neutral-900 mb-1.5 leading-tight break-words">
+                          {title}
+                        </h3>
+                      )}
 
-                    {/* Description if present */}
-                    {hasDesc && (
-                      <p className="text-xs text-neutral-600 leading-relaxed mb-5 whitespace-pre-line break-words">
-                        {description}
-                      </p>
-                    )}
+                      {/* Description if present */}
+                      {hasDesc && (
+                        <p className="text-xs text-neutral-600 leading-relaxed mb-4 whitespace-pre-line break-words line-clamp-4">
+                          {description}
+                        </p>
+                      )}
+                    </div>
 
                     {/* Button if present */}
                     {hasButton && (
-                      <div className="space-y-2">
-                        <div className="w-full h-11 bg-black text-white rounded-xl text-[11px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-sm px-3">
+                      <div className="space-y-1.5 pt-1 mt-auto">
+                        <div className="w-full h-10 bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-sm px-3">
                           <span className="truncate">{buttonLabel}</span>
-                          <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+                          <ArrowRight className="w-3 h-3 shrink-0" />
                         </div>
                         <p className="text-center text-[10px] text-neutral-400">
                           Maybe later
@@ -483,72 +485,74 @@ export default function PopupTab({ config, onChange }) {
           />
 
           {/* Dialog Container */}
-          <div className={`relative w-full ${hasBanner ? 'max-w-[720px]' : 'max-w-md'} bg-white rounded-2xl shadow-2xl border border-black/10 overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95 max-h-[90vh] flex ${hasBanner ? 'flex-row' : 'flex-col'}`}>
+          <div className={`relative w-full ${hasBanner ? 'max-w-[480px] md:max-w-[760px] md:h-[440px]' : 'max-w-[440px] md:h-[360px]'} bg-white rounded-2xl shadow-2xl border border-black/10 overflow-hidden transform transition-all duration-300 z-10 scale-100 animate-in zoom-in-95 max-h-[88vh] md:max-h-[460px] flex flex-col ${hasBanner ? 'md:flex-row' : ''}`}>
             {/* Close Button */}
             <button
               type="button"
               onClick={() => setTestModalOpen(false)}
-              className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5 z-20 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-black/10 hover:bg-black/20 text-neutral-800 transition-all cursor-pointer shadow-sm"
+              className="absolute top-3 right-3 z-30 w-8 h-8 flex items-center justify-center rounded-full bg-black/40 hover:bg-black/60 text-white md:bg-black/10 md:hover:bg-black/20 md:text-neutral-800 transition-all cursor-pointer shadow-sm"
               aria-label="Close"
             >
-              <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <X className="w-4 h-4" />
             </button>
 
-            {/* Banner Image — Left Column */}
+            {/* Banner Image — TOP on mobile, LEFT on desktop */}
             {hasBanner && (
-              <div className="relative w-[36%] xs:w-[40%] sm:w-[45%] shrink-0 bg-neutral-100 self-stretch overflow-hidden">
+              <div className="relative w-full h-44 sm:h-52 md:h-full md:w-[44%] lg:w-[46%] shrink-0 bg-neutral-100 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={bannerUrl}
                   alt="Banner"
-                  className="absolute inset-0 w-full h-full object-cover object-center"
+                  className="w-full h-full object-cover object-center"
                 />
               </div>
             )}
 
-            <div className="p-4 xs:p-6 sm:p-8 flex-1 min-w-0 overflow-y-auto flex flex-col justify-center">
+            {/* Modal Content Body — BOTTOM on mobile, RIGHT on desktop */}
+            <div className="p-5 sm:p-7 md:p-8 lg:p-9 flex-1 min-w-0 overflow-y-auto flex flex-col justify-between">
+              <div>
+                {/* Badge */}
+                {hasBadge && (
+                  <div className="mb-2 sm:mb-3">
+                    <span className="inline-block px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-black text-white text-[9px] sm:text-[10px] font-bold tracking-[0.15em] sm:tracking-[0.2em] uppercase max-w-full truncate">
+                      {badgeText}
+                    </span>
+                  </div>
+                )}
 
-              {/* Badge */}
-              {hasBadge && (
-                <div className="mb-3.5">
-                  <span className="inline-block px-3 py-1 rounded-full bg-black text-white text-[10px] font-bold tracking-[0.2em] uppercase max-w-full truncate">
-                    {badgeText}
-                  </span>
-                </div>
-              )}
+                {/* Title */}
+                {hasTitle && (
+                  <h2 className="text-base sm:text-xl md:text-2xl font-bold uppercase tracking-tight text-neutral-900 mb-2 leading-tight break-words">
+                    {title}
+                  </h2>
+                )}
 
-              {/* Title */}
-              {hasTitle && (
-                <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-tight text-neutral-900 mb-2.5 leading-tight break-words">
-                  {title}
-                </h2>
-              )}
-
-              {/* Description */}
-              {hasDesc && (
-                <p className="text-sm text-neutral-600 leading-relaxed mb-6 whitespace-pre-line break-words">
-                  {description}
-                </p>
-              )}
+                {/* Description */}
+                {hasDesc && (
+                  <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed mb-4 whitespace-pre-line break-words">
+                    {description}
+                  </p>
+                )}
+              </div>
 
               {/* Action Button */}
               {hasButton && (
-                <div className="space-y-3 pt-2">
+                <div className="space-y-2 pt-2 mt-auto">
                   <button
                     type="button"
                     onClick={() => {
                       setTestModalOpen(false);
                       toast.success(`Preview Action: would navigate to "${resolvedLink}"${popup.openInNewTab ? " in a new tab" : ""}`);
                     }}
-                    className="w-full h-12 bg-black text-white rounded-xl text-xs font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer px-4"
+                    className="w-full h-10 sm:h-11 md:h-12 bg-black text-white rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] sm:tracking-[0.2em] hover:bg-neutral-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer px-3 sm:px-4"
                   >
                     <span className="truncate">{buttonLabel}</span>
-                    <ArrowRight className="w-4 h-4 shrink-0" />
+                    <ArrowRight className="w-3.5 h-3.5 shrink-0" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setTestModalOpen(false)}
-                    className="w-full text-center text-xs text-neutral-400 hover:text-neutral-700 py-1 transition-colors cursor-pointer"
+                    className="w-full text-center text-[10px] sm:text-xs text-neutral-400 hover:text-neutral-700 py-0.5 transition-colors cursor-pointer"
                   >
                     Maybe later
                   </button>

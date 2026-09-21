@@ -3,7 +3,9 @@ export const SECTION_SCHEMAS = {
     name: "Hero Slider",
     icon: "Layout",
     fields: [
+      { name: "badge", label: "Hero Badge / Tagline (Default)", type: "text" },
       { name: "slides", label: "Slides", type: "repeater", fields: [
+        { name: "badge", label: "Slide Badge (e.g. Handcrafted Luxury)", type: "text" },
         { name: "title", label: "Title", type: "text" },
         { name: "subtitle", label: "Subtitle", type: "textarea" },
         { name: "image", label: "Image URL", type: "image" },
@@ -12,7 +14,7 @@ export const SECTION_SCHEMAS = {
         { name: "link", label: "Button Link", type: "text" }
       ]},
       { name: "brand", label: "Brand Settings", type: "group", fields: [
-        { name: "tagline", label: "Tagline", type: "text" }
+        { name: "tagline", label: "Tagline / Badge Fallback", type: "text" }
       ]},
       { name: "labels", label: "Labels", type: "group", fields: [
         { name: "viewCollection", label: "View Collection Label", type: "text" },

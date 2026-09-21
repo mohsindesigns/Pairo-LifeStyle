@@ -145,10 +145,12 @@ const SiteConfigSchema = new mongoose.Schema({
     links: [{ name: String, href: String, hasMegaMenu: Boolean }]
   },
   hero: {
-    slides: [{ id: Number, title: String, subtitle: String, image: String, buttonText: String, link: String }],
+    badge: { type: String, default: '' },
+    slides: [{ id: Number, badge: String, title: String, subtitle: String, image: String, mobileImage: String, buttonText: String, link: String }],
     labels: Object,
     stats: [{ value: String, label: String }],
-    brands: [String]
+    brands: [String],
+    marqueeItems: [String]
   },
   categories: {
     title: String,
