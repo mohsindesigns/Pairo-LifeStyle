@@ -20,13 +20,17 @@ export default function RoleManagement() {
   const fetchRoles = async () => {
     try {
       const res = await fetch("/api/admin/roles");
-      const data = await res.json();
       if (res.ok) {
-        setRoles(data);
-        if (data.length > 0 && !selectedRole) setSelectedRole(data[0]);
+        const data = await res.json();
+        const rolesList = Array.isArray(data) ? data : [];
+        setRoles(rolesList);
+        if (rolesList.length > 0 && !selectedRole) setSelectedRole(rolesList[0]);
+      } else {
+        setRoles([]);
       }
     } catch (err) {
       console.error(err);
+      setRoles([]);
     } finally {
       setLoading(false);
     }
@@ -200,7 +204,7 @@ export default function RoleManagement() {
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
                            <span className="font-bold text-[13px] text-[#1d2327] uppercase tracking-wide">{module}</span>
                            <span className="text-[11px] text-[#646970]">
-                             ({selectedRole.permissions[module]?.length || 0} / {actions.length} permissions)
+                             ({selectedRole?.permissions?.[module]?.length || 0} / {actions.length} permissions)
                            </span>
                         </div>
                         {expandedModules[module] ? <ChevronUp className="w-4 h-4 shrink-0 text-[#8c8f94]" /> : <ChevronDown className="w-4 h-4 shrink-0 text-[#8c8f94]" />}
@@ -209,7 +213,7 @@ export default function RoleManagement() {
                       {(expandedModules[module] || true) && (
                         <div className="p-3 sm:p-4 grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
                           {actions.map((action) => {
-                            const isChecked = selectedRole.permissions[module]?.includes(action);
+                            const isChecked = Boolean(selectedRole?.permissions?.[module]?.includes(action));
                             return (
                               <label 
                                 key={action} 

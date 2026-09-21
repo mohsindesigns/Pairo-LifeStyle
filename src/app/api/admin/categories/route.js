@@ -8,14 +8,24 @@ import { NextResponse } from "next/server";
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!can(session.user, "products.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+  
   const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
   const type = searchParams.get("type") || "product";
   const trash = searchParams.get("trash") === "true";
 
+  if (!can(session.user, "products.view") && !can(session.user, "blogs.view")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   await dbConnect();
   try {
+    if (id) {
+      const category = await Category.findById(id).lean();
+      if (!category) return NextResponse.json({ error: "Category not found" }, { status: 404 });
+      return NextResponse.json(category);
+    }
+
     const query = { isDeleted: trash };
     if (type === "product") {
        query.$or = [{ type: "product" }, { type: { $exists: false } }];

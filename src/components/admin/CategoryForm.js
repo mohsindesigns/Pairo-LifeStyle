@@ -43,23 +43,46 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
 
   const fetchCategory = async () => {
     try {
-      const res = await fetch(`/api/admin/categories?type=${type}`);
-      const data = await res.json();
-      const cat = data.find(c => c._id === categoryId);
-      if (cat) {
-        setFormData(prev => ({
-          ...prev,
-          ...cat,
-          sizeChart: cat.sizeChart || "",
-          showBannerOverlay: Boolean(cat.showBannerOverlay),
-          faqs: cat.faqs || [],
-          faqSchemaCustom: cat.faqSchemaCustom || "",
-          seo: { ...prev.seo, ...(cat.seo || {}) }
-        }));
-        return cat;
+      // 1. Try direct lookup by categoryId
+      const directRes = await fetch(`/api/admin/categories?id=${categoryId}`).catch(() => null);
+      if (directRes?.ok) {
+        const directCat = await directRes.json().catch(() => null);
+        if (directCat && directCat._id) {
+          setFormData(prev => ({
+            ...prev,
+            ...directCat,
+            sizeChart: directCat.sizeChart || "",
+            showBannerOverlay: Boolean(directCat.showBannerOverlay),
+            faqs: directCat.faqs || [],
+            faqSchemaCustom: directCat.faqSchemaCustom || "",
+            seo: { ...prev.seo, ...(directCat.seo || {}) }
+          }));
+          return directCat;
+        }
+      }
+
+      // 2. Fallback to collection list lookup
+      const res = await fetch(`/api/admin/categories?type=${type}`).catch(() => null);
+      if (res?.ok) {
+        const data = await res.json().catch(() => []);
+        if (Array.isArray(data)) {
+          const cat = data.find(c => String(c?._id) === String(categoryId));
+          if (cat) {
+            setFormData(prev => ({
+              ...prev,
+              ...cat,
+              sizeChart: cat.sizeChart || "",
+              showBannerOverlay: Boolean(cat.showBannerOverlay),
+              faqs: cat.faqs || [],
+              faqSchemaCustom: cat.faqSchemaCustom || "",
+              seo: { ...prev.seo, ...(cat.seo || {}) }
+            }));
+            return cat;
+          }
+        }
       }
     } catch (err) {
-      console.error(err);
+      console.error("fetchCategory error:", err);
     }
     return null;
   };
