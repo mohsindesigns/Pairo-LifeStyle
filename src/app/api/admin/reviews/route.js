@@ -28,6 +28,8 @@ export async function GET(req) {
     const rating = searchParams.get("rating");
     const productId = searchParams.get("productId");
     const search = searchParams.get("search");
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
 
     await dbConnect();
 
@@ -58,6 +60,15 @@ export async function GET(req) {
         { title: { $regex: search, $options: "i" } },
         { comment: { $regex: search, $options: "i" } }
       ];
+    }
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) {
+        query.createdAt.$gte = new Date(`${dateFrom}T00:00:00.000Z`);
+      }
+      if (dateTo) {
+        query.createdAt.$lte = new Date(`${dateTo}T23:59:59.999Z`);
+      }
     }
 
     const total = await Review.countDocuments(query);

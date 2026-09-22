@@ -165,7 +165,7 @@ export async function POST(req, { params }) {
     const { id: paramId } = resolvedParams;
 
     const session = await getServerSession(authOptions);
-    const { rating, title, comment, customerName, recommend, guestEmail, orderNumber, status: customStatus } = body;
+    const { rating, title, comment, customerName, recommend, guestEmail, orderNumber } = body;
 
     if (!rating || rating < 1 || rating > 5) {
       return NextResponse.json({ error: "Invalid rating value (must be between 1 and 5)" }, { status: 400 });
@@ -215,8 +215,8 @@ export async function POST(req, { params }) {
     const sanitizedTitle = maskProfanity(sanitizeText(title || ""));
     const sanitizedComment = maskProfanity(sanitizeText(comment || ""));
 
-    // 4. Review Creation (allows approved direct status or pending)
-    const reviewStatus = customStatus || (isSpam ? "Spam" : "Approved");
+    // 4. Review Creation - new reviews always require admin approval (never auto-approved)
+    const reviewStatus = isSpam ? "Spam" : "Pending";
 
     const review = await Review.create({
       tenantId: "DEFAULT_STORE",
@@ -235,16 +235,6 @@ export async function POST(req, { params }) {
       userAgent,
       spamScore
     });
-
-    // Automatically update product aggregated ratings if Approved
-    if (reviewStatus === "Approved") {
-      try {
-        const { aggregateProductRatings } = await import("@/lib/review-aggregator");
-        await aggregateProductRatings(product._id);
-      } catch (aggErr) {
-        console.error("Aggregation error:", aggErr);
-      }
-    }
 
     return NextResponse.json({
       success: true,
@@ -278,10 +268,18 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
 
-    // 1. Verify Ownership if customer
-    if (session && session.user.role !== "Admin") {
+    // 1. Verify Ownership - every request must prove it owns this review, session or not
+    if (session) {
       const isOwner = review.customerId?.toString() === session.user.id ||
         review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase();
+      if (!isOwner) {
+        return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
+      }
+    } else {
+      // Guest (unauthenticated) edit: only allowed on a review that was itself created
+      // as a guest review, and only by supplying the same email used to create it.
+      const providedEmail = guestEmail?.toLowerCase().trim();
+      const isOwner = !review.customerId && providedEmail && providedEmail === review.customerEmail?.toLowerCase();
       if (!isOwner) {
         return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
       }

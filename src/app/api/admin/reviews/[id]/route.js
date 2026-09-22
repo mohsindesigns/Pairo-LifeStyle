@@ -66,7 +66,7 @@ export async function PUT(req, { params }) {
     }
 
     const body = await req.json();
-    const { status, isFeatured, replyComment, restore, customerName, customerEmail, rating, title, comment } = body;
+    const { status, isFeatured, replyComment, restore, customerName, customerEmail, rating, title, comment, createdAt } = body;
 
     await dbConnect();
 
@@ -108,6 +108,13 @@ export async function PUT(req, { params }) {
     }
     if (comment !== undefined) {
       review.comment = comment;
+    }
+    if (createdAt !== undefined) {
+      const parsedDate = new Date(createdAt);
+      if (isNaN(parsedDate.getTime())) {
+        return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+      }
+      review.createdAt = parsedDate;
     }
 
     // Append/update admin reply

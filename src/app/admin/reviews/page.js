@@ -45,6 +45,8 @@ export default function AdminReviewsPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [ratingFilter, setRatingFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   
   // Selection for bulk actions
   const [selectedIds, setSelectedIds] = useState([]);
@@ -60,8 +62,18 @@ export default function AdminReviewsPage() {
     rating: 5,
     title: "",
     comment: "",
-    status: "Pending"
+    status: "Pending",
+    createdAt: ""
   });
+
+  // Format a date/datetime value for an <input type="datetime-local">
+  const toDatetimeLocal = (dateString) => {
+    if (!dateString) return "";
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
 
   // Fetch reviews list from API
   const fetchReviews = useCallback(async () => {
@@ -74,6 +86,8 @@ export default function AdminReviewsPage() {
       if (statusFilter) queryParams.set("status", statusFilter);
       if (ratingFilter) queryParams.set("rating", ratingFilter);
       if (searchQuery) queryParams.set("search", searchQuery);
+      if (dateFrom) queryParams.set("dateFrom", dateFrom);
+      if (dateTo) queryParams.set("dateTo", dateTo);
 
       const res = await fetch(`/api/admin/reviews?${queryParams.toString()}`);
       if (res.ok) {
@@ -92,7 +106,7 @@ export default function AdminReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, ratingFilter, searchQuery]);
+  }, [page, statusFilter, ratingFilter, searchQuery, dateFrom, dateTo]);
 
   useEffect(() => {
     fetchReviews();
@@ -273,7 +287,8 @@ export default function AdminReviewsPage() {
       rating: review.rating || 5,
       title: review.title || "",
       comment: review.comment || "",
-      status: review.status || "Pending"
+      status: review.status || "Pending",
+      createdAt: toDatetimeLocal(review.createdAt)
     });
   };
 
@@ -504,7 +519,7 @@ export default function AdminReviewsPage() {
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs font-bold text-gray-500">Filter:</span>
             <select
               value={ratingFilter}
@@ -518,6 +533,31 @@ export default function AdminReviewsPage() {
               <option value="2">2 Stars</option>
               <option value="1">1 Star</option>
             </select>
+
+            <span className="text-xs font-bold text-gray-500 ml-1">Date:</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+              max={dateTo || undefined}
+              className="text-xs border border-[#ccd0d4] bg-white px-2 py-1.5 outline-none text-[#2c3338] font-medium rounded-[3px] focus:border-[#2271b1]"
+            />
+            <span className="text-xs text-gray-400">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => { setDateTo(e.target.value); setPage(1); }}
+              min={dateFrom || undefined}
+              className="text-xs border border-[#ccd0d4] bg-white px-2 py-1.5 outline-none text-[#2c3338] font-medium rounded-[3px] focus:border-[#2271b1]"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
+                className="text-xs text-[#2271b1] hover:underline"
+              >
+                Clear dates
+              </button>
+            )}
           </div>
         </div>
 
@@ -592,7 +632,7 @@ export default function AdminReviewsPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Rating</label>
-                                    <select 
+                                    <select
                                       className="w-full border border-[#ccd0d4] bg-white text-xs p-1.5 outline-none rounded-[3px] focus:border-[#2271b1]"
                                       value={quickEditData.rating}
                                       onChange={e => setQuickEditData({ ...quickEditData, rating: parseInt(e.target.value) })}
@@ -606,7 +646,7 @@ export default function AdminReviewsPage() {
                                   </div>
                                   <div>
                                     <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Status</label>
-                                    <select 
+                                    <select
                                       className="w-full border border-[#ccd0d4] bg-white text-xs p-1.5 outline-none rounded-[3px] focus:border-[#2271b1]"
                                       value={quickEditData.status}
                                       onChange={e => setQuickEditData({ ...quickEditData, status: e.target.value })}
@@ -617,6 +657,15 @@ export default function AdminReviewsPage() {
                                       <option value="Spam">Spam</option>
                                     </select>
                                   </div>
+                                </div>
+                                <div>
+                                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Submitted On</label>
+                                  <input
+                                    type="datetime-local"
+                                    className={inputClass}
+                                    value={quickEditData.createdAt}
+                                    onChange={e => setQuickEditData({ ...quickEditData, createdAt: e.target.value })}
+                                  />
                                 </div>
                                 <div>
                                   <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Comment Content</label>
