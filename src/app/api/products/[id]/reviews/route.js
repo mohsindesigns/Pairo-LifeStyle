@@ -249,9 +249,17 @@ export async function POST(req, { params }) {
 export async function PUT(req, { params }) {
   try {
     const session = await getServerSession(authOptions);
+
+    // Editing a review requires being logged in as its owner. There is no reliable way to
+    // verify a guest's identity after the fact (the guest email at submission time is
+    // client-supplied and unverified), so guest-submitted reviews cannot be edited later.
+    if (!session) {
+      return NextResponse.json({ error: "You must be logged in to edit a review." }, { status: 401 });
+    }
+
     const rawBody = await req.json().catch(() => ({}));
     const body = sanitizeObject(rawBody);
-    const { reviewId, rating, title, comment, recommend, guestEmail, orderNumber } = body;
+    const { reviewId, rating, title, comment, recommend } = body;
 
     if (!reviewId || !mongoose.isValidObjectId(reviewId)) {
       return NextResponse.json({ error: "Invalid review ID" }, { status: 400 });
@@ -268,21 +276,11 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
 
-    // 1. Verify Ownership - every request must prove it owns this review, session or not
-    if (session) {
-      const isOwner = review.customerId?.toString() === session.user.id ||
-        review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase();
-      if (!isOwner) {
-        return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
-      }
-    } else {
-      // Guest (unauthenticated) edit: only allowed on a review that was itself created
-      // as a guest review, and only by supplying the same email used to create it.
-      const providedEmail = guestEmail?.toLowerCase().trim();
-      const isOwner = !review.customerId && providedEmail && providedEmail === review.customerEmail?.toLowerCase();
-      if (!isOwner) {
-        return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
-      }
+    // Verify ownership
+    const isOwner = review.customerId?.toString() === session.user.id ||
+      review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase();
+    if (!isOwner) {
+      return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
     }
 
     // 2. Profanity Masking & Sanitization

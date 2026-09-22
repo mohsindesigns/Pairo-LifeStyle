@@ -298,10 +298,23 @@ export default function AdminReviewsPage() {
       return;
     }
     try {
+      // The <input type="datetime-local"> value has no timezone attached; resolve it against
+      // the browser's own local time here so the server (which may run in a different timezone)
+      // doesn't reinterpret the same wall-clock string as a different instant.
+      const payload = { ...quickEditData };
+      if (payload.createdAt) {
+        const parsed = new Date(payload.createdAt);
+        if (isNaN(parsed.getTime())) {
+          toast.error("Invalid submitted-on date");
+          return;
+        }
+        payload.createdAt = parsed.toISOString();
+      }
+
       const res = await fetch(`/api/admin/reviews/${reviewId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(quickEditData)
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {

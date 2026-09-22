@@ -81,9 +81,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
     rating: 5,
     title: "",
     comment: "",
-    recommend: true,
-    guestEmail: "",
-    orderNumber: ""
+    recommend: true
   });
 
   // Mock File Upload State
@@ -202,11 +200,6 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
         comment: editFormData.comment,
         recommend: editFormData.recommend
       };
-
-      if (!session) {
-        submitBody.guestEmail = editFormData.guestEmail;
-        submitBody.orderNumber = editFormData.orderNumber;
-      }
 
       const res = await fetch(`/api/products/${productId}/reviews`, {
         method: "PUT",
@@ -365,9 +358,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
       rating: review.rating,
       title: review.title || "",
       comment: review.comment || "",
-      recommend: review.recommend,
-      guestEmail: "",
-      orderNumber: ""
+      recommend: review.recommend
     });
     setIsEditOpen(true);
   };
@@ -696,46 +687,6 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                   </div>
                 </div>
 
-                {/* Verification fields for guests */}
-                {!session && (
-                  <div className="bg-neutral-50 border border-neutral-200/60 p-4 rounded-xl space-y-4">
-                    <div className="flex items-start gap-2.5 text-neutral-500 text-xs">
-                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <p className="leading-relaxed">
-                        <strong>Verify Purchase Info:</strong> Provide your checkout details to modify this review.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                          Checkout Email
-                        </label>
-                        <input
-                          required
-                          type="email"
-                          placeholder="e.g. name@domain.com"
-                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
-                          value={editFormData.guestEmail}
-                          onChange={e => setEditFormData(prev => ({ ...prev, guestEmail: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                          Order Number
-                        </label>
-                        <input
-                          required
-                          type="text"
-                          placeholder="e.g. PO-89021"
-                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
-                          value={editFormData.orderNumber}
-                          onChange={e => setEditFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* Review title */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
@@ -1005,8 +956,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {/* Customer editing option if they are owners (30 day check is enforced on server) */}
-                    {(isOwner || !session) && (
+                    {/* Customer editing option - only the owning logged-in customer can edit */}
+                    {isOwner && (
                       <button
                         onClick={() => handleOpenEdit(review)}
                         className="flex items-center gap-1 text-[10px] text-[#6F655B]/60 hover:text-[#1E1B19] font-medium uppercase tracking-wider"
@@ -1015,8 +966,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                         Edit Review
                       </button>
                     )}
-                    
-                    {(isOwner || !session) && <span className="text-neutral-250 text-xs">|</span>}
+
+                    {isOwner && <span className="text-neutral-250 text-xs">|</span>}
 
                     <button
                       onClick={() => handleReport(review._id)}
