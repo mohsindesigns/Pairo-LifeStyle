@@ -29,6 +29,7 @@ const ReviewSchema = new mongoose.Schema({
   voters: [{ type: String }], // IP + UserAgent hashes to prevent duplicate voting
   reported: { type: Boolean, default: false, index: true },
   reportsCount: { type: Number, default: 0 },
+  reporters: [{ type: String }], // IP + UserAgent hashes to prevent duplicate reporting
   replies: [ReplySchema],
   isFeatured: { type: Boolean, default: false, index: true },
   media: [{
