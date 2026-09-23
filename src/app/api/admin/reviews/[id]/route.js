@@ -114,7 +114,9 @@ export async function PUT(req, { params }) {
       if (isNaN(parsedDate.getTime())) {
         return NextResponse.json({ error: "Invalid date" }, { status: 400 });
       }
-      review.createdAt = parsedDate;
+      // Mongoose's auto-generated `createdAt` (from timestamps: true) is immutable by default -
+      // a plain assignment is silently dropped on save. overwriteImmutable explicitly allows it.
+      review.$set("createdAt", parsedDate, undefined, { overwriteImmutable: true });
     }
 
     // Append/update admin reply
