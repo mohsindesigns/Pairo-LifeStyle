@@ -56,6 +56,21 @@ const STRIPE_APPEARANCE = {
   }
 };
 
+// Synthetic shipping selection used only when the order total is fully discounted to $0 —
+// module-level so it's a stable reference across renders (avoids re-triggering the
+// selection effect on every render the way an inline object literal would).
+const FREE_ORDER_SHIPPING = {
+  methodId: "free-order",
+  methodName: "Free Shipping",
+  cost: 0,
+  provider: "free",
+  zoneId: null,
+  zoneName: null,
+  currency: "USD",
+  settings: null,
+  conditions: null,
+};
+
 function getReferralCode() {
   try {
     const cookieMatch = document.cookie.match(/(^|;)\s*pairo_ref\s*=\s*([^;]+)/);
@@ -250,6 +265,23 @@ export default function CheckoutPage() {
   const [loadingRates, setLoadingRates] = useState(false);
   const [shippingRatesFetched, setShippingRatesFetched] = useState(false);
 
+  // A 100%-off coupon (or affiliate discount) can bring the pre-shipping amount to $0 —
+  // in that case shipping is free and there's nothing to pay by card, so the checkout UI
+  // switches to a simplified "no payment required" flow instead of the normal Stripe/COD choice.
+  const isFreeOrder = Math.max(0, (cartSubtotal || 0) - (discountTotal || 0) - (affiliateDiscountAmount || 0)) <= 0;
+
+  // Force the free-shipping selection while the order is $0, and release it back to a real
+  // rate selection once it no longer is (e.g. the coupon is removed).
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      if (isFreeOrder) {
+        setSelectedShipping(FREE_ORDER_SHIPPING);
+      } else if (selectedShipping?.methodId === FREE_ORDER_SHIPPING.methodId) {
+        setSelectedShipping(null);
+      }
+    });
+  }, [isFreeOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     // Generate unique key for this session to prevent double-orders
     Promise.resolve().then(() => {
@@ -438,11 +470,13 @@ export default function CheckoutPage() {
     finally { setLoadingRates(false); }
   }, [formData.country, formData.state, formData.city, formData.zip, cartSubtotal, cartItems, selectedShipping, setSelectedShipping]);
 
-  // Debounce: fetch rates when address changes
+  // Debounce: fetch rates when address changes (skipped once the order is free — there's
+  // nothing to rate-shop for, shipping is forced free either way).
   useEffect(() => {
+    if (isFreeOrder) return;
     const t = setTimeout(fetchRates, 600);
     return () => clearTimeout(t);
-  }, [fetchRates]);
+  }, [fetchRates, isFreeOrder]);
 
   // Debounced email-change promo code validation
   useEffect(() => {
@@ -608,6 +642,7 @@ export default function CheckoutPage() {
     items: cartItems,
     idempotencyKey,
           turnstileToken,
+    expectedFree: isFreeOrder,
     customerEmail: formData.email,
     customerNote: formData.customerNote,
     shippingAddress: {
@@ -671,9 +706,10 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  // Debounce: (re)create the PaymentIntent when priced inputs change
+  // Debounce: (re)create the PaymentIntent when priced inputs change. Never called for a
+  // free ($0) order — Stripe can't create a $0 PaymentIntent, and there's nothing to pay.
   useEffect(() => {
-    if (paymentMethod !== "card") return;
+    if (paymentMethod !== "card" || isFreeOrder) return;
     if (!idempotencyKey || !cartItems || cartItems.length === 0) return;
 
     Promise.resolve().then(() => {
@@ -685,7 +721,7 @@ export default function CheckoutPage() {
       fetchClientSecret(buildCheckoutPayloadRef.current());
     }, 600);
     return () => clearTimeout(t);
-  }, [paymentMethod, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret]);
+  }, [paymentMethod, isFreeOrder, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret]);
 
   const handlePayment = async () => {
     if (!validateForm()) return;
@@ -693,7 +729,7 @@ export default function CheckoutPage() {
     // GA4 Event: add_payment_info — the shopper submitted the order with payment details.
     if (!hasFiredPayment.current) {
       hasFiredPayment.current = true;
-      trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, paymentMethod === "cod" ? "Cash on Delivery" : "Card");
+      trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, isFreeOrder ? "Free" : (paymentMethod === "cod" ? "Cash on Delivery" : "Card"));
     }
 
     setIsProcessing(true);
@@ -1089,6 +1125,13 @@ export default function CheckoutPage() {
             {/* 3. Shipping Method */}
             <section className="space-y-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-black">Shipping Method</h2>
+              {isFreeOrder ? (
+                <div className="border border-neutral-200 rounded-[4px] bg-white p-4 flex items-center justify-between">
+                  <p className="text-[13px] font-semibold text-black">Free Shipping</p>
+                  <span className="text-[13px] font-bold text-black font-mono">Free</span>
+                </div>
+              ) : (
+                <>
               {loadingRates && (
                 <div className="flex items-center gap-2 py-3 text-xs text-neutral-500">
                   <Loader2 className="w-4 h-4 animate-spin text-black" />
@@ -1126,11 +1169,20 @@ export default function CheckoutPage() {
                   ))}
                 </div>
               )}
+                </>
+              )}
             </section>
 
             {/* 4. Payment Method */}
             <section className="space-y-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-black">Payment</h2>
+              {isFreeOrder ? (
+                <div className="border border-green-200 bg-green-50 rounded-[4px] p-4">
+                  <p className="text-[13px] font-bold text-green-800">No payment required</p>
+                  <p className="text-[11px] text-green-700 mt-0.5">Your order total is $0 — nothing to charge.</p>
+                </div>
+              ) : (
+                <>
               <div className="border border-neutral-200 rounded-[4px] divide-y divide-neutral-200 overflow-hidden bg-white">
                 {cardMethodEnabled && (
                   <label
@@ -1172,15 +1224,6 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Security check — required before either payment method can submit */}
-              <div className="pt-4">
-                <TurnstileWidget
-                  ref={turnstileRef}
-                  onVerify={(token) => setTurnstileToken(token)}
-                  onExpire={() => setTurnstileToken("")}
-                />
-              </div>
-
               {paymentMethod === "card" && (
                 <div className="pt-1">
                   {loadingClientSecret && !clientSecret && (
@@ -1213,10 +1256,21 @@ export default function CheckoutPage() {
                   )}
                 </div>
               )}
+                </>
+              )}
+
+              {/* Security check — required before any payment method (including a free order) can submit */}
+              <div className="pt-4">
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken("")}
+                />
+              </div>
             </section>
 
-            {/* Submit Action (Cash on Delivery only — Card has its own submit button above) */}
-            {paymentMethod === "cod" && (
+            {/* Submit Action (Cash on Delivery / free order only — Card has its own submit button above) */}
+            {(isFreeOrder || paymentMethod === "cod") && (
               <div className="space-y-4">
                 <button
                   type="button"

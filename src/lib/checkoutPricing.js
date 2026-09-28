@@ -304,9 +304,17 @@ export async function computeAuthoritativeCheckout({
     }
   }
 
-  const authoritativeShippingCost = await resolveAuthoritativeShippingCost({
-    tenantId, shippingAddress, shippingSnapshot, subtotal: authoritativeSubtotal, items, mongoSession,
-  });
+  // A fully-discounted cart (e.g. a 100%-off coupon) has nothing left to ship-charge for —
+  // force free shipping instead of validating the client's shippingSnapshot against real
+  // rates, since there may be no rate the client could have legitimately selected (or the
+  // client sent none at all) once the order is already $0 before shipping.
+  const preShippingAmount = Math.max(0, authoritativeSubtotal - finalDiscountTotal - affiliateDiscountAmount);
+
+  const authoritativeShippingCost = preShippingAmount === 0
+    ? 0
+    : await resolveAuthoritativeShippingCost({
+        tenantId, shippingAddress, shippingSnapshot, subtotal: authoritativeSubtotal, items, mongoSession,
+      });
 
   // Tax is not yet wired into checkout by design (see admin Tax Settings / TaxService) —
   // forced to 0 here rather than trusting a client-submitted financials.tax value.

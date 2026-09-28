@@ -41,6 +41,22 @@ async function ensureOrderCounter(tenantId) {
   }
 }
 
+/**
+ * Atomic, race-safe order number generation, shared by customer checkout and
+ * admin-created orders so numbering stays single-sourced. Two concurrent
+ * callers $inc the same counter doc, which produces a WriteConflict (retried
+ * by the caller's transaction) rather than duplicate order numbers.
+ */
+export async function getNextOrderNumber(tenantId, mongoSession = null) {
+  await ensureOrderCounter(tenantId);
+  const bumped = await Counter.findByIdAndUpdate(
+    `order:${tenantId}`,
+    { $inc: { seq: 1 } },
+    { session: mongoSession, new: true, upsert: true }
+  );
+  return `PAI-${bumped.seq}`;
+}
+
 export async function createOrderFromCheckoutPayload(payload, {
   tenantId,
   orderUserId = null,
@@ -50,7 +66,7 @@ export async function createOrderFromCheckoutPayload(payload, {
   paymentInfo = null,
   clientUserAgent = null,
 } = {}) {
-  const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode } = payload;
+  const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode, expectedFree } = payload;
 
   await dbConnect();
   await ensureOrderCounter(tenantId);
@@ -135,25 +151,33 @@ export async function createOrderFromCheckoutPayload(payload, {
         });
       }
 
-      // Atomic, race-safe order number. Two concurrent checkouts $inc the same counter doc,
-      // which produces a WriteConflict (retried by withTransaction / the checkout route's
-      // retry loop) rather than the duplicate order numbers that countDocuments+1 allowed.
-      const bumped = await Counter.findByIdAndUpdate(
-        `order:${tenantId}`,
-        { $inc: { seq: 1 } },
-        { session: mongoSession, new: true, upsert: true }
-      );
-      const orderNumber = `PAI-${bumped.seq}`;
+      // The checkout UI hides all payment methods and shows "no payment required" when it
+      // believes the order is free. If the server's authoritative total disagrees (a promo/
+      // affiliate discount resolved differently between the client's estimate and the real
+      // DB-backed calculation), fail loudly instead of silently falling through to an unpaid
+      // Cash on Delivery order the customer was never shown or asked to consent to.
+      if (expectedFree && authoritativeTotal > 0 && !paymentInfo) {
+        throw new Error("Your order total has changed and is no longer $0. Please review your order and select a payment method.");
+      }
+
+      const orderNumber = await getNextOrderNumber(tenantId, mongoSession);
 
       // Shipping cost is no longer taken from the client at all — computeAuthoritativeCheckout
       // above already re-derived it from the real ShippingZone/ShippingMethod config and threw
       // if the selected method wasn't actually available, so there's nothing further to verify here.
 
-      const isPaid = paymentInfo?.status === 'Paid';
+      // A fully-discounted (100%-off coupon) order has nothing to collect — auto-confirm it as
+      // Paid instead of leaving it "Pending" forever waiting for a COD cash payment that will
+      // never happen. Only applies to the no-payment (COD-style) path; the card path already
+      // passes its own paymentInfo when Stripe actually confirms a charge.
+      const isFreeOrder = authoritativeTotal === 0 && !paymentInfo;
+      const isPaid = paymentInfo?.status === 'Paid' || isFreeOrder;
       const initialStatus = isPaid ? 'Confirmed' : 'Pending';
-      const initialMessage = isPaid
-        ? 'Payment confirmed via Card. Order is being processed.'
-        : 'Order placed successfully. Pending confirmation.';
+      const initialMessage = isFreeOrder
+        ? 'Order total is $0 (fully discounted) — no payment required.'
+        : isPaid
+          ? 'Payment confirmed via Card. Order is being processed.'
+          : 'Order placed successfully. Pending confirmation.';
 
       const orderDoc = {
         tenantId,
@@ -202,6 +226,8 @@ export async function createOrderFromCheckoutPayload(payload, {
           receiptUrl: paymentInfo.receiptUrl || null,
           paidAt: paymentInfo.paidAt || null,
         };
+      } else if (isFreeOrder) {
+        orderDoc.payment = { method: 'Cash on Delivery', status: 'Paid', paidAt: new Date() };
       }
 
       const [newOrder] = await Order.create([orderDoc], { session: mongoSession });
@@ -273,7 +299,10 @@ export async function createOrderFromCheckoutPayload(payload, {
 
       checkoutResult = newOrder;
 
-      if (affiliateId && activeAffiliate) {
+      // A fully-discounted order generated $0 in revenue — paying the affiliate a commission
+      // computed off the pre-discount subtotal would be a straight payout on a sale that
+      // never happened.
+      if (affiliateId && activeAffiliate && authoritativeTotal > 0) {
         await CommissionEngine.calculateCommission(checkoutResult, activeAffiliate, mongoSession);
       }
     });
