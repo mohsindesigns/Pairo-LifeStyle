@@ -11,7 +11,7 @@ export async function GET() {
     await dbConnect();
 
     const items = await SizeChartItem
-      .find({ enabled: true, tenantId: "DEFAULT_STORE" })
+      .find({ enabled: true })
       .sort({ order: 1, createdAt: -1 })
       .lean();
 

@@ -8,7 +8,6 @@ const ReplySchema = new mongoose.Schema({
 });
 
 const ReviewSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: "DEFAULT_STORE", index: true },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true, index: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", index: true },
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true, index: true },

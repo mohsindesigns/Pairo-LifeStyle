@@ -82,8 +82,7 @@ export default async function BlogArchive() {
   const [dbBlogs, page] = await Promise.all([
     Blog.find({
       status: "Published",
-      isDeleted: { $ne: true },
-      tenantId: "DEFAULT_STORE"
+      isDeleted: { $ne: true }
     }).sort({ publishedAt: -1, createdAt: -1 }).lean(),
     Page.findOne({ slug: "blog", status: "Published" }).lean()
   ]);

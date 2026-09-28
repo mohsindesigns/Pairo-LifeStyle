@@ -8,8 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 async function handlePaymentFailed(paymentIntent, log) {
-  const tenantId = paymentIntent.metadata?.tenantId || "DEFAULT_STORE";
-  log.warn({ paymentIntentId: paymentIntent.id, tenantId, error: paymentIntent.last_payment_error?.message }, "PaymentIntent failed");
+  log.warn({ paymentIntentId: paymentIntent.id, error: paymentIntent.last_payment_error?.message }, "PaymentIntent failed");
 }
 
 export async function POST(req) {

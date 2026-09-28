@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 const ProductSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
   // Core Info
   name: { type: String, required: true },
   slug: { type: String, index: true },
@@ -150,9 +149,9 @@ const ProductSchema = new mongoose.Schema({
   sizeChart: { type: mongoose.Schema.Types.ObjectId, ref: 'SizeChart', default: null }
 }, { timestamps: true });
 
-// Ensure unique slugs per tenant
-ProductSchema.index({ tenantId: 1, slug: 1 }, { unique: true, sparse: true });
-ProductSchema.index({ tenantId: 1, status: 1, isDeleted: 1, createdAt: -1 });
+// Ensure unique slugs
+ProductSchema.index({ slug: 1 }, { unique: true, sparse: true });
+ProductSchema.index({ status: 1, isDeleted: 1, createdAt: -1 });
 
 delete mongoose.models.Product;
 export default mongoose.models.Product || mongoose.model('Product', ProductSchema);

@@ -67,7 +67,7 @@ export default function AdminTrash() {
       
       if (type === "product") {
         url = "/api/admin/products";
-        payload = { id, isDeleted: false, status: 'Draft', tenantId: "DEFAULT_STORE" };
+        payload = { id, isDeleted: false, status: 'Draft' };
       } else if (type === "category") {
         url = "/api/admin/categories";
         payload = { id, isDeleted: false };

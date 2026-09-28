@@ -12,6 +12,7 @@ import ProductMainSection from "@/components/product/ProductMainSection";
 import ProductProcessSection from "@/components/product/ProductProcessSection";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
+import { sanitizeRichHtml } from "@/lib/sanitize";
 import Review from "@/models/Review";
 import mongoose from "mongoose";
 import { permanentRedirect, notFound } from "next/navigation";
@@ -228,7 +229,7 @@ export default async function ProductDetailPage({ params, searchParams }) {
                 {product.name} <br />
                 <span className="text-primary/30 font-normal">Masterpiece Narrative</span>
               </p>
-              <div className="text-sm md:text-base text-primary/70 leading-relaxed font-normal" dangerouslySetInnerHTML={{ __html: product.narrative.content.replace(/\n/g, '<br/>') }} />
+              <div className="text-sm md:text-base text-primary/70 leading-relaxed font-normal" dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(product.narrative.content).replace(/\n/g, '<br/>') }} />
             </div>
           </div>
         )}

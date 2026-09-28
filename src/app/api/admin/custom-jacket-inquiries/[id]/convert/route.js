@@ -29,13 +29,11 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "This inquiry has already been converted to an order" }, { status: 409 });
     }
 
-    const tenantId = inquiry.tenantId || "DEFAULT_STORE";
-    const count = await Order.countDocuments({ tenantId });
+    const count = await Order.countDocuments();
     const orderNumber = `PAI-${1000 + count + 1}`;
     const idempotencyKey = `custom-jacket-${crypto.randomUUID()}`;
 
     const order = await Order.create({
-      tenantId,
       orderNumber,
       status: "Pending",
       items: [

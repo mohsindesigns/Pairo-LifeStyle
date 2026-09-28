@@ -9,7 +9,7 @@ async function fix() {
   await dbConnect();
   
   // Fix Products Stock
-  const products = await Product.find({ tenantId: 'root' });
+  const products = await Product.find({});
   let fixedCount = 0;
   for (const p of products) {
     let stock = p.stock || 0;
@@ -35,7 +35,7 @@ async function fix() {
   const categories = await Category.find({ type: 'product' });
   let catFixedCount = 0;
   for (const c of categories) {
-    const count = await Product.countDocuments({ tenantId: 'root', categories: c._id });
+    const count = await Product.countDocuments({ categories: c._id });
     c.productCount = count;
     await c.save();
     catFixedCount++;

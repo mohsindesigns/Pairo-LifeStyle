@@ -19,7 +19,6 @@ const ShippingConditionSchema = new mongoose.Schema({
 
 // ─── Shipping Method Schema ────────────────────────────────────────────────────
 const ShippingMethodSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
   zoneId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ShippingZone', required: true, index: true },
 
   name:        { type: String, required: true, trim: true },
@@ -53,7 +52,7 @@ const ShippingMethodSchema = new mongoose.Schema({
 
 // Compound index: load active methods for a zone in display order
 ShippingMethodSchema.index({ zoneId: 1, status: 1, sortOrder: 1 });
-ShippingMethodSchema.index({ tenantId: 1, provider: 1 });
+ShippingMethodSchema.index({ provider: 1 });
 
 delete mongoose.models.ShippingMethod;
 export default mongoose.model('ShippingMethod', ShippingMethodSchema);

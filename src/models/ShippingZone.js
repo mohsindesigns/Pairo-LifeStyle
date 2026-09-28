@@ -14,8 +14,6 @@ const MatchRuleSchema = new mongoose.Schema({
 
 // ─── Shipping Zone Schema ──────────────────────────────────────────────────────
 const ShippingZoneSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
-
   name:        { type: String, required: true, trim: true },
   description: { type: String, default: '' },
 
@@ -33,9 +31,9 @@ const ShippingZoneSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Compound index: active zone query sorted by priority (highest first)
-ShippingZoneSchema.index({ tenantId: 1, status: 1, priority: -1 });
+ShippingZoneSchema.index({ status: 1, priority: -1 });
 // Index for UI listing sorted by display order
-ShippingZoneSchema.index({ tenantId: 1, sortOrder: 1 });
+ShippingZoneSchema.index({ sortOrder: 1 });
 
 delete mongoose.models.ShippingZone;
 export default mongoose.model('ShippingZone', ShippingZoneSchema);

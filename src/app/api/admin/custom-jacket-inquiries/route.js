@@ -18,7 +18,7 @@ export async function GET(req) {
   const search = searchParams.get("search") || "";
   const status = searchParams.get("status") || "all";
 
-  const query = { isDeleted: false, tenantId: "DEFAULT_STORE" };
+  const query = { isDeleted: false };
   if (status !== "all") query.status = status;
   if (search) {
     query.$or = [
@@ -40,7 +40,7 @@ export async function GET(req) {
     ]);
 
     const counts = await CustomJacketInquiry.aggregate([
-      { $match: { isDeleted: false, tenantId: "DEFAULT_STORE" } },
+      { $match: { isDeleted: false } },
       { $group: { _id: "$status", count: { $sum: 1 } } }
     ]);
 

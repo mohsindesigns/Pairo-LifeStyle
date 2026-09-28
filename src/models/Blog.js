@@ -11,7 +11,6 @@ const BlogSchema = new mongoose.Schema({
   status: { type: String, enum: ['Draft', 'Published'], default: 'Draft' },
   isFeatured: { type: Boolean, default: false },
   tags: [String],
-  tenantId: { type: String, required: true, default: "DEFAULT_STORE" },
   heritage: { type: String, default: "" },
   process: { type: String, default: "" },
   style: { type: String, default: "" },

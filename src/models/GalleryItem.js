@@ -13,12 +13,8 @@ const GalleryItemSchema = new mongoose.Schema({
   },
 
   order: { type: Number, default: 0, index: true },
-  enabled: { type: Boolean, default: true },
-
-  tenantId: { type: String, default: 'DEFAULT_STORE', index: true }
+  enabled: { type: Boolean, default: true }
 }, { timestamps: true });
-
-GalleryItemSchema.index({ tenantId: 1, order: 1 });
 
 export default mongoose.models.GalleryItem ||
   mongoose.model('GalleryItem', GalleryItemSchema);

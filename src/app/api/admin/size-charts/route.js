@@ -95,10 +95,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "A size chart with this label already exists." }, { status: 400 });
     }
 
-    const sizeChart = await SizeChart.create({
-      ...data,
-      tenantId: data.tenantId || "DEFAULT_STORE"
-    });
+    const sizeChart = await SizeChart.create({ ...data });
 
     const scId = sizeChart._id;
 

@@ -1,8 +1,6 @@
 import { NextResponse }   from 'next/server';
 import { shippingService } from '@/services/shipping/ShippingService';
 
-const TENANT_ID = 'DEFAULT_STORE';
-
 /**
  * POST /api/shipping/calculate
  * 
@@ -35,10 +33,7 @@ export async function POST(req) {
       );
     }
 
-    const tenantId = req.headers.get('x-tenant-id') || TENANT_ID;
-
     const result = await shippingService.getRatesForAddress(
-      tenantId,
       address,
       subtotal,
       items ?? []

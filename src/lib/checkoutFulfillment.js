@@ -16,18 +16,18 @@ import {
 } from "@/lib/guestCheckoutAccount";
 
 /**
- * Ensures the per-tenant order-number counter exists, seeded from the highest existing
+ * Ensures the order-number counter exists, seeded from the highest existing
  * order number so numbering stays continuous with any orders created before this counter
  * was introduced. Idempotent and safe to call concurrently (a duplicate-key from a racing
  * seed is harmless). Runs OUTSIDE the order transaction so first-ever concurrent orders
  * don't collide on the counter's insert.
  */
-async function ensureOrderCounter(tenantId) {
-  const counterId = `order:${tenantId}`;
+async function ensureOrderCounter() {
+  const counterId = 'order:global';
   const existing = await Counter.findById(counterId);
   if (existing) return;
 
-  const lastOrder = await Order.findOne({ tenantId }).sort({ createdAt: -1 }).select("orderNumber");
+  const lastOrder = await Order.findOne().sort({ createdAt: -1 }).select("orderNumber");
   const lastSeq = parseInt(String(lastOrder?.orderNumber || "").match(/(\d+)\s*$/)?.[1] || "1000", 10);
   try {
     await Counter.updateOne(
@@ -47,10 +47,10 @@ async function ensureOrderCounter(tenantId) {
  * callers $inc the same counter doc, which produces a WriteConflict (retried
  * by the caller's transaction) rather than duplicate order numbers.
  */
-export async function getNextOrderNumber(tenantId, mongoSession = null) {
-  await ensureOrderCounter(tenantId);
+export async function getNextOrderNumber(mongoSession = null) {
+  await ensureOrderCounter();
   const bumped = await Counter.findByIdAndUpdate(
-    `order:${tenantId}`,
+    'order:global',
     { $inc: { seq: 1 } },
     { session: mongoSession, new: true, upsert: true }
   );
@@ -58,7 +58,6 @@ export async function getNextOrderNumber(tenantId, mongoSession = null) {
 }
 
 export async function createOrderFromCheckoutPayload(payload, {
-  tenantId,
   orderUserId = null,
   checkoutEmail = "",
   isGuestSession = true,
@@ -69,7 +68,7 @@ export async function createOrderFromCheckoutPayload(payload, {
   const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode, expectedFree } = payload;
 
   await dbConnect();
-  await ensureOrderCounter(tenantId);
+  await ensureOrderCounter();
   const mongoSession = await mongoose.startSession();
   let checkoutResult = null;
 
@@ -81,7 +80,6 @@ export async function createOrderFromCheckoutPayload(payload, {
         referralCode,
         checkoutEmail,
         orderUserId,
-        tenantId,
         shippingAddress,
         shippingSnapshot,
         mongoSession,
@@ -106,7 +104,7 @@ export async function createOrderFromCheckoutPayload(payload, {
 
       const orderItems = [];
       for (const item of items) {
-        const product = await Product.findOne({ _id: item.id || item._id, tenantId }).session(mongoSession);
+        const product = await Product.findOne({ _id: item.id || item._id }).session(mongoSession);
         if (!product) throw new Error(`Product ${item.id} not found.`);
 
         if (product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
@@ -123,7 +121,7 @@ export async function createOrderFromCheckoutPayload(payload, {
 
         if (product.manageStock) {
           const invRes = await Product.findOneAndUpdate(
-            { _id: product._id, tenantId, stock: { $gte: item.quantity } },
+            { _id: product._id, stock: { $gte: item.quantity } },
             { $inc: { stock: -item.quantity } },
             { session: mongoSession, new: true }
           );
@@ -160,7 +158,7 @@ export async function createOrderFromCheckoutPayload(payload, {
         throw new Error("Your order total has changed and is no longer $0. Please review your order and select a payment method.");
       }
 
-      const orderNumber = await getNextOrderNumber(tenantId, mongoSession);
+      const orderNumber = await getNextOrderNumber(mongoSession);
 
       // Shipping cost is no longer taken from the client at all — computeAuthoritativeCheckout
       // above already re-derived it from the real ShippingZone/ShippingMethod config and threw
@@ -180,7 +178,6 @@ export async function createOrderFromCheckoutPayload(payload, {
           : 'Order placed successfully. Pending confirmation.';
 
       const orderDoc = {
-        tenantId,
         orderNumber,
         idempotencyKey,
         status: initialStatus,

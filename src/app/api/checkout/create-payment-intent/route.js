@@ -11,8 +11,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(req) {
   const correlationId = req.headers.get("x-correlation-id") || crypto.randomUUID();
-  const tenantId = req.headers.get("x-tenant-id") || "DEFAULT_STORE";
-  const log = getContextLogger(correlationId, { path: '/api/checkout/create-payment-intent', tenantId });
+  const log = getContextLogger(correlationId, { path: '/api/checkout/create-payment-intent' });
 
   try {
     await dbConnect();
@@ -27,7 +26,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
     }
 
-    const existingOrder = await Order.findOne({ idempotencyKey, tenantId });
+    const existingOrder = await Order.findOne({ idempotencyKey });
     if (existingOrder) {
       return NextResponse.json({ error: "This order has already been placed." }, { status: 409 });
     }
@@ -39,7 +38,7 @@ export async function POST(req) {
     const ipAddress = req.headers.get("x-forwarded-for") || "unknown";
 
     const itemProductIds = items.map(item => item.id || item._id);
-    const foundProducts = await Product.find({ _id: { $in: itemProductIds }, tenantId });
+    const foundProducts = await Product.find({ _id: { $in: itemProductIds } });
     const productById = new Map(foundProducts.map(p => [p._id.toString(), p]));
 
     for (const item of items) {
@@ -58,7 +57,6 @@ export async function POST(req) {
       referralCode,
       checkoutEmail,
       orderUserId,
-      tenantId,
       // Must pass shipping context so the PaymentIntent amount includes the real shipping
       // cost — otherwise card orders are charged subtotal-minus-discounts with NO shipping,
       // while the webhook fulfillment (which does pass these) records the full total.
@@ -85,9 +83,9 @@ export async function POST(req) {
       shippingSnapshot,
       referralCode,
     };
-    const storedContext = { tenantId, orderUserId, checkoutEmail, isGuestSession, ipAddress };
+    const storedContext = { orderUserId, checkoutEmail, isGuestSession, ipAddress };
 
-    let existingPending = await PendingCheckout.findOne({ tenantId, idempotencyKey });
+    let existingPending = await PendingCheckout.findOne({ idempotencyKey });
 
     if (existingPending?.status === 'consumed') {
       return NextResponse.json({ error: "This order has already been placed." }, { status: 409 });
@@ -109,14 +107,13 @@ export async function POST(req) {
         automatic_payment_methods: { enabled: true },
         metadata: {
           idempotencyKey,
-          tenantId,
         },
       });
 
       await PendingCheckout.findOneAndUpdate(
-        { tenantId, idempotencyKey },
+        { idempotencyKey },
         {
-          $setOnInsert: { tenantId, idempotencyKey, createdAt: new Date() },
+          $setOnInsert: { idempotencyKey, createdAt: new Date() },
           $set: {
             status: 'pending',
             payload: { payload: storedPayload, context: storedContext },

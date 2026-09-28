@@ -15,8 +15,7 @@ const AffiliateSchema = new mongoose.Schema({
   couponCode: { type: String, unique: true, sparse: true, index: true }, // Optional direct coupon code
   customerDiscountType: { type: String, enum: ['Percentage', 'Fixed', 'None'], default: 'None' },
   customerDiscountValue: { type: Number, default: 0 },
-  
-  tenantId: { type: String, default: 'default', index: true }, // SaaS multi-tenancy
+
   isVerified: { type: Boolean, default: false }, // Email verification flag
   isDeleted: { type: Boolean, default: false, index: true }, // GDPR soft deletes
   

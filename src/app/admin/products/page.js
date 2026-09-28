@@ -92,7 +92,7 @@ export default function AdminProducts() {
       const res = await fetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, isDeleted: false, status: 'Draft', tenantId: "DEFAULT_STORE" })
+        body: JSON.stringify({ id, isDeleted: false, status: 'Draft' })
       });
       if (res.ok) fetchProducts();
     } catch (err) {
@@ -408,7 +408,7 @@ export default function AdminProducts() {
                           const res = await fetch("/api/admin/products", {
                             method: "PUT",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ id: p._id, status: newStatus, tenantId: "DEFAULT_STORE" })
+                            body: JSON.stringify({ id: p._id, status: newStatus })
                           });
                           if (res.ok) fetchProducts();
                         }}
@@ -473,7 +473,7 @@ export default function AdminProducts() {
                     const res = await fetch("/api/admin/products", {
                       method: "PUT",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ ...quickEditData, id: quickEditId, tenantId: "DEFAULT_STORE" })
+                      body: JSON.stringify({ ...quickEditData, id: quickEditId })
                     });
                     if (res.ok) {
                       setQuickEditId(null);

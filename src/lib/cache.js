@@ -27,13 +27,13 @@ export const cache = {
      * Instead of deleting keys by pattern (O(N)), we increment a version number.
      * Old keys will naturally expire via TTL.
      */
-    async getVersionedKey(baseKey, tenantId = 'GLOBAL') {
+    async getVersionedKey(baseKey) {
         if (!redis) return baseKey;
         try {
             const version = await redis.get('PROMO:SCHEMA_VERSION') || 'v1';
-            return `PROMO:${version}:TENANT:${tenantId}:${baseKey}`;
+            return `PROMO:${version}:${baseKey}`;
         } catch (e) {
-            return `PROMO:v1:TENANT:${tenantId}:${baseKey}`;
+            return `PROMO:v1:${baseKey}`;
         }
     },
 

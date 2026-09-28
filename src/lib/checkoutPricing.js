@@ -17,9 +17,9 @@ const withSession = (query, mongoSession) => mongoSession ? query.session(mongoS
 // every downstream calculation (discount math, affiliate cut, final total)
 // inherit an arbitrarily low number. Resolves per-variant pricing (not just the
 // base product price) since a variant can legitimately cost more or less.
-async function resolveAuthoritativeSubtotal({ items, tenantId, mongoSession }) {
+async function resolveAuthoritativeSubtotal({ items, mongoSession }) {
   const productIds = items.map(item => item.id || item._id).filter(Boolean);
-  const dbProducts = await withSession(Product.find({ _id: { $in: productIds }, tenantId }).select("price variantCombinations attributes"), mongoSession);
+  const dbProducts = await withSession(Product.find({ _id: { $in: productIds } }).select("price variantCombinations attributes"), mongoSession);
   const productById = new Map(dbProducts.map(p => [p._id.toString(), p]));
 
   return items.reduce((sum, item) => {
@@ -38,10 +38,10 @@ async function resolveAuthoritativeSubtotal({ items, tenantId, mongoSession }) {
 // price (including $0) for a real order. If the zone has no rates at all,
 // authoritative cost is 0 (nothing to charge for); if rates exist, the
 // client's selected method must still be one of them.
-async function resolveAuthoritativeShippingCost({ tenantId, shippingAddress, shippingSnapshot, subtotal, items, mongoSession }) {
+async function resolveAuthoritativeShippingCost({ shippingAddress, shippingSnapshot, subtotal, items, mongoSession }) {
   if (!shippingAddress) return 0;
 
-  const result = await shippingService.getRatesForAddress(tenantId, shippingAddress, subtotal, items);
+  const result = await shippingService.getRatesForAddress(shippingAddress, subtotal, items);
   if (!result.rates || result.rates.length === 0) return 0;
 
   const matchedRate = result.rates.find(r => String(r.methodId) === String(shippingSnapshot?.methodId));
@@ -57,7 +57,6 @@ export async function computeAuthoritativeCheckout({
   referralCode,
   checkoutEmail,
   orderUserId,
-  tenantId,
   shippingAddress = null,
   shippingSnapshot = null,
   mongoSession = null,
@@ -74,14 +73,13 @@ export async function computeAuthoritativeCheckout({
 
   if (checkoutOrConditions.length > 0) {
     const orderCount = await withSession(Order.countDocuments({
-      tenantId,
       $or: checkoutOrConditions,
       status: { $nin: ['Cancelled', 'Refunded'] }
     }), mongoSession);
     customerType = orderCount > 0 ? 'returning' : (orderUserId ? 'logged_in' : 'new');
   }
 
-  const authoritativeSubtotal = await resolveAuthoritativeSubtotal({ items, tenantId, mongoSession });
+  const authoritativeSubtotal = await resolveAuthoritativeSubtotal({ items, mongoSession });
 
   const engineResults = await Engine.evaluate(
     { subtotal: authoritativeSubtotal, items },
@@ -89,8 +87,7 @@ export async function computeAuthoritativeCheckout({
       couponCodes: financials.promoCode ? [financials.promoCode] : [],
       userId: orderUserId,
       email: checkoutEmail,
-      customerType,
-      tenantId
+      customerType
     }
   );
 
@@ -108,7 +105,6 @@ export async function computeAuthoritativeCheckout({
       if (!maxPerCustomer) continue;
 
       const priorUses = await withSession(Order.countDocuments({
-        tenantId,
         $or: checkoutOrConditions,
         status: { $nin: ['Cancelled', 'Refunded'] },
         "financials.appliedPromotions.promotionId": applied.promotionId
@@ -200,7 +196,6 @@ export async function computeAuthoritativeCheckout({
         try {
           usageRes = await PromotionCustomerUsage.findOneAndUpdate(
             {
-              tenantId,
               promotionId: applied.promotionId,
               customerKey,
               usageCount: { $lt: maxPerCustomer }
@@ -226,7 +221,6 @@ export async function computeAuthoritativeCheckout({
       const promoRes = await Promotion.findOneAndUpdate(
         {
           _id: applied.promotionId,
-          tenantId,
           adminStatus: 'Active',
           $or: [
             { 'usageLimits.maxTotalUses': null },
@@ -310,10 +304,13 @@ export async function computeAuthoritativeCheckout({
   // client sent none at all) once the order is already $0 before shipping.
   const preShippingAmount = Math.max(0, authoritativeSubtotal - finalDiscountTotal - affiliateDiscountAmount);
 
+  // Shipping-rate eligibility (e.g. "free shipping over $100") is evaluated against what the
+  // customer actually pays after discounts, not the pre-discount subtotal — otherwise a cart
+  // that only qualifies for a threshold before a coupon is applied would still get it after.
   const authoritativeShippingCost = preShippingAmount === 0
     ? 0
     : await resolveAuthoritativeShippingCost({
-        tenantId, shippingAddress, shippingSnapshot, subtotal: authoritativeSubtotal, items, mongoSession,
+        shippingAddress, shippingSnapshot, subtotal: preShippingAmount, items, mongoSession,
       });
 
   // Tax is not yet wired into checkout by design (see admin Tax Settings / TaxService) —

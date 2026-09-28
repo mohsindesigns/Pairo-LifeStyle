@@ -21,8 +21,7 @@ const StaffSchema = new mongoose.Schema({
     failedAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date },
     passwordChangedAt: { type: Date, default: Date.now }
-  },
-  tenantId: { type: String, default: 'DEFAULT_STORE' }
+  }
 }, { timestamps: true });
 
 export default mongoose.models.Staff || mongoose.model('Staff', StaffSchema);

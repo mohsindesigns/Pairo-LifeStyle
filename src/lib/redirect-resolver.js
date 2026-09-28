@@ -1,24 +1,14 @@
 import { redirect, permanentRedirect } from "next/navigation";
 import dbConnect from "@/lib/db";
 import Redirect from "@/models/Redirect";
+import { RESERVED_ROUTES } from "@/lib/routes";
 
-export const RESERVED_SLUGS = [
-  "admin",
-  "api",
-  "product",
-  "shop",
-  "checkout",
-  "cart",
-  "login",
-  "signup",
-  "profile",
-  "order-tracking",
-  "search",
-  "sitemap.xml",
-  "robots.txt",
-  "sitemap",
-  "promo"
-];
+// Derived from the single source of truth (RESERVED_ROUTES) instead of a hand-maintained
+// duplicate list — the two had drifted apart (e.g. "wishlist"/"account"/"orders"/"faq" were
+// reserved in one list but not enforced by isReservedPath), letting CMS pages be created at
+// slugs meant to be reserved for future app routes. "sitemap" (no extension) is kept as an
+// addition since RESERVED_ROUTES only lists "sitemap.xml".
+export const RESERVED_SLUGS = [...new Set([...RESERVED_ROUTES.filter(Boolean), "sitemap"])];
 
 /**
  * Normalizes a path for consistent lookup:

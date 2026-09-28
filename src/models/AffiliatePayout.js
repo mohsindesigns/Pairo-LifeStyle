@@ -13,8 +13,7 @@ const AffiliatePayoutSchema = new mongoose.Schema({
   transactionId: String,
   paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
   paidDate: Date,
-  notes: String,
-  tenantId: { type: String, default: 'default', index: true } // SaaS multi-tenancy
+  notes: String
 }, { timestamps: true });
 
 delete mongoose.models.AffiliatePayout;

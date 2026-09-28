@@ -23,14 +23,13 @@ const SizeChartSchema = new mongoose.Schema(
     },
     
     status: { type: String, enum: ["Draft", "Published"], default: "Published" },
-    isDeleted: { type: Boolean, default: false },
-    tenantId: { type: String, default: "DEFAULT_STORE", index: true }
+    isDeleted: { type: Boolean, default: false }
   },
   { timestamps: true }
 );
 
 // Indexes
-SizeChartSchema.index({ tenantId: 1, isDeleted: 1 });
+SizeChartSchema.index({ isDeleted: 1 });
 SizeChartSchema.index({ assignmentType: 1, assignmentTargetId: 1 });
 
 delete mongoose.models.SizeChart;

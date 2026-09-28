@@ -17,10 +17,8 @@ export async function GET(req) {
          const blog = await Blog.findById(id).lean();
          return NextResponse.json(blog);
       }
-      let query = { 
-         tenantId: searchParams.get('tenantId') || "DEFAULT_STORE"
-      };
-      
+      let query = {};
+
       if (searchParams.get("isDeleted") === "true") {
          query.isDeleted = true;
       } else {
@@ -44,10 +42,7 @@ export async function POST(req) {
    await dbConnect();
    try {
       const data = await req.json();
-      const blogData = {
-         ...data,
-         tenantId: data.tenantId || "DEFAULT_STORE"
-      };
+      const blogData = { ...data };
 
       // Auto-generate slug if missing or handle collisions
       if (!blogData.slug && blogData.title) {
@@ -57,7 +52,7 @@ export async function POST(req) {
       // Check for collision and append suffix if needed
       let slug = blogData.slug;
       let count = 1;
-      while (await Blog.findOne({ slug, tenantId: blogData.tenantId })) {
+      while (await Blog.findOne({ slug })) {
          slug = `${blogData.slug}-${count}`;
          count++;
       }
@@ -80,7 +75,7 @@ export async function PUT(req) {
    await dbConnect();
    try {
       const rawData = await req.json();
-      const { id, tenantId, _id, __v, createdAt, updatedAt, ...updateData } = rawData;
+      const { id, _id, __v, createdAt, updatedAt, ...updateData } = rawData;
       console.log("[Blogs PUT] Updating blog:", id, "with seo:", updateData.seo);
 
       const oldBlog = await Blog.findById(id);

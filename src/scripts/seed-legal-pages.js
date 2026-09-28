@@ -118,7 +118,6 @@ async function seedLegalPages() {
         status: "Published",
         template: "default",
         isSystem: true,
-        tenantId: "DEFAULT_STORE",
         sections: [
           {
             id: sectionId,
@@ -147,7 +146,7 @@ async function seedLegalPages() {
       };
 
       // Check if exists
-      const existing = await pagesCollection.findOne({ slug: def.slug, tenantId: "DEFAULT_STORE" });
+      const existing = await pagesCollection.findOne({ slug: def.slug });
       if (existing) {
         console.log(`Page with slug "${def.slug}" already exists. Updating it...`);
         await pagesCollection.updateOne(

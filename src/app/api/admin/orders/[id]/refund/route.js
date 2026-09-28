@@ -21,12 +21,11 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const tenantId = req.headers.get("x-tenant-id") || "DEFAULT_STORE";
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     const requestedAmount = body?.amount;
 
-    const order = await Order.findOne({ _id: id, tenantId });
+    const order = await Order.findById(id);
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     if (order.payment?.provider !== 'stripe' || !order.payment?.stripePaymentIntentId) {

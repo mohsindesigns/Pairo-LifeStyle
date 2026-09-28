@@ -10,15 +10,7 @@ async function migrate() {
 
     const Blog = mongoose.models.Blog || mongoose.model('Blog', new mongoose.Schema({}, { strict: false }));
 
-    // Force update all blogs to have DEFAULT_STORE if they don't have it
-    const result = await Blog.updateMany(
-      { tenantId: { $ne: 'DEFAULT_STORE' } }, 
-      { $set: { tenantId: 'DEFAULT_STORE' } }
-    );
-
-    console.log(`Successfully updated ${result.modifiedCount} blogs in Atlas to DEFAULT_STORE`);
-    
-    // Also check for isDeleted consistency
+    // Check for isDeleted consistency
     const result2 = await Blog.updateMany(
       { isDeleted: { $exists: false } },
       { $set: { isDeleted: false } }

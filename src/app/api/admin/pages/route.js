@@ -17,7 +17,7 @@ export async function GET(req) {
 
     await dbConnect();
     try {
-        const pages = await Page.find({ tenantId: 'DEFAULT_STORE' }).sort({ createdAt: -1 }).lean();
+        const pages = await Page.find().sort({ createdAt: -1 }).lean();
         return NextResponse.json(pages);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -59,7 +59,7 @@ export async function POST(req) {
             return NextResponse.json({ error: "Slug collides with a reserved system route" }, { status: 400 });
         }
 
-        const existing = await Page.findOne({ slug, tenantId: 'DEFAULT_STORE' });
+        const existing = await Page.findOne({ slug });
         if (existing) {
             return NextResponse.json({ error: "Page with this slug already exists" }, { status: 400 });
         }
@@ -81,8 +81,7 @@ export async function POST(req) {
             template: templateKey,
             sections: pageSections,
             createdBy: session.user.id,
-            updatedBy: session.user.id,
-            tenantId: 'DEFAULT_STORE'
+            updatedBy: session.user.id
         });
 
         await logAction(req, session, 'CREATE_PAGE', 'page', {

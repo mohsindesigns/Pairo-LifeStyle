@@ -23,11 +23,8 @@ export async function GET(req) {
       return NextResponse.json(product);
     }
 
-    const tenantId = searchParams.get('tenantId');
-    
     let query = { isDeleted };
-    if (tenantId) query.tenantId = tenantId;
-    
+
     if (status) query.status = status;
     
     const products = await Product.find(query)
@@ -48,12 +45,8 @@ export async function POST(req) {
   await dbConnect();
   try {
     const data = await req.json();
-    
-    // Inject tenantId (Mandatory for SaaS Hardening)
-    const productData = {
-        ...data,
-        tenantId: data.tenantId || "DEFAULT_STORE"
-    };
+
+    const productData = { ...data };
 
     // Strip empty-string ObjectId fields — Mongoose cannot cast "" to ObjectId
     if (!productData.primaryCategory) delete productData.primaryCategory;
@@ -68,11 +61,10 @@ export async function POST(req) {
     }
     if (!slug) slug = "product";
     
-    // Ensure uniqueness within the tenant without appending suffixes unless a duplicate exists
+    // Ensure uniqueness without appending suffixes unless a duplicate exists
     let finalSlug = slug;
     let counter = 1;
-    const tenantId = productData.tenantId || "DEFAULT_STORE";
-    while (await Product.findOne({ slug: finalSlug, tenantId, isDeleted: { $ne: true } })) {
+    while (await Product.findOne({ slug: finalSlug, isDeleted: { $ne: true } })) {
       finalSlug = `${slug}-${counter}`;
       counter++;
     }
@@ -125,8 +117,8 @@ export async function PUT(req) {
   await dbConnect();
   try {
     const rawBody = await req.json();
-    const { id, tenantId, _id, __v, createdAt, updatedAt, ...data } = rawBody;
-    
+    const { id, _id, __v, createdAt, updatedAt, ...data } = rawBody;
+
     console.log("[Products PUT] Updating product:", id, "with seo:", data.seo);
 
     // Strip empty-string ObjectId fields — Mongoose cannot cast "" to ObjectId
@@ -135,7 +127,6 @@ export async function PUT(req) {
       data.categories = data.categories.filter(Boolean);
     }
     
-    // Find by _id only (tenantId may not be present on legacy products)
     const oldProduct = await Product.findById(id);
     if (!oldProduct) {
       console.error("[Products PUT] Product not found:", id);
@@ -224,12 +215,11 @@ export async function DELETE(req) {
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
-  const tenantId = searchParams.get("tenantId") || "DEFAULT_STORE";
 
   await dbConnect();
   try {
-    // Scoped Soft delete
-    const product = await Product.findOneAndUpdate({ _id: id, tenantId }, { isDeleted: true }, { new: true });
+    // Soft delete
+    const product = await Product.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
     return NextResponse.json(product);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -10,7 +10,7 @@ import { can } from "@/lib/rbac";
 
 // Fields the server owns — never let a client set them via the request body. Otherwise a
 // staff user could reset a coupon's used-count (usageLimits.currentTotalUses), forge its
-// analytics, or hijack its Stripe linkage. (tenantId is intentionally left writable.)
+// analytics, or hijack its Stripe linkage.
 function stripServerManagedFields(data) {
   if (!data || typeof data !== "object") return data;
   const { _id, analytics, stripeCouponId, stripePromotionCodeId, stripeSyncStatus, stripeSyncError, stripeSyncKey, createdAt, updatedAt, ...safe } = data;

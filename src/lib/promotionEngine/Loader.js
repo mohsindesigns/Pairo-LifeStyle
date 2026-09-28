@@ -9,22 +9,21 @@ import logger, { LogCategory } from "../logger.js";
 export default class Loader {
   /**
    * @param {Array} couponCodes - Optional array of strings
-   * @param {String} tenantId - Mandatory tenant context for SaaS isolation
    */
-  static async loadPromotions(couponCodes = [], tenantId = 'DEFAULT_STORE') {
+  static async loadPromotions(couponCodes = []) {
     const baseKey = `ACTIVE:${[...couponCodes].sort().join(',')}`;
-    const cacheKey = await cache.getVersionedKey(baseKey, tenantId);
-    
+    const cacheKey = await cache.getVersionedKey(baseKey);
+
     // 1. Try Cache First
     try {
       const cachedData = await cache.get(cacheKey);
       if (cachedData) {
         const promos = JSON.parse(cachedData);
-        logger.debug({ category: LogCategory.CACHE_OPERATIONS, count: promos.length, tenantId }, "Promotion cache HIT");
+        logger.debug({ category: LogCategory.CACHE_OPERATIONS, count: promos.length }, "Promotion cache HIT");
         return promos;
       }
     } catch (e) {
-      logger.error({ category: LogCategory.CACHE_OPERATIONS, error: e.message, tenantId }, "Redis GET failed. Falling back to DB.");
+      logger.error({ category: LogCategory.CACHE_OPERATIONS, error: e.message }, "Redis GET failed. Falling back to DB.");
     }
 
     // 2. Database Fallback
@@ -33,7 +32,6 @@ export default class Loader {
     const now = new Date();
     // Base Query for Active & Date-Eligible
     const query = {
-      tenantId, // STRICT ISOLATION
       adminStatus: 'Active',
       $and: [
         {

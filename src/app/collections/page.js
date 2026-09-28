@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   await dbConnect();
-  const page = await Page.findOne({ slug: "collections", tenantId: "DEFAULT_STORE" }).lean();
+  const page = await Page.findOne({ slug: "collections" }).lean();
   const { metadata } = await resolveSEOMetadata({
     entity: page || {},
     type: "page",

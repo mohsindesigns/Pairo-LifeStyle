@@ -44,8 +44,8 @@ class ShippingService {
    * Build a deterministic cache key from the request context.
    * @private
    */
-  #buildCacheKey(tenantId, address, subtotal) {
-    const raw = JSON.stringify({ tenantId, address, subtotal });
+  #buildCacheKey(address, subtotal) {
+    const raw = JSON.stringify({ address, subtotal });
     return `shipping:rates:${crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16)}`;
   }
 
@@ -54,9 +54,9 @@ class ShippingService {
    * Falls back to 'USD' if not configured.
    * @private
    */
-  async #getStoreCurrency(tenantId) {
+  async #getStoreCurrency() {
     try {
-      const config = await SiteConfig.findOne({ key: 'main', tenantId }).select('commerce').lean();
+      const config = await SiteConfig.findOne({ key: 'main' }).select('commerce').lean();
       return config?.commerce?.storeCurrency ?? 'USD';
     } catch {
       return 'USD';
@@ -66,7 +66,6 @@ class ShippingService {
   /**
    * Calculate available shipping rates for a given address and cart context.
    * 
-   * @param {string} tenantId
    * @param {{ country?: string, state?: string, city?: string, zip?: string }} address
    * @param {number} cartSubtotal
    * @param {Array}  cartItems
@@ -77,8 +76,8 @@ class ShippingService {
    *   cacheHit: boolean
    * }>}
    */
-  async getRatesForAddress(tenantId, address, cartSubtotal, cartItems = []) {
-    const cacheKey = this.#buildCacheKey(tenantId, address, cartSubtotal);
+  async getRatesForAddress(address, cartSubtotal, cartItems = []) {
+    const cacheKey = this.#buildCacheKey(address, cartSubtotal);
 
     // ── 1. Cache check ─────────────────────────────────────────────────────────
     const cached = await this.cache.get(cacheKey);
@@ -88,9 +87,9 @@ class ShippingService {
 
     await dbConnect();
 
-    // ── 2. Load active zones for tenant ───────────────────────────────────────
+    // ── 2. Load active zones ───────────────────────────────────────
     const zones = await ShippingZone
-      .find({ tenantId, status: 'Active' })
+      .find({ status: 'Active' })
       .sort({ priority: -1 })
       .lean();
 
@@ -125,7 +124,7 @@ class ShippingService {
     };
 
     // ── 6. Load store currency ────────────────────────────────────────────────
-    const currency = await this.#getStoreCurrency(tenantId);
+    const currency = await this.#getStoreCurrency();
 
     // ── 7. Filter eligible methods and calculate rates ────────────────────────
     const rates = [];

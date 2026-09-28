@@ -54,7 +54,6 @@ export default async function SitemapPage() {
   // 4. Fetch dynamic CMS pages (Published, not deleted, not noIndexed)
   const cmsPages = await Page.find({
     status: "Published",
-    tenantId: "DEFAULT_STORE",
     isDeleted: { $ne: true },
     "seo.noIndex": { $ne: true }
   })

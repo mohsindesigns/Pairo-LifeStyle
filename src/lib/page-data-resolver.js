@@ -9,7 +9,7 @@ export async function resolvePageSections(sections) {
     try {
       // Resolve Product Grid Data
       if (section.type === 'product_grid') {
-        const query = { isDeleted: false, status: 'Published', tenantId: 'DEFAULT_STORE' };
+        const query = { isDeleted: false, status: 'Published' };
         let products = [];
 
         if (config.showType === 'products' && config.productIds && config.productIds.length > 0) {
@@ -112,7 +112,7 @@ export async function resolvePageSections(sections) {
          }
          if (config.collectionId) {
             const mongoose = require('mongoose');
-            const query = { isDeleted: false };
+            const query = { isDeleted: false, status: 'Published' };
             if (mongoose.Types.ObjectId.isValid(config.collectionId)) {
                query._id = config.collectionId;
             } else {

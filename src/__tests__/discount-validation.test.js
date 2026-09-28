@@ -31,7 +31,6 @@ describe("Legacy Discount Verification and Validation Suite", () => {
 
     // Create temp products
     tempProduct1 = await Product.create({
-      tenantId: "DEFAULT_STORE",
       id: 9991,
       name: "Discount Test Hoodie",
       slug: "discount-test-hoodie-" + Date.now(),
@@ -40,7 +39,6 @@ describe("Legacy Discount Verification and Validation Suite", () => {
     });
 
     tempProduct2 = await Product.create({
-      tenantId: "DEFAULT_STORE",
       id: 9992,
       name: "Discount Test Jacket",
       slug: "discount-test-jacket-" + Date.now(),
@@ -173,7 +171,6 @@ describe("Legacy Discount Verification and Validation Suite", () => {
     // Create a mock order for an existing email
     const existingEmail = "repeat-customer@test.com";
     const order = await Order.create({
-      tenantId: "DEFAULT_STORE",
       orderNumber: "TEST-ORD-" + Math.floor(Math.random() * 1000000),
       idempotencyKey: "test_key_" + Date.now() + "_" + Math.random(),
       status: "Confirmed",

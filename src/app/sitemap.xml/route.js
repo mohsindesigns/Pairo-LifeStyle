@@ -92,7 +92,7 @@ export async function GET() {
 
       // 4. Fetch dynamic CMS pages (Published, not deleted, not noIndexed)
       const pages = await Page.find(
-        { tenantId: "DEFAULT_STORE", status: "Published", isDeleted: { $ne: true }, "seo.noIndex": { $ne: true } },
+        { status: "Published", isDeleted: { $ne: true }, "seo.noIndex": { $ne: true } },
         "slug updatedAt"
       ).lean();
 

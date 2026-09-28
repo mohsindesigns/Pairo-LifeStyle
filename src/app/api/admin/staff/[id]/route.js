@@ -45,9 +45,16 @@ export async function PUT(req, { params }) {
         if (session.user.id === id && status === 'Suspended') {
             return NextResponse.json({ error: "You cannot suspend your own account" }, { status: 400 });
         }
-        
+
         if (staff.roleId?.slug === 'super-admin' && status === 'Suspended' && session.user.id !== id) {
             return NextResponse.json({ error: "Cannot suspend a Super Admin" }, { status: 400 });
+        }
+
+        // Security: Changing a staff member's role is a separate, more sensitive permission
+        // than general staff.edit — without this, anyone who can edit staff (e.g. update a
+        // name) could hand themselves or anyone else a super-admin role.
+        if (roleId && String(staff.roleId?._id || staff.roleId) !== String(roleId) && !can(session.user, "staff.manage_roles")) {
+            return NextResponse.json({ error: "You don't have permission to change staff roles" }, { status: 403 });
         }
 
         const before = JSON.parse(JSON.stringify(staff));

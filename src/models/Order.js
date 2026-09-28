@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 const OrderSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
   orderNumber: { type: String, required: true, index: true },
   status: { 
     type: String, 
@@ -179,9 +178,9 @@ const OrderSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
-// SaaS Unique Constraints
-OrderSchema.index({ tenantId: 1, orderNumber: 1 }, { unique: true });
-OrderSchema.index({ tenantId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
+// Unique Constraints
+OrderSchema.index({ orderNumber: 1 }, { unique: true });
+OrderSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 
 // Performance Indexes
 OrderSchema.index({ createdAt: -1 });

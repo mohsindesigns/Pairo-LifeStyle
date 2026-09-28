@@ -51,11 +51,10 @@ export async function PUT(req, { params }) {
     }
     if (!slug) slug = oldProduct.slug || "product";
 
-    // Ensure uniqueness within the tenant without appending suffixes unless a duplicate exists
+    // Ensure uniqueness without appending suffixes unless a duplicate exists
     let finalSlug = slug;
     let counter = 1;
-    const tenantId = oldProduct.tenantId || "DEFAULT_STORE";
-    while (await Product.findOne({ slug: finalSlug, tenantId, _id: { $ne: id }, isDeleted: { $ne: true } })) {
+    while (await Product.findOne({ slug: finalSlug, _id: { $ne: id }, isDeleted: { $ne: true } })) {
       finalSlug = `${slug}-${counter}`;
       counter++;
     }

@@ -47,6 +47,15 @@ export async function POST(req) {
         const existing = await Staff.findOne({ email });
         if (existing) return NextResponse.json({ error: "Staff email already exists" }, { status: 400 });
 
+        // Security: creating an account with an elevated (super-admin) role is a
+        // staff.manage_roles action, not merely staff.create — otherwise anyone who can
+        // create staff accounts could hand out full super-admin access.
+        const targetRole = await Role.findById(roleId);
+        if (!targetRole) return NextResponse.json({ error: "Role not found" }, { status: 400 });
+        if (targetRole.slug === 'super-admin' && !can(session.user, "staff.manage_roles")) {
+            return NextResponse.json({ error: "You don't have permission to assign the Super Admin role" }, { status: 403 });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const newStaff = await Staff.create({
             name,

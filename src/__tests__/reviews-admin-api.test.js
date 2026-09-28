@@ -17,7 +17,6 @@ describe("Reviews Admin API Mongoose Level Lifecycle Verification", () => {
 
     // Setup mock product
     tempProduct = await Product.create({
-      tenantId: "DEFAULT_STORE",
       id: 8888,
       name: "Admin API Lifecycle Test Jacket",
       slug: "admin-api-lifecycle-test-jacket-" + Date.now(),
@@ -37,7 +36,6 @@ describe("Reviews Admin API Mongoose Level Lifecycle Verification", () => {
 
   it("should create a new review with isDeleted defaults to false", async () => {
     tempReview = await Review.create({
-      tenantId: "DEFAULT_STORE",
       productId: tempProduct._id,
       orderId: new mongoose.Types.ObjectId(),
       rating: 5,

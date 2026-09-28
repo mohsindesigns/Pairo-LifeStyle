@@ -46,9 +46,7 @@ const CustomJacketInquirySchema = new mongoose.Schema({
   userAgent: { type: String },
 
   // Soft delete
-  isDeleted: { type: Boolean, default: false, index: true },
-
-  tenantId: { type: String, default: 'DEFAULT_STORE', index: true }
+  isDeleted: { type: Boolean, default: false, index: true }
 }, { timestamps: true });
 
 // Text search index

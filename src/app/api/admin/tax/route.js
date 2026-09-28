@@ -14,8 +14,6 @@ async function requireSettings() {
   return session;
 }
 
-const TENANT_ID = 'DEFAULT_STORE';
-
 function defaultTaxClasses() {
   return [
     { key: 'standard', name: 'Standard', isDefault: true, rates: [] },
@@ -96,7 +94,7 @@ async function migrateLegacyTaxSettings(doc) {
   ];
 
   const updated = await TaxSettings.findOneAndUpdate(
-    { tenantId: TENANT_ID },
+    {},
     {
       $set: { taxClasses },
       $unset: { taxLabel: 1, defaultTaxRate: 1, taxRules: 1, zonalRules: 1, applyToShipping: 1 },
@@ -112,11 +110,10 @@ export async function GET(req) {
     if (!await requireSettings()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     await dbConnect();
 
-    let doc = await TaxSettings.findOne({ tenantId: TENANT_ID }).lean();
+    let doc = await TaxSettings.findOne().lean();
 
     if (!doc) {
       const created = await TaxSettings.create({
-        tenantId: TENANT_ID,
         enabled: false,
         calculationMethod: 'exclusive',
         taxRoundingMode: 'round',
@@ -164,7 +161,7 @@ export async function PUT(req) {
     }
 
     const settings = await TaxSettings.findOneAndUpdate(
-      { tenantId: TENANT_ID },
+      {},
       {
         $set: {
           enabled: enabled ?? false,

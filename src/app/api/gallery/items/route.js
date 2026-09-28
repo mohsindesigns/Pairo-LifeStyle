@@ -11,7 +11,7 @@ export async function GET() {
     await dbConnect();
 
     const items = await GalleryItem
-      .find({ enabled: true, tenantId: "DEFAULT_STORE" })
+      .find({ enabled: true })
       .populate("linkedProduct", "slug name") // Only fetch slug and name from Product
       .sort({ order: 1, createdAt: -1 })
       .lean();

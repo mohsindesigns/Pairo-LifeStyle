@@ -11,9 +11,8 @@ export async function GET(req) {
     const limit = parseInt(searchParams.get("limit")) || 6;
     
     const blogs = await Blog.find({ 
-      status: 'Published', 
-      isDeleted: { $ne: true },
-      tenantId: 'DEFAULT_STORE'
+      status: 'Published',
+      isDeleted: { $ne: true }
     })
     .sort({ createdAt: -1 })
     .limit(limit)

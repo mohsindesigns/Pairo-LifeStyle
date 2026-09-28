@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
+import { sanitizeRichHtml } from "@/lib/sanitize";
 import ProductGallery from "./ProductGallery";
 import ClientProductActions from "./ClientProductActions";
 import {
@@ -186,7 +187,7 @@ export default function ProductMainSection({ product }) {
           {product.shortDescription && (
             <div
               className="short-description-prose text-black text-sm md:text-base leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: product.shortDescription }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(product.shortDescription) }}
             />
           )}
 

@@ -10,7 +10,7 @@ import { can } from "@/lib/rbac";
 
 // Fields the server owns — never let a client set them via the request body. Otherwise a
 // staff user could reset a coupon's used-count (usageLimits.currentTotalUses), forge its
-// analytics, or hijack its Stripe linkage. (tenantId is intentionally left writable.)
+// analytics, or hijack its Stripe linkage.
 function stripServerManagedFields(data) {
   if (!data || typeof data !== "object") return data;
   const { _id, analytics, stripeCouponId, stripePromotionCodeId, stripeSyncStatus, stripeSyncError, stripeSyncKey, createdAt, updatedAt, ...safe } = data;
@@ -34,11 +34,9 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
-    const tenantId = searchParams.get('tenantId') || "DEFAULT_STORE";
-    
-    const query = { 
-        tenantId,
-        adminStatus: { $ne: 'Archived' } 
+
+    const query = {
+        adminStatus: { $ne: 'Archived' }
     };
     
     if (status && status !== 'All') {
@@ -69,11 +67,7 @@ export async function POST(req) {
         return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    // Ensure tenantId is present (Mandatory for SaaS Hardening)
-    const promotionData = {
-        ...stripServerManagedFields(data),
-        tenantId: data.tenantId || "DEFAULT_STORE"
-    };
+    const promotionData = stripServerManagedFields(data);
 
     const promotion = await Promotion.create(promotionData);
 

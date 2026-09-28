@@ -15,7 +15,6 @@ describe("Database SEO Persistence Tests", () => {
   it("should successfully save and retrieve SEO fields on a Product", async () => {
     // 1. Create a dummy product
     const productData = {
-      tenantId: "TEST_TENANT",
       name: "SEO Test Jacket",
       slug: "seo-test-jacket",
       price: 299,
@@ -32,7 +31,7 @@ describe("Database SEO Persistence Tests", () => {
     };
 
     // Clean old test records
-    await Product.deleteOne({ slug: "seo-test-jacket", tenantId: "TEST_TENANT" });
+    await Product.deleteOne({ slug: "seo-test-jacket" });
 
     const created = await Product.create(productData);
     expect(created.seo.title).toBe("Custom SEO Title for Jacket");
@@ -52,8 +51,8 @@ describe("Database SEO Persistence Tests", () => {
       }
     };
 
-    const updated = await Product.findOneAndUpdate(
-      { _id: created._id, tenantId: "TEST_TENANT" },
+    const updated = await Product.findByIdAndUpdate(
+      created._id,
       updateData,
       { new: true }
     );
@@ -73,7 +72,6 @@ describe("Database SEO Persistence Tests", () => {
 
   it("should successfully save and retrieve SEO fields on a Page", async () => {
     const pageData = {
-      tenantId: "TEST_TENANT",
       title: "SEO Test Page",
       slug: "seo-test-page",
       status: "Draft",
@@ -89,7 +87,7 @@ describe("Database SEO Persistence Tests", () => {
     };
 
     // Clean old test records
-    await Page.deleteOne({ slug: "seo-test-page", tenantId: "TEST_TENANT" });
+    await Page.deleteOne({ slug: "seo-test-page" });
 
     const created = await Page.create(pageData);
     expect(created.seo.title).toBe("Custom Page SEO Title");
@@ -128,7 +126,6 @@ describe("Database SEO Persistence Tests", () => {
 
   it("should successfully save and retrieve SEO fields on a Blog", async () => {
     const blogData = {
-      tenantId: "TEST_TENANT",
       title: "SEO Test Blog",
       slug: "seo-test-blog",
       status: "Draft",
@@ -144,7 +141,7 @@ describe("Database SEO Persistence Tests", () => {
     };
 
     // Clean old test records
-    await Blog.deleteOne({ slug: "seo-test-blog", tenantId: "TEST_TENANT" });
+    await Blog.deleteOne({ slug: "seo-test-blog" });
 
     const created = await Blog.create(blogData);
     expect(created.seo.title).toBe("Custom Blog SEO Title");
@@ -162,8 +159,8 @@ describe("Database SEO Persistence Tests", () => {
       }
     };
 
-    const updated = await Blog.findOneAndUpdate(
-      { _id: created._id, tenantId: "TEST_TENANT" },
+    const updated = await Blog.findByIdAndUpdate(
+      created._id,
       updateData,
       { new: true }
     );

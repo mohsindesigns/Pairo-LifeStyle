@@ -90,7 +90,6 @@ export async function PUT(req) {
     // Refund the deducted amount back to available balance (financial ledger record)
     await AffiliateLedger.record({
       affiliateId: affiliate._id,
-      tenantId: payout.tenantId || affiliate.tenantId || "default",
       type: 'Credit',
       amount: payout.amount,
       source: 'Reversal',

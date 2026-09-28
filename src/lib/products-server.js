@@ -6,7 +6,6 @@ export async function getProductsForShop() {
   await dbConnect();
   
   const products = await Product.find({
-    tenantId: 'DEFAULT_STORE',
     status: 'Published',
     isDeleted: { $ne: true }
   })

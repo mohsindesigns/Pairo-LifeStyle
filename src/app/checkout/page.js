@@ -453,7 +453,9 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           address: { country: formData.country, state: formData.state, city: formData.city, zip: formData.zip },
-          subtotal: cartSubtotal,
+          // Post-discount subtotal, so rate eligibility (e.g. "free shipping over $100")
+          // matches what the server evaluates in checkoutPricing.js, not the pre-discount cart value.
+          subtotal: Math.max(0, cartSubtotal - (discountTotal || 0) - (affiliateDiscountAmount || 0)),
           items: cartItems
         })
       });

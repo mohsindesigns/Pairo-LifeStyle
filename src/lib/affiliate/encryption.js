@@ -3,7 +3,17 @@ import crypto from 'crypto';
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
 
-// Derive a secure 32-byte key from whatever key passphrase is provided in Env variables
+// Derive a secure 32-byte key from whatever key passphrase is provided in Env variables.
+// In production this MUST come from the environment — a hardcoded fallback baked into
+// source would mean anyone with repo access could decrypt sensitive affiliate data at rest
+// in any deployment that forgot to set it. Only dev/test gets a (loud) fallback so local
+// work isn't blocked by a missing .env.local entry.
+if (!process.env.AFFILIATE_ENCRYPTION_KEY && process.env.NODE_ENV === 'production') {
+  throw new Error('AFFILIATE_ENCRYPTION_KEY must be set in production — refusing to encrypt affiliate data with a fallback key.');
+}
+if (!process.env.AFFILIATE_ENCRYPTION_KEY) {
+  console.error('[affiliate/encryption] AFFILIATE_ENCRYPTION_KEY is not set — using an insecure dev-only fallback key. Set it in .env.local before storing real data.');
+}
 const rawKey = process.env.AFFILIATE_ENCRYPTION_KEY || 'pairo-lifestyle-affiliate-system-passphrase-key-32-chars-long';
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(rawKey).digest();
 

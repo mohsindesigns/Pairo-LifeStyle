@@ -80,15 +80,13 @@ function roundValue(value, mode) {
 
 class TaxService {
   /**
-   * Fetch tax settings for a tenant. Returns safe, tax-disabled defaults if not configured.
-   * @param {string} tenantId
+   * Fetch tax settings. Returns safe, tax-disabled defaults if not configured.
    * @returns {Promise<object>}
    */
-  async getTaxSettings(tenantId) {
+  async getTaxSettings() {
     await dbConnect();
-    const settings = await TaxSettings.findOne({ tenantId }).lean();
+    const settings = await TaxSettings.findOne().lean();
     return settings ?? {
-      tenantId,
       enabled: false,
       calculationMethod: 'exclusive',
       taxRoundingMode: 'round',

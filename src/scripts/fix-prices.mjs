@@ -7,7 +7,7 @@ import Product from '../models/Product.js';
 async function fix() {
   await dbConnect();
   
-  const products = await Product.find({ tenantId: 'root' });
+  const products = await Product.find({});
   let fixedCount = 0;
   for (const p of products) {
     let price = p.price || 0;

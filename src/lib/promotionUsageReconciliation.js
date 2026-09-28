@@ -25,7 +25,6 @@ export async function reconcilePromotionUsage(order, delta) {
   const applied = order.financials?.appliedPromotions || [];
   if (applied.length === 0) return;
 
-  const tenantId = order.tenantId;
   const customerKey = order.customer?.userId
     ? `user:${order.customer.userId}`
     : order.customer?.email
@@ -39,7 +38,7 @@ export async function reconcilePromotionUsage(order, delta) {
     // persist which system generated an entry, so an ID lookup against both
     // collections is how legacy vs. enterprise is distinguished after the fact.
     const promotion = await Promotion.findOneAndUpdate(
-      { _id: entry.promotionId, tenantId },
+      { _id: entry.promotionId },
       {
         $inc: {
           'usageLimits.currentTotalUses': delta,
@@ -53,7 +52,7 @@ export async function reconcilePromotionUsage(order, delta) {
     if (promotion) {
       if (customerKey) {
         await PromotionCustomerUsage.updateOne(
-          { tenantId, promotionId: entry.promotionId, customerKey },
+          { promotionId: entry.promotionId, customerKey },
           { $inc: { usageCount: delta } }
         );
       }

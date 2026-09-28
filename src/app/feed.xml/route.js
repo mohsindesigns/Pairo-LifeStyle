@@ -9,7 +9,7 @@ export async function GET() {
   try {
     await dbConnect();
 
-    const siteConfig = await SiteConfig.findOne({ tenantId: "DEFAULT_STORE" }).lean();
+    const siteConfig = await SiteConfig.findOne({}).lean();
     let domain = siteConfig?.domain || "https://pairolifestyle.com";
     if (!domain.startsWith("http")) {
       domain = `https://${domain}`;

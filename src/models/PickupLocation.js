@@ -10,8 +10,6 @@ const OperatingHoursSchema = new mongoose.Schema({
 
 // ─── Pickup Location Schema ────────────────────────────────────────────────────
 const PickupLocationSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
-
   name:         { type: String, required: true, trim: true }, // e.g. "Lahore Flagship Store"
   instructions: { type: String, default: '' },                // shown to customer at checkout
 
@@ -34,7 +32,7 @@ const PickupLocationSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-PickupLocationSchema.index({ tenantId: 1, status: 1, sortOrder: 1 });
+PickupLocationSchema.index({ status: 1, sortOrder: 1 });
 
 delete mongoose.models.PickupLocation;
 export default mongoose.model('PickupLocation', PickupLocationSchema);

@@ -219,7 +219,6 @@ export async function POST(req, { params }) {
     const reviewStatus = isSpam ? "Spam" : "Pending";
 
     const review = await Review.create({
-      tenantId: "DEFAULT_STORE",
       productId: product._id,
       customerId: session ? session.user.id : null,
       orderId: new mongoose.Types.ObjectId(),

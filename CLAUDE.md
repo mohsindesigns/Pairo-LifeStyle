@@ -31,8 +31,8 @@ There is no `test` npm script — invoke `vitest` directly. Tests are integratio
 
 `src/middleware.js` is the perimeter: it protects `/admin/:path*` and `/api/admin/:path*`, redirecting unauthenticated or non-staff users to `/admin-login`, and does coarse-grained route-level permission checks (customers, settings/team, settings/roles) before the page even renders. Fine-grained checks happen in `src/lib/rbac.js`'s `can(staff, "module.action")`, used inside admin pages/API routes. `super-admin` role always bypasses permission checks.
 
-### Multi-tenant-shaped data model
-Most collections (Product, Order, etc.) carry a `tenantId` field defaulting to `'DEFAULT_STORE'` and most queries filter on it, even though this deployment only runs a single store. Preserve the `tenantId` filter pattern when writing new queries rather than dropping it.
+### Single-store data model
+This is a single-store deployment with no tenant/multi-store concept — there is no `tenantId` field on any model and no tenant scoping anywhere in the codebase. Do not reintroduce a tenant/store dimension to models or queries.
 
 ### CMS page builder (the biggest subsystem)
 Pages are stored as documents (`src/models/Page.js`) made of an ordered list of `{ type, config }` sections. Three registries drive this:
@@ -40,7 +40,7 @@ Pages are stored as documents (`src/models/Page.js`) made of an ordered list of 
 - `src/lib/section-registry.js` — `SECTION_REGISTRY`: maps a section `type` string to a `next/dynamic` React component.
 - `src/lib/section-schemas.js` — editable field schemas per section type, used to render the admin builder UI (`src/app/admin/pages/[id]/builder`, `src/components/admin/builder`).
 
-Rendering a page (`src/lib/page-cache.js` → `resolvePageAndTemplate`, `src/lib/page-data-resolver.js` → `resolvePageSections`) resolves each section's `config` against live data (e.g. `product_grid` resolves `productIds`/`collectionId` into real `Product` docs, respecting `isDeleted`/`status`/`tenantId`). `src/app/[slug]/page.js` is the catch-all route that serves any non-reserved top-level slug as a CMS page (after checking for a category-slug redirect and reserved routes in `src/lib/routes.js`'s `RESERVED_ROUTES` / `redirect-resolver.js`'s `RESERVED_SLUGS`). Adding a new section type requires updates in all three registries plus the corresponding component under `src/components/home` or `src/components/sections`.
+Rendering a page (`src/lib/page-cache.js` → `resolvePageAndTemplate`, `src/lib/page-data-resolver.js` → `resolvePageSections`) resolves each section's `config` against live data (e.g. `product_grid` resolves `productIds`/`collectionId` into real `Product` docs, respecting `isDeleted`/`status`). `src/app/[slug]/page.js` is the catch-all route that serves any non-reserved top-level slug as a CMS page (after checking for a category-slug redirect and reserved routes in `src/lib/routes.js`'s `RESERVED_ROUTES` / `redirect-resolver.js`'s `RESERVED_SLUGS`). Adding a new section type requires updates in all three registries plus the corresponding component under `src/components/home` or `src/components/sections`.
 
 ### Promotion/discount engine
 `src/lib/promotionEngine/` is a small rule pipeline: `Loader` → `ConditionEvaluator` → `ConflictResolver` → `ActionExecutor` → `Engine` (orchestrator), with `Validator`, `Debugger`, and `HistoryService` (writes `PromotionRevision`/`PromotionAuditLog`) alongside it. Admin promotion UI mirrors this structure under `src/components/admin/promotions/{RuleBuilder,ActionBuilder,History,Simulator}`.

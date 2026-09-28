@@ -99,14 +99,14 @@ export async function syncPromotionToStripe(promotion) {
       ...spec,
       duration: "once",
       name: promotion.title?.slice(0, 40) || code,
-      metadata: { promotionId: promotion._id.toString(), tenantId: promotion.tenantId },
+      metadata: { promotionId: promotion._id.toString() },
     });
 
     const promotionCodeParams = {
       promotion: { type: "coupon", coupon: coupon.id },
       code,
       active: isActive,
-      metadata: { promotionId: promotion._id.toString(), tenantId: promotion.tenantId },
+      metadata: { promotionId: promotion._id.toString() },
     };
     if (promotion.usageLimits?.maxTotalUses) {
       promotionCodeParams.max_redemptions = promotion.usageLimits.maxTotalUses;

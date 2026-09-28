@@ -78,12 +78,11 @@ const PageSchema = new mongoose.Schema({
     structuredData: String // JSON-LD
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
-  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
-  tenantId: { type: String, default: 'DEFAULT_STORE' }
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" }
 }, { timestamps: true });
 
 // Ensure slugs are indexable
-PageSchema.index({ slug: 1, tenantId: 1 }, { unique: true });
+PageSchema.index({ slug: 1 }, { unique: true });
 
 delete mongoose.models.Page;
 export default mongoose.models.Page || mongoose.model("Page", PageSchema);

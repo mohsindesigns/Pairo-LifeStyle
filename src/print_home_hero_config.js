@@ -3,7 +3,7 @@ const mongoose = require('/var/www/pairolifestyle.com/node_modules/mongoose');
 async function run() {
   const uri = "mongodb://pairolifestyle_user:mD%26tEam%2FpLs-19yY@127.0.0.1:27017/pairo?authSource=pairo&replicaSet=rs0";
   await mongoose.connect(uri);
-  const home = await mongoose.connection.db.collection('pages').findOne({ slug: 'home', tenantId: 'DEFAULT_STORE' });
+  const home = await mongoose.connection.db.collection('pages').findOne({ slug: 'home' });
   console.log("HOMEPAGE HERO SLIDER CONFIG:");
   if (home && home.sections) {
     home.sections.forEach(s => {

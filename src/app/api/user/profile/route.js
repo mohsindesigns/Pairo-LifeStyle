@@ -30,8 +30,7 @@ export async function GET() {
             orderHistory: []
           };
           const orders = await Order.find({
-            "customer.email": staff.email,
-            tenantId: 'DEFAULT_STORE'
+            "customer.email": staff.email
           }).sort({ createdAt: -1 }).lean();
           if (orders.length > 0) {
             const productIds = orders.flatMap(o => (o.items || []).map(item => item.productId)).filter(Boolean);
@@ -61,9 +60,8 @@ export async function GET() {
     }
 
     // Fetch Orders from Order collection (Live data)
-    const orders = await Order.find({ 
-      "customer.userId": session.user.id,
-      tenantId: 'DEFAULT_STORE' // or dynamic tenantId
+    const orders = await Order.find({
+      "customer.userId": session.user.id
     }).sort({ createdAt: -1 }).lean();
 
     // Fetch product images for any orders with missing image URLs

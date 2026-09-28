@@ -12,7 +12,6 @@ async function requireSettings() {
   return session;
 }
 
-const TENANT_ID = 'DEFAULT_STORE';
 const EXPECTED_HEADER = ['country', 'state', 'postcode', 'city', 'rate', 'name', 'priority', 'compound', 'shipping'];
 
 // Minimal CSV line parser — handles quoted fields with embedded commas/quotes.
@@ -97,7 +96,7 @@ export async function POST(req) {
       return NextResponse.json({ error: 'No valid rate rows found in CSV.' }, { status: 400 });
     }
 
-    const settings = await TaxSettings.findOne({ tenantId: TENANT_ID });
+    const settings = await TaxSettings.findOne();
     if (!settings) return NextResponse.json({ error: 'Tax settings not found — open the Tax settings page first.' }, { status: 404 });
 
     const taxClass = settings.taxClasses.find(c => c.key === classKey);

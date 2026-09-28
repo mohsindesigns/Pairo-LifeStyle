@@ -33,10 +33,8 @@ export async function GET(req) {
     const page = parseInt(searchParams.get("page")) || 1;
     const limit = parseInt(searchParams.get("limit")) || 10;
     const skip = (page - 1) * limit;
-    const tenantId = searchParams.get("tenantId") || "DEFAULT_STORE";
-    
-    // Base query must include tenantId
-    let query = { tenantId };
+
+    let query = {};
     // Filter by status if not "all"
     if (status && status !== "all") {
       if (status === "Affiliate") {
@@ -113,11 +111,6 @@ export async function POST(req) {
     sendConfirmation = true,
   } = body;
 
-  // tenantId is never trusted from the client — this deployment is single-tenant, and
-  // deriving it from request input would let any staff member with orders.create attach
-  // an order (and its stock decrement) to a tenant they don't belong to.
-  const tenantId = "DEFAULT_STORE";
-
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "At least one line item is required" }, { status: 400 });
   }
@@ -148,7 +141,7 @@ export async function POST(req) {
   // idempotencyKey the client generated and hand back the existing order instead of creating
   // a second one (with a second stock decrement) for the same submission.
   if (idempotencyKey) {
-    const existing = await Order.findOne({ idempotencyKey, tenantId }).lean();
+    const existing = await Order.findOne({ idempotencyKey }).lean();
     if (existing) {
       return NextResponse.json({ success: true, order: existing });
     }
@@ -163,7 +156,7 @@ export async function POST(req) {
 
       for (const item of items) {
         const quantity = Math.max(1, parseInt(item.quantity, 10) || 1);
-        const product = await Product.findOne({ _id: item.productId, tenantId, isDeleted: false }).session(mongoSession);
+        const product = await Product.findOne({ _id: item.productId, isDeleted: false }).session(mongoSession);
         if (!product) throw new Error(`Product not found: ${item.productId}`);
 
         const selectedOptions = item.selectedOptions && Object.keys(item.selectedOptions).length > 0
@@ -176,7 +169,7 @@ export async function POST(req) {
 
         if (product.manageStock) {
           const invRes = await Product.findOneAndUpdate(
-            { _id: product._id, tenantId, stock: { $gte: quantity } },
+            { _id: product._id, stock: { $gte: quantity } },
             { $inc: { stock: -quantity } },
             { session: mongoSession, new: true }
           );
@@ -204,7 +197,7 @@ export async function POST(req) {
       const subtotal = orderItems.reduce((sum, item) => sum + item.priceAtPurchase * item.quantity, 0);
       const total = subtotal + shippingCost;
 
-      const orderNumber = await getNextOrderNumber(tenantId, mongoSession);
+      const orderNumber = await getNextOrderNumber(mongoSession);
 
       let customerInfo = { userId: null, email: customer?.email || "", isGuest: true };
       if (customer?.customerId) {
@@ -217,7 +210,6 @@ export async function POST(req) {
       const staffName = session.user.name || session.user.email || "Admin";
 
       const orderDoc = {
-        tenantId,
         orderNumber,
         idempotencyKey: idempotencyKey || undefined,
         status: "Confirmed",

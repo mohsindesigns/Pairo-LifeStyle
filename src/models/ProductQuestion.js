@@ -8,7 +8,6 @@ const QuestionReplySchema = new mongoose.Schema({
 });
 
 const ProductQuestionSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: "DEFAULT_STORE", index: true },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true, index: true },
   customerName: { type: String, required: true },
   customerEmail: { type: String, required: true, index: true },

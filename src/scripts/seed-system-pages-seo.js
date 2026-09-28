@@ -58,13 +58,12 @@ async function seedSystemPages() {
       status: "Published",
       template: "default",
       isSystem: true,
-      tenantId: "DEFAULT_STORE",
       sections: [],
       seo: page.seo,
       updatedAt: new Date()
     };
 
-    const existing = await pagesCollection.findOne({ slug: page.slug, tenantId: "DEFAULT_STORE" });
+    const existing = await pagesCollection.findOne({ slug: page.slug });
     if (existing) {
       console.log(`Page "${page.slug}" already exists. Updating its metadata...`);
       await pagesCollection.updateOne(

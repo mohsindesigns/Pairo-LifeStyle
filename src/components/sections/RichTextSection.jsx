@@ -1,5 +1,7 @@
 "use client";
 
+import { sanitizeRichHtml } from "@/lib/sanitize";
+
 function makeLinksDofollow(html) {
   if (!html) return "";
   return html.replace(/<a\s+([^>]*href=["']([^"']*)["'][^>]*)>/gi, (match, body) => {
@@ -142,7 +144,7 @@ export default function RichTextSection({ title = "", content = "", headingLevel
             {content && (
               <div
                 className="rich-text-body"
-                dangerouslySetInnerHTML={{ __html: makeLinksDofollow(content) }}
+                dangerouslySetInnerHTML={{ __html: makeLinksDofollow(sanitizeRichHtml(content)) }}
               />
             )}
           </div>

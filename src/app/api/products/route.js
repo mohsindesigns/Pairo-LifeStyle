@@ -11,9 +11,8 @@ export async function GET(req) {
     const id = searchParams.get('id');
 
     // Always filter for Published and not Deleted for public API
-    const baseQuery = { 
-        tenantId: searchParams.get('tenantId') || 'DEFAULT_STORE',
-        status: 'Published', 
+    const baseQuery = {
+        status: 'Published',
         isDeleted: { $ne: true } 
     };
 

@@ -11,8 +11,7 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(req) {
   const correlationId = req.headers.get("x-correlation-id") || crypto.randomUUID();
-  const tenantId = req.headers.get("x-tenant-id") || "DEFAULT_STORE";
-  const log = getContextLogger(correlationId, { path: '/api/checkout', tenantId });
+  const log = getContextLogger(correlationId, { path: '/api/checkout' });
   const ip = getClientIp(req);
 
   // 1. Rate Limiting (10 checkouts per minute per IP)
@@ -53,7 +52,7 @@ export async function POST(req) {
       const checkoutEmail = (body.customerEmail || authSession?.user?.email || "").trim().toLowerCase();
 
       if (idempotencyKey) {
-        const existingOrder = await Order.findOne({ idempotencyKey, tenantId });
+        const existingOrder = await Order.findOne({ idempotencyKey });
         if (existingOrder) {
           log.warn({ idempotencyKey, orderNumber: existingOrder.orderNumber }, "Idempotency hit");
           return NextResponse.json({ success: true, orderNumber: existingOrder.orderNumber });
@@ -61,7 +60,6 @@ export async function POST(req) {
       }
 
       const checkoutResult = await createOrderFromCheckoutPayload(body, {
-        tenantId,
         orderUserId,
         checkoutEmail,
         isGuestSession: !orderUserId,
@@ -89,7 +87,7 @@ export async function POST(req) {
       // or double-clicked request. The order exists and is correct — return it as success
       // instead of showing the customer a scary duplicate-key error.
       if (error.code === 11000 && idempotencyKey) {
-        const existingOrder = await Order.findOne({ idempotencyKey, tenantId }).catch(() => null);
+        const existingOrder = await Order.findOne({ idempotencyKey }).catch(() => null);
         if (existingOrder) {
           log.warn({ idempotencyKey, orderNumber: existingOrder.orderNumber }, "Duplicate submit resolved to existing order");
           return NextResponse.json({ success: true, orderNumber: existingOrder.orderNumber, orderId: existingOrder._id });

@@ -32,15 +32,13 @@ export async function POST(req) {
       );
     }
 
-    const tenantId = "DEFAULT_STORE";
-
     // ── Safe order number generation ──────────────────────────────────
-    const count = await Order.countDocuments({ tenantId });
+    const count = await Order.countDocuments({});
     const orderNumber = `PAI-${1000 + count + 1}`;
 
     // ── Generate unique idempotencyKey to avoid duplicate-index conflicts ─
-    // The Order schema has a compound unique index { tenantId, idempotencyKey }.
-    // If idempotencyKey is null and tenantId is the same, subsequent custom
+    // The Order schema has a unique index on idempotencyKey.
+    // If idempotencyKey is null, subsequent custom
     // orders throw E11000. A per-request UUID eliminates this completely.
     const idempotencyKey = `custom-${crypto.randomUUID()}`;
 
@@ -83,7 +81,6 @@ export async function POST(req) {
 
     // ── Create Order ──────────────────────────────────────────────────
     const newOrder = await Order.create({
-      tenantId,
       orderNumber,
       status: "Pending",
       items: [

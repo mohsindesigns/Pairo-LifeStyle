@@ -6,9 +6,7 @@ const AffiliateApplicationSchema = new mongoose.Schema({
   email: { type: String, required: true, index: true },
   phone: { type: String, required: true },
   dob: { type: Date, required: true },
-  
-  tenantId: { type: String, default: 'default', index: true }, // SaaS multi-tenancy
-  
+
   address: {
     country: { type: String, required: true },
     state: { type: String, required: true },
