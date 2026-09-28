@@ -56,6 +56,37 @@ export default class Validator {
       });
     }
 
+    // 3b. Condition/Action scope mismatch — the single most common promo-authoring mistake:
+    // a condition restricts eligibility to specific product(s)/category(s)/collection(s), but
+    // the discount action's target is left on its "Entire Cart" default, so the promo silently
+    // discounts everything once the eligibility condition is met, not just the triggering
+    // item(s). Warn (not block) since a cart-wide reward for buying a qualifying item is
+    // sometimes intentional — but it's worth the admin double-checking.
+    const scopedConditionFields = new Set();
+    const collectScopedFields = (group) => {
+      if (!group) return;
+      const { rules = [] } = group;
+      rules.forEach(rule => {
+        if (rule.operator) {
+          collectScopedFields(rule);
+        } else if (rule.field === 'product_id' || rule.field === 'category_id' || rule.field === 'collection_id') {
+          scopedConditionFields.add(rule.field);
+        }
+      });
+    };
+    collectScopedFields(promotion.conditions);
+
+    if (scopedConditionFields.size > 0) {
+      (promotion.actions || []).forEach((action, index) => {
+        if ((action.type === 'percentage_discount' || action.type === 'fixed_discount') && (!action.target || action.target === 'cart')) {
+          warnings.push({
+            field: `actions.${index}.target`,
+            message: 'This promotion only activates for specific product(s)/category/collection, but this action\'s Target is "Entire Cart" — it will discount the WHOLE cart once that condition is met, not just the qualifying item. If you meant to discount only the qualifying item(s), change Target to "Specific Products/Categories/Collections" and pick the same ones here.'
+          });
+        }
+      });
+    }
+
     // 4. BXGY Specific Checks
     const bxgyActions = promotion.actions?.filter(a => a.type === 'bxgy') || [];
     bxgyActions.forEach((action, index) => {

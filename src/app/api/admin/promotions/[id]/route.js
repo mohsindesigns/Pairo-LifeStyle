@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
+import Validator from "@/lib/promotionEngine/Validator";
 import { syncPromotionToStripe, deactivatePromotionStripeCode } from "@/lib/promotionEngine/StripeSync";
 import { cache } from "@/lib/cache";
 import { can } from "@/lib/rbac";
@@ -59,7 +60,16 @@ export async function PUT(req, { params }) {
     const oldPromo = await Promotion.findById(id);
     if (!oldPromo) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const promotion = await Promotion.findByIdAndUpdate(id, stripServerManagedFields(data), { new: true, runValidators: true });
+    const safeData = stripServerManagedFields(data);
+
+    // Server-side enforcement — see the matching comment in the promotions list POST route.
+    // The admin editor's client-side Validator check is easy to bypass.
+    const validation = Validator.validate({ ...oldPromo.toObject(), ...safeData });
+    if (!validation.isValid) {
+      return NextResponse.json({ error: validation.errors[0]?.message || "Invalid promotion configuration", errors: validation.errors }, { status: 400 });
+    }
+
+    const promotion = await Promotion.findByIdAndUpdate(id, safeData, { new: true, runValidators: true });
 
     // Track History
     const diff = HistoryService.generateDiff(oldPromo.toObject(), promotion.toObject());

@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
+import Validator from "@/lib/promotionEngine/Validator";
 import { syncPromotionToStripe } from "@/lib/promotionEngine/StripeSync";
 import { cache } from "@/lib/cache";
 import { can } from "@/lib/rbac";
@@ -68,6 +69,15 @@ export async function POST(req) {
     }
 
     const promotionData = stripServerManagedFields(data);
+
+    // Server-side enforcement of the same checks the admin editor shows client-side (e.g. a
+    // product/category/collection target must have at least one targetId) — the client check
+    // is easy to bypass (devtools, a direct API call, a UI bug), and a promotion that skips
+    // it can silently discount the entire cart instead of the intended scope.
+    const validation = Validator.validate(promotionData);
+    if (!validation.isValid) {
+      return NextResponse.json({ error: validation.errors[0]?.message || "Invalid promotion configuration", errors: validation.errors }, { status: 400 });
+    }
 
     const promotion = await Promotion.create(promotionData);
 
