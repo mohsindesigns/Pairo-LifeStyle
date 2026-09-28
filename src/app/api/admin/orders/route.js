@@ -191,6 +191,7 @@ export async function POST(req) {
           priceAtPurchase,
           quantity,
           ...(variantTitle ? { selectedVariant: { title: variantTitle, options: selectedOptions } } : {}),
+          ...(item.customization?.enabled ? { customization: item.customization } : {}),
         });
       }
 

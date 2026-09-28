@@ -680,14 +680,20 @@ export default function OrderDetailPage() {
                                   {item.customization.leatherType && item.customization.leatherType !== "None" && (
                                     <div><span className="font-semibold text-[#646970]">Leather Type:</span> {item.customization.leatherType} {item.customization.leatherTypeNote && `(${item.customization.leatherTypeNote})`}</div>
                                   )}
-                                  {item.customization.lining && item.customization.lining !== "None" && (
-                                    <div><span className="font-semibold text-[#646970]">Lining:</span> {item.customization.lining}</div>
+                                  {item.customization.innerLining && item.customization.innerLining !== "None" && (
+                                    <div><span className="font-semibold text-[#646970]">Inner Lining:</span> {item.customization.innerLining} {item.customization.innerLiningNote && `(${item.customization.innerLiningNote})`}</div>
                                   )}
                                   {item.customization.hardwareColor && item.customization.hardwareColor !== "None" && (
-                                    <div><span className="font-semibold text-[#646970]">Hardware:</span> {item.customization.hardwareColor}</div>
+                                    <div><span className="font-semibold text-[#646970]">Hardware:</span> {item.customization.hardwareColor} {item.customization.hardwareColorNote && `(${item.customization.hardwareColorNote})`}</div>
                                   )}
-                                  {item.customization.notes && (
-                                    <div className="text-neutral-500 italic">"{item.customization.notes}"</div>
+                                  {item.customization.fur?.type && item.customization.fur.type !== "None" && (
+                                    <div>
+                                      <span className="font-semibold text-[#646970]">Fur:</span> {item.customization.fur.type}
+                                      {item.customization.fur.color && ` · ${item.customization.fur.color}`}
+                                      {item.customization.fur.density && ` · ${item.customization.fur.density}`}
+                                      {item.customization.fur.placement?.length > 0 && ` · ${item.customization.fur.placement.join(", ")}`}
+                                      {item.customization.fur.removable !== null && item.customization.fur.removable !== undefined && ` · ${item.customization.fur.removable ? "Removable" : "Fixed"}`}
+                                    </div>
                                   )}
                                   {item.customization.artwork && Object.values(item.customization.artwork).some(Boolean) && (
                                     <div className="mt-2 pt-2 border-t border-neutral-100 space-y-1">

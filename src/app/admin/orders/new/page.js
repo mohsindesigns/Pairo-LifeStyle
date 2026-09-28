@@ -7,6 +7,7 @@ import { Plus, Trash2, Search, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { can } from "@/lib/rbac";
+import CustomizationEditor, { defaultCustomization } from "./CustomizationEditor";
 
 const inputClass = "w-full bg-white border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] transition-all text-black";
 const labelClass = "block text-[11px] font-bold text-[#3c434a] uppercase tracking-wide mb-1";
@@ -82,6 +83,8 @@ function ProductPicker({ onAdd }) {
       variantTitle: resolveVariantTitle(pendingProduct, selectedOptions),
       quantity: Math.max(1, parseInt(quantity, 10) || 1),
       price: Number(price) || 0,
+      orderType: "simple",
+      customization: null,
     });
     setPendingProduct(null);
   };
@@ -249,6 +252,7 @@ export default function AdminNewOrderPage() {
             selectedOptions: i.selectedOptions,
             quantity: i.quantity,
             priceOverride: i.price,
+            customization: i.orderType === "customized" ? i.customization : null,
           })),
           customer: customerMode === "existing"
             ? { customerId: selectedCustomerId }
@@ -297,30 +301,63 @@ export default function AdminNewOrderPage() {
               {lineItems.length > 0 && (
                 <div className="divide-y divide-[#f0f0f1] border border-[#f0f0f1] rounded-[3px]">
                   {lineItems.map(item => (
-                    <div key={item.key} className="flex items-center gap-3 p-2.5">
-                      <img src={item.image || "/placeholder.jpg"} alt="" className="w-10 h-10 object-cover rounded-[2px] border border-[#e0e0e0] shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold text-black truncate">{item.name}</p>
-                        {item.variantTitle && <p className="text-[11px] text-[#646970]">{item.variantTitle}</p>}
+                    <div key={item.key} className="p-2.5 space-y-2.5">
+                      <div className="flex items-center gap-3">
+                        <img src={item.image || "/placeholder.jpg"} alt="" className="w-10 h-10 object-cover rounded-[2px] border border-[#e0e0e0] shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-semibold text-black truncate">{item.name}</p>
+                          {item.variantTitle && <p className="text-[11px] text-[#646970]">{item.variantTitle}</p>}
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.quantity}
+                          onChange={(e) => updateItem(item.key, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                          className="w-16 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[12px] text-center"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={item.price}
+                          onChange={(e) => updateItem(item.key, { price: e.target.value })}
+                          className="w-24 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[12px] text-right"
+                        />
+                        <button type="button" onClick={() => removeItem(item.key)} className="text-[#bc0b0d] hover:text-red-700 cursor-pointer shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) => updateItem(item.key, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                        className="w-16 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[12px] text-center"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={item.price}
-                        onChange={(e) => updateItem(item.key, { price: e.target.value })}
-                        className="w-24 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[12px] text-right"
-                      />
-                      <button type="button" onClick={() => removeItem(item.key)} className="text-[#bc0b0d] hover:text-red-700 cursor-pointer shrink-0">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+
+                      <div className="flex items-center gap-4 pl-[52px] text-[12px] font-semibold">
+                        <span className="text-[10px] font-bold uppercase text-[#646970]">Order Type:</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            checked={item.orderType !== "customized"}
+                            onChange={() => updateItem(item.key, { orderType: "simple" })}
+                            className="accent-[#2271b1]"
+                          />
+                          Simple
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="radio"
+                            checked={item.orderType === "customized"}
+                            onChange={() => updateItem(item.key, { orderType: "customized", customization: item.customization || defaultCustomization() })}
+                            className="accent-[#2271b1]"
+                          />
+                          Customized Order
+                        </label>
+                      </div>
+
+                      {item.orderType === "customized" && (
+                        <div className="pl-[52px]">
+                          <CustomizationEditor
+                            value={item.customization}
+                            onChange={(c) => updateItem(item.key, { customization: c })}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
