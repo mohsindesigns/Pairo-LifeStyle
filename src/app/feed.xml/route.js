@@ -18,7 +18,12 @@ export async function GET() {
       domain = domain.slice(0, -1);
     }
 
-    const currency = siteConfig?.commerce?.storeCurrency || "USD";
+    // Always USD, regardless of the site's "Store Currency" display setting — every product's
+    // price in the database is a real USD amount (Stripe charges in USD, checkout/order
+    // financials default to USD everywhere), so labeling the feed with a different currency
+    // code would misrepresent the same numeric price as a different amount of money, not
+    // convert it.
+    const currency = "USD";
 
     // Only published/eligible products (not deleted, status is Published)
     const products = await Product.find({
@@ -132,6 +137,11 @@ export async function GET() {
     return new NextResponse(xml, {
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
+        // This route is already re-run against the live DB on every request (dynamic =
+        // "force-dynamic"), but without an explicit no-store header a CDN/reverse proxy in
+        // front of the app is free to cache the response anyway — that would silently serve
+        // stale prices/products after an edit until that cache layer's own TTL expires.
+        "Cache-Control": "no-store, max-age=0",
       },
     });
   } catch (error) {
@@ -149,6 +159,7 @@ export async function GET() {
         status: 500,
         headers: {
           "Content-Type": "application/xml; charset=utf-8",
+          "Cache-Control": "no-store, max-age=0",
         },
       }
     );
