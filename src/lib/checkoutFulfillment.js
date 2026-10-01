@@ -5,6 +5,8 @@ import Order from "@/models/Order";
 import Product from "@/models/Product";
 import Customer from "@/models/Customer";
 import Counter from "@/models/Counter";
+import AbandonedCart from "@/models/AbandonedCart";
+import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 import pairoEvents from "@/lib/events";
 import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
@@ -78,6 +80,9 @@ export async function createOrderFromCheckoutPayload(payload, {
   const missingAddressFields = requiredAddressFields.filter(f => !String(shippingAddress?.[f] || '').trim());
   if (missingAddressFields.length > 0) {
     throw new Error(`Shipping address is incomplete (missing: ${missingAddressFields.join(', ')}). Please provide a full shipping address before placing an order.`);
+  }
+  if (isRestrictedCountry(shippingAddress?.country, shippingAddress?.countryCode)) {
+    throw new Error(RESTRICTED_COUNTRY_MESSAGE);
   }
   const resolvedEmail = (customerEmail || checkoutEmail || '').trim();
   if (!resolvedEmail) {
@@ -330,6 +335,16 @@ export async function createOrderFromCheckoutPayload(payload, {
     // awaited so it can't slow or break checkout; no-ops unless PINTEREST_* env vars are set.
     // Dedupes with the browser pixel via a shared event_id (`checkout_<orderNumber>`).
     sendPinterestPurchaseEvent(checkoutResult, { clientIp: ipAddress, clientUserAgent }).catch(() => {});
+
+    // This checkout session completed for real — its autosaved abandoned-cart snapshot (if
+    // any) is no longer an abandonment, just an in-progress record that finished. Best-effort
+    // only; never let this affect the order that was already successfully created.
+    if (idempotencyKey) {
+      AbandonedCart.updateOne(
+        { sessionKey: idempotencyKey },
+        { $set: { status: 'recovered', orderId: checkoutResult._id } }
+      ).catch(() => {});
+    }
   }
 
   return checkoutResult;

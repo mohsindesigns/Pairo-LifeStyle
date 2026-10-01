@@ -14,6 +14,7 @@ import StripePaymentForm from "@/components/checkout/StripePaymentForm";
 import { usePopup } from "@/context/PopupContext";
 import { getProductUrl } from "@/lib/routes";
 import { trackBeginCheckout, trackAddShippingInfo, trackAddPaymentInfo } from "@/lib/analytics";
+import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -270,6 +271,17 @@ export default function CheckoutPage() {
   // switches to a simplified "no payment required" flow instead of the normal Stripe/COD choice.
   const isFreeOrder = Math.max(0, (cartSubtotal || 0) - (discountTotal || 0) - (affiliateDiscountAmount || 0)) <= 0;
 
+  // We don't ship to / serve some countries at all — block the entire rest of checkout the
+  // moment that's selected, both here (immediate feedback) and authoritatively on the server
+  // (so it can't be bypassed by skipping the UI).
+  const isRestricted = isRestrictedCountry(formData.country, formData.countryCode);
+
+  // "Personal information" — everything needed to actually fulfill and contact the customer
+  // about this order. No payment method should even be offered until this is filled in, so a
+  // shopper can't pay before we have anywhere to ship to or any way to reach them.
+  const requiredFieldsFilled = ["email", "lastName", "street", "city", "phone", "zip", "country"]
+    .every(f => String(formData[f] || "").trim().length > 0);
+
   // Force the free-shipping selection while the order is $0, and release it back to a real
   // rate selection once it no longer is (e.g. the coupon is removed).
   useEffect(() => {
@@ -503,7 +515,7 @@ export default function CheckoutPage() {
     let error = "";
     const cleanVal = (value || "").trim();
 
-    if (["email", "lastName", "street", "city", "phone"].includes(name) && !cleanVal) {
+    if (["email", "lastName", "street", "city", "phone", "country"].includes(name) && !cleanVal) {
       return "This field is required";
     }
 
@@ -654,7 +666,8 @@ export default function CheckoutPage() {
       state: formData.state,
       zip: formData.zip,
       phone: formData.phone,
-      country: formData.country
+      country: formData.country,
+      countryCode: formData.countryCode
     },
     shippingSnapshot: selectedShipping ? {
       version: 1,
@@ -713,6 +726,10 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (paymentMethod !== "card" || isFreeOrder) return;
     if (!idempotencyKey || !cartItems || cartItems.length === 0) return;
+    // Don't create (or leak money-collecting intent for) a PaymentIntent until there's
+    // somewhere to ship to and someone to contact — also avoids ever snapshotting a blank
+    // checkout payload in the first place.
+    if (isRestricted || !requiredFieldsFilled) return;
 
     Promise.resolve().then(() => {
       setClientSecret("");
@@ -723,7 +740,82 @@ export default function CheckoutPage() {
       fetchClientSecret(buildCheckoutPayloadRef.current());
     }, 600);
     return () => clearTimeout(t);
-  }, [paymentMethod, isFreeOrder, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret]);
+  }, [paymentMethod, isFreeOrder, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret, isRestricted, requiredFieldsFilled]);
+
+  // Autosave an abandoned-cart snapshot once the shopper has actually started entering their
+  // details (not just landed on the page with items in cart) — so if they leave without
+  // finishing, the admin can still see who they were, what they wanted, and when. Debounced to
+  // avoid hammering the server on every keystroke; marked "recovered" server-side the moment
+  // this same idempotencyKey turns into a real order.
+  const hasStartedCheckout = Boolean((formData.email || formData.lastName || formData.street || "").trim());
+  useEffect(() => {
+    if (!idempotencyKey || !hasStartedCheckout || !cartItems || cartItems.length === 0) return;
+
+    const t = setTimeout(() => {
+      fetch("/api/checkout/abandoned-cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionKey: idempotencyKey,
+          items: cartItems,
+          cartSubtotal,
+          cartTotal,
+          contact: { email: formData.email, firstName: formData.firstName, lastName: formData.lastName, phone: formData.phone },
+          shippingAddress: {
+            fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+            street: formData.street,
+            city: formData.city,
+            state: formData.state,
+            zip: formData.zip,
+            country: formData.country,
+            phone: formData.phone,
+          },
+        }),
+      }).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idempotencyKey, hasStartedCheckout, cartItems, cartSubtotal, cartTotal, formData.email, formData.firstName, formData.lastName, formData.phone, formData.street, formData.city, formData.state, formData.zip, formData.country]);
+
+  // The PaymentIntent above is created/refreshed only when cart contents, shipping cost,
+  // promo code, or the selected shipping method change — NOT when the shopper edits their
+  // email, name, street, or phone. Those fields can be auto-selected (e.g. the default
+  // "United States" country already lets a shipping rate resolve before the shopper has
+  // typed anything else) long before the contact/address fields are filled in, so the very
+  // first PaymentIntent snapshot can capture a nearly-blank form. The server only ever builds
+  // the final order from whatever was last stored against this PaymentIntent — never anything
+  // sent at the moment of clicking "pay" — so without this, a shopper who fills the form in a
+  // particular order (or whose browser autofills address but not name/email) can pay
+  // successfully while the saved order ends up with a blank/incomplete shipping address, with
+  // no error shown anywhere. Re-sending the payload right before confirming payment guarantees
+  // the stored checkout data matches what just passed validation, not a stale early snapshot.
+  const finalizeAndValidateForPayment = async () => {
+    if (!validateForm()) return false;
+    try {
+      const res = await fetch("/api/checkout/create-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCheckoutPayloadRef.current())
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showPopup({
+          title: "Order Details Changed",
+          message: data.error || "Please double-check your information and try again.",
+          type: "error",
+        });
+        return false;
+      }
+      return true;
+    } catch (err) {
+      showPopup({
+        title: "Network Error",
+        message: "Could not confirm your order details. Please check your connection and try again.",
+        type: "error",
+      });
+      return false;
+    }
+  };
 
   const handlePayment = async () => {
     if (!validateForm()) return;
@@ -950,13 +1042,21 @@ export default function CheckoutPage() {
                   labelClass={labelClass}
                   required
                   onChange={(val, matched) => {
+                    const countryCode = matched ? matched.isoCode : "";
                     setFormData(prev => ({
                       ...prev,
                       country: val,
-                      countryCode: matched ? matched.isoCode : "",
+                      countryCode,
                       state: "", stateCode: "", city: ""
                     }));
                     setErrors(prev => ({ ...prev, country: "" }));
+                    if (isRestrictedCountry(val, countryCode)) {
+                      showPopup({
+                        title: "Shipping Not Available",
+                        message: RESTRICTED_COUNTRY_MESSAGE,
+                        type: "error",
+                      });
+                    }
                   }}
                 />
                 {errors.country && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.country}</p>}
@@ -1127,7 +1227,12 @@ export default function CheckoutPage() {
             {/* 3. Shipping Method */}
             <section className="space-y-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-black">Shipping Method</h2>
-              {isFreeOrder ? (
+              {isRestricted ? (
+                <div className="border border-red-200 bg-red-50 rounded-[4px] p-4">
+                  <p className="text-[13px] font-bold text-red-800">Shipping Unavailable</p>
+                  <p className="text-[11px] text-red-700 mt-0.5">{RESTRICTED_COUNTRY_MESSAGE}</p>
+                </div>
+              ) : isFreeOrder ? (
                 <div className="border border-neutral-200 rounded-[4px] bg-white p-4 flex items-center justify-between">
                   <p className="text-[13px] font-semibold text-black">Free Shipping</p>
                   <span className="text-[13px] font-bold text-black font-mono">Free</span>
@@ -1178,7 +1283,17 @@ export default function CheckoutPage() {
             {/* 4. Payment Method */}
             <section className="space-y-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-black">Payment</h2>
-              {isFreeOrder ? (
+              {isRestricted ? (
+                <div className="border border-red-200 bg-red-50 rounded-[4px] p-4">
+                  <p className="text-[13px] font-bold text-red-800">Checkout Unavailable</p>
+                  <p className="text-[11px] text-red-700 mt-0.5">{RESTRICTED_COUNTRY_MESSAGE}</p>
+                </div>
+              ) : !requiredFieldsFilled ? (
+                <div className="border border-neutral-200 bg-[#FAF9F6] rounded-[4px] p-4">
+                  <p className="text-[13px] font-semibold text-black">Complete your contact & delivery details above</p>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">Payment options will appear once your name, email, address, and phone number are filled in.</p>
+                </div>
+              ) : isFreeOrder ? (
                 <div className="border border-green-200 bg-green-50 rounded-[4px] p-4">
                   <p className="text-[13px] font-bold text-green-800">No payment required</p>
                   <p className="text-[11px] text-green-700 mt-0.5">Your order total is $0 — nothing to charge.</p>
@@ -1245,7 +1360,7 @@ export default function CheckoutPage() {
                       <StripePaymentForm
                         returnUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/checkout/success?idempotencyKey=${idempotencyKey}`}
                         idempotencyKey={idempotencyKey}
-                        onValidate={validateForm}
+                        onValidate={finalizeAndValidateForPayment}
                         onBeforeSubmit={() => {
                           if (!hasFiredPayment.current) {
                             hasFiredPayment.current = true;
@@ -1262,17 +1377,19 @@ export default function CheckoutPage() {
               )}
 
               {/* Security check — required before any payment method (including a free order) can submit */}
-              <div className="pt-4">
-                <TurnstileWidget
-                  ref={turnstileRef}
-                  onVerify={(token) => setTurnstileToken(token)}
-                  onExpire={() => setTurnstileToken("")}
-                />
-              </div>
+              {!isRestricted && requiredFieldsFilled && (
+                <div className="pt-4">
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken("")}
+                  />
+                </div>
+              )}
             </section>
 
             {/* Submit Action (Cash on Delivery / free order only — Card has its own submit button above) */}
-            {(isFreeOrder || paymentMethod === "cod") && (
+            {!isRestricted && requiredFieldsFilled && (isFreeOrder || paymentMethod === "cod") && (
               <div className="space-y-4">
                 <button
                   type="button"

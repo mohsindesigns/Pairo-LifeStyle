@@ -7,6 +7,7 @@ import Product from "@/models/Product";
 import stripe from "@/lib/stripe";
 import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { getContextLogger, LogCategory } from "@/lib/logger";
+import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
@@ -33,6 +34,9 @@ export async function POST(req) {
     const missingAddressFields = requiredAddressFields.filter(f => !String(shippingAddress?.[f] || '').trim());
     if (missingAddressFields.length > 0) {
       return NextResponse.json({ error: `Shipping address is incomplete (missing: ${missingAddressFields.join(', ')}).` }, { status: 400 });
+    }
+    if (isRestrictedCountry(shippingAddress?.country, shippingAddress?.countryCode)) {
+      return NextResponse.json({ error: RESTRICTED_COUNTRY_MESSAGE }, { status: 400 });
     }
 
     const existingOrder = await Order.findOne({ idempotencyKey });

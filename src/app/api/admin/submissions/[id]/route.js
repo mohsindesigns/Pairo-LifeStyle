@@ -50,6 +50,14 @@ export async function PATCH(req, { params }) {
     const data = await req.json();
     const { action, ...updates } = data;
 
+    // Replying (adding an internal note) and triaging (status/priority/assignment) are
+    // distinct permissions — a reply-only role must not be able to reassign or re-prioritize,
+    // and vice versa.
+    const requiredPermission = action === "ADD_NOTE" ? "submissions.reply" : "submissions.assign";
+    if (!can(session.user, requiredPermission)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     let updateQuery = {};
     let auditAction = 'UPDATE_SUBMISSION';
 

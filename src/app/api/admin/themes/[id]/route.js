@@ -9,7 +9,8 @@ import { logAction } from "@/lib/audit";
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  
+  if (!can(session.user, "settings.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const { id } = await params;
   await dbConnect();
   try {

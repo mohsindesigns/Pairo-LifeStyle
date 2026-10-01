@@ -25,7 +25,9 @@ export async function GET(req, { params }) {
 export async function PATCH(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!can(session.user, "submissions.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // Updating status/priority/notes is a triage action, not mere viewing — a view-only role
+  // must not be able to mutate inquiries.
+  if (!can(session.user, "submissions.assign")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   await dbConnect();
@@ -52,7 +54,7 @@ export async function PATCH(req, { params }) {
 export async function DELETE(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!can(session.user, "submissions.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!can(session.user, "submissions.delete")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
   await dbConnect();

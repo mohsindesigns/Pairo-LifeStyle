@@ -6,6 +6,10 @@ import { can } from "@/lib/rbac";
 import { authOptions } from "../../auth/[...nextauth]/route";
 
 export async function GET(req) {
+   const session = await getServerSession(authOptions);
+   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   if (!can(session.user, "blogs.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
    await dbConnect();
    const { searchParams } = new URL(req.url);
    const id = searchParams.get("id");
@@ -37,7 +41,7 @@ export async function GET(req) {
 export async function POST(req) {
    const session = await getServerSession(authOptions);
    if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   if (!can(session.user, "blogs.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+   if (!can(session.user, "blogs.create")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
    
    await dbConnect();
    try {
@@ -70,7 +74,7 @@ export async function POST(req) {
 export async function PUT(req) {
    const session = await getServerSession(authOptions);
    if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-   if (!can(session.user, "blogs.create")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+   if (!can(session.user, "blogs.edit")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
    await dbConnect();
    try {

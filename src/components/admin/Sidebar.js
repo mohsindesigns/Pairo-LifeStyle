@@ -197,6 +197,7 @@ export default function AdminSidebar({ open = false, onClose }) {
             isOpen={openAccordion === "commerce"} onToggle={() => handleToggle("commerce")}
           >
             <NavLink href="/admin/orders" exact isSubmenu>Orders</NavLink>
+            <NavLink href="/admin/abandoned-carts" exact isSubmenu>Abandoned Carts</NavLink>
             <NavLink href="/admin/custom-jacket-orders" exact isSubmenu>Custom Orders</NavLink>
             <NavLink href="/admin/custom-jacket-inquiries" exact isSubmenu>Custom Inquiries</NavLink>
             <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>

@@ -139,7 +139,13 @@ export const authOptions = {
       if (token?.isStaff && token.id) {
           try {
               await dbConnect();
-              const staff = await Staff.findById(token.id).select('status roleId').populate('roleId');
+              // .lean() is essential here, not just a performance nicety: Role.permissions is a
+              // Mongoose Map field, and without .lean() this stays a live Map instance all the
+              // way into the session object. rbac.js's can() does plain `permissions[module]`
+              // property access, which silently returns undefined on a real Map (it needs
+              // .get()) — every fine-grained permission check was returning false for every
+              // non-super-admin role, every request, with no error anywhere to reveal it.
+              const staff = await Staff.findById(token.id).select('status roleId').populate('roleId').lean();
               if (!staff || staff.status !== 'Active') {
                   return {};
               }
