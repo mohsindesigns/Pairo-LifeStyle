@@ -6,6 +6,7 @@ import { UserPlus, Search, Shield, Mail, Key, UserCheck, UserX, MoreVertical, Lo
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRBAC } from "@/hooks/useRBAC";
 import { toast } from "react-hot-toast";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function StaffManagement() {
   const router = useRouter();
@@ -137,8 +138,9 @@ export default function StaffManagement() {
   };
 
   return (
-    <AdminPageLayout 
-      title="Team Management" 
+    <RequirePermission permission="staff.view">
+    <AdminPageLayout
+      title="Team Management"
       addNewLink="/admin/settings/team/new"
       addNewLabel="Invite Staff Member"
       breadcrumbs={[{ label: "Settings", href: "/admin/settings" }, { label: "Team" }]}
@@ -402,5 +404,6 @@ export default function StaffManagement() {
         )}
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

@@ -6,6 +6,7 @@ import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import { toast } from "react-hot-toast";
 import { Pencil, Trash2, X, Save, Loader2 } from "lucide-react";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 const inputClass = "border border-[#8c8f94] bg-white text-[13px] px-3 py-2 rounded-[3px] outline-none focus:border-[#2271b1] w-full";
 
@@ -188,6 +189,7 @@ export default function SizeChartItemsPage() {
   };
 
   return (
+    <RequirePermission permission="products.edit">
     <AdminPageLayout title="Size Chart Items" addNewLabel="Add Size Chart" onAddNew={() => { setEditingItem(null); setFormOpen(true); }}>
       <div className="space-y-4">
         <p className="text-[13px] text-[#646970]">
@@ -255,5 +257,6 @@ export default function SizeChartItemsPage() {
         />
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { Eye, Trash2, Search, ChevronLeft, ChevronRight, X, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 const STATUS_COLORS = {
   New: "bg-blue-100 text-blue-700 border-blue-200",
@@ -293,6 +294,7 @@ export default function CustomJacketInquiriesPage() {
   };
 
   return (
+    <RequirePermission permission="submissions.view">
     <AdminPageLayout title="Custom Jacket Inquiries">
       <div className="space-y-4">
         {/* Status Tabs */}
@@ -426,5 +428,6 @@ export default function CustomJacketInquiriesPage() {
         />
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

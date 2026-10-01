@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { Eye, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 const PAYMENT_STATUS_COLORS = {
   Paid: BADGE_COLORS.green,
@@ -50,6 +51,7 @@ export default function CustomJacketOrdersPage() {
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   return (
+    <RequirePermission permission="orders.view">
     <AdminPageLayout
       title="Custom Orders"
       breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Custom Orders" }]}
@@ -180,5 +182,6 @@ export default function CustomJacketOrdersPage() {
         )}
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

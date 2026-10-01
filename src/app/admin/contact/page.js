@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminContact() {
   // --- State: Data & Pagination ---
@@ -216,6 +217,7 @@ export default function AdminContact() {
   };
 
   return (
+    <RequirePermission permission="submissions.view">
     <AdminPageLayout
       title="Submissions"
       breadcrumbs={[{ label: "Submissions" }]}
@@ -595,5 +597,6 @@ export default function AdminContact() {
         </div>
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

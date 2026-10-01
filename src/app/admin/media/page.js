@@ -8,6 +8,7 @@ import {
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminMedia() {
   const { showConfirm } = usePopup();
@@ -199,8 +200,9 @@ export default function AdminMedia() {
   };
 
   return (
-    <AdminPageLayout 
-      title="Media Library" 
+    <RequirePermission permission="media.manage">
+    <AdminPageLayout
+      title="Media Library"
       breadcrumbs={[{ label: "Media", href: "/admin/media" }, { label: tab === "trash" ? "Trash" : "Library" }]}
     >
       {/* ── Toolbar ── */}
@@ -467,5 +469,6 @@ export default function AdminMedia() {
         </div>
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

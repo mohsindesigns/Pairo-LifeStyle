@@ -20,6 +20,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRBAC } from "@/hooks/useRBAC";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function ScriptManagementPage() {
   const { can } = useRBAC();
@@ -82,8 +83,9 @@ export default function ScriptManagementPage() {
   );
 
   return (
-    <AdminPageLayout 
-      title="Tracking & Script Management" 
+    <RequirePermission permission="scripts.view">
+    <AdminPageLayout
+      title="Tracking & Script Management"
       subtitle="Manage tracking pixels, analytics, and custom injections across the store."
       addNewLink="/admin/settings/scripts/new"
       addNewLabel="Add Script"
@@ -234,5 +236,6 @@ export default function ScriptManagementPage() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

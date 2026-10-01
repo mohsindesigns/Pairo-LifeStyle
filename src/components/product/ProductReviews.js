@@ -872,9 +872,6 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                           <CheckCircle className="w-2.5 h-2.5 fill-emerald-600 text-white" />
                           Verified Purchase
                         </span>
-                        <span className="text-[9px] text-[#6F655B]/50 font-normal normal-case">
-                          Purchased on {new Date(review.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </span>
                       </div>
                     )}
                     {review.recommend ? (

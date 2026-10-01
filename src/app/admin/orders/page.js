@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminOrdersPage() {
   const router = useRouter();
@@ -145,8 +146,9 @@ export default function AdminOrdersPage() {
   });
 
   return (
-    <AdminPageLayout 
-      title="Orders" 
+    <RequirePermission permission="orders.view">
+    <AdminPageLayout
+      title="Orders"
       addNewLink="/admin/orders/new"
       addNewLabel="Add New"
       breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Orders" }]}
@@ -311,5 +313,6 @@ export default function AdminOrdersPage() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

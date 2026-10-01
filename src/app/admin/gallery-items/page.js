@@ -6,6 +6,7 @@ import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import { toast } from "react-hot-toast";
 import { Plus, Pencil, Trash2, GripVertical, Eye, EyeOff, X, Save, Loader2, Search } from "lucide-react";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 const inputClass = "border border-[#8c8f94] bg-white text-[13px] px-3 py-2 rounded-[3px] outline-none focus:border-[#2271b1] w-full";
 
@@ -268,6 +269,7 @@ export default function GalleryItemsPage() {
   };
 
   return (
+    <RequirePermission permission="pages.edit">
     <AdminPageLayout title="Gallery Items" addNewLabel="Add Gallery Item" onAddNew={() => { setEditingItem(null); setFormOpen(true); }}>
       <div className="space-y-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[13px] text-blue-700">
@@ -344,5 +346,6 @@ export default function GalleryItemsPage() {
         />
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

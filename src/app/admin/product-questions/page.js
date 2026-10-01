@@ -5,6 +5,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { MessageSquare, Check, EyeOff, Trash2, Reply, Eye, Search, AlertCircle, X, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminProductQuestionsPage() {
   const { showConfirm } = usePopup();
@@ -119,6 +120,7 @@ export default function AdminProductQuestionsPage() {
   };
 
   return (
+    <RequirePermission permission="products.view">
     <AdminPageLayout
       title="Product Q&A"
       subtitle="Moderate, reply to, and publish customer questions"
@@ -363,5 +365,6 @@ export default function AdminProductQuestionsPage() {
         </div>
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

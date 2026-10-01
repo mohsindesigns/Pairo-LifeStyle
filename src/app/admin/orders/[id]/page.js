@@ -26,6 +26,7 @@ import { formatCurrency } from "@/lib/currency";
 import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
 import { usePopup } from "@/context/PopupContext";
 import { isPayableByLink } from "@/lib/customOrderConstants";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -374,8 +375,9 @@ export default function OrderDetailPage() {
   );
 
   return (
-    <AdminPageLayout 
-      title={`Order #${order.orderNumber}`} 
+    <RequirePermission permission="orders.view">
+    <AdminPageLayout
+      title={`Order #${order.orderNumber}`}
       breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Orders", href: "/admin/orders" }, { label: `Edit Order` }]}
     >
       <InvoiceTemplate order={order} />
@@ -1027,5 +1029,6 @@ export default function OrderDetailPage() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

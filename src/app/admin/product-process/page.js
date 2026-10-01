@@ -6,6 +6,7 @@ import MediaPicker from "@/components/admin/MediaPicker";
 import { ArrowUp, ArrowDown, Trash2, Plus, Edit2, Check, X, Move, ImageIcon } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminProductProcessPage() {
   const { showConfirm } = usePopup();
@@ -198,6 +199,7 @@ export default function AdminProductProcessPage() {
   }
 
   return (
+    <RequirePermission permission="products.view">
     <AdminPageLayout
       title="Product Process Management"
       subtitle="Configure the craftsmanship process section shown on all product pages"
@@ -415,5 +417,6 @@ export default function AdminProductProcessPage() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

@@ -27,7 +27,8 @@ import {
   SlidersHorizontal,
   Ruler
 } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
+import { can } from "@/lib/rbac";
 
 const NavLink = ({ href, icon: Icon, children, exact = false, isSubmenu = false }) => {
   const pathname = usePathname();
@@ -90,7 +91,38 @@ const AccordionMenu = ({ title, icon: Icon, children, isOpen, onToggle }) => {
 
 export default function AdminSidebar({ open = false, onClose }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [openAccordion, setOpenAccordion] = useState("");
+
+  // Mirrors the exact permission keys enforced server-side on each section's underlying API
+  // routes — a nav entry pointing at a page the staff member's role can't actually use is
+  // worse than no entry at all, so this hides it instead of letting them click into a 403.
+  const user = session?.user;
+  const perms = {
+    analyticsView: can(user, "analytics.view"),
+    blogsView: can(user, "blogs.view"),
+    blogsCreate: can(user, "blogs.create"),
+    mediaManage: can(user, "media.manage"),
+    pagesView: can(user, "pages.view"),
+    pagesCreate: can(user, "pages.create"),
+    pagesEdit: can(user, "pages.edit"),
+    reviewsView: can(user, "reviews.view"),
+    ordersView: can(user, "orders.view"),
+    submissionsView: can(user, "submissions.view"),
+    customersView: can(user, "customers.view"),
+    promotionsView: can(user, "promotions.view"),
+    affiliatesView: can(user, "affiliates.view"),
+    productsView: can(user, "products.view"),
+    productsEdit: can(user, "products.edit"),
+    settingsView: can(user, "settings.view"),
+    staffView: can(user, "staff.view"),
+    staffCreate: can(user, "staff.create"),
+    staffManageRoles: can(user, "staff.manage_roles"),
+    scriptsView: can(user, "scripts.view"),
+  };
+  const canSeeCommerce = perms.ordersView || perms.submissionsView || perms.customersView || perms.promotionsView;
+  const canSeeTools = perms.submissionsView || perms.settingsView || perms.scriptsView || perms.productsView;
+  const canSeeUsers = perms.staffView || perms.staffManageRoles;
 
   // Close the mobile drawer whenever navigation happens
   useEffect(() => {
@@ -156,7 +188,7 @@ export default function AdminSidebar({ open = false, onClose }) {
             {isDashboardActive && (
               <div className="bg-[#32373c] py-1.5">
                 <NavLink href="/admin" exact isSubmenu>Home</NavLink>
-                <NavLink href="/admin/analytics" exact isSubmenu>Analytics</NavLink>
+                {perms.analyticsView && <NavLink href="/admin/analytics" exact isSubmenu>Analytics</NavLink>}
               </div>
             )}
           </div>
@@ -164,48 +196,55 @@ export default function AdminSidebar({ open = false, onClose }) {
           <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
 
           {/* Posts (Blogs) */}
-          <AccordionMenu
-            title="Posts" icon={FileText}
-            isOpen={openAccordion === "posts"} onToggle={() => handleToggle("posts")}
-          >
-            <NavLink href="/admin/blogs" exact isSubmenu>All Posts</NavLink>
-            <NavLink href="/admin/blogs/new" exact isSubmenu>Add New</NavLink>
-            <NavLink href="/admin/blogs/categories" exact isSubmenu>Categories</NavLink>
-          </AccordionMenu>
+          {perms.blogsView && (
+            <AccordionMenu
+              title="Posts" icon={FileText}
+              isOpen={openAccordion === "posts"} onToggle={() => handleToggle("posts")}
+            >
+              <NavLink href="/admin/blogs" exact isSubmenu>All Posts</NavLink>
+              {perms.blogsCreate && <NavLink href="/admin/blogs/new" exact isSubmenu>Add New</NavLink>}
+              <NavLink href="/admin/blogs/categories" exact isSubmenu>Categories</NavLink>
+            </AccordionMenu>
+          )}
 
           {/* Media Standalone */}
-          <NavLink href="/admin/media" exact icon={ImageIcon}>Media</NavLink>
+          {perms.mediaManage && <NavLink href="/admin/media" exact icon={ImageIcon}>Media</NavLink>}
 
           {/* Pages Accordion */}
-          <AccordionMenu
-            title="Pages" icon={Layers}
-            isOpen={openAccordion === "pages"} onToggle={() => handleToggle("pages")}
-          >
-            <NavLink href="/admin/pages" exact isSubmenu>All Pages</NavLink>
-            <NavLink href="/admin/pages/new" exact isSubmenu>Add New</NavLink>
-            <NavLink href="/admin/gallery-items" exact isSubmenu>Gallery Items</NavLink>
-          </AccordionMenu>
+          {perms.pagesView && (
+            <AccordionMenu
+              title="Pages" icon={Layers}
+              isOpen={openAccordion === "pages"} onToggle={() => handleToggle("pages")}
+            >
+              <NavLink href="/admin/pages" exact isSubmenu>All Pages</NavLink>
+              {perms.pagesCreate && <NavLink href="/admin/pages/new" exact isSubmenu>Add New</NavLink>}
+              {perms.pagesEdit && <NavLink href="/admin/gallery-items" exact isSubmenu>Gallery Items</NavLink>}
+            </AccordionMenu>
+          )}
 
           {/* Comments / Reviews Standalone */}
-          <NavLink href="/admin/reviews" exact icon={MessageSquare}>Reviews</NavLink>
+          {perms.reviewsView && <NavLink href="/admin/reviews" exact icon={MessageSquare}>Reviews</NavLink>}
 
           <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
 
           {/* Commerce */}
-          <AccordionMenu
-            title="Commerce" icon={ShoppingCart}
-            isOpen={openAccordion === "commerce"} onToggle={() => handleToggle("commerce")}
-          >
-            <NavLink href="/admin/orders" exact isSubmenu>Orders</NavLink>
-            <NavLink href="/admin/abandoned-carts" exact isSubmenu>Abandoned Carts</NavLink>
-            <NavLink href="/admin/custom-jacket-orders" exact isSubmenu>Custom Orders</NavLink>
-            <NavLink href="/admin/custom-jacket-inquiries" exact isSubmenu>Custom Inquiries</NavLink>
-            <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>
-            <NavLink href="/admin/discounts" exact isSubmenu>Coupons</NavLink>
-            <NavLink href="/admin/promotions" exact isSubmenu>Promotions & BOGO</NavLink>
-          </AccordionMenu>
+          {canSeeCommerce && (
+            <AccordionMenu
+              title="Commerce" icon={ShoppingCart}
+              isOpen={openAccordion === "commerce"} onToggle={() => handleToggle("commerce")}
+            >
+              {perms.ordersView && <NavLink href="/admin/orders" exact isSubmenu>Orders</NavLink>}
+              {perms.ordersView && <NavLink href="/admin/abandoned-carts" exact isSubmenu>Abandoned Carts</NavLink>}
+              {perms.ordersView && <NavLink href="/admin/custom-jacket-orders" exact isSubmenu>Custom Orders</NavLink>}
+              {perms.submissionsView && <NavLink href="/admin/custom-jacket-inquiries" exact isSubmenu>Custom Inquiries</NavLink>}
+              {perms.customersView && <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>}
+              {perms.promotionsView && <NavLink href="/admin/discounts" exact isSubmenu>Coupons</NavLink>}
+              {perms.promotionsView && <NavLink href="/admin/promotions" exact isSubmenu>Promotions & BOGO</NavLink>}
+            </AccordionMenu>
+          )}
 
           {/* Affiliates — Dedicated Module */}
+          {perms.affiliatesView && (
           <AccordionMenu
             title="Affiliates" icon={Link2}
             isOpen={openAccordion === "affiliates"} onToggle={() => handleToggle("affiliates")}
@@ -241,55 +280,65 @@ export default function AdminSidebar({ open = false, onClose }) {
               <span style={{display:'flex',alignItems:'center',gap:'6px'}}><SlidersHorizontal size={11}/>Settings</span>
             </NavLink>
           </AccordionMenu>
+          )}
 
           {/* Products Accordion */}
-          <AccordionMenu
-            title="Products" icon={Box}
-            isOpen={openAccordion === "products"} onToggle={() => handleToggle("products")}
-          >
-            <NavLink href="/admin/products" exact isSubmenu>All Products</NavLink>
-            <NavLink href="/admin/products/new" exact isSubmenu>Add New</NavLink>
-            <NavLink href="/admin/products/size-charts" exact isSubmenu>Size Charts</NavLink>
-            <NavLink href="/admin/categories" exact isSubmenu>Categories</NavLink>
-            <NavLink href="/admin/product-process" exact isSubmenu>Product Process</NavLink>
-            <NavLink href="/admin/product-questions" exact isSubmenu>Product Questions</NavLink>
-          </AccordionMenu>
+          {perms.productsView && (
+            <AccordionMenu
+              title="Products" icon={Box}
+              isOpen={openAccordion === "products"} onToggle={() => handleToggle("products")}
+            >
+              <NavLink href="/admin/products" exact isSubmenu>All Products</NavLink>
+              <NavLink href="/admin/products/new" exact isSubmenu>Add New</NavLink>
+              <NavLink href="/admin/products/size-charts" exact isSubmenu>Size Charts</NavLink>
+              {perms.productsEdit && <NavLink href="/admin/size-chart-items" exact isSubmenu>Size Chart Items</NavLink>}
+              <NavLink href="/admin/categories" exact isSubmenu>Categories</NavLink>
+              <NavLink href="/admin/product-process" exact isSubmenu>Product Process</NavLink>
+              <NavLink href="/admin/product-questions" exact isSubmenu>Product Questions</NavLink>
+            </AccordionMenu>
+          )}
 
           <div className="my-1.5 bg-[#ffffff1a] h-[1px] w-full" />
 
           {/* Appearance Standalone */}
-          <NavLink href="/admin/appearance" exact icon={Palette}>Appearance</NavLink>
+          {perms.settingsView && <NavLink href="/admin/appearance" exact icon={Palette}>Appearance</NavLink>}
 
           {/* Users Accordion */}
-          <AccordionMenu
-            title="Users" icon={Users}
-            isOpen={openAccordion === "users"} onToggle={() => handleToggle("users")}
-          >
-            <NavLink href="/admin/settings/team" exact isSubmenu>All Users</NavLink>
-            <NavLink href="/admin/settings/team/new" exact isSubmenu>Add New</NavLink>
-            <NavLink href="/admin/settings/roles" exact isSubmenu>Roles</NavLink>
-          </AccordionMenu>
+          {canSeeUsers && (
+            <AccordionMenu
+              title="Users" icon={Users}
+              isOpen={openAccordion === "users"} onToggle={() => handleToggle("users")}
+            >
+              <NavLink href="/admin/settings/team" exact isSubmenu>All Users</NavLink>
+              {perms.staffCreate && <NavLink href="/admin/settings/team/new" exact isSubmenu>Add New</NavLink>}
+              <NavLink href="/admin/settings/roles" exact isSubmenu>Roles</NavLink>
+            </AccordionMenu>
+          )}
 
           {/* Tools Accordion */}
-          <AccordionMenu
-            title="Tools" icon={Wrench}
-            isOpen={openAccordion === "tools"} onToggle={() => handleToggle("tools")}
-          >
-            <NavLink href="/admin/contact" exact isSubmenu>Contact Forms</NavLink>
-            <NavLink href="/admin/settings/logs" exact isSubmenu>Audit Logs</NavLink>
-            <NavLink href="/admin/settings/scripts" exact isSubmenu>Custom Scripts</NavLink>
-            <NavLink href="/admin/settings/filters" exact isSubmenu>Category Filters</NavLink>
-          </AccordionMenu>
+          {canSeeTools && (
+            <AccordionMenu
+              title="Tools" icon={Wrench}
+              isOpen={openAccordion === "tools"} onToggle={() => handleToggle("tools")}
+            >
+              {perms.submissionsView && <NavLink href="/admin/contact" exact isSubmenu>Contact Forms</NavLink>}
+              {perms.settingsView && <NavLink href="/admin/settings/logs" exact isSubmenu>Audit Logs</NavLink>}
+              {perms.scriptsView && <NavLink href="/admin/settings/scripts" exact isSubmenu>Custom Scripts</NavLink>}
+              {perms.productsView && <NavLink href="/admin/settings/filters" exact isSubmenu>Category Filters</NavLink>}
+            </AccordionMenu>
+          )}
 
           {/* Settings Accordion */}
-          <AccordionMenu
-            title="Settings" icon={Settings}
-            isOpen={openAccordion === "settings"} onToggle={() => handleToggle("settings")}
-          >
-            <NavLink href="/admin/settings/site" exact isSubmenu>General</NavLink>
-            <NavLink href="/admin/settings/shipping" exact isSubmenu>Shipping</NavLink>
-            <NavLink href="/admin/settings/tax" exact isSubmenu>Tax</NavLink>
-          </AccordionMenu>
+          {perms.settingsView && (
+            <AccordionMenu
+              title="Settings" icon={Settings}
+              isOpen={openAccordion === "settings"} onToggle={() => handleToggle("settings")}
+            >
+              <NavLink href="/admin/settings/site" exact isSubmenu>General</NavLink>
+              <NavLink href="/admin/settings/shipping" exact isSubmenu>Shipping</NavLink>
+              <NavLink href="/admin/settings/tax" exact isSubmenu>Tax</NavLink>
+            </AccordionMenu>
+          )}
 
         </nav>
       </div>

@@ -6,6 +6,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 import ProductSelector from "@/components/admin/discounts/ProductSelector";
 import CategorySelector from "@/components/admin/discounts/CategorySelector";
 import CouponViewModal from "@/components/admin/discounts/CouponViewModal";
@@ -1324,8 +1325,10 @@ function CouponsContent() {
 
 export default function AdminDiscounts() {
   return (
-    <Suspense fallback={<div className="p-8 text-center italic text-gray-400">Loading layout...</div>}>
-      <CouponsContent />
-    </Suspense>
+    <RequirePermission permission="promotions.view">
+      <Suspense fallback={<div className="p-8 text-center italic text-gray-400">Loading layout...</div>}>
+        <CouponsContent />
+      </Suspense>
+    </RequirePermission>
   );
 }

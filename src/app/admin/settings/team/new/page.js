@@ -6,6 +6,7 @@ import { UserPlus, Shield, Mail, Key, ArrowLeft, Save, Eye, EyeOff } from "lucid
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function InviteStaff() {
   const router = useRouter();
@@ -60,8 +61,9 @@ export default function InviteStaff() {
   };
 
   return (
-    <AdminPageLayout 
-      title="Invite Staff Member" 
+    <RequirePermission permission="staff.create">
+    <AdminPageLayout
+      title="Invite Staff Member"
       breadcrumbs={[{ label: "Team", href: "/admin/settings/team" }, { label: "New Member" }]}
     >
       <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
@@ -148,5 +150,6 @@ export default function InviteStaff() {
          </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

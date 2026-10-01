@@ -9,6 +9,7 @@ import {
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
 import { COUNTRIES } from "@/lib/countries";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 // ─── Shared WordPress input styles (kept identical to the shipping/tax pages) ─
 const inp  = "w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white transition-all shadow-sm";
@@ -198,6 +199,7 @@ export default function PickupLocationsPage() {
   };
 
   return (
+    <RequirePermission permission="settings.view">
     <AdminPageLayout
       title="Pickup locations"
       breadcrumbs={[{ label: "Settings" }, { label: "Shipping", href: "/admin/settings/shipping" }, { label: "Pickup Locations" }]}
@@ -298,5 +300,6 @@ export default function PickupLocationsPage() {
         />
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminSizeCharts() {
   const router = useRouter();
@@ -211,6 +212,7 @@ export default function AdminSizeCharts() {
   };
 
   return (
+    <RequirePermission permission="products.view">
     <AdminPageLayout
       title="Size Charts"
       subtitle="Manage reusable dynamic size charts and assignments"
@@ -479,5 +481,6 @@ export default function AdminSizeCharts() {
         </div>
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 // WordPress-Style Meta Box (Shared Pattern)
 function MetaBox({ title, children, className = "" }) {
@@ -141,8 +142,9 @@ export default function AppearanceManagement() {
   if (loading) return <div className="p-10 text-center font-sans text-gray-400 italic">Loading Appearance Settings...</div>;
 
   return (
-    <AdminPageLayout 
-      title="Appearance" 
+    <RequirePermission permission="settings.view">
+    <AdminPageLayout
+      title="Appearance"
       subtitle="Manage your site's visual identity"
       breadcrumbs={[{ label: "Appearance" }]}
     >
@@ -438,5 +440,6 @@ export default function AppearanceManagement() {
         </div>
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

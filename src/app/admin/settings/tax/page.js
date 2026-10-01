@@ -10,6 +10,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
 import { inp, hint } from "@/components/admin/tax/taxStyles";
 import TaxRateRow from "@/components/admin/tax/TaxRateRow";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 const defaultSettings = {
   enabled: false,
@@ -322,6 +323,7 @@ export default function TaxSettingsPage() {
   }
 
   return (
+    <RequirePermission permission="settings.view">
     <AdminPageLayout title="Tax settings" breadcrumbs={[{ label: "Settings" }, { label: "Tax" }]}>
       <NavTabs activeTab="tax" />
 
@@ -563,5 +565,6 @@ export default function TaxSettingsPage() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

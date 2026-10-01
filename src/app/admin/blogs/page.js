@@ -17,6 +17,7 @@ import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminBlogs() {
   const router = useRouter();
@@ -167,8 +168,9 @@ export default function AdminBlogs() {
   });
 
   return (
-    <AdminPageLayout 
-      title="Blog Posts" 
+    <RequirePermission permission="blogs.view">
+    <AdminPageLayout
+      title="Blog Posts"
       addNewLink="/admin/blogs/new"
       addNewLabel="Add New"
     >
@@ -308,5 +310,6 @@ export default function AdminBlogs() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

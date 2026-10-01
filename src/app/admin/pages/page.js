@@ -16,6 +16,7 @@ import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
 import { useRBAC } from "@/hooks/useRBAC";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function PagesManagementPage() {
   const { can } = useRBAC();
@@ -139,8 +140,9 @@ export default function PagesManagementPage() {
   );
 
   return (
-    <AdminPageLayout 
-      title="Pages" 
+    <RequirePermission permission="pages.view">
+    <AdminPageLayout
+      title="Pages"
       addNewLink="/admin/pages/new"
       addNewLabel="Add New"
     >
@@ -239,5 +241,6 @@ export default function PagesManagementPage() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

@@ -7,6 +7,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { ALL_PERMISSIONS, ACTIONS } from "@/lib/rbac";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function RoleManagement() {
   const router = useRouter();
@@ -110,8 +111,9 @@ export default function RoleManagement() {
   if (loading) return <AdminPageLayout title="Loading Roles..."><div className="p-10 text-center italic text-gray-400">Loading system roles...</div></AdminPageLayout>;
 
   return (
-    <AdminPageLayout 
-      title="Role & Permission Management" 
+    <RequirePermission permission={["staff.view", "staff.manage_roles"]}>
+    <AdminPageLayout
+      title="Role & Permission Management"
       breadcrumbs={[{ label: "Settings", href: "/admin/settings" }, { label: "Roles" }]}
     >
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 md:gap-6">
@@ -244,5 +246,6 @@ export default function RoleManagement() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { Search, Loader2, Filter, ToggleLeft, ToggleRight, Eye, EyeOff } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function CategoryFiltersPage() {
   const [categories, setCategories] = useState([]);
@@ -84,6 +85,7 @@ export default function CategoryFiltersPage() {
   );
 
   return (
+    <RequirePermission permission="products.view">
     <AdminPageLayout title="Category Filters" subtitle="Manage which product categories appear in the shop filter tab">
       <div className="bg-white border border-[#c3c4c7] rounded shadow-sm max-w-5xl">
         {/* Header toolbar */}
@@ -201,5 +203,6 @@ export default function CategoryFiltersPage() {
         )}
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

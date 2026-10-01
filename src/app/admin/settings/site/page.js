@@ -13,6 +13,7 @@ import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import PopupTab from "@/components/admin/settings/PopupTab";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
 
@@ -1294,6 +1295,7 @@ export default function SiteSettingsPage() {
   if (!config) return <div className="p-10 text-center text-[13px] text-[#d63638] bg-[#f0f0f1] min-h-screen">Failed to load settings.</div>;
 
   return (
+    <RequirePermission permission="settings.view">
     <AdminPageLayout title="Site Settings" breadcrumbs={[{ label: "Settings" }, { label: "Site Settings" }]}>
       {/* WP-style sub-navigation tabs */}
       <nav className="flex gap-0 border-b border-[#c3c4c7] mb-6 -mt-2 overflow-x-auto max-w-full scrollbar-none">
@@ -1345,5 +1347,6 @@ export default function SiteSettingsPage() {
         </div>
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

@@ -6,6 +6,7 @@ import { Star, Search, MessageSquare, Edit2, CornerDownRight, X, Square, CheckSq
 import { toast } from "react-hot-toast";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 // Helper to format date like WordPress: YYYY/MM/DD at hh:mm am/pm
 const formatDate = (dateString) => {
@@ -427,8 +428,9 @@ export default function AdminReviewsPage() {
   const primaryBtnClass = "bg-[#2271b1] border border-[#135e96] hover:bg-[#135e96] text-white text-xs font-semibold px-4 py-1.5 rounded-[3px] cursor-pointer inline-block transition-colors outline-none select-none";
 
   return (
-    <AdminPageLayout 
-      title="Comments" 
+    <RequirePermission permission="reviews.view">
+    <AdminPageLayout
+      title="Comments"
       breadcrumbs={[{ label: "Store", href: "/admin/orders" }, { label: "Reviews" }]}
     >
       <div className="flex flex-col gap-4 pb-20 items-start w-full">
@@ -882,5 +884,6 @@ export default function AdminReviewsPage() {
         )}
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

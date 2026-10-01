@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminAnalyticsPage() {
   const [stats, setStats] = useState(null);
@@ -53,8 +54,9 @@ export default function AdminAnalyticsPage() {
   const last30 = stats.last30Days[0] || { revenue: 0, count: 0 };
 
   return (
-    <AdminPageLayout 
-      title="Store Analytics" 
+    <RequirePermission permission="analytics.view">
+    <AdminPageLayout
+      title="Store Analytics"
       breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Analytics" }]}
     >
       <div className="space-y-6 sm:space-y-8">
@@ -161,5 +163,6 @@ export default function AdminAnalyticsPage() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

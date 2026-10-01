@@ -24,6 +24,7 @@ import { useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminProducts() {
   const router = useRouter();
@@ -201,8 +202,9 @@ export default function AdminProducts() {
   });
 
   return (
-    <AdminPageLayout 
-      title="Products" 
+    <RequirePermission permission="products.view">
+    <AdminPageLayout
+      title="Products"
       addNewLink="/admin/products/new"
       addNewLabel="Add New"
       breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Products" }]}
@@ -500,5 +502,6 @@ export default function AdminProducts() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

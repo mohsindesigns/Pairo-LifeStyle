@@ -5,6 +5,7 @@ import { ArrowLeft, User as UserIcon, Package, Calendar, Mail, MapPin, ExternalL
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function CustomerDetail({ params }) {
   const { id } = use(params);
@@ -39,8 +40,9 @@ export default function CustomerDetail({ params }) {
   if (!customer) return <AdminPageLayout title="Error"><div className="p-10 text-center text-red-500 font-bold uppercase">Customer not found</div></AdminPageLayout>;
 
   return (
-    <AdminPageLayout 
-      title={customer.name} 
+    <RequirePermission permission="customers.view">
+    <AdminPageLayout
+      title={customer.name}
       breadcrumbs={[{ label: "Customers", href: "/admin/customers" }, { label: customer.name }]}
     >
       <div className="space-y-6">
@@ -203,5 +205,6 @@ export default function CustomerDetail({ params }) {
          </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

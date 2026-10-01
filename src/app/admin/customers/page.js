@@ -5,6 +5,7 @@ import { Search, User as UserIcon, ChevronLeft, ChevronRight } from "lucide-reac
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminCustomers() {
   const { showConfirm } = usePopup();
@@ -98,8 +99,9 @@ export default function AdminCustomers() {
   );
 
   return (
-    <AdminPageLayout 
-      title="Customers" 
+    <RequirePermission permission="customers.view">
+    <AdminPageLayout
+      title="Customers"
       addNewLink="/admin/customers/new"
       addNewLabel="Add New"
       breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Customers" }]}
@@ -203,5 +205,6 @@ export default function AdminCustomers() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

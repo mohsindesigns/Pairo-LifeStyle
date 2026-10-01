@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import dbConnect from "@/lib/db";
 import AffiliatesManagerClient from "@/components/admin/AffiliatesManagerClient";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export const metadata = {
   title: "Affiliate Management — Pairo Admin",
@@ -20,8 +21,10 @@ export default async function AdminAffiliatesPage() {
   await dbConnect();
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#f6f7f7]" />}>
-      <AffiliatesManagerClient userSession={session} />
-    </Suspense>
+    <RequirePermission permission="affiliates.view">
+      <Suspense fallback={<div className="min-h-screen bg-[#f6f7f7]" />}>
+        <AffiliatesManagerClient userSession={session} />
+      </Suspense>
+    </RequirePermission>
   );
 }

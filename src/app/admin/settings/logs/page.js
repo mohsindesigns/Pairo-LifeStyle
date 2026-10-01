@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { History, Search, Filter, Monitor, Globe, Clock, ArrowRight } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AuditLogs() {
   const [logs, setLogs] = useState([]);
@@ -27,8 +28,9 @@ export default function AuditLogs() {
   }, []);
 
   return (
-    <AdminPageLayout 
-      title="Security & Audit Logs" 
+    <RequirePermission permission="settings.view">
+    <AdminPageLayout
+      title="Security & Audit Logs"
       breadcrumbs={[{ label: "Settings", href: "/admin/settings" }, { label: "Audit Logs" }]}
     >
       <div className="space-y-4">
@@ -116,5 +118,6 @@ export default function AuditLogs() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

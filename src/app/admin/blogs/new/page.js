@@ -1,5 +1,10 @@
 import BlogForm from "@/components/admin/BlogForm";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function NewBlogPage() {
-   return <BlogForm />;
+   return (
+     <RequirePermission permission="blogs.create">
+       <BlogForm />
+     </RequirePermission>
+   );
 }

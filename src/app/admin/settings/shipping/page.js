@@ -10,6 +10,7 @@ import {
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
 import { COUNTRIES, countryName } from "@/lib/countries";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 // ─── Shared WordPress input styles ─────────────────────────────────────────────
 const inp  = "w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white transition-all shadow-sm";
@@ -787,6 +788,7 @@ export default function ShippingSettingsPage() {
   const catchAllCount = zones.filter(z => z.isCatchAll).length;
 
   return (
+    <RequirePermission permission="settings.view">
     <AdminPageLayout title="Shipping settings" breadcrumbs={[{ label: "Settings" }, { label: "Shipping" }]}>
       <NavTabs activeTab="shipping" />
 
@@ -856,5 +858,6 @@ export default function ShippingSettingsPage() {
         </div>
       )}
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

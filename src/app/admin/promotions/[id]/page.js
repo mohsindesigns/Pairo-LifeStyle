@@ -25,6 +25,7 @@ import Validator from "@/lib/promotionEngine/Validator";
 
 import RevisionHistory from "@/components/admin/promotions/History/RevisionHistory";
 import { toast } from "react-hot-toast";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function PromotionEditor({ isNew = false } = {}) {
   const params = useParams();
@@ -131,7 +132,8 @@ export default function PromotionEditor({ isNew = false } = {}) {
   if (loading) return <div className="p-8 text-center text-gray-400 italic">Initializing Enterprise Editor...</div>;
 
   return (
-    <AdminPageLayout 
+    <RequirePermission permission="promotions.manage">
+    <AdminPageLayout
       title={id === "new" ? "Create New Promotion" : `Edit: ${formData.title}`}
       breadcrumbs={[{ label: "Promotions", href: "/admin/promotions" }, { label: id === "new" ? "New" : "Edit" }]}
     >
@@ -426,5 +428,6 @@ export default function PromotionEditor({ isNew = false } = {}) {
 
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

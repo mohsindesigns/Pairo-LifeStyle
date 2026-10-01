@@ -23,6 +23,7 @@ import {
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function PromotionsDashboard() {
   const { showConfirm } = usePopup();
@@ -149,8 +150,9 @@ export default function PromotionsDashboard() {
   };
 
   return (
-    <AdminPageLayout 
-      title="Discounts & Coupons" 
+    <RequirePermission permission="promotions.view">
+    <AdminPageLayout
+      title="Discounts & Coupons"
       addNewLink="/admin/promotions/new"
       addNewLabel="Create Discount"
       breadcrumbs={[{ label: "Marketing", href: "#" }, { label: "Discounts" }]}
@@ -312,5 +314,6 @@ export default function PromotionsDashboard() {
         </div>
       </div>
     </AdminPageLayout>
+    </RequirePermission>
   );
 }

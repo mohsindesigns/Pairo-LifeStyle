@@ -29,7 +29,8 @@ export const ACTIONS = {
     REFUND: 'refund',
     UPDATE: 'update',
     MANAGE: 'manage',
-    MANAGE_ROLES: 'manage_roles'
+    MANAGE_ROLES: 'manage_roles',
+    SETTINGS: 'settings'
 };
 
 /**
