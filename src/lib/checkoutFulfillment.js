@@ -67,6 +67,23 @@ export async function createOrderFromCheckoutPayload(payload, {
 } = {}) {
   const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode, expectedFree } = payload;
 
+  // The checkout UI's "required" form fields are a client-side convenience only — nothing
+  // stopped a request built directly (devtools, a script, a retried/malformed request) from
+  // skipping the browser form entirely and submitting a blank shippingAddress. That produced
+  // real, paid orders with no name/street/city on file — unfulfillable, and unrecoverable
+  // after the fact. This is the one chokepoint every order-creation path (COD, and the Stripe
+  // webhook after a card payment succeeds) goes through, so it's enforced here, not just in
+  // the UI.
+  const requiredAddressFields = ['fullName', 'street', 'city', 'country'];
+  const missingAddressFields = requiredAddressFields.filter(f => !String(shippingAddress?.[f] || '').trim());
+  if (missingAddressFields.length > 0) {
+    throw new Error(`Shipping address is incomplete (missing: ${missingAddressFields.join(', ')}). Please provide a full shipping address before placing an order.`);
+  }
+  const resolvedEmail = (customerEmail || checkoutEmail || '').trim();
+  if (!resolvedEmail) {
+    throw new Error('A valid email address is required to place an order.');
+  }
+
   await dbConnect();
   await ensureOrderCounter();
   const mongoSession = await mongoose.startSession();

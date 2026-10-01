@@ -25,6 +25,15 @@ export async function POST(req) {
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
     }
+    // Fail before charging the card, not after — the order-creation chokepoint
+    // (createOrderFromCheckoutPayload, called from the Stripe webhook once payment succeeds)
+    // enforces this too and would trigger an auto-refund, but it's a much worse experience to
+    // charge a customer and then immediately refund them for a mistake that's catchable here.
+    const requiredAddressFields = ['fullName', 'street', 'city', 'country'];
+    const missingAddressFields = requiredAddressFields.filter(f => !String(shippingAddress?.[f] || '').trim());
+    if (missingAddressFields.length > 0) {
+      return NextResponse.json({ error: `Shipping address is incomplete (missing: ${missingAddressFields.join(', ')}).` }, { status: 400 });
+    }
 
     const existingOrder = await Order.findOne({ idempotencyKey });
     if (existingOrder) {
@@ -35,6 +44,9 @@ export async function POST(req) {
     const orderUserId = authSession?.user?.id || null;
     const checkoutEmail = (customerEmail || authSession?.user?.email || "").trim().toLowerCase();
     const isGuestSession = !orderUserId;
+    if (!checkoutEmail) {
+      return NextResponse.json({ error: "A valid email address is required to place an order." }, { status: 400 });
+    }
     const ipAddress = req.headers.get("x-forwarded-for") || "unknown";
 
     const itemProductIds = items.map(item => item.id || item._id);
