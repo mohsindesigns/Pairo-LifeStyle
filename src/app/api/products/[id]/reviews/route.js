@@ -190,7 +190,17 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const checkEmail = session ? session.user.email?.toLowerCase().trim() : (guestEmail?.toLowerCase().trim() || "guest@example.com");
+    // session.user.email is normally guaranteed (it's the same email used to log in), but a
+    // session created before this field existed on the JWT, or any other edge case that leaves
+    // it empty, must not crash into a raw Mongoose "customerEmail is required" error — fall back
+    // to a submitted guestEmail if present, otherwise ask the shopper to re-authenticate.
+    const checkEmail = session
+      ? (session.user.email?.toLowerCase().trim() || guestEmail?.toLowerCase().trim() || "")
+      : (guestEmail?.toLowerCase().trim() || "guest@example.com");
+
+    if (!checkEmail) {
+      return NextResponse.json({ error: "We couldn't verify your account email. Please log out and log back in, then try again." }, { status: 400 });
+    }
 
     const ip = req.headers.get("x-forwarded-for") || req.ip || "127.0.0.1";
     const userAgent = req.headers.get("user-agent") || "unknown";

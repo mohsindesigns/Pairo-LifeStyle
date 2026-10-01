@@ -451,7 +451,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} id="review-submit-form" className="space-y-6">
                 {/* Rating selection */}
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
@@ -630,7 +630,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                 Cancel
               </button>
               <button
-                onClick={handleSubmit}
+                type="submit"
+                form="review-submit-form"
                 disabled={submitting}
                 className="w-2/3 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-300 transition-colors px-4 py-3 rounded-full text-xs font-bold uppercase tracking-[0.2em]"
               >
