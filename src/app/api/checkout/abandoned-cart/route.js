@@ -12,7 +12,9 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
  */
 export async function POST(req) {
   try {
-    const rateCheck = await checkRateLimit(req, { limit: 30, window: 60, keyPrefix: "ABANDONED_CART" });
+    // The checkout page debounces autosave calls to one per 2s, so continuous form-filling for
+    // over a minute could brush right up against a tight limit — give it headroom.
+    const rateCheck = await checkRateLimit(req, { limit: 60, window: 90, keyPrefix: "ABANDONED_CART" });
     if (!rateCheck.success) {
       return NextResponse.json({ success: false }, { status: 429 });
     }
@@ -28,8 +30,14 @@ export async function POST(req) {
     const ipAddress = getClientIp(req);
     const userAgent = req.headers.get("user-agent") || "";
 
+    // Match on sessionKey ALONE, not also status: "active" — if the order already completed
+    // in the brief window before this debounced autosave landed (status is now "recovered"),
+    // filtering on status too would miss the existing doc and upsert would try to INSERT a
+    // second document with the same sessionKey, colliding with its unique index and throwing
+    // on what should be a harmless no-op. status/orderId are never touched here — only
+    // checkoutFulfillment.js's recovery update owns that transition.
     await AbandonedCart.findOneAndUpdate(
-      { sessionKey, status: "active" },
+      { sessionKey },
       {
         $set: {
           items: Array.isArray(items) ? items.slice(0, 50).map(i => ({

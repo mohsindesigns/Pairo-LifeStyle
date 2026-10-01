@@ -279,7 +279,7 @@ export default function CheckoutPage() {
   // "Personal information" — everything needed to actually fulfill and contact the customer
   // about this order. No payment method should even be offered until this is filled in, so a
   // shopper can't pay before we have anywhere to ship to or any way to reach them.
-  const requiredFieldsFilled = ["email", "lastName", "street", "city", "phone", "zip", "country"]
+  const requiredFieldsFilled = ["email", "firstName", "lastName", "street", "city", "phone", "zip", "country"]
     .every(f => String(formData[f] || "").trim().length > 0);
 
   // Force the free-shipping selection while the order is $0, and release it back to a real
@@ -515,7 +515,7 @@ export default function CheckoutPage() {
     let error = "";
     const cleanVal = (value || "").trim();
 
-    if (["email", "lastName", "street", "city", "phone", "country"].includes(name) && !cleanVal) {
+    if (["email", "firstName", "lastName", "street", "city", "phone", "country"].includes(name) && !cleanVal) {
       return "This field is required";
     }
 
@@ -622,7 +622,7 @@ export default function CheckoutPage() {
   const validateForm = () => {
     const newErrors = {};
     Object.keys(formData).forEach(key => {
-      if (key !== "customerNote" && key !== "stateCode" && key !== "countryCode" && key !== "firstName") {
+      if (key !== "customerNote" && key !== "stateCode" && key !== "countryCode") {
         const err = validateField(key, formData[key]);
         if (err) {
           newErrors[key] = err;
@@ -1064,7 +1064,7 @@ export default function CheckoutPage() {
                 {/* Names */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className={labelClass}>First name (optional)</label>
+                    <label className={labelClass}>First name *</label>
                     <input
                       type="text"
                       name="firstName"
@@ -1072,6 +1072,7 @@ export default function CheckoutPage() {
                       onChange={handleInputChange}
                       placeholder="First name"
                       className={`${inputClass} ${errors.firstName ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                      required
                     />
                     {errors.firstName && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.firstName}</p>}
                   </div>
