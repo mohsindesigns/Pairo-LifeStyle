@@ -17,6 +17,7 @@ import { PopupProvider } from "@/context/PopupContext";
 import { cache, Suspense } from "react";
 import CookieConsent from "@/components/common/CookieConsent";
 import AffiliateTracker from "@/components/common/AffiliateTracker";
+import SecurityShield from "@/components/common/SecurityShield";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const poppins = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-poppins" });
@@ -184,14 +185,115 @@ export default async function RootLayout({ children }) {
     console.error("Layout DB connection failed:", error.message);
   }
 
+  const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_FORCE_SECURITY_SHIELD === "true";
+
   return (
-    <html lang="en">
-      <head>
-        <ScriptLoader location="head" />
-        <ThemeStyle />
-      </head>
-      <body className={`${inter.variable} ${poppins.variable} ${montserrat.variable} font-sans antialiased`}>
-        <ScriptLoader location="body_top" />
+      <html lang="en">
+        <head>
+          <ScriptLoader location="head" />
+          <ThemeStyle />
+          {isProduction && (
+            <script
+              id="pairo-anti-inspect-init"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  (function() {
+                    try {
+                      var p = window.location.pathname || '';
+                      if (p.startsWith('/admin')) return;
+
+                      // Early contextmenu & drag prevention
+                      document.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                      }, true);
+
+                      document.addEventListener('dragstart', function(e) {
+                        e.preventDefault();
+                        return false;
+                      }, true);
+
+                      // Early copy, cut & selection prevention outside form inputs
+                      document.addEventListener('copy', function(e) {
+                        var t = (e.target && e.target.tagName || '').toLowerCase();
+                        if (t !== 'input' && t !== 'textarea') {
+                          e.preventDefault();
+                          return false;
+                        }
+                      }, true);
+
+                      document.addEventListener('cut', function(e) {
+                        var t = (e.target && e.target.tagName || '').toLowerCase();
+                        if (t !== 'input' && t !== 'textarea') {
+                          e.preventDefault();
+                          return false;
+                        }
+                      }, true);
+
+                      document.addEventListener('selectstart', function(e) {
+                        var t = (e.target && e.target.tagName || '').toLowerCase();
+                        if (t !== 'input' && t !== 'textarea') {
+                          e.preventDefault();
+                          return false;
+                        }
+                      }, true);
+
+                      // Early DevTools and Screenshot shortcuts interception
+                      window.addEventListener('keydown', function(e) {
+                        var k = (e.key || '').toLowerCase();
+                        var isCtrl = e.ctrlKey || e.metaKey;
+
+                        // PrintScreen or Snipping Tool
+                        if (e.keyCode === 44 || k === 'printscreen' || (isCtrl && e.shiftKey && (k === 's' || e.keyCode === 83))) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          return false;
+                        }
+
+                        // F12
+                        if (e.keyCode === 123 || k === 'f12') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (p !== '/access-denied') window.location.replace('/access-denied');
+                          return false;
+                        }
+
+                        // Ctrl/Cmd + Shift + (I, J, C, K, E, P)
+                        if (isCtrl && e.shiftKey && (k === 'i' || k === 'j' || k === 'c' || k === 'k' || k === 'e' || k === 'p')) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (p !== '/access-denied') window.location.replace('/access-denied');
+                          return false;
+                        }
+
+                        // Ctrl/Cmd + U (View Source) or S (Save Page)
+                        if (isCtrl && (k === 'u' || e.keyCode === 85 || k === 's' || e.keyCode === 83)) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (k === 'u' && p !== '/access-denied') window.location.replace('/access-denied');
+                          return false;
+                        }
+                      }, true);
+
+                      // Early dimension check for already-open docked devtools
+                      if (p !== '/access-denied') {
+                        var wDiff = window.outerWidth - window.innerWidth;
+                        var hDiff = window.outerHeight - window.innerHeight;
+                        if (wDiff > 160 || hDiff > 160) {
+                          window.location.replace('/access-denied');
+                        }
+                      }
+                    } catch(err) {}
+                  })();
+                `,
+              }}
+            />
+          )}
+        </head>
+        <body className={`${inter.variable} ${poppins.variable} ${montserrat.variable} font-sans antialiased`}>
+          {isProduction && <SecurityShield />}
+          <ScriptLoader location="body_top" />
         <AuthProvider>
           <PopupProvider>
             <Toaster position="top-right" />

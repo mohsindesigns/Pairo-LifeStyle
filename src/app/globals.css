@@ -852,5 +852,26 @@ body.admin-drawer-open {
   color: #64748b !important;
 }
 
+/* Security Shield: Anti-Scraping & Anti-Inspection */
+img, picture, video, canvas {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none !important;
+}
 
+body.pairo-prod-shield *:not(input):not(textarea):not([contenteditable="true"]) {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
 
+body.pairo-security-blur {
+  filter: blur(40px) brightness(0.1) !important;
+  opacity: 0.05 !important;
+  pointer-events: none !important;
+  transition: filter 0.05s ease, opacity 0.05s ease !important;
+}
