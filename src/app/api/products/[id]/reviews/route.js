@@ -165,7 +165,7 @@ export async function POST(req, { params }) {
     const { id: paramId } = resolvedParams;
 
     const session = await getServerSession(authOptions);
-    const { rating, title, comment, customerName, recommend, guestEmail, orderNumber } = body;
+    const { rating, title, comment, customerName, recommend, guestEmail, email, orderNumber } = body;
 
     if (!rating || rating < 1 || rating > 5) {
       return NextResponse.json({ error: "Invalid rating value (must be between 1 and 5)" }, { status: 400 });
@@ -195,8 +195,8 @@ export async function POST(req, { params }) {
     // it empty, must not crash into a raw Mongoose "customerEmail is required" error — fall back
     // to a submitted guestEmail if present, otherwise ask the shopper to re-authenticate.
     const checkEmail = session
-      ? (session.user.email?.toLowerCase().trim() || guestEmail?.toLowerCase().trim() || "")
-      : (guestEmail?.toLowerCase().trim() || "guest@example.com");
+      ? (session.user.email?.toLowerCase().trim() || email?.toLowerCase().trim() || guestEmail?.toLowerCase().trim() || "")
+      : (email?.toLowerCase().trim() || guestEmail?.toLowerCase().trim() || "");
 
     if (!checkEmail) {
       return NextResponse.json({ error: "We couldn't verify your account email. Please log out and log back in, then try again." }, { status: 400 });

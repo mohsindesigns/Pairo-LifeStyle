@@ -69,9 +69,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
     title: "",
     comment: "",
     customerName: session?.user?.name || "",
-    recommend: true,
-    guestEmail: "",
-    orderNumber: ""
+    email: session?.user?.email || "",
+    recommend: true
   });
 
   // Customer edit review drawer state
@@ -98,7 +97,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
   useEffect(() => {
     if (session?.user) {
       Promise.resolve().then(() => {
-        setFormData(prev => ({ ...prev, customerName: session.user.name || "" }));
+        setFormData(prev => ({ ...prev, customerName: prev.customerName || session.user.name || "", email: prev.email || session.user.email || "" }));
       });
     }
   }, [session]);
@@ -145,12 +144,9 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
         title: formData.title,
         comment: formData.comment,
         customerName: formData.customerName,
+        email: formData.email,
+        guestEmail: formData.email,
         recommend: formData.recommend
-      };
-
-      if (!session) {
-        submitBody.guestEmail = formData.guestEmail;
-        submitBody.orderNumber = formData.orderNumber;
       }
 
       const res = await fetch(`/api/products/${productId}/reviews`, {
@@ -171,9 +167,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
           title: "",
           comment: "",
           customerName: session?.user?.name || "",
-          recommend: true,
-          guestEmail: "",
-          orderNumber: ""
+          email: session?.user?.email || "",
+          recommend: true
         });
         fetchReviews(1);
       } else {
@@ -475,47 +470,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                   </div>
                 </div>
 
-                {/* Verification fields for guests */}
-                {!session && (
-                  <div className="bg-neutral-50 border border-neutral-200/60 p-4 rounded-xl space-y-4">
-                    <div className="flex items-start gap-2.5 text-neutral-500 text-xs">
-                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <p className="leading-relaxed">
-                        <strong>Verified Purchase Check:</strong> Pairo requires checkout validation. Please provide the checkout email and order number to review this item.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                          Checkout Email
-                        </label>
-                        <input
-                          required
-                          type="email"
-                          placeholder="e.g. name@domain.com"
-                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
-                          value={formData.guestEmail}
-                          onChange={e => setFormData(prev => ({ ...prev, guestEmail: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                          Order Number
-                        </label>
-                        <input
-                          required
-                          type="text"
-                          placeholder="e.g. PO-89021"
-                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
-                          value={formData.orderNumber}
-                          onChange={e => setFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Customer name */}
+                                {/* Customer name */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
                     Your Name
@@ -527,6 +482,21 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                     className="w-full border border-neutral-200 rounded-lg p-3 text-xs outline-none focus:border-black transition-colors"
                     value={formData.customerName}
                     onChange={e => setFormData(prev => ({ ...prev, customerName: e.target.value }))}
+                  />
+                </div>
+
+                {/* Email address */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
+                    Your Email
+                  </label>
+                  <input
+                    required
+                    type="email"
+                    placeholder="e.g. name@domain.com"
+                    className="w-full border border-neutral-200 rounded-lg p-3 text-xs outline-none focus:border-black transition-colors"
+                    value={formData.email}
+                    onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   />
                 </div>
 
