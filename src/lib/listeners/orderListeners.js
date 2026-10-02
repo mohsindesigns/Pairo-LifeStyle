@@ -8,8 +8,10 @@ import { dispatchOrderToCRM } from '../crmWebhook';
  */
 export function initOrderListeners() {
   // 1. ORDER_CREATED
-  pairoEvents.on('ORDER_CREATED', async (order) => {
+  pairoEvents.on('ORDER_CREATED', async (payload) => {
     try {
+        const order = payload?.order || payload;
+        if (!order) return;
         console.log(`[Event Received] ORDER_CREATED: ${order.orderNumber}`);
         // Email Customer
         await sendOrderConfirmation(order).catch(e => console.error("Email Cust Error:", e.message));
@@ -27,7 +29,9 @@ export function initOrderListeners() {
   });
 
   // 2. ORDER_CANCELLED
-  pairoEvents.on('ORDER_CANCELLED', (order) => {
+  pairoEvents.on('ORDER_CANCELLED', (payload) => {
+     const order = payload?.order || payload;
+     if (!order) return;
      QueueService.push('SEND_CANCELLATION_EMAIL', async () => {
         console.log(`Sending cancellation email for order ${order.orderNumber}`);
      }, { retries: 3, referenceId: order._id });
@@ -36,7 +40,11 @@ export function initOrderListeners() {
   });
 
   // 3. ORDER_STATUS_UPDATED
-  pairoEvents.on('ORDER_STATUS_UPDATED', ({ order, oldStatus, newStatus }) => {
+  pairoEvents.on('ORDER_STATUS_UPDATED', (payload) => {
+    const order = payload?.order || payload;
+    if (!order) return;
+    const oldStatus = payload?.oldStatus || order?.status;
+    const newStatus = payload?.newStatus || order?.status;
     console.log(`Order ${order.orderNumber} status changed from ${oldStatus} to ${newStatus}`);
     dispatchOrderToCRM('ORDER_STATUS_UPDATED', order).catch(e => console.error("CRM Status Webhook Error:", e.message));
   });

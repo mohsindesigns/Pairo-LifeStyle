@@ -228,11 +228,12 @@ function SecurityShieldActive() {
     // 8. Active DevTools Detection Heuristics
     // Heuristic A: Window Dimension Delta (Docked DevTools on bottom, right, or left)
     const checkDimensions = () => {
-      const threshold = 160;
+      const thresholdWidth = 320;
+      const thresholdHeight = 250;
       const widthDiff = window.outerWidth - window.innerWidth;
       const heightDiff = window.outerHeight - window.innerHeight;
 
-      if (widthDiff > threshold || heightDiff > threshold) {
+      if (widthDiff > thresholdWidth || heightDiff > thresholdHeight) {
         triggerLockdown();
       }
     };
@@ -240,10 +241,11 @@ function SecurityShieldActive() {
     // Heuristic B: Debugger timing threshold (Undocked or Docked DevTools)
     const checkDebuggerTiming = () => {
       try {
+        if (typeof document !== "undefined" && document.hidden) return;
         const start = performance.now();
         Function("debugger")();
         const duration = performance.now() - start;
-        if (duration > 100) {
+        if (duration > 200) {
           triggerLockdown();
         }
       } catch (e) {}

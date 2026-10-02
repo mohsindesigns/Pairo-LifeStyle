@@ -19,6 +19,10 @@ export async function OPTIONS() {
   });
 }
 
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Validates the CRM API Key if configured in environment.
  * If CRM_API_KEY is not set in .env.local, access is permitted so the endpoint works out of the box.
@@ -76,17 +80,22 @@ export async function GET(req) {
     }
 
     if (orderNumber) {
-      query.orderNumber = { $regex: orderNumber.trim(), $options: "i" };
+      const sanitized = escapeRegex(orderNumber.trim());
+      query.orderNumber = { $regex: sanitized, $options: "i" };
     }
 
     if (email) {
-      query["customer.email"] = { $regex: email.trim(), $options: "i" };
+      const sanitized = escapeRegex(email.trim());
+      query["customer.email"] = { $regex: sanitized, $options: "i" };
     }
 
     if (since) {
       const sinceDate = new Date(since);
       if (!isNaN(sinceDate.getTime())) {
-        query.updatedAt = { $gte: sinceDate };
+        query.$or = [
+          { updatedAt: { $gte: sinceDate } },
+          { createdAt: { $gte: sinceDate } },
+        ];
       }
     }
 

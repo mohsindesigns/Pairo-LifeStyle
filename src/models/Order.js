@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const OrderSchema = new mongoose.Schema({
-  orderNumber: { type: String, required: true, index: true },
+  orderNumber: { type: String, required: true },
   status: { 
     type: String, 
     enum: ['Pending', 'Confirmed', 'Processing', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Refunded'],
@@ -146,7 +146,7 @@ const OrderSchema = new mongoose.Schema({
     phone: String
   },
 
-  idempotencyKey: { type: String, unique: true, sparse: true, index: true },
+  idempotencyKey: { type: String },
   customerNote: String,
   adminNotes: [String],
 

@@ -217,7 +217,7 @@ export default async function RootLayout({ children }) {
                       // 1. Instant check for Docked DevTools (bottom, side)
                       var wDiff = window.outerWidth - window.innerWidth;
                       var hDiff = window.outerHeight - window.innerHeight;
-                      if (wDiff > 160 || hDiff > 160) {
+                      if (wDiff > 320 || hDiff > 250) {
                         abortAndLockdown();
                         return;
                       }
@@ -226,19 +226,20 @@ export default async function RootLayout({ children }) {
                       var t0 = performance.now();
                       debugger;
                       var t1 = performance.now();
-                      if (t1 - t0 > 100) {
+                      if (t1 - t0 > 200) {
                         abortAndLockdown();
                         return;
                       }
 
-                      // 3. Continuous anti-debugger trap loop
+                      // 3. Continuous anti-debugger trap loop (ignoring backgrounded tab sleep)
                       setInterval(function() {
+                        if (document.hidden) return;
                         var start = performance.now();
                         (function() { return Function('debugger')(); })();
-                        if (performance.now() - start > 100) {
+                        if (performance.now() - start > 200) {
                           abortAndLockdown();
                         }
-                      }, 150);
+                      }, 250);
 
                       // Early contextmenu & drag prevention
                       document.addEventListener('contextmenu', function(e) {

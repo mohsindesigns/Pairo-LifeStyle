@@ -32,8 +32,15 @@ export async function middleware(req) {
             });
         }
 
-        // Block if hotlinked from an external third-party domain
-        if (referer && !referer.includes(host) && !referer.includes("localhost")) {
+        // Block if hotlinked from an external third-party domain (allow same host, CRM app domain, and localhost)
+        const isAllowedReferer =
+            !referer ||
+            referer.includes(host) ||
+            referer.includes("localhost") ||
+            referer.includes("127.0.0.1") ||
+            referer.includes("mohsindesigns.com");
+
+        if (!isAllowedReferer) {
             return new NextResponse("Hotlinking media assets is prohibited.", {
                 status: 403,
                 headers: { "Content-Type": "text/plain" }

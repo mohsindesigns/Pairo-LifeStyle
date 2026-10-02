@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import QueueService from "@/lib/queue";
 import AuditLog from "@/models/AuditLog";
+import dbConnect from "@/lib/db";
 
 /**
  * Pairo Lifestyle CRM Webhook Dispatcher
@@ -10,6 +11,10 @@ import AuditLog from "@/models/AuditLog";
  * - CRM_WEBHOOK_SECRET: shared secret for HMAC-SHA256 signature verification
  */
 export async function dispatchOrderToCRM(event, order) {
+  if (!order || !order.orderNumber) {
+    return;
+  }
+
   const webhookUrl = process.env.CRM_WEBHOOK_URL;
   if (!webhookUrl) {
     // CRM webhook not configured, skip silently
@@ -60,18 +65,20 @@ export async function dispatchOrderToCRM(event, order) {
         paidAt: order.payment?.paidAt || null,
         refundedAmount: order.payment?.refundedAmount || 0,
       },
-      items: (order.items || []).map((item) => ({
-        productId: item.productId?.toString() || null,
-        name: item.name,
-        slug: item.slug,
-        sku: item.sku || null,
-        image: item.image,
-        priceAtPurchase: item.priceAtPurchase,
-        quantity: item.quantity,
-        selectedVariant: item.selectedVariant || null,
-        madeToMeasure: item.madeToMeasure?.enabled ? item.madeToMeasure : null,
-        customization: item.customization?.enabled ? item.customization : null,
-      })),
+      items: (order.items || [])
+        .filter(Boolean)
+        .map((item) => ({
+          productId: item.productId?.toString?.() || item.productId || null,
+          name: item.name || "Product",
+          slug: item.slug || "",
+          sku: item.sku || null,
+          image: item.image || "",
+          priceAtPurchase: item.priceAtPurchase || 0,
+          quantity: item.quantity || 1,
+          selectedVariant: item.selectedVariant || null,
+          madeToMeasure: item.madeToMeasure?.enabled ? item.madeToMeasure : null,
+          customization: item.customization?.enabled ? item.customization : null,
+        })),
       customJacketSnapshot: order.customJacketSnapshot || null,
       affiliateReferralCode: order.affiliateReferralCode || null,
       customerNote: order.customerNote || null,
@@ -104,12 +111,15 @@ export async function dispatchOrderToCRM(event, order) {
         throw new Error(`CRM webhook responded with HTTP ${response.status}`);
       }
 
-      await AuditLog.create({
-        event: "CRM_WEBHOOK_DISPATCH_SUCCESS",
-        referenceId: order._id?.toString() || order.orderNumber,
-        severity: "info",
-        message: `Successfully pushed order ${order.orderNumber} to CRM (${event})`,
-      }).catch(() => {});
+      try {
+        await dbConnect();
+        await AuditLog.create({
+          event: "CRM_WEBHOOK_DISPATCH_SUCCESS",
+          referenceId: order._id?.toString() || order.orderNumber,
+          severity: "info",
+          message: `Successfully pushed order ${order.orderNumber} to CRM (${event})`,
+        });
+      } catch (_) {}
     },
     { retries: 3, referenceId: order._id?.toString() || order.orderNumber }
   );

@@ -9,6 +9,7 @@ import mongoose from "mongoose";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { reconcilePaymentLinkOrder } from "@/lib/stripeFulfillment";
 import { reconcilePromotionUsage, isUsageReleasingTransition, isUsageRestoringTransition } from "@/lib/promotionUsageReconciliation";
+import pairoEvents from "@/lib/events";
 
 export async function GET(req, { params }) {
   try {
@@ -104,6 +105,19 @@ export async function PATCH(req, { params }) {
     }
 
     await order.save();
+
+    // Trigger internal event for real-time CRM webhook and listener sync
+    if (status && status !== oldStatus) {
+      try {
+        pairoEvents.dispatch("ORDER_STATUS_UPDATED", {
+          order,
+          oldStatus,
+          newStatus: status,
+        });
+      } catch (evErr) {
+        console.error("[Order Status Event Dispatch Error]", evErr);
+      }
+    }
 
     // Release/restore any usage-limit "slots" this order's promo codes consumed
     // when it moves into/out of Cancelled or Refunded.
