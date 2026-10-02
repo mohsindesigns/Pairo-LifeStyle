@@ -53,12 +53,18 @@ function SecurityShieldActive() {
       document.body.classList.add("pairo-prod-shield");
     }
 
-    // 1. Lockdown execution: Redirect to /access-denied and freeze inspection
+    // 1. Lockdown execution: Immediately cancel all network requests and redirect to /access-denied
     const triggerLockdown = () => {
+      try {
+        if (typeof window.stop === "function") {
+          window.stop();
+        }
+      } catch (e) {}
+
       if (!isAccessDeniedPage) {
         try {
-          if (document.body) {
-            document.body.style.display = "none";
+          if (document.documentElement) {
+            document.documentElement.innerHTML = "";
           }
           window.location.replace("/access-denied");
         } catch (e) {

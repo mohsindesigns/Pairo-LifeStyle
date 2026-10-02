@@ -202,6 +202,44 @@ export default async function RootLayout({ children }) {
                       var p = window.location.pathname || '';
                       if (p.startsWith('/admin')) return;
 
+                      var abortAndLockdown = function() {
+                        try {
+                          if (typeof window.stop === 'function') window.stop();
+                        } catch(e) {}
+                        try {
+                          document.documentElement.innerHTML = '';
+                        } catch(e) {}
+                        if (p !== '/access-denied') {
+                          window.location.replace('/access-denied');
+                        }
+                      };
+
+                      // 1. Instant check for Docked DevTools (bottom, side)
+                      var wDiff = window.outerWidth - window.innerWidth;
+                      var hDiff = window.outerHeight - window.innerHeight;
+                      if (wDiff > 160 || hDiff > 160) {
+                        abortAndLockdown();
+                        return;
+                      }
+
+                      // 2. Instant check for Detached DevTools (Network tab, Elements, etc.)
+                      var t0 = performance.now();
+                      debugger;
+                      var t1 = performance.now();
+                      if (t1 - t0 > 100) {
+                        abortAndLockdown();
+                        return;
+                      }
+
+                      // 3. Continuous anti-debugger trap loop
+                      setInterval(function() {
+                        var start = performance.now();
+                        (function() { return Function('debugger')(); })();
+                        if (performance.now() - start > 100) {
+                          abortAndLockdown();
+                        }
+                      }, 150);
+
                       // Early contextmenu & drag prevention
                       document.addEventListener('contextmenu', function(e) {
                         e.preventDefault();
@@ -255,7 +293,7 @@ export default async function RootLayout({ children }) {
                         if (e.keyCode === 123 || k === 'f12') {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (p !== '/access-denied') window.location.replace('/access-denied');
+                          abortAndLockdown();
                           return false;
                         }
 
@@ -263,7 +301,7 @@ export default async function RootLayout({ children }) {
                         if (isCtrl && e.shiftKey && (k === 'i' || k === 'j' || k === 'c' || k === 'k' || k === 'e' || k === 'p')) {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (p !== '/access-denied') window.location.replace('/access-denied');
+                          abortAndLockdown();
                           return false;
                         }
 
@@ -271,19 +309,10 @@ export default async function RootLayout({ children }) {
                         if (isCtrl && (k === 'u' || e.keyCode === 85 || k === 's' || e.keyCode === 83)) {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (k === 'u' && p !== '/access-denied') window.location.replace('/access-denied');
+                          if (k === 'u') abortAndLockdown();
                           return false;
                         }
                       }, true);
-
-                      // Early dimension check for already-open docked devtools
-                      if (p !== '/access-denied') {
-                        var wDiff = window.outerWidth - window.innerWidth;
-                        var hDiff = window.outerHeight - window.innerHeight;
-                        if (wDiff > 160 || hDiff > 160) {
-                          window.location.replace('/access-denied');
-                        }
-                      }
                     } catch(err) {}
                   })();
                 `,

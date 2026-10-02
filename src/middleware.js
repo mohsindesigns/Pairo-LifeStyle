@@ -17,6 +17,34 @@ export async function middleware(req) {
 
     const path = req.nextUrl.pathname;
 
+    // Image Direct Extraction & Hotlinking Protection
+    if (path.startsWith("/uploads/")) {
+        const secFetchDest = req.headers.get("sec-fetch-dest");
+        const secFetchMode = req.headers.get("sec-fetch-mode");
+        const referer = req.headers.get("referer") || "";
+        const host = req.headers.get("host") || "";
+
+        // Block if someone opens the image directly in the URL address bar or "Open image in new tab"
+        if (secFetchDest === "document" && secFetchMode === "navigate") {
+            return new NextResponse("Access to raw media assets is prohibited.", {
+                status: 403,
+                headers: { "Content-Type": "text/plain" }
+            });
+        }
+
+        // Block if hotlinked from an external third-party domain
+        if (referer && !referer.includes(host) && !referer.includes("localhost")) {
+            return new NextResponse("Hotlinking media assets is prohibited.", {
+                status: 403,
+                headers: { "Content-Type": "text/plain" }
+            });
+        }
+
+        const res = NextResponse.next();
+        res.headers.set("X-Content-Type-Options", "nosniff");
+        return res;
+    }
+
     // 1. API Admin Protection
     if (path.startsWith("/api/admin")) {
         // Allow affiliates to view/download their own verification files through the requests document API route
@@ -111,6 +139,7 @@ export const config = {
     "/admin",
     "/admin/:path*",
     "/admin-login",
-    "/api/admin/:path*"
+    "/api/admin/:path*",
+    "/uploads/:path*"
   ],
 };
