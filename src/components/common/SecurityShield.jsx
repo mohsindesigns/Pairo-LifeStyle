@@ -46,14 +46,12 @@ function SecurityShieldActive() {
       return;
     }
 
-    const isAccessDeniedPage = pathname === "/access-denied";
-
     // Add production protection CSS class to body (disables text selection outside inputs)
     if (document.body) {
       document.body.classList.add("pairo-prod-shield");
     }
 
-    // 1. Lockdown execution: Immediately cancel all network requests and redirect to /access-denied
+    // 1. Lockdown execution: Immediately cancel network requests, blank DOM, and freeze debugger (no page redirect)
     const triggerLockdown = () => {
       try {
         if (typeof window.stop === "function") {
@@ -61,16 +59,11 @@ function SecurityShieldActive() {
         }
       } catch (e) {}
 
-      if (!isAccessDeniedPage) {
-        try {
-          if (document.documentElement) {
-            document.documentElement.innerHTML = "";
-          }
-          window.location.replace("/access-denied");
-        } catch (e) {
-          window.location.href = "/access-denied";
+      try {
+        if (document.documentElement) {
+          document.documentElement.innerHTML = "";
         }
-      }
+      } catch (e) {}
 
       // Freeze execution if devtools is open
       try {

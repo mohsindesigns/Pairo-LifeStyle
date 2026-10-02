@@ -209,9 +209,9 @@ export default async function RootLayout({ children }) {
                         try {
                           document.documentElement.innerHTML = '';
                         } catch(e) {}
-                        if (p !== '/access-denied') {
-                          window.location.replace('/access-denied');
-                        }
+                        try {
+                          Function('debugger')();
+                        } catch(e) {}
                       };
 
                       // 1. Instant check for Docked DevTools (bottom, side)
@@ -231,7 +231,7 @@ export default async function RootLayout({ children }) {
                         return;
                       }
 
-                      // 3. Continuous anti-debugger trap loop (ignoring backgrounded tab sleep)
+                      // 3. Continuous anti-debugger trap loop (silent lockdown, no page shown)
                       setInterval(function() {
                         if (document.hidden) return;
                         var start = performance.now();
@@ -290,7 +290,7 @@ export default async function RootLayout({ children }) {
                           return false;
                         }
 
-                        // F12
+                        // F12 key
                         if (e.keyCode === 123 || k === 'f12') {
                           e.preventDefault();
                           e.stopPropagation();

@@ -26,8 +26,7 @@ export const RESERVED_ROUTES = [
   "sitemap.xml",
   "robots.txt",
   "product",
-  "promo",
-  "access-denied"
+  "promo"
 ];
 
 export function getProductPrimaryCategorySlug(product) {
