@@ -709,10 +709,32 @@ function AddZoneForm({ onCreated }) {
   );
 }
 
+// ─── WordPress Style Toggle (Check Switch) ──────────────────────────────────────
+function Toggle({ on, onChange, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      disabled={disabled}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+        on ? "bg-[#2271b1]" : "bg-[#c3c4c7]"
+      } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+          on ? "translate-x-6" : "translate-x-1"
+        }`}
+      />
+    </button>
+  );
+}
+
 // ─── Main Shipping Settings Page ──────────────────────────────────────────────
 export default function ShippingSettingsPage() {
   const { showConfirm } = usePopup();
   const [zones, setZones]   = useState([]);
+  const [shippingEnabled, setShippingEnabled] = useState(true);
+  const [togglingShipping, setTogglingShipping] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
@@ -721,14 +743,52 @@ export default function ShippingSettingsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/admin/shipping/zones");
-        const data = await res.json();
-        if (data.success) setZones(data.zones);
-        else toast.error(data.error || "Failed to load zones.");
-      } catch { toast.error("Failed to load shipping zones."); }
-      finally { setLoading(false); }
+        const [zonesRes, settingsRes] = await Promise.all([
+          fetch("/api/admin/shipping/zones", { cache: "no-store" }),
+          fetch("/api/admin/shipping/settings", { cache: "no-store" }),
+        ]);
+        const zonesData = await zonesRes.json();
+        const settingsData = await settingsRes.json();
+
+        if (zonesData.success) setZones(zonesData.zones);
+        else toast.error(zonesData.error || "Failed to load zones.");
+
+        if (settingsData.success) {
+          setShippingEnabled(settingsData.shippingEnabled !== false);
+        }
+      } catch {
+        toast.error("Failed to load shipping data.");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
+
+  const handleToggleShipping = async () => {
+    if (togglingShipping) return;
+    const nextVal = !shippingEnabled;
+    setTogglingShipping(true);
+    setShippingEnabled(nextVal);
+    try {
+      const res = await fetch("/api/admin/shipping/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shippingEnabled: nextVal }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update shipping settings.");
+      toast.success(
+        nextVal
+          ? "Shipping module enabled. Custom rates will be applied at checkout."
+          : "Shipping module disabled. Free Delivery will be offered at checkout."
+      );
+    } catch (e) {
+      setShippingEnabled(!nextVal);
+      toast.error(e.message || "Failed to update shipping status.");
+    } finally {
+      setTogglingShipping(false);
+    }
+  };
 
   const handleDelete = async (id) => {
     const ok = await showConfirm("Delete this zone and ALL its shipping methods? This cannot be undone.");
@@ -774,9 +834,6 @@ export default function ShippingSettingsPage() {
   const handleDrop = (dropIndex) => {
     setOverIndex(null);
     if (dragIndex === null || dragIndex === dropIndex) { setDragIndex(null); return; }
-    // Compute the reordered list and persist it as a plain side effect (not from
-    // inside the setZones updater) so a double-invoked updater (e.g. React Strict
-    // Mode) can never fire the PATCH request twice.
     const next = [...zones];
     const [moved] = next.splice(dragIndex, 1);
     next.splice(dropIndex, 0, moved);
@@ -792,70 +849,108 @@ export default function ShippingSettingsPage() {
     <AdminPageLayout title="Shipping settings" breadcrumbs={[{ label: "Settings" }, { label: "Shipping" }]}>
       <NavTabs activeTab="shipping" />
 
-      {/* WordPress Style Notice Callout */}
-      <div className="bg-white border-l-4 border-[#72aee6] shadow-sm p-4 mb-6 text-[13.5px] text-[#1d2327]">
-        <p className="font-semibold mb-1">Store Shipping Management</p>
-        <p className="text-[#646970] leading-relaxed">
-          Create zones representing your shipping locations, then assign methods and rates to them.
-          During checkout, the matching engine looks for the most specific geographical match.
-          Drag zones by their handle to reorder them, and use the country picker below to avoid typos in coverage rules.
-          Every store keeps exactly one catch-all zone (marked below) that matches any address not covered elsewhere.
-        </p>
+      {/* ── 1. Enable / Disable Section ─────────────────────── */}
+      <div className="bg-white border border-[#c3c4c7] shadow-sm p-4 flex items-center justify-between flex-wrap gap-3 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 shrink-0 rounded-[3px] bg-[#f0f6fb] flex items-center justify-center border border-[#c3c4c7]">
+            <Truck className="w-4 h-4 text-[#2271b1]" />
+          </div>
+          <div>
+            <p className="text-[13.5px] font-bold text-[#1d2327]">Enable Shipping & Delivery Module</p>
+            <p className="text-[11.5px] text-[#646970]">
+              Toggle shipping rates and calculation features. When ON, your shipping zones and rates are applied. When OFF, website checkout displays Free Delivery.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-[12px] font-bold ${shippingEnabled ? "text-green-600" : "text-[#646970]"}`}>
+            {shippingEnabled ? "ACTIVE" : "INACTIVE"}
+          </span>
+          <Toggle on={shippingEnabled} onChange={handleToggleShipping} disabled={togglingShipping} />
+        </div>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20 gap-2 text-[13px] text-[#646970]">
           <Loader2 className="w-4 h-4 animate-spin" />Loading shipping zones…
         </div>
+      ) : !shippingEnabled ? (
+        /* ── Module OFF View: Show Free Delivery status notice, hide zones/features ── */
+        <div className="bg-white border border-[#c3c4c7] p-8 text-center shadow-sm mb-6">
+          <div className="w-12 h-12 rounded-full bg-[#f0f6fb] text-[#2271b1] flex items-center justify-center mx-auto mb-3">
+            <Truck className="w-6 h-6" />
+          </div>
+          <p className="text-[15px] font-bold text-[#1d2327] mb-1">Shipping Module is Turned OFF</p>
+          <p className="text-[13px] text-[#646970] max-w-lg mx-auto mb-4">
+            Custom shipping zones, rules, and rate calculations are currently inactive. All customers on the website checkout page will automatically receive <strong className="text-[#1d2327]">Free Delivery ($0.00)</strong>.
+          </p>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#f0f6fb] border border-[#c3c4c7] rounded-[3px] text-[12px] text-[#2271b1] font-semibold">
+            <Info className="w-3.5 h-3.5" /> Turn the switch ON above to view and configure shipping zones and rates.
+          </div>
+        </div>
       ) : (
-        <div className="space-y-4 pb-16">
-          {zones.length === 0 && (
-            <div className="bg-white border border-[#c3c4c7] p-6 sm:p-12 text-center shadow-sm">
-              <Globe className="w-10 h-10 text-[#ccd0d4] mx-auto mb-3" />
-              <p className="text-[14px] font-bold text-[#1d2327] mb-1">No shipping zones configured</p>
-              <p className="text-[12px] text-[#646970] max-w-sm mx-auto">Create a shipping zone below to start configuring shipping rates for your customers.</p>
-            </div>
-          )}
-
-          {reordering && (
-            <div className="flex items-center gap-2 text-[12px] text-[#2271b1] font-semibold">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />Saving new zone order…
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {zones.map((zone, index) => (
-              <div
-                key={zone._id}
-                onDragOver={e => { e.preventDefault(); if (overIndex !== index) setOverIndex(index); }}
-                onDragLeave={() => setOverIndex(o => (o === index ? null : o))}
-                onDrop={() => handleDrop(index)}
-                className={`transition-all rounded-none ${dragIndex === index ? "opacity-40" : ""} ${overIndex === index && dragIndex !== null && dragIndex !== index ? "outline outline-2 outline-[#2271b1] outline-offset-2" : ""}`}
-              >
-                <ZoneCard
-                  zone={zone}
-                  onDelete={handleDelete}
-                  onUpdate={updated => setZones(p => p.map(z => z._id === updated._id ? { ...z, ...updated } : z))}
-                  deleteDisabled={zone.isCatchAll && catchAllCount <= 1}
-                  dragHandle={
-                    <span
-                      draggable
-                      onDragStart={e => { e.stopPropagation(); setDragIndex(index); }}
-                      onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
-                      onClick={e => e.stopPropagation()}
-                      className="cursor-grab active:cursor-grabbing text-[#a7aaad] hover:text-[#646970] shrink-0 px-0.5"
-                      title="Drag to reorder zones"
-                    >
-                      <GripVertical className="w-4 h-4" />
-                    </span>
-                  }
-                />
-              </div>
-            ))}
+        /* ── Module ON View: Show features and things (Zones, Rules, Rates) ── */
+        <>
+          {/* WordPress Style Notice Callout */}
+          <div className="bg-white border-l-4 border-[#72aee6] shadow-sm p-4 mb-6 text-[13.5px] text-[#1d2327]">
+            <p className="font-semibold mb-1">Store Shipping Management</p>
+            <p className="text-[#646970] leading-relaxed">
+              Create zones representing your shipping locations, then assign methods and rates to them.
+              During checkout, the matching engine looks for the most specific geographical match.
+              Drag zones by their handle to reorder them, and use the country picker below to avoid typos in coverage rules.
+              Every store keeps exactly one catch-all zone (marked below) that matches any address not covered elsewhere.
+            </p>
           </div>
 
-          <AddZoneForm onCreated={zone => setZones(p => [...p, zone])} />
-        </div>
+          <div className="space-y-4 pb-16">
+            {zones.length === 0 && (
+              <div className="bg-white border border-[#c3c4c7] p-6 sm:p-12 text-center shadow-sm">
+                <Globe className="w-10 h-10 text-[#ccd0d4] mx-auto mb-3" />
+                <p className="text-[14px] font-bold text-[#1d2327] mb-1">No shipping zones configured</p>
+                <p className="text-[12px] text-[#646970] max-w-sm mx-auto">Create a shipping zone below to start configuring shipping rates for your customers.</p>
+              </div>
+            )}
+
+            {reordering && (
+              <div className="flex items-center gap-2 text-[12px] text-[#2271b1] font-semibold">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />Saving new zone order…
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {zones.map((zone, index) => (
+                <div
+                  key={zone._id}
+                  onDragOver={e => { e.preventDefault(); if (overIndex !== index) setOverIndex(index); }}
+                  onDragLeave={() => setOverIndex(o => (o === index ? null : o))}
+                  onDrop={() => handleDrop(index)}
+                  className={`transition-all rounded-none ${dragIndex === index ? "opacity-40" : ""} ${overIndex === index && dragIndex !== null && dragIndex !== index ? "outline outline-2 outline-[#2271b1] outline-offset-2" : ""}`}
+                >
+                  <ZoneCard
+                    zone={zone}
+                    onDelete={handleDelete}
+                    onUpdate={updated => setZones(p => p.map(z => z._id === updated._id ? { ...z, ...updated } : z))}
+                    deleteDisabled={zone.isCatchAll && catchAllCount <= 1}
+                    dragHandle={
+                      <span
+                        draggable
+                        onDragStart={e => { e.stopPropagation(); setDragIndex(index); }}
+                        onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                        onClick={e => e.stopPropagation()}
+                        className="cursor-grab active:cursor-grabbing text-[#a7aaad] hover:text-[#646970] shrink-0 px-0.5"
+                        title="Drag to reorder zones"
+                      >
+                        <GripVertical className="w-4 h-4" />
+                      </span>
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+
+            <AddZoneForm onCreated={zone => setZones(p => [...p, zone])} />
+          </div>
+        </>
       )}
     </AdminPageLayout>
     </RequirePermission>

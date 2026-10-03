@@ -160,7 +160,7 @@ export default function TaxSettingsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/admin/tax");
+        const res = await fetch("/api/admin/tax", { cache: "no-store" });
         const data = await res.json();
         if (data.success && data.settings) {
           setSettings({ ...defaultSettings, ...data.settings });
@@ -312,6 +312,23 @@ export default function TaxSettingsPage() {
     }
   };
 
+  const handleToggleTaxes = async () => {
+    const nextVal = !settings.enabled;
+    set("enabled", nextVal);
+    try {
+      const res = await fetch("/api/admin/tax", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...settings, enabled: nextVal }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update tax status.");
+      toast.success(nextVal ? "Tax module enabled." : "Tax module disabled.");
+    } catch (e) {
+      toast.error(e.message || "Failed to update tax status.");
+    }
+  };
+
   if (loading) {
     return (
       <AdminPageLayout title="Tax" breadcrumbs={[{ label: "Settings" }, { label: "Tax" }]}>
@@ -344,22 +361,39 @@ export default function TaxSettingsPage() {
             <span className={`text-[12px] font-bold ${settings.enabled ? "text-green-600" : "text-[#646970]"}`}>
               {settings.enabled ? "ACTIVE" : "INACTIVE"}
             </span>
-            <Toggle on={settings.enabled} onChange={() => set("enabled", !settings.enabled)} />
+            <Toggle on={settings.enabled} onChange={handleToggleTaxes} />
           </div>
         </div>
 
-        {/* ── Staged-rollout notice: tax config is not yet wired into checkout ── */}
-        <div className="bg-[#f0f6fb] border-l-4 border-[#72aee6] shadow-sm p-4 flex items-start gap-3">
-          <Info className="w-4 h-4 text-[#2271b1] mt-0.5 shrink-0" />
-          <p className="text-[12.5px] text-[#1d2327] leading-relaxed">
-            <span className="font-semibold">Not yet applied at checkout.</span> Tax rates configured here are not
-            yet applied to checkout totals. This screen prepares your tax configuration for when tax calculation
-            goes live.
-          </p>
-        </div>
+        {!settings.enabled ? (
+          /* ── Tax Module OFF View: Show inactive status notice, hide tax options & classes ── */
+          <div className="bg-white border border-[#c3c4c7] p-8 text-center shadow-sm mb-6">
+            <div className="w-12 h-12 rounded-full bg-[#f0f6fb] text-[#2271b1] flex items-center justify-center mx-auto mb-3">
+              <ReceiptText className="w-6 h-6" />
+            </div>
+            <p className="text-[15px] font-bold text-[#1d2327] mb-1">Tax Module is Turned OFF</p>
+            <p className="text-[13px] text-[#646970] max-w-lg mx-auto mb-4">
+              Tax calculation is currently inactive. No taxes will be calculated or added to orders on the storefront cart and checkout pages.
+            </p>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#f0f6fb] border border-[#c3c4c7] rounded-[3px] text-[12px] text-[#2271b1] font-semibold">
+              <Info className="w-3.5 h-3.5" /> Turn the switch ON above to view and configure tax calculation options and rate classes.
+            </div>
+          </div>
+        ) : (
+          /* ── Tax Module ON View: Show features and things (Options, Classes, Rates) ── */
+          <>
+            {/* ── Staged-rollout notice: tax config is not yet wired into checkout ── */}
+            <div className="bg-[#f0f6fb] border-l-4 border-[#72aee6] shadow-sm p-4 flex items-start gap-3">
+              <Info className="w-4 h-4 text-[#2271b1] mt-0.5 shrink-0" />
+              <p className="text-[12.5px] text-[#1d2327] leading-relaxed">
+                <span className="font-semibold">Not yet applied at checkout.</span> Tax rates configured here are not
+                yet applied to checkout totals. This screen prepares your tax configuration for when tax calculation
+                goes live.
+              </p>
+            </div>
 
-        {/* ── 2. Tax Options Postbox ──────────────────────────── */}
-        <Postbox title="Tax Options" subtitle="Global tax calculation behavior" dim={!settings.enabled}>
+            {/* ── 2. Tax Options Postbox ──────────────────────────── */}
+            <Postbox title="Tax Options" subtitle="Global tax calculation behavior">
           <div className="divide-y divide-[#f0f0f1]">
             <SettingsRow label="Calculation Method" hint="Inclusive means prices already include tax. Exclusive adds tax on top of your prices.">
               <select
@@ -545,6 +579,8 @@ export default function TaxSettingsPage() {
             )}
           </div>
         </div>
+          </>
+        )}
 
       </div>
 

@@ -72,6 +72,19 @@ const FREE_ORDER_SHIPPING = {
   conditions: null,
 };
 
+// Synthetic shipping selection used when shipping module is disabled in admin
+const FREE_DELIVERY_METHOD = {
+  methodId: "free-delivery",
+  methodName: "Free Delivery",
+  cost: 0,
+  provider: "FREE_SHIPPING",
+  zoneId: null,
+  zoneName: null,
+  currency: "USD",
+  settings: null,
+  conditions: null,
+};
+
 function getReferralCode() {
   try {
     const cookieMatch = document.cookie.match(/(^|;)\s*pairo_ref\s*=\s*([^;]+)/);
@@ -266,6 +279,28 @@ export default function CheckoutPage() {
   const [loadingRates, setLoadingRates] = useState(false);
   const [shippingRatesFetched, setShippingRatesFetched] = useState(false);
 
+  // Shipping module enabled/disabled state (defaults from SiteConfig, synced with server)
+  const [serverShippingEnabled, setServerShippingEnabled] = useState(
+    siteData?.commerce?.shippingEnabled !== false
+  );
+  const shippingEnabled = serverShippingEnabled;
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/shipping/calculate", { cache: "no-store" });
+        const data = await res.json();
+        if (active && data.success && typeof data.shippingEnabled === "boolean") {
+          setServerShippingEnabled(data.shippingEnabled);
+        }
+      } catch (e) {
+        // Fallback to siteData
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   // A 100%-off coupon (or affiliate discount) can bring the pre-shipping amount to $0 —
   // in that case shipping is free and there's nothing to pay by card, so the checkout UI
   // switches to a simplified "no payment required" flow instead of the normal Stripe/COD choice.
@@ -282,17 +317,27 @@ export default function CheckoutPage() {
   const requiredFieldsFilled = ["email", "firstName", "lastName", "street", "city", "phone", "zip", "country"]
     .every(f => String(formData[f] || "").trim().length > 0);
 
+  // Automatically assign FREE_DELIVERY_METHOD when shipping module is off.
   // Force the free-shipping selection while the order is $0, and release it back to a real
-  // rate selection once it no longer is (e.g. the coupon is removed).
+  // rate selection once it no longer is (e.g. the coupon is removed or shipping is re-enabled).
   useEffect(() => {
     Promise.resolve().then(() => {
-      if (isFreeOrder) {
-        setSelectedShipping(FREE_ORDER_SHIPPING);
-      } else if (selectedShipping?.methodId === FREE_ORDER_SHIPPING.methodId) {
+      if (!shippingEnabled) {
+        if (selectedShipping?.methodId !== FREE_DELIVERY_METHOD.methodId) {
+          setSelectedShipping(FREE_DELIVERY_METHOD);
+        }
+      } else if (isFreeOrder) {
+        if (selectedShipping?.methodId !== FREE_ORDER_SHIPPING.methodId) {
+          setSelectedShipping(FREE_ORDER_SHIPPING);
+        }
+      } else if (
+        selectedShipping?.methodId === FREE_ORDER_SHIPPING.methodId ||
+        selectedShipping?.methodId === FREE_DELIVERY_METHOD.methodId
+      ) {
         setSelectedShipping(null);
       }
     });
-  }, [isFreeOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shippingEnabled, isFreeOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Generate unique key for this session to prevent double-orders
@@ -457,7 +502,7 @@ export default function CheckoutPage() {
 
   // Fetch shipping rates when address fields are filled
   const fetchRates = useCallback(async () => {
-    if (!formData.country) return;
+    if (!shippingEnabled || isFreeOrder || !formData.country) return;
     setLoadingRates(true);
     try {
       const res = await fetch('/api/shipping/calculate', {
@@ -473,6 +518,11 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (data.success) {
+        if (data.shippingEnabled === false) {
+          setServerShippingEnabled(false);
+          setSelectedShipping(FREE_DELIVERY_METHOD);
+          return;
+        }
         setShippingRates(data.rates || []);
         setShippingRatesFetched(true);
         // Auto-select first rate if none selected
@@ -482,15 +532,14 @@ export default function CheckoutPage() {
       }
     } catch (e) { console.error('Failed to fetch shipping rates', e); }
     finally { setLoadingRates(false); }
-  }, [formData.country, formData.state, formData.city, formData.zip, cartSubtotal, cartItems, selectedShipping, setSelectedShipping]);
+  }, [shippingEnabled, isFreeOrder, formData.country, formData.state, formData.city, formData.zip, cartSubtotal, discountTotal, affiliateDiscountAmount, cartItems, selectedShipping, setSelectedShipping]);
 
-  // Debounce: fetch rates when address changes (skipped once the order is free — there's
-  // nothing to rate-shop for, shipping is forced free either way).
+  // Debounce: fetch rates when address changes (skipped once the order is free or shipping module is off).
   useEffect(() => {
-    if (isFreeOrder) return;
+    if (!shippingEnabled || isFreeOrder) return;
     const t = setTimeout(fetchRates, 600);
     return () => clearTimeout(t);
-  }, [fetchRates, isFreeOrder]);
+  }, [fetchRates, shippingEnabled, isFreeOrder]);
 
   // Debounced email-change promo code validation
   useEffect(() => {
@@ -669,19 +718,33 @@ export default function CheckoutPage() {
       country: formData.country,
       countryCode: formData.countryCode
     },
-    shippingSnapshot: selectedShipping ? {
-      version: 1,
-      zoneId: selectedShipping.zoneId,
-      zoneName: selectedShipping.zoneName,
-      methodId: selectedShipping.methodId,
-      methodName: selectedShipping.methodName,
-      provider: selectedShipping.provider,
-      cost: selectedShipping.cost,
-      currency: selectedShipping.currency,
-      settings: selectedShipping.settings,
-      conditions: selectedShipping.conditions,
-      capturedAt: new Date().toISOString()
-    } : null,
+    shippingSnapshot: (!shippingEnabled)
+      ? {
+          version: 1,
+          zoneId: null,
+          zoneName: 'Free Delivery',
+          methodId: 'free-delivery',
+          methodName: 'Free Delivery',
+          provider: 'FREE_SHIPPING',
+          cost: 0,
+          currency: 'USD',
+          settings: null,
+          conditions: null,
+          capturedAt: new Date().toISOString()
+        }
+      : selectedShipping ? {
+          version: 1,
+          zoneId: selectedShipping.zoneId,
+          zoneName: selectedShipping.zoneName,
+          methodId: selectedShipping.methodId,
+          methodName: selectedShipping.methodName,
+          provider: selectedShipping.provider,
+          cost: selectedShipping.cost,
+          currency: selectedShipping.currency,
+          settings: selectedShipping.settings,
+          conditions: selectedShipping.conditions,
+          capturedAt: new Date().toISOString()
+        } : null,
     referralCode: getReferralCode(),
     financials: {
       subtotal: cartSubtotal,
@@ -1238,6 +1301,21 @@ export default function CheckoutPage() {
                   <p className="text-[13px] font-semibold text-black">Free Shipping</p>
                   <span className="text-[13px] font-bold text-black font-mono">Free</span>
                 </div>
+              ) : !shippingEnabled ? (
+                <div className="border border-neutral-200 rounded-[4px] bg-white p-4 flex items-center justify-between shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-neutral-100 text-black flex items-center justify-center">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold text-black">Free Delivery</p>
+                      <p className="text-[11px] text-neutral-500">Free delivery on all orders</p>
+                    </div>
+                  </div>
+                  <span className="text-[13px] font-bold text-black font-mono bg-neutral-100 px-2.5 py-0.5 rounded">
+                    Free
+                  </span>
+                </div>
               ) : (
                 <>
               {loadingRates && (
@@ -1542,7 +1620,7 @@ export default function CheckoutPage() {
                 <span className="text-black font-bold font-mono">
                   {selectedShipping
                     ? (shippingCost === 0 ? "Free" : `$${shippingCost.toLocaleString()}`)
-                    : "Calculated at next step"}
+                    : (!shippingEnabled ? "Free" : "Calculated at next step")}
                 </span>
               </div>
 

@@ -136,7 +136,8 @@ const SiteConfigSchema = new mongoose.Schema({
     paymentMethods: {
       cardEnabled: { type: Boolean, default: true },
       codEnabled:  { type: Boolean, default: true },
-    }
+    },
+    shippingEnabled: { type: Boolean, default: true },
   },
 
   // ─── Legacy fields kept for backward compatibility ─────────

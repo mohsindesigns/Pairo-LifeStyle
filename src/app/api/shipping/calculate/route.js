@@ -1,28 +1,56 @@
-import { NextResponse }   from 'next/server';
+import { NextResponse } from 'next/server';
 import { shippingService } from '@/services/shipping/ShippingService';
+import dbConnect from '@/lib/db';
+import SiteConfig from '@/models/SiteConfig';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
- * POST /api/shipping/calculate
- * 
- * Public endpoint called by Cart estimator and Checkout page.
- * 
- * Request body:
- *   {
- *     address:  { country, state, city, zip },
- *     subtotal: number,
- *     items:    [{ quantity, weight? }]
- *   }
- * 
- * Response:
- *   {
- *     success: true,
- *     zone:    { _id, name, ... } | null,
- *     rates:   [{ methodId, methodName, provider, cost, currency, ... }],
- *     currency: string
- *   }
+ * GET /api/shipping/calculate
+ * Quick public status check for checkout to see if shipping module is enabled.
  */
+export async function GET() {
+  try {
+    await dbConnect();
+    const config = await SiteConfig.findOne({ key: 'main' }).select('commerce').lean();
+    const shippingEnabled = config?.commerce?.shippingEnabled !== false;
+    return NextResponse.json({
+      success: true,
+      shippingEnabled,
+      currency: config?.commerce?.storeCurrency ?? 'USD'
+    });
+  } catch (error) {
+    return NextResponse.json({ success: true, shippingEnabled: true, currency: 'USD' });
+  }
+}
+
 export async function POST(req) {
   try {
+    await dbConnect();
+    const config = await SiteConfig.findOne({ key: 'main' }).select('commerce').lean();
+    const shippingEnabled = config?.commerce?.shippingEnabled !== false;
+    const currency = config?.commerce?.storeCurrency ?? 'USD';
+
+    if (!shippingEnabled) {
+      return NextResponse.json({
+        success: true,
+        shippingEnabled: false,
+        zone: null,
+        rates: [
+          {
+            methodId: 'free-delivery',
+            methodName: 'Free Delivery',
+            provider: 'FREE_SHIPPING',
+            cost: 0,
+            currency,
+            description: 'Free delivery on all orders'
+          }
+        ],
+        currency
+      });
+    }
+
     const body = await req.json();
     const { address, subtotal, items } = body;
 

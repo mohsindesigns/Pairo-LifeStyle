@@ -77,6 +77,30 @@ class ShippingService {
    * }>}
    */
   async getRatesForAddress(address, cartSubtotal, cartItems = []) {
+    await dbConnect();
+
+    // ── Check if shipping module is enabled ──────────────────────
+    const currency = await this.#getStoreCurrency();
+    const config = await SiteConfig.findOne({ key: 'main' }).select('commerce').lean();
+    if (config?.commerce?.shippingEnabled === false) {
+      return {
+        zone: null,
+        shippingEnabled: false,
+        rates: [
+          {
+            methodId: 'free-delivery',
+            methodName: 'Free Delivery',
+            provider: 'FREE_SHIPPING',
+            cost: 0,
+            currency,
+            description: 'Free delivery on all orders'
+          }
+        ],
+        currency,
+        cacheHit: false
+      };
+    }
+
     const cacheKey = this.#buildCacheKey(address, cartSubtotal);
 
     // ── 1. Cache check ─────────────────────────────────────────────────────────
@@ -85,8 +109,6 @@ class ShippingService {
       return { ...cached, cacheHit: true };
     }
 
-    await dbConnect();
-
     // ── 2. Load active zones ───────────────────────────────────────
     const zones = await ShippingZone
       .find({ status: 'Active' })
@@ -94,7 +116,7 @@ class ShippingService {
       .lean();
 
     if (!zones.length) {
-      return { zone: null, rates: [], currency: 'USD', cacheHit: false };
+      return { zone: null, shippingEnabled: true, rates: [], currency, cacheHit: false };
     }
 
     // ── 3. Match best zone ────────────────────────────────────────────────────
@@ -123,8 +145,7 @@ class ShippingService {
       city:    address.city
     };
 
-    // ── 6. Load store currency ────────────────────────────────────────────────
-    const currency = await this.#getStoreCurrency();
+    // ── 6. Store currency already resolved above ─────────────────────────────
 
     // ── 7. Filter eligible methods and calculate rates ────────────────────────
     const rates = [];
@@ -134,7 +155,7 @@ class ShippingService {
       }
     }
 
-    const result = { zone: matchedZone, rates, currency, cacheHit: false };
+    const result = { zone: matchedZone, shippingEnabled: true, rates, currency, cacheHit: false };
 
     // ── 8. Cache result ───────────────────────────────────────────────────────
     await this.cache.set(cacheKey, result, CACHE_TTL_SECONDS);

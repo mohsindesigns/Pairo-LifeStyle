@@ -1,6 +1,7 @@
 "use client";
 
 import { useCart } from "@/context/CartContext";
+import { useSiteData } from "@/context/SiteContext";
 import Image from "next/image";
 import Link from "next/link";
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Truck, Sparkles } from "lucide-react";
@@ -10,6 +11,7 @@ import { getProductUrl } from "@/lib/routes";
 import { trackBeginCheckout, trackViewCart } from "@/lib/analytics";
 
 export default function CartPage() {
+  const siteData = useSiteData();
   const { 
     cartItems, 
     updateQuantity, 
@@ -307,7 +309,7 @@ export default function CartPage() {
               
               <div className="flex justify-between items-center text-[11px] font-bold text-black/60 uppercase tracking-wider">
                 <span>Shipping</span>
-                <span>Calculated next</span>
+                <span>{siteData?.commerce?.shippingEnabled === false ? "Free" : "Calculated next"}</span>
               </div>
               <div className="flex justify-between items-center text-[11px] font-bold text-black/60 uppercase tracking-wider">
                 <span>Estimated Tax</span>

@@ -231,7 +231,19 @@ export async function createOrderFromCheckoutPayload(payload, {
           ipAddress
         },
         shippingAddress,
-        shippingSnapshot: shippingSnapshot ?? null,
+        shippingSnapshot: shippingSnapshot || (authoritativeShippingCost === 0 ? {
+          version: 1,
+          zoneId: null,
+          zoneName: 'Free Delivery',
+          methodId: 'free-delivery',
+          methodName: 'Free Delivery',
+          provider: 'FREE_SHIPPING',
+          cost: 0,
+          currency: financials.currency || 'USD',
+          settings: null,
+          conditions: null,
+          capturedAt: new Date()
+        } : null),
         customerNote
       };
 

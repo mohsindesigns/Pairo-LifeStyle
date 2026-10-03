@@ -155,9 +155,9 @@ const OrderSchema = new mongoose.Schema({
   // creation — changes to zones/methods do not affect historical orders.
   shippingSnapshot: {
     version:    { type: Number, default: 1 },                                    // schema version guard for future migrations
-    zoneId:     { type: mongoose.Schema.Types.ObjectId, ref: 'ShippingZone' },
+    zoneId:     { type: mongoose.Schema.Types.Mixed },
     zoneName:   String,
-    methodId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ShippingMethod' },
+    methodId:   { type: mongoose.Schema.Types.Mixed },
     methodName: String,
     provider:   String,
     cost:       { type: Number, default: 0 },

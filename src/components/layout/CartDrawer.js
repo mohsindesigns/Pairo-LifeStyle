@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus, ShoppingBag, ArrowRight, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
+import { useSiteData } from "@/context/SiteContext";
 import Link from "next/link";
 import { getProductUrl } from "@/lib/routes";
 import { trackBeginCheckout } from "@/lib/analytics";
 
 export default function CartDrawer() {
+  const siteData = useSiteData();
   const { isCartOpen, setIsCartOpen, cartItems, updateQuantity, removeFromCart, cartSubtotal, affiliateDiscount, affiliateDiscountAmount } = useCart();
 
   const drawerVariants = {
@@ -186,7 +188,7 @@ export default function CartDrawer() {
                   <div className="flex justify-between items-center">
                     <span className="text-black/50 uppercase tracking-widest font-bold text-[10px]">Shipping</span>
                     <span className="text-[10px] font-bold text-black/75 uppercase tracking-widest">
-                      Calculated next
+                      {siteData?.commerce?.shippingEnabled === false ? "Free" : "Calculated next"}
                     </span>
                   </div>
                 </div>

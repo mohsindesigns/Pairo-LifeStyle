@@ -38,14 +38,18 @@ async function resolveAuthoritativeSubtotal({ items, mongoSession }) {
 // price (including $0) for a real order. If the zone has no rates at all,
 // authoritative cost is 0 (nothing to charge for); if rates exist, the
 // client's selected method must still be one of them.
-async function resolveAuthoritativeShippingCost({ shippingAddress, shippingSnapshot, subtotal, items, mongoSession }) {
+export async function resolveAuthoritativeShippingCost({ shippingAddress, shippingSnapshot, subtotal, items, mongoSession }) {
   if (!shippingAddress) return 0;
 
   const result = await shippingService.getRatesForAddress(shippingAddress, subtotal, items);
+  if (result.shippingEnabled === false) return 0;
   if (!result.rates || result.rates.length === 0) return 0;
 
   const matchedRate = result.rates.find(r => String(r.methodId) === String(shippingSnapshot?.methodId));
   if (!matchedRate) {
+    if (shippingSnapshot?.methodId === 'free-delivery' || shippingSnapshot?.methodId === 'free-order') {
+      return 0;
+    }
     throw new Error("Selected shipping method is no longer available for this address. Please refresh and choose a shipping method again.");
   }
   return matchedRate.cost;

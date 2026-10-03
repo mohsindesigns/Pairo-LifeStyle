@@ -7,10 +7,17 @@ import { getServerSession } from 'next-auth';
 import { authOptions }      from '@/app/api/auth/[...nextauth]/route';
 import { can }              from '@/lib/rbac';
 
-async function requireSettings() {
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+async function requireSettings(action = 'manage') {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) return null;
-  if (!can(session.user, 'settings.manage')) return null;
+  if (action === 'view') {
+    if (!can(session.user, 'settings.view') && !can(session.user, 'settings.manage') && !can(session.user, 'settings.edit')) return null;
+  } else {
+    if (!can(session.user, 'settings.manage') && !can(session.user, 'settings.edit')) return null;
+  }
   return session;
 }
 
@@ -107,7 +114,7 @@ async function migrateLegacyTaxSettings(doc) {
 
 export async function GET(req) {
   try {
-    if (!await requireSettings()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!await requireSettings('view')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     await dbConnect();
 
     let doc = await TaxSettings.findOne().lean();
