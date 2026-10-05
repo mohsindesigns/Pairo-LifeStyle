@@ -12,6 +12,8 @@ export const TEMPLATE_REGISTRY = {
     component: HomeTemplate,
     allowedSections: [
       "hero_slider",
+      "trust_badges",
+      "dual_category_banner",
       "product_grid",
       "feature_marquee",
       "banner_feature",
@@ -21,6 +23,8 @@ export const TEMPLATE_REGISTRY = {
     ],
     defaultSections: [
       { type: "hero_slider", config: {} },
+      { type: "trust_badges", config: {} },
+      { type: "dual_category_banner", config: {} },
       { type: "product_grid", config: { title: "NEW ARRIVALS", limit: 16 } },
       { type: "feature_marquee", config: {} },
       { type: "product_grid", config: { title: "TOP SELLING", limit: 16 } },

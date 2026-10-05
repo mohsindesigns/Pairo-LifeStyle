@@ -26,6 +26,41 @@ export const SECTION_SCHEMAS = {
       ]}
     ]
   },
+  trust_badges: {
+    name: "Trust Badges & Stats",
+    icon: "Shield",
+    fields: [
+      {
+        name: "items",
+        label: "Badges & Stats Items",
+        type: "repeater",
+        fields: [
+          { name: "title", label: "Stat / Badge Title (e.g. Real Lambskin)", type: "text" },
+          { name: "description", label: "Description / Subtitle (e.g. Leather)", type: "text" },
+          { name: "icon", label: "Icon from Library", type: "icon" },
+          { name: "customIcon", label: "Or Upload Custom Icon Image", type: "image" },
+          { name: "link", label: "Optional Link URL", type: "text" }
+        ]
+      }
+    ]
+  },
+  dual_category_banner: {
+    name: "Side-by-Side Category Banners",
+    icon: "Grid",
+    fields: [
+      {
+        name: "banners",
+        label: "Banners (Side by Side)",
+        type: "repeater",
+        fields: [
+          { name: "image", label: "Banner Image", type: "image" },
+          { name: "heading", label: "Heading (Bottom Center - Leave empty to hide)", type: "text" },
+          { name: "buttonText", label: "Button Text (Bottom Center - Leave empty to hide)", type: "text" },
+          { name: "link", label: "Link URL", type: "text" }
+        ]
+      }
+    ]
+  },
   product_grid: {
     name: "Product Collection",
     icon: "ShoppingBag",
