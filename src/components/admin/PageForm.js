@@ -625,9 +625,18 @@ export default function PageForm({ pageId }) {
                         </span>
                      )}
                   </div>
-                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1">
+                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5">
                      Permalink: <span className="text-gray-400">pairo.store/</span>
-                     <input className="border-b border-dashed border-[#2271b1]/30 bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px] max-w-full focus:border-[#2271b1]" value={page.slug} onChange={(e) => setPage({ ...page, slug: e.target.value })} />
+                     {page.isSystem ? (
+                        <span className="font-mono text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                           {page.slug}
+                        </span>
+                     ) : (
+                        <input className="border-b border-dashed border-[#2271b1]/30 bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px] max-w-full focus:border-[#2271b1]" value={page.slug || ""} onChange={(e) => setPage({ ...page, slug: e.target.value })} />
+                     )}
+                     {page.isSystem && (
+                        <span className="text-[10px] text-gray-400 italic">(system slug locked)</span>
+                     )}
                   </div>
                </div>
 

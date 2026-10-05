@@ -68,21 +68,43 @@ export async function PUT(req, { params }) {
             return NextResponse.json({ error }, { status: 400 });
         }
 
-        // Prevent collisions with reserved system routes
+        // Prevent collisions with reserved system routes and handle slug changes
         const { isReservedPath, registerRedirect } = await import("@/lib/redirect-resolver");
+        let targetSlug = existing.slug;
+
         if (body.slug) {
-            if (isReservedPath(body.slug)) {
-                return NextResponse.json({ error: "Slug collides with a reserved system route" }, { status: 400 });
+            const cleanSlug = body.slug.toLowerCase().trim().replace(/[^a-z0-9-_]+/g, '-');
+            
+            if (existing.isSystem) {
+                // System pages (e.g. contact, about, home) have locked system slugs that power core routes
+                if (cleanSlug !== existing.slug) {
+                    return NextResponse.json({ error: "System page slug cannot be modified" }, { status: 400 });
+                }
+                targetSlug = existing.slug;
+            } else if (cleanSlug !== existing.slug) {
+                // Non-system pages: check for collisions only if the slug is actually changing
+                if (isReservedPath(cleanSlug)) {
+                    return NextResponse.json({ error: "Slug collides with a reserved system route" }, { status: 400 });
+                }
+
+                const slugCollision = await Page.findOne({ slug: cleanSlug, _id: { $ne: existing._id } });
+                if (slugCollision) {
+                    return NextResponse.json({ error: "A page with this slug already exists" }, { status: 400 });
+                }
+
+                // Register 301 redirect if slug changed
+                if (existing.slug) {
+                    await registerRedirect(`/${existing.slug}`, `/${cleanSlug}`);
+                }
+                targetSlug = cleanSlug;
             }
         }
 
-        // Register redirect if slug changed
-        if (body.slug && existing.slug && existing.slug !== body.slug) {
-            await registerRedirect(`/${existing.slug}`, `/${body.slug}`);
-        }
+        const { _id, __v, createdAt, updatedAt, ...updateData } = body;
 
-        const updated = await Page.findByIdAndUpdate(id, {
-            ...body,
+        const updated = await Page.findByIdAndUpdate(existing._id, {
+            ...updateData,
+            slug: targetSlug,
             template: existingTemplate, // Force template to be immutable
             isSystem: existing.isSystem, // Force isSystem to be immutable
             updatedBy: session.user.id
@@ -95,6 +117,9 @@ export async function PUT(req, { params }) {
         });
 
         // Trigger cache revalidation
+        if (existing.slug && existing.slug !== updated.slug) {
+            revalidatePath(existing.slug === 'home' ? '/' : `/${existing.slug}`);
+        }
         if (updated.slug === 'home') {
             revalidatePath('/');
         } else {

@@ -53,13 +53,18 @@ export async function POST(req) {
             }
         }
 
+        const cleanSlug = slug.toLowerCase().trim().replace(/[^a-z0-9-_]+/g, '-');
+        if (!cleanSlug) {
+            return NextResponse.json({ error: "Invalid slug" }, { status: 400 });
+        }
+
         // Prevent collisions with reserved system routes
         const { isReservedPath } = await import("@/lib/redirect-resolver");
-        if (isReservedPath(slug)) {
+        if (isReservedPath(cleanSlug)) {
             return NextResponse.json({ error: "Slug collides with a reserved system route" }, { status: 400 });
         }
 
-        const existing = await Page.findOne({ slug });
+        const existing = await Page.findOne({ slug: cleanSlug });
         if (existing) {
             return NextResponse.json({ error: "Page with this slug already exists" }, { status: 400 });
         }
@@ -78,6 +83,7 @@ export async function POST(req) {
 
         const newPage = await Page.create({
             ...body,
+            slug: cleanSlug,
             template: templateKey,
             sections: pageSections,
             createdBy: session.user.id,
