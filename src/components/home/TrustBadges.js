@@ -4,7 +4,7 @@ import React, { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import * as LucideIcons from "lucide-react";
-import { ChevronLeft, ChevronRight, Shield } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shield, Truck, Package, Globe, UserCheck, Star } from "lucide-react";
 
 export default function TrustBadges({
   items: propItems,
@@ -60,8 +60,8 @@ export default function TrustBadges({
   };
 
   return (
-    <section className="w-full bg-[#fafafa] border-y border-gray-200/80 py-5 sm:py-6 md:py-8 relative select-none">
-      <div className="container mx-auto px-4 md:px-8 relative">
+    <section className="container mx-auto px-2 sm:px-4 md:px-8 my-4 md:my-6 select-none">
+      <div className="bg-white border border-black/[0.07] rounded-[24px] md:rounded-[32px] shadow-sm py-6 md:py-8 px-4 sm:px-6 md:px-8 relative overflow-hidden">
         {/* Navigation buttons for overflowing items on desktop */}
         {isOverflowing && (
           <>
@@ -69,7 +69,7 @@ export default function TrustBadges({
               type="button"
               onClick={scrollLeft}
               aria-label="Previous"
-              className="hidden lg:flex absolute -left-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-gray-300 shadow-md items-center justify-center text-gray-700 hover:text-black hover:scale-105 active:scale-95 transition-all"
+              className="hidden lg:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-md items-center justify-center text-gray-700 hover:text-black hover:scale-105 active:scale-95 transition-all"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -77,7 +77,7 @@ export default function TrustBadges({
               type="button"
               onClick={scrollRight}
               aria-label="Next"
-              className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white border border-gray-300 shadow-md items-center justify-center text-gray-700 hover:text-black hover:scale-105 active:scale-95 transition-all"
+              className="hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-md items-center justify-center text-gray-700 hover:text-black hover:scale-105 active:scale-95 transition-all"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -87,10 +87,10 @@ export default function TrustBadges({
         {/* Badges Container */}
         <div
           ref={scrollContainerRef}
-          className={`flex items-center overflow-x-auto no-scrollbar scroll-smooth snap-x snap-mandatory ${
+          className={`flex items-center no-scrollbar scroll-smooth ${
             isOverflowing
-              ? "justify-start gap-4 md:gap-8"
-              : "justify-start md:justify-around lg:justify-center lg:gap-12"
+              ? "overflow-x-auto justify-start gap-4 md:gap-8 snap-x snap-mandatory px-4"
+              : "overflow-x-auto sm:overflow-visible justify-between w-full"
           }`}
         >
           {items.map((item, index) => {
@@ -105,9 +105,9 @@ export default function TrustBadges({
             const hasDivider = index !== items.length - 1;
 
             const badgeContent = (
-              <div className="flex flex-col items-center text-center px-3 sm:px-6 py-2 group min-w-[130px] sm:min-w-[150px] md:min-w-0 flex-shrink-0 snap-center transition-transform duration-300 hover:-translate-y-0.5">
+              <div className="flex flex-col items-center text-center px-2 sm:px-4 py-2 group flex-1 min-w-[125px] sm:min-w-0 transition-transform duration-300 hover:-translate-y-0.5">
                 {/* Icon wrapper */}
-                <div className="w-12 h-12 mb-2 flex items-center justify-center text-gray-800 transition-colors duration-300 group-hover:text-black">
+                <div className="w-12 h-12 mb-2 flex items-center justify-center text-neutral-800 transition-colors duration-300 group-hover:text-black">
                   {hasCustomIcon ? (
                     <div className="relative w-9 h-9 sm:w-10 sm:h-10">
                       <Image
@@ -116,25 +116,26 @@ export default function TrustBadges({
                         fill
                         className="object-contain"
                         sizes="40px"
+                        unoptimized
                       />
                     </div>
                   ) : (
-                    <IconComponent className="w-7 h-7 sm:w-8 sm:h-8 stroke-[1.25]" />
+                    <IconComponent className="w-7 h-7 sm:w-8 sm:h-8 stroke-[1.25] text-neutral-800 group-hover:stroke-[1.5] transition-all" />
                   )}
                 </div>
 
                 {/* Title */}
                 {title ? (
-                  <h4 className="text-[13px] sm:text-[14px] font-bold text-gray-900 tracking-tight leading-tight">
+                  <h4 className="text-[13px] sm:text-[14px] font-bold text-neutral-900 tracking-tight leading-tight uppercase">
                     {title}
                   </h4>
                 ) : (
-                  <span className="text-[12px] text-gray-400 italic">No Title</span>
+                  <span className="text-[12px] text-neutral-400 italic">No Title</span>
                 )}
 
                 {/* Description / Subtitle */}
                 {description && (
-                  <p className="text-[11px] sm:text-[12px] text-gray-500 font-normal tracking-normal mt-0.5">
+                  <p className="text-[11px] sm:text-[12px] text-neutral-500 font-normal tracking-normal mt-0.5">
                     {description}
                   </p>
                 )}
@@ -144,7 +145,7 @@ export default function TrustBadges({
             return (
               <React.Fragment key={index}>
                 {linkHref ? (
-                  <Link href={linkHref} className="block flex-shrink-0 snap-center focus:outline-none focus:ring-1 focus:ring-black">
+                  <Link href={linkHref} className="flex-1 block focus:outline-none focus:ring-1 focus:ring-black">
                     {badgeContent}
                   </Link>
                 ) : (
@@ -153,7 +154,7 @@ export default function TrustBadges({
 
                 {/* Vertical Divider */}
                 {hasDivider && (
-                  <div className="hidden sm:block h-10 w-[1px] bg-gray-200/90 flex-shrink-0" />
+                  <div className="hidden sm:block h-10 w-[1px] bg-black/[0.08] flex-shrink-0" />
                 )}
               </React.Fragment>
             );
