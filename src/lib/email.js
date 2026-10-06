@@ -33,20 +33,46 @@ function getSmtpPassword(secretKey, region) {
   return signatureAndVersion.toString('base64');
 }
 
-const smtpUser = process.env.AWS_ACCESS_KEY_ID || process.env.EMAIL_USER;
-const smtpPass = process.env.AWS_SECRET_ACCESS_KEY 
-  ? getSmtpPassword(process.env.AWS_SECRET_ACCESS_KEY, sesRegion) 
-  : process.env.EMAIL_PASS;
+const smtpUser = process.env.EMAIL_USER || process.env.AWS_ACCESS_KEY_ID;
+const smtpPass = process.env.EMAIL_PASS 
+  || (process.env.AWS_SECRET_ACCESS_KEY ? getSmtpPassword(process.env.AWS_SECRET_ACCESS_KEY, sesRegion) : undefined);
 
 const transporter = nodemailer.createTransport({
   host: smtpHost,
   port: smtpPort,
   secure: smtpPort === 465,
-  auth: {
+  auth: smtpUser && smtpPass ? {
     user: smtpUser,
     pass: smtpPass,
+  } : undefined,
+  tls: {
+    rejectUnauthorized: false,
   },
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 20000,
 });
+
+/**
+ * Robust RFC-compliant From address formatter
+ */
+export function getFromAddress(displayName = 'PAIRO Lifestyle') {
+  const storeName = process.env.STORE_NAME || displayName;
+  const rawFrom = (
+    process.env.STORE_EMAIL ||
+    process.env.FROM_EMAIL ||
+    process.env.EMAIL_FROM ||
+    (process.env.EMAIL_USER && process.env.EMAIL_USER.includes('@') ? process.env.EMAIL_USER : null) ||
+    'support@pairolifestyle.com'
+  ).trim();
+
+  if (rawFrom.includes('<') && rawFrom.includes('>')) {
+    return rawFrom;
+  }
+
+  const cleanEmail = rawFrom.replace(/[<>"']/g, '').trim();
+  return `"${storeName}" <${cleanEmail}>`;
+}
 
 /**
  * Send Email Verification to New Customer
@@ -89,7 +115,6 @@ export async function sendEmailVerification(toEmail, name, verificationUrl) {
     </div>
   `;
 
-  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || process.env.EMAIL_FROM || (process.env.EMAIL_USER?.includes('@') ? process.env.EMAIL_USER : 'support@pairolifestyle.com');
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
 
   if (!smtpUser || !smtpPass) {
@@ -99,7 +124,7 @@ export async function sendEmailVerification(toEmail, name, verificationUrl) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"${storeName}" <${storeEmail}>`,
+      from: getFromAddress(storeName),
       to: toEmail,
       subject: `Verify your email — ${storeName}`,
       html,
@@ -153,8 +178,6 @@ export async function sendAffiliateEmailVerification(toEmail, name, verification
     </div>
   `;
 
-  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || process.env.EMAIL_FROM || (process.env.EMAIL_USER?.includes('@') ? process.env.EMAIL_USER : 'support@pairolifestyle.com');
-
   if (!smtpUser || !smtpPass) {
     console.log(`[Email Simulation] Affiliate Verification Email → ${toEmail} | URL: ${verificationUrl}`);
     return;
@@ -162,7 +185,7 @@ export async function sendAffiliateEmailVerification(toEmail, name, verification
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Affiliates" <${storeEmail}>`,
+      from: getFromAddress("PAIRO Affiliates"),
       to: toEmail,
       subject: `Verify your email — PAIRO Affiliates`,
       html,
@@ -262,7 +285,7 @@ export async function sendOrderConfirmation(order) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Store" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Store"),
       to: order.customer?.email,
       subject: `Order Confirmed: #${order.orderNumber}`,
       html,
@@ -332,7 +355,7 @@ export async function sendAdminOrderNotification(order) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO System" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO System"),
       to: adminEmail,
       subject: `🛍 New Order: #${order.orderNumber} — $${(order.financials?.total || 0).toLocaleString()}`,
       html,
@@ -374,7 +397,7 @@ export async function sendSubmissionReply(toEmail, subject, message, customerNam
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Support" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Support"),
       to: toEmail,
       subject: subject,
       html,
@@ -421,7 +444,7 @@ export async function sendAffiliateApplicationReceived(toEmail, affiliateName) {
 
   try {
     await transporter.sendMail({
-      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Affiliates"),
       to: toEmail,
       subject: "Affiliate Application Received — Pairo Lifestyle",
       html,
@@ -479,7 +502,7 @@ export async function sendAffiliateApplicationApproved(toEmail, affiliateName, r
 
   try {
     await transporter.sendMail({
-      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Affiliates"),
       to: toEmail,
       subject: "Affiliate Account Approved! — Pairo Lifestyle",
       html,
@@ -530,7 +553,7 @@ export async function sendAffiliateApplicationRejected(toEmail, affiliateName, r
 
   try {
     await transporter.sendMail({
-      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Affiliates"),
       to: toEmail,
       subject: "Affiliate Application Update — Pairo Lifestyle",
       html,
@@ -581,7 +604,7 @@ export async function sendAffiliatePayoutUpdate(toEmail, affiliateName, amount, 
 
   try {
     await transporter.sendMail({
-      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Affiliates"),
       to: toEmail,
       subject: `Affiliate Payout Update: $${amount} — Pairo Lifestyle`,
       html,
@@ -635,7 +658,7 @@ export async function sendAffiliatePasswordReset(toEmail, name, resetUrl) {
 
   try {
     await transporter.sendMail({
-      from: `"PAIRO Partners" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Partners"),
       to: toEmail,
       subject: `Reset Your PAIRO Partner Password`,
       html,
@@ -721,7 +744,7 @@ export async function sendCustomOrderConfirmation(order) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Custom Design" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Custom Design"),
       to: order.customer?.email,
       subject: `PAIRO Bespoke Design Request Received: #${order.orderNumber}`,
       html,
@@ -807,7 +830,7 @@ export async function sendAdminCustomOrderNotification(order) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO System" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO System"),
       to: adminEmail,
       subject: `✨ New Custom Order: #${order.orderNumber} by ${order.shippingAddress?.fullName || 'Guest'}`,
       html,
@@ -848,7 +871,7 @@ export async function sendQuestionConfirmationEmail({ customerEmail, customerNam
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Store" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Store"),
       to: customerEmail,
       subject: `We have received your question regarding ${productName}`,
       html,
@@ -917,7 +940,7 @@ export async function sendAdminQuestionNotification({ customerName, customerEmai
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Store System" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Store System"),
       to: adminEmail,
       subject: `❓ New Q&A Question on ${productName} by ${customerName}`,
       html,
@@ -974,7 +997,7 @@ export async function sendQuestionReplyEmail({ customerEmail, customerName, orig
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Support" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Support"),
       to: customerEmail,
       subject: `Answered: Your question regarding ${productName}`,
       html,
@@ -1033,7 +1056,7 @@ export async function sendCustomerPasswordReset(toEmail, name, resetUrl) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Lifestyle" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: getFromAddress("PAIRO Lifestyle"),
       to: toEmail,
       subject: `Reset your password — PAIRO Lifestyle`,
       html,
@@ -1102,7 +1125,7 @@ export async function sendCustomJacketConfirmation(toEmail, firstName, inquiry) 
 
   try {
     const info = await transporter.sendMail({
-      from: `"${storeName}" <${storeEmail}>`,
+      from: getFromAddress(storeName),
       to: toEmail,
       subject: `Your Custom Jacket Inquiry — We'll Be In Touch!`,
       html
@@ -1178,7 +1201,7 @@ export async function sendCustomJacketAdminNotification(inquiry) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"${storeName}" <${storeEmail}>`,
+      from: getFromAddress("PAIRO System"),
       to: adminEmail,
       subject: `🧥 New Custom Jacket Inquiry — ${inquiry.firstName} ${inquiry.lastName}`,
       html
@@ -1245,7 +1268,7 @@ export async function sendPaymentLinkEmail(order, paymentLinkUrl) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"${storeName}" <${storeEmail}>`,
+      from: getFromAddress(storeName),
       to: order.customer?.email,
       subject: `Complete Your Payment — Order #${order.orderNumber}`,
       html
@@ -1331,7 +1354,7 @@ export async function sendOrderInvoiceEmail(order) {
 
   try {
     const info = await transporter.sendMail({
-      from: `"${storeName}" <${storeEmail}>`,
+      from: getFromAddress(storeName),
       to: order.customer?.email,
       subject: `Invoice — Order #${order.orderNumber}`,
       html

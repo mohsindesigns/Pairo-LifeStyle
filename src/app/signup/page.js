@@ -17,6 +17,33 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+  const [resendError, setResendError] = useState("");
+
+  const handleResend = async () => {
+    if (resending || !email) return;
+    setResending(true);
+    setResendMessage("");
+    setResendError("");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResendMessage(data.message || "Verification email resent! Please check your inbox and spam folder.");
+      } else {
+        setResendError(data.message || "Failed to resend verification email. Please try again.");
+      }
+    } catch (err) {
+      setResendError("Network error. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -89,11 +116,26 @@ export default function SignupPage() {
           <div className="border-t border-black/10 pt-5 space-y-3">
             <p className="text-[10px] text-black/50 uppercase tracking-widest">Didn&apos;t receive it?</p>
             <button
-              onClick={() => handleSubmit({ preventDefault: () => {} })}
-              className="text-[10px] font-black uppercase tracking-widest text-black underline underline-offset-4 hover:opacity-70 transition cursor-pointer"
+              type="button"
+              onClick={handleResend}
+              disabled={resending}
+              className="text-[10px] font-black uppercase tracking-widest text-black underline underline-offset-4 hover:opacity-70 transition cursor-pointer disabled:opacity-50"
             >
-              Resend Verification Email
+              {resending ? "Sending..." : "Resend Verification Email"}
             </button>
+            {resendMessage && (
+              <p className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-[3px] text-center">
+                {resendMessage}
+              </p>
+            )}
+            {resendError && (
+              <p className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-[3px] text-center">
+                {resendError}
+              </p>
+            )}
+            <p className="text-[9px] text-black/50 leading-relaxed">
+              Be sure to check your <strong>Spam / Junk</strong> folder as verification emails can sometimes land there.
+            </p>
           </div>
           <Link
             href="/login"

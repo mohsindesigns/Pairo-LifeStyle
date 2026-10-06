@@ -16,7 +16,28 @@ export default function LoginPage() {
   const turnstileRef = useRef(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState("");
   const router = useRouter();
+
+  const handleResendFromLogin = async () => {
+    if (resending || !email) return;
+    setResending(true);
+    setResendStatus("");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setResendStatus(data.message || "Verification email sent! Check your inbox.");
+    } catch (err) {
+      setResendStatus("Failed to resend. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -85,11 +106,23 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <p className="uppercase tracking-widest">Email Not Verified</p>
                   <p className="normal-case tracking-normal font-semibold text-amber-600">
-                    Please check your inbox and click the verification link before signing in.
+                    Please check your inbox (and spam folder) and click the verification link before signing in.
                   </p>
-                  <Link href="/signup" className="inline-block underline underline-offset-2 text-amber-700 font-black uppercase tracking-widest text-[9px]">
-                    Resend Verification Email
-                  </Link>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleResendFromLogin}
+                      disabled={resending}
+                      className="inline-block underline underline-offset-2 text-amber-800 hover:text-black font-black uppercase tracking-widest text-[9px] cursor-pointer disabled:opacity-50"
+                    >
+                      {resending ? "Sending..." : "Resend Verification Email"}
+                    </button>
+                    {resendStatus && (
+                      <p className="mt-2 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded">
+                        {resendStatus}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <p className="uppercase tracking-widest">{error}</p>
