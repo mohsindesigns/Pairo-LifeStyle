@@ -89,19 +89,23 @@ export async function sendEmailVerification(toEmail, name, verificationUrl) {
     </div>
   `;
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || process.env.EMAIL_FROM || (process.env.EMAIL_USER?.includes('@') ? process.env.EMAIL_USER : 'support@pairolifestyle.com');
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+
+  if (!smtpUser || !smtpPass) {
     console.log(`[Email Simulation] Verification Email → ${toEmail} | URL: ${verificationUrl}`);
     return;
   }
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Lifestyle" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: `"${storeName}" <${storeEmail}>`,
       to: toEmail,
-      subject: `Verify your email — PAIRO Lifestyle`,
+      subject: `Verify your email — ${storeName}`,
       html,
     });
     console.log(`[Email] ✅ Verification email sent to ${toEmail} | MsgID: ${info.messageId}`);
+    return info;
   } catch (err) {
     console.error('[Email] ❌ Failed to send verification email:', err.message);
     throw err;
@@ -149,19 +153,22 @@ export async function sendAffiliateEmailVerification(toEmail, name, verification
     </div>
   `;
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || process.env.EMAIL_FROM || (process.env.EMAIL_USER?.includes('@') ? process.env.EMAIL_USER : 'support@pairolifestyle.com');
+
+  if (!smtpUser || !smtpPass) {
     console.log(`[Email Simulation] Affiliate Verification Email → ${toEmail} | URL: ${verificationUrl}`);
     return;
   }
 
   try {
     const info = await transporter.sendMail({
-      from: `"PAIRO Affiliates" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: `"PAIRO Affiliates" <${storeEmail}>`,
       to: toEmail,
       subject: `Verify your email — PAIRO Affiliates`,
       html,
     });
     console.log(`[Email] ✅ Affiliate verification email sent to ${toEmail} | MsgID: ${info.messageId}`);
+    return info;
   } catch (err) {
     console.error('[Email] ❌ Failed to send affiliate verification email:', err.message);
     throw err;

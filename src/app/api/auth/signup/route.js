@@ -79,19 +79,24 @@ export async function POST(req) {
 
         const siteUrl = process.env.NEXTAUTH_URL || "https://pairolifestyle.com";
         const verificationUrl = `${siteUrl}/verify-email?token=${token}`;
+        let emailSent = false;
         try {
-          await sendEmailVerification(email, name, verificationUrl);
-          return NextResponse.json({
-            message: "Verification email resent. Please check your inbox.",
-            resent: true
-          }, { status: 200 });
+          await sendEmailVerification(email, existingCustomer.name || name, verificationUrl);
+          emailSent = true;
+          console.log(`[Signup] ✅ Verification email resent to ${email}`);
         } catch (emailError) {
-          console.error("[Signup] ⚠️ Failed to resend verification email:", emailError);
-          return NextResponse.json({
-            message: "Failed to resend verification email. Please try again.",
-            error: emailError.message
-          }, { status: 500 });
+          console.error("[Signup] ⚠️ Failed to resend verification email:", emailError.message);
+          console.log(`[Signup] Verification URL for ${email}: ${verificationUrl}`);
         }
+
+        return NextResponse.json({
+          message: emailSent
+            ? "Verification email resent. Please check your inbox."
+            : "We've generated a new verification link. Please check your inbox shortly or contact support if it does not arrive.",
+          resent: true,
+          pendingVerification: true,
+          warning: emailSent ? undefined : "email_delayed"
+        }, { status: 200 });
       }
       return NextResponse.json({ message: "An account with this email already exists." }, { status: 400 });
     }
@@ -117,20 +122,21 @@ export async function POST(req) {
     // Send verification email
     const siteUrl = process.env.NEXTAUTH_URL || "https://pairolifestyle.com";
     const verificationUrl = `${siteUrl}/verify-email?token=${verificationToken}`;
+    let emailSent = false;
     try {
       await sendEmailVerification(email, name, verificationUrl);
+      emailSent = true;
       console.log(`[Signup] ✅ Verification email dispatched to ${email}`);
-      return NextResponse.json({
-        message: "Account created. Please check your email to verify your account.",
-        pendingVerification: true
-      }, { status: 201 });
     } catch (emailError) {
-      console.error("[Signup] ⚠️ Failed to send verification email:", emailError);
-      return NextResponse.json({
-        message: "Failed to send verification email. Please try again.",
-        error: emailError.message
-      }, { status: 500 });
+      console.error("[Signup] ⚠️ Failed to send verification email:", emailError.message);
+      console.log(`[Signup] Verification URL for ${email}: ${verificationUrl}`);
     }
+
+    return NextResponse.json({
+      message: "Account created. Please check your email to verify your account.",
+      pendingVerification: true,
+      warning: emailSent ? undefined : "email_delayed"
+    }, { status: 201 });
 
   } catch (error) {
     console.error("[Signup] ❌ CRITICAL ERROR:", error);
