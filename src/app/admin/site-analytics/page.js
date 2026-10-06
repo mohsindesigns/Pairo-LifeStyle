@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
@@ -414,27 +414,48 @@ function FilterSelect({ label, paramKey, value, onChange, options = [] }) {
 
 function SiteAnalyticsView() {
   const router = useRouter();
-  const pathname = usePathname() || "/admin/site-analytics";
   const searchParams = useSearchParams();
   const params = useParams();
 
-  const rawTab = params?.tab || searchParams.get("tab") || "overview";
-  const tab = typeof rawTab === "string" ? rawTab : "overview";
-  const hasCustom = Boolean(searchParams.get("from") && searchParams.get("to"));
-  const query = useMemo(() => {
+  // Unified client-side params state (initializes from URL, updates instantaneously with zero reload)
+  const [paramsState, setParamsState] = useState(() => {
     const p = new URLSearchParams(searchParams.toString());
-    if (!p.get("range") && !hasCustom) p.set("range", "30");
-    p.set("tab", tab);
-    return p.toString();
-  }, [searchParams, tab, hasCustom]);
+    if (params?.tab && !p.get("tab")) {
+      p.set("tab", params.tab);
+    }
+    if (!p.get("range") && !(p.get("from") && p.get("to"))) {
+      p.set("range", "30");
+    }
+    if (!p.get("tab")) {
+      p.set("tab", "overview");
+    }
+    return p;
+  });
+
+  const tab = paramsState.get("tab") || "overview";
+  const hasCustom = Boolean(paramsState.get("from") && paramsState.get("to"));
+  const query = paramsState.toString();
+
+  // Listen to browser Back/Forward navigation
+  useEffect(() => {
+    const onPopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      if (!p.get("tab")) p.set("tab", "overview");
+      if (!p.get("range") && !(p.get("from") && p.get("to"))) p.set("range", "30");
+      setParamsState(p);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState(false);
   const [options, setOptions] = useState(null);
   const [journeyId, setJourneyId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const cacheRef = useRef({});
 
   useEffect(() => {
     fetch("/api/admin/site-analytics?tab=options")
@@ -443,10 +464,23 @@ function SiteAnalyticsView() {
       .catch(() => {});
   }, []);
 
+  // Fetch data with in-memory caching and silent background revalidation (Stale-While-Revalidate)
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(false);
+
+    // 1. If already in memory cache, display IMMEDIATELY (0ms delay, ZERO flicker)
+    if (cacheRef.current[query]) {
+      setData(cacheRef.current[query]);
+      setError(false);
+    } else {
+      // If switching tabs, check if we have data for this tab from any query
+      const match = Object.values(cacheRef.current).find((d) => d._tab === tab);
+      if (match) {
+        setData(match);
+      }
+    }
+
+    setIsFetching(true);
     fetch(`/api/admin/site-analytics?${query}`)
       .then((r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -454,59 +488,97 @@ function SiteAnalyticsView() {
       })
       .then((j) => {
         if (cancelled) return;
-        if (j.success) setData({ ...j.data, _tab: j.tab });
-        else setError(true);
+        if (j.success) {
+          const payload = { ...j.data, _tab: j.tab };
+          cacheRef.current[query] = payload;
+          setData(payload);
+          setError(false);
+        } else {
+          setError(true);
+        }
       })
       .catch((err) => {
         console.error("Site analytics fetch error:", err);
-        if (!cancelled) setError(true);
+        if (!cancelled && !cacheRef.current[query]) setError(true);
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) setIsFetching(false);
+      });
+
     return () => { cancelled = true; };
-  }, [query, refreshKey]);
+  }, [query, refreshKey, tab]);
 
-  const isReady = Boolean(data && data._tab === tab);
 
-  useEffect(() => {
-    if (tab !== "live") return undefined;
-    const timer = setInterval(() => setRefreshKey((k) => k + 1), 15000);
-    return () => clearInterval(timer);
-  }, [tab]);
-
+  // Update parameters seamlessly with zero page reload
   const setParams = useCallback((updates) => {
-    const p = new URLSearchParams(searchParams.toString());
-    for (const [k, v] of Object.entries(updates)) {
-      if (v === null || v === undefined || v === "" || v === "all") p.delete(k);
-      else p.set(k, v);
-    }
-    router.replace(`/admin/site-analytics?${p.toString()}`, { scroll: false });
-  }, [router, searchParams]);
+    setParamsState((prev) => {
+      const next = new URLSearchParams(prev.toString());
+      for (const [k, v] of Object.entries(updates)) {
+        if (v === null || v === undefined || v === "" || v === "all") {
+          next.delete(k);
+        } else {
+          next.set(k, v);
+        }
+      }
+      if (typeof window !== "undefined") {
+        const queryStr = next.toString();
+        const newUrl = queryStr ? `/admin/site-analytics?${queryStr}` : `/admin/site-analytics`;
+        window.history.replaceState(null, "", newUrl);
+      }
+      return next;
+    });
+  }, []);
 
   const onFilter = (key, value) => setParams({ [key]: value });
-  const rangeValue = hasCustom ? "custom" : (searchParams.get("range") || "30");
+  const rangeValue = hasCustom ? "custom" : (paramsState.get("range") || "30");
 
   const onRangeChange = (value) => {
     if (value === "custom") {
       setParams({
         range: null,
-        from: searchParams.get("from") || daysAgoIso(30),
-        to: searchParams.get("to") || todayIso(),
+        from: paramsState.get("from") || daysAgoIso(30),
+        to: paramsState.get("to") || todayIso(),
       });
     } else {
       setParams({ range: value, from: null, to: null });
     }
   };
 
-  const activeFilters = ["device", "segment", "browser", "os", "source", "medium", "campaign", "country", "pageType", "category", "priceBand", "productId"]
-    .filter((k) => searchParams.get(k));
+  const activeFilters = [
+    "device",
+    "segment",
+    "browser",
+    "os",
+    "source",
+    "medium",
+    "campaign",
+    "country",
+    "pageType",
+    "category",
+    "priceBand",
+    "productId",
+  ].filter((k) => paramsState.get(k));
 
-  const secondaryKeys = ["source", "medium", "campaign", "country", "browser", "os", "pageType", "category", "priceBand", "productId"];
-  const secondaryActiveCount = secondaryKeys.filter((k) => searchParams.get(k)).length;
+  const secondaryKeys = [
+    "source",
+    "medium",
+    "campaign",
+    "country",
+    "browser",
+    "os",
+    "pageType",
+    "category",
+    "priceBand",
+    "productId",
+  ];
+  const secondaryActiveCount = secondaryKeys.filter((k) => paramsState.get(k)).length;
 
   const openJourney = (visitorId) => setJourneyId(visitorId);
   const pinProduct = (row) => setParams({ productId: row.productId });
   const pinCategory = (row) => setParams({ category: row.category });
   const pinPriceBand = (row) => setParams({ priceBand: row.key });
+
+  const isReady = Boolean(data && data._tab === tab);
 
   return (
     <div className="space-y-5">
@@ -523,7 +595,11 @@ function SiteAnalyticsView() {
                 onChange={(e) => onRangeChange(e.target.value)}
                 className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] font-medium bg-white text-[#2c3338] outline-none"
               >
-                {DATE_PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                {DATE_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -533,14 +609,14 @@ function SiteAnalyticsView() {
                 <span className="text-[11px] font-bold text-[#646970]">From</span>
                 <input
                   type="date"
-                  value={searchParams.get("from") || ""}
+                  value={paramsState.get("from") || ""}
                   onChange={(e) => setParams({ from: e.target.value })}
                   className="border border-[#8c8f94] rounded-[2px] px-1.5 py-0.5 text-[11px] bg-white text-[#2c3338]"
                 />
                 <span className="text-[11px] font-bold text-[#646970]">To</span>
                 <input
                   type="date"
-                  value={searchParams.get("to") || ""}
+                  value={paramsState.get("to") || ""}
                   onChange={(e) => setParams({ to: e.target.value })}
                   className="border border-[#8c8f94] rounded-[2px] px-1.5 py-0.5 text-[11px] bg-white text-[#2c3338]"
                 />
@@ -549,7 +625,7 @@ function SiteAnalyticsView() {
 
             {/* Shopper Type */}
             <select
-              value={searchParams.get("segment") || "all"}
+              value={paramsState.get("segment") || "all"}
               onChange={(e) => onFilter("segment", e.target.value)}
               className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] bg-white text-[#2c3338] outline-none"
             >
@@ -560,12 +636,16 @@ function SiteAnalyticsView() {
 
             {/* Device */}
             <select
-              value={searchParams.get("device") || "all"}
+              value={paramsState.get("device") || "all"}
               onChange={(e) => onFilter("device", e.target.value)}
               className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] bg-white text-[#2c3338] outline-none capitalize"
             >
               <option value="all">All Devices</option>
-              {DEVICES.map((d) => <option key={d} value={d}>{d}</option>)}
+              {DEVICES.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
             </select>
 
             {/* Toggle More Filters */}
@@ -597,17 +677,30 @@ function SiteAnalyticsView() {
               className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[#2c3338] font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
               title="Refresh data"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin text-[#2271b1]" : ""}`} />
               <span>Refresh</span>
             </button>
             {(activeFilters.length > 0 || hasCustom || (rangeValue !== "30" && !hasCustom)) && (
               <button
                 type="button"
                 onClick={() => {
-                  const p = new URLSearchParams();
-                  p.set("tab", tab);
-                  p.set("range", "30");
-                  router.replace(`${pathname}?${p.toString()}`, { scroll: false });
+                  setParams({
+                    range: "30",
+                    from: null,
+                    to: null,
+                    device: null,
+                    segment: null,
+                    source: null,
+                    medium: null,
+                    campaign: null,
+                    country: null,
+                    browser: null,
+                    os: null,
+                    pageType: null,
+                    category: null,
+                    priceBand: null,
+                    productId: null,
+                  });
                 }}
                 className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-white hover:bg-[#f6f7f7] text-[#d63638] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
               >
@@ -622,16 +715,76 @@ function SiteAnalyticsView() {
         {showMoreFilters && (
           <div className="pt-3 border-t border-[#f0f0f1] bg-[#fbfbfb] -mx-3 -mb-3 p-3 rounded-b-[3px]">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              <FilterSelect label="Traffic Source" paramKey="source" value={searchParams.get("source")} onChange={onFilter} options={(options?.sources || []).map((v) => ({ value: v, label: v }))} />
-              <FilterSelect label="UTM Medium" paramKey="medium" value={searchParams.get("medium")} onChange={onFilter} options={(options?.mediums || []).map((v) => ({ value: v, label: v }))} />
-              <FilterSelect label="Campaign" paramKey="campaign" value={searchParams.get("campaign")} onChange={onFilter} options={(options?.campaigns || []).map((v) => ({ value: v, label: v }))} />
-              <FilterSelect label="Country" paramKey="country" value={searchParams.get("country")} onChange={onFilter} options={(options?.countries || []).map((v) => ({ value: v, label: v }))} />
-              <FilterSelect label="Page Type" paramKey="pageType" value={searchParams.get("pageType")} onChange={onFilter} options={(options?.pageTypes || []).map((v) => ({ value: v, label: v }))} />
-              <FilterSelect label="Browser" paramKey="browser" value={searchParams.get("browser")} onChange={onFilter} options={(options?.browsers || []).map((v) => ({ value: v, label: v }))} />
-              <FilterSelect label="Operating System" paramKey="os" value={searchParams.get("os")} onChange={onFilter} options={(options?.oses || []).map((v) => ({ value: v, label: v }))} />
-              <FilterSelect label="Product Category" paramKey="category" value={searchParams.get("category")} onChange={onFilter} options={(options?.categories || []).map((v) => ({ value: v, label: v }))} />
-              <FilterSelect label="Price Range" paramKey="priceBand" value={searchParams.get("priceBand")} onChange={onFilter} options={(options?.priceBands || []).map((b) => ({ value: b.key, label: b.label }))} />
-              <FilterSelect label="Specific Product" paramKey="productId" value={searchParams.get("productId")} onChange={onFilter} options={(options?.products || []).map((p) => ({ value: p.id, label: p.name }))} />
+              <FilterSelect
+                label="Traffic Source"
+                paramKey="source"
+                value={paramsState.get("source")}
+                onChange={onFilter}
+                options={(options?.sources || []).map((v) => ({ value: v, label: v }))}
+              />
+              <FilterSelect
+                label="UTM Medium"
+                paramKey="medium"
+                value={paramsState.get("medium")}
+                onChange={onFilter}
+                options={(options?.mediums || []).map((v) => ({ value: v, label: v }))}
+              />
+              <FilterSelect
+                label="Campaign"
+                paramKey="campaign"
+                value={paramsState.get("campaign")}
+                onChange={onFilter}
+                options={(options?.campaigns || []).map((v) => ({ value: v, label: v }))}
+              />
+              <FilterSelect
+                label="Country"
+                paramKey="country"
+                value={paramsState.get("country")}
+                onChange={onFilter}
+                options={(options?.countries || []).map((v) => ({ value: v, label: v }))}
+              />
+              <FilterSelect
+                label="Page Type"
+                paramKey="pageType"
+                value={paramsState.get("pageType")}
+                onChange={onFilter}
+                options={(options?.pageTypes || []).map((v) => ({ value: v, label: v }))}
+              />
+              <FilterSelect
+                label="Browser"
+                paramKey="browser"
+                value={paramsState.get("browser")}
+                onChange={onFilter}
+                options={(options?.browsers || []).map((v) => ({ value: v, label: v }))}
+              />
+              <FilterSelect
+                label="Operating System"
+                paramKey="os"
+                value={paramsState.get("os")}
+                onChange={onFilter}
+                options={(options?.oses || []).map((v) => ({ value: v, label: v }))}
+              />
+              <FilterSelect
+                label="Product Category"
+                paramKey="category"
+                value={paramsState.get("category")}
+                onChange={onFilter}
+                options={(options?.categories || []).map((v) => ({ value: v, label: v }))}
+              />
+              <FilterSelect
+                label="Price Range"
+                paramKey="priceBand"
+                value={paramsState.get("priceBand")}
+                onChange={onFilter}
+                options={(options?.priceBands || []).map((b) => ({ value: b.key, label: b.label }))}
+              />
+              <FilterSelect
+                label="Specific Product"
+                paramKey="productId"
+                value={paramsState.get("productId")}
+                onChange={onFilter}
+                options={(options?.products || []).map((p) => ({ value: p.id, label: p.name }))}
+              />
             </div>
           </div>
         )}
@@ -646,11 +799,11 @@ function SiteAnalyticsView() {
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[2px] bg-[#f0f6fb] border border-[#c5d9e8] text-[#135e96] font-medium"
               >
                 <span className="text-[#646970]">{FILTER_LABELS[k] || k}:</span>
-                <span className="font-semibold">{searchParams.get(k)}</span>
+                <span className="font-semibold">{paramsState.get(k)}</span>
                 <button
                   type="button"
                   onClick={() => setParams({ [k]: null })}
-                  className="text-[#646970] hover:text-[#d63638] ml-0.5 font-bold"
+                  className="text-[#646970] hover:text-[#d63638] ml-0.5 font-bold cursor-pointer"
                   title="Remove filter"
                 >
                   ×
@@ -663,7 +816,7 @@ function SiteAnalyticsView() {
                 const clearObj = Object.fromEntries(activeFilters.map((k) => [k, null]));
                 setParams(clearObj);
               }}
-              className="text-[11px] text-[#2271b1] hover:underline ml-1 font-semibold"
+              className="text-[11px] text-[#2271b1] hover:underline ml-1 font-semibold cursor-pointer"
             >
               Clear all
             </button>
@@ -723,9 +876,26 @@ function SiteAnalyticsView() {
         })()}
       </div>
 
-      {(!isReady || loading) && !error && <div className="p-16 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">Crunching visitor data…</div>}
-      {error && <div className="p-16 text-center text-[13px] text-red-500 font-bold bg-white border border-[#ccd0d4]">Failed to load this view.</div>}
+      {/* Top subtle progress bar during background revalidation */}
+      <div className="h-0.5 -mt-2 mb-2 overflow-hidden rounded-[2px] bg-transparent">
+        {isFetching && (
+          <div className="h-full bg-[#2271b1] animate-pulse w-full transition-all duration-300" />
+        )}
+      </div>
 
+      {/* Only show full loading block when there is NO data in cache yet */}
+      {!isReady && !data && isFetching && !error && (
+        <div className="p-16 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">
+          Loading visitor analytics…
+        </div>
+      )}
+      {error && !data && (
+        <div className="p-16 text-center text-[13px] text-red-500 font-bold bg-white border border-[#ccd0d4]">
+          Failed to load this view. Please try refreshing.
+        </div>
+      )}
+
+      {/* Keep active tab rendered and smooth during background updates */}
       {isReady && tab === "overview" && <OverviewTab data={data} />}
       {isReady && tab === "pages" && (
         <div className="space-y-6">
