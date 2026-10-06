@@ -18,8 +18,15 @@ import {
   ChevronUp, 
   Monitor, 
   Smartphone, 
+  Tablet,
   Lock, 
   ExternalLink,
+  CheckCircle2,
+  MousePointer,
+  Eye,
+  Layers,
+  Activity,
+  Search,
   X 
 } from "lucide-react";
 
@@ -95,26 +102,59 @@ const FUNNEL_LABELS = {
   purchase: "Purchased",
 };
 
-const FEATURES = [
-  ["Traffic", "Sessions, unique and returning visitors, bounce rate, pages per session, session time, live visitors."],
-  ["Pages", "Every page view with its type (home, shop, category, product, cart, checkout, blog, account), time on page, scroll depth, entry and exit pages."],
-  ["Sections", "Every section on every page (auto-detected, or marked with data-track-section): how many visitors saw it and how long it was on screen."],
-  ["Clicks", "Every button, link and call-to-action click, with its label, destination and the section it was in."],
-  ["Products", "Views, product-list impressions, add-to-cart, units sold, revenue and cart rate per product."],
-  ["Categories", "Product performance rolled up by category, plus category page views."],
-  ["Price ranges", "Views, cart adds, sales and revenue by price band."],
-  ["Cart & checkout", "Funnel from product view to purchase, with the drop-off at each step."],
-  ["Forms", "Which form fields visitors fill in or leave empty. Only field names and fill state are stored, never typed values."],
-  ["Search", "What visitors search for, how often, and which searches return zero results."],
-  ["Size & colour", "Which sizes and colours shoppers pick on each product, and what share of product viewers make a choice."],
-  ["Errors", "Script errors, failed API requests and form validation messages, and how they relate to conversion."],
-  ["Checkout", "Checkout funnel with the drop-off at each step, the likely reason shoppers left, and the last field they touched."],
-  ["Repeat buyers", "How many customers buy again and how soon, plus where they first came from and what brought them back."],
-  ["Friction", "Dead clicks (buttons or links that did nothing) and rage clicks (rapid repeated clicks on one element)."],
-  ["Heatmap", "Where shoppers click on each page, shown as a grid of page width by page height."],
-  ["Audience", "Device, browser, OS, country, traffic source, UTM medium and campaign, guest vs logged-in."],
-  ["Users & journeys", "Logged-in customers with their revenue, and a step-by-step journey for every visitor."],
-  ["Filters & export", "Date range (presets or custom), and every dimension above can be combined. Filters stay in the URL, and every table exports to CSV."],
+const TRACKING_CATEGORIES = [
+  {
+    id: "audience",
+    title: "Audience & Traffic Intelligence",
+    description: "Real-time visitor counts, traffic sources, devices, and user demographics.",
+    icon: Users,
+    items: [
+      { name: "Live Visitors", desc: "Real-time active visitors currently browsing within the last 5 minutes." },
+      { name: "Traffic & Sessions", desc: "Total sessions, unique visitors, returning shoppers, bounce rate, and average session time." },
+      { name: "Audience Breakdown", desc: "Device types (desktop, mobile, tablet), browser, OS, and country of origin." },
+      { name: "Campaigns & Referrers", desc: "Traffic acquisition source, UTM campaign tags, mediums, and external referring domains." },
+      { name: "User Journeys", desc: "Step-by-step chronological action timeline for logged-in and guest customer sessions." },
+    ],
+  },
+  {
+    id: "content",
+    title: "Pages & UX Interaction",
+    description: "Every page view, scroll depth, and interaction with UI elements.",
+    icon: FileText,
+    items: [
+      { name: "Page Views & Dwell Time", desc: "Every URL tracked with classification (home, product, shop, cart, checkout, blog) and dwell time." },
+      { name: "Scroll Depth Tracking", desc: "Tracks how far shoppers scroll down each page before leaving or navigating." },
+      { name: "Section Visibility", desc: "Auto-detects hero banners, product carousels, and testimonials to measure on-screen exposure time." },
+      { name: "Button & Link Clicks", desc: "Captures every button and call-to-action click with destination URL and parent section." },
+      { name: "Site Search & Queries", desc: "Tracks internal search keywords, search volume, and searches returning zero results." },
+    ],
+  },
+  {
+    id: "ecommerce",
+    title: "E-Commerce & Funnel Tracking",
+    description: "Complete merchandise tracking from product impressions to completed purchases.",
+    icon: ShoppingBag,
+    items: [
+      { name: "Product Performance", desc: "Catalog views, list impressions, cart adds, quantity sold, and revenue generated per product." },
+      { name: "Category Rollups", desc: "Sales, revenue, and page views grouped by merchandise category." },
+      { name: "Conversion Funnel", desc: "5-step funnel (View Product -> Add to Cart -> Begin Checkout -> Payment -> Purchase) with drop-off rates." },
+      { name: "Size & Variant Choices", desc: "Tracks which size and color variants shoppers select, helping identify inventory demand." },
+      { name: "Repeat Buyers", desc: "Customer retention metrics, purchase intervals, and acquisition channels for returning buyers." },
+    ],
+  },
+  {
+    id: "heatmap",
+    title: "Heatmaps, Friction & Health",
+    description: "Visual click coordinate heatmaps and UX friction diagnostics.",
+    icon: Flame,
+    items: [
+      { name: "Visual Click Heatmaps", desc: "High-resolution coordinate click density grid by page width and height across devices." },
+      { name: "Fold-Line Analysis", desc: "Calculates the ratio of above-the-fold vs below-the-fold clicks based on viewport height." },
+      { name: "Rage Clicks", desc: "Flags rapid, repeated clicks on unresponsive elements indicating user frustration." },
+      { name: "Dead Clicks", desc: "Detects clicks on non-interactive elements that visitors expected to be clickable." },
+      { name: "Errors & Form Friction", desc: "Monitors JavaScript runtime errors, failed API calls, and abandoned checkout form fields." },
+    ],
+  },
 ];
 
 const DEVICES = ["desktop", "mobile", "tablet"];
@@ -1161,11 +1201,45 @@ function HeatmapTab({ data, setParams }) {
   const cells = data.cells || [];
   const topElements = data.topElements || [];
 
+  const aboveFoldClicks = useMemo(() => {
+    return cells.filter((c) => c.row < 3).reduce((sum, c) => sum + c.count, 0);
+  }, [cells]);
+  const belowFoldClicks = totalClicks > 0 ? totalClicks - aboveFoldClicks : 0;
+  const aboveFoldPct = totalClicks > 0 ? Math.round((aboveFoldClicks / totalClicks) * 100) : 0;
+  const belowFoldPct = totalClicks > 0 ? 100 - aboveFoldPct : 0;
+  const topElement = topElements[0]?.label || "None recorded";
+
   return (
     <div className="space-y-4">
+      {/* KPI Highlights for Selected Page */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white border border-[#c3c4c7] p-3 rounded-[3px] shadow-xs">
+          <div className="text-[11px] font-bold uppercase text-[#646970]">Total Page Clicks</div>
+          <div className="text-[20px] font-bold text-[#1d2327] mt-0.5">{fmtNum(totalClicks)}</div>
+          <div className="text-[11px] text-[#2271b1] truncate font-mono mt-0.5">{currentPath || "/"}</div>
+        </div>
+        <div className="bg-white border border-[#c3c4c7] p-3 rounded-[3px] shadow-xs">
+          <div className="text-[11px] font-bold uppercase text-[#646970]">Active Hotspots</div>
+          <div className="text-[20px] font-bold text-[#1d2327] mt-0.5">{cells.length} zones</div>
+          <div className="text-[11px] text-[#646970] mt-0.5">Peak hotspot: {fmtNum(maxClicks)} clicks</div>
+        </div>
+        <div className="bg-white border border-[#c3c4c7] p-3 rounded-[3px] shadow-xs">
+          <div className="text-[11px] font-bold uppercase text-[#646970]">Above-The-Fold Share</div>
+          <div className="text-[20px] font-bold text-emerald-700 mt-0.5">{aboveFoldPct}%</div>
+          <div className="text-[11px] text-[#646970] mt-0.5">{fmtNum(aboveFoldClicks)} clicks (visible viewport)</div>
+        </div>
+        <div className="bg-white border border-[#c3c4c7] p-3 rounded-[3px] shadow-xs">
+          <div className="text-[11px] font-bold uppercase text-[#646970]">Top Clicked Target</div>
+          <div className="text-[14px] font-bold text-[#1d2327] truncate mt-1" title={topElement}>{topElement}</div>
+          <div className="text-[11px] text-[#2271b1] mt-0.5">
+            {topElements[0] ? `${fmtNum(topElements[0].count)} clicks (${Math.round((topElements[0].count / Math.max(1, totalClicks)) * 100)}%)` : "No elements"}
+          </div>
+        </div>
+      </div>
+
       {/* WordPress Heatmap Studio Control Toolbar */}
       <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] p-3 flex flex-wrap items-center justify-between gap-3 text-[13px]">
-        {/* Left: Page Selector */}
+        {/* Left: Page Selector & Live Link */}
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2">
             <span className="text-[12px] font-bold text-[#1d2327]">Page:</span>
@@ -1183,18 +1257,15 @@ function HeatmapTab({ data, setParams }) {
             </select>
           </label>
 
-          {/* Quick Metrics */}
-          <div className="flex items-center gap-2 text-[12px]">
-            <span className="bg-[#f0f6fb] text-[#135e96] border border-[#c5d9e8] px-2 py-0.5 rounded-[2px] font-semibold">
-              {fmtNum(totalClicks)} Total Clicks
-            </span>
-            <span className="bg-[#f6f7f7] text-[#50575e] border border-[#dcdcde] px-2 py-0.5 rounded-[2px] font-medium">
-              {cells.length} Active Hotspots
-            </span>
-            <span className="bg-[#f6f7f7] text-[#50575e] border border-[#dcdcde] px-2 py-0.5 rounded-[2px] font-medium hidden sm:inline">
-              Peak: {fmtNum(maxClicks)} clicks
-            </span>
-          </div>
+          <a
+            href={currentPath || "/"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-[11px] font-semibold text-[#2271b1] bg-[#f0f6fb] hover:bg-[#e7f1f9] border border-[#c5d9e8] px-2.5 py-1.5 rounded-[3px] transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Open Live Page</span>
+          </a>
         </div>
 
         {/* Right: Controls & View toggles */}
@@ -1205,14 +1276,25 @@ function HeatmapTab({ data, setParams }) {
               type="button"
               onClick={() => setDeviceMode("desktop")}
               className={`px-2.5 py-1 transition-colors flex items-center gap-1.5 cursor-pointer ${deviceMode === "desktop" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+              title="Desktop 100% Viewport"
             >
               <Monitor className="w-3.5 h-3.5" />
               <span>Desktop</span>
             </button>
             <button
               type="button"
+              onClick={() => setDeviceMode("tablet")}
+              className={`px-2.5 py-1 transition-colors flex items-center gap-1.5 cursor-pointer ${deviceMode === "tablet" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+              title="Tablet 768px Viewport"
+            >
+              <Tablet className="w-3.5 h-3.5" />
+              <span>Tablet</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setDeviceMode("mobile")}
               className={`px-2.5 py-1 transition-colors flex items-center gap-1.5 cursor-pointer ${deviceMode === "mobile" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+              title="Mobile 390px Viewport"
             >
               <Smartphone className="w-3.5 h-3.5" />
               <span>Mobile</span>
@@ -1262,9 +1344,11 @@ function HeatmapTab({ data, setParams }) {
 
       {totalClicks === 0 ? (
         <div className="bg-white border border-[#c3c4c7] p-8 text-center rounded-[3px] shadow-sm">
+          <Flame className="w-8 h-8 text-[#8c8f94] mx-auto mb-2" />
           <p className="text-[14px] font-semibold text-[#1d2327]">No click coordinates recorded for this page yet.</p>
           <p className="text-[12px] text-[#646970] mt-1.5">
-            Clicks are recorded in real-time as visitors interact with buttons, links, banners, and forms on <span className="font-mono text-[#2271b1]">{currentPath || "this page"}</span>.
+            Clicks are recorded in real-time as visitors interact with buttons, links, banners, and forms on{" "}
+            <span className="font-mono text-[#2271b1]">{currentPath || "this page"}</span>.
           </p>
         </div>
       ) : (
@@ -1278,6 +1362,8 @@ function HeatmapTab({ data, setParams }) {
                 showGrid={showGrid}
                 hoveredCell={hoveredCell}
                 setHoveredCell={setHoveredCell}
+                aboveFoldPct={aboveFoldPct}
+                belowFoldPct={belowFoldPct}
               />
             </div>
           )}
@@ -1299,8 +1385,7 @@ function HeatmapTab({ data, setParams }) {
   );
 }
 
-function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHoveredCell }) {
-  const isMobile = deviceMode === "mobile";
+function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHoveredCell, aboveFoldPct = 0, belowFoldPct = 0 }) {
   const rows = Math.max(4, data.rows || 4);
   const cols = data.cols || 20;
   const max = Math.max(1, data.max || 1);
@@ -1314,7 +1399,7 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
         bg: "radial-gradient(circle, rgba(239,68,68,0.92) 0%, rgba(245,158,11,0.65) 45%, rgba(239,68,68,0.15) 75%, transparent 100%)",
         border: "#ef4444",
         badgeBg: "bg-red-600 text-white",
-        level: "Hot (High Activity)",
+        level: "Peak Activity",
       };
     }
     if (ratio >= 0.45) {
@@ -1322,7 +1407,7 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
         bg: "radial-gradient(circle, rgba(245,158,11,0.88) 0%, rgba(234,179,8,0.55) 45%, rgba(245,158,11,0.15) 75%, transparent 100%)",
         border: "#f59e0b",
         badgeBg: "bg-amber-500 text-white",
-        level: "Warm (Medium Activity)",
+        level: "High Activity",
       };
     }
     if (ratio >= 0.2) {
@@ -1341,12 +1426,19 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
     };
   };
 
+  const frameWidthClass =
+    deviceMode === "mobile"
+      ? "w-[390px]"
+      : deviceMode === "tablet"
+      ? "w-[768px]"
+      : "w-full max-w-[880px]";
+
   return (
     <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] overflow-hidden">
       {/* Panel Header */}
       <div className="px-4 py-2.5 border-b border-[#c3c4c7] bg-[#f6f7f7] flex items-center justify-between">
         <h3 className="text-[12px] font-bold uppercase tracking-wider text-[#1d2327]">
-          Visual Click Density ({isMobile ? "Mobile 390px" : "Desktop View"})
+          Visual Click Density ({deviceMode === "mobile" ? "Mobile 390px" : deviceMode === "tablet" ? "Tablet 768px" : "Desktop 100%"})
         </h3>
         <span className="text-[11px] text-[#646970] font-medium">
           {fmtNum(data.total)} clicks across ~{rows * 200}px page depth
@@ -1355,11 +1447,7 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
 
       <div className="p-4 bg-[#f0f0f1] flex justify-center overflow-x-auto">
         {/* Browser Mockup Window */}
-        <div
-          className={`bg-white rounded-[6px] border border-[#ccd0d4] shadow-md transition-all ${
-            isMobile ? "w-[390px]" : "w-full max-w-[860px]"
-          }`}
-        >
+        <div className={`bg-white rounded-[6px] border border-[#ccd0d4] shadow-md transition-all ${frameWidthClass}`}>
           {/* Browser Chrome Header */}
           <div className="bg-[#f6f7f7] border-b border-[#e5e5e5] px-3 py-2 flex items-center gap-2 select-none">
             <div className="flex items-center gap-1.5">
@@ -1369,85 +1457,130 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
             </div>
             <div className="flex-1 max-w-md mx-auto bg-white border border-[#dcdcde] rounded px-2.5 py-0.5 text-[11px] font-mono text-[#50575e] truncate flex items-center gap-1.5">
               <Lock className="w-3 h-3 text-emerald-600 shrink-0" />
-              <span className="truncate">https://pairo-lifestyle.com{data.path || "/"}</span>
+              <span className="truncate">https://pairolifestyle.com{data.path || "/"}</span>
             </div>
             <span className="text-[10px] text-[#8c8f94] font-medium hidden sm:inline">
-              {isMobile ? "390px" : "100%"}
+              {deviceMode === "mobile" ? "390px" : deviceMode === "tablet" ? "768px" : "100%"}
             </span>
           </div>
 
           {/* Webpage Mock Content Container with Heatmap Overlay */}
-          <div className="relative bg-white select-none overflow-hidden" style={{ minHeight: `${rows * 150}px` }}>
-            {/* 1. Underlying Webpage Skeleton Wireframe */}
-            <div className="p-4 space-y-4 opacity-75 pointer-events-none">
+          <div className="relative bg-white select-none overflow-hidden" style={{ minHeight: `${rows * 160}px` }}>
+            {/* 1. Realistic Pairo Lifestyle Webpage Mock */}
+            <div className="p-4 space-y-4 opacity-80 pointer-events-none">
+              {/* Announcement Bar */}
+              <div className="bg-[#1d2327] text-white text-[10px] py-1 text-center font-medium tracking-wide rounded-[2px]">
+                Free Worldwide Shipping on Orders Over $75 · Easy 30-Day Returns
+              </div>
+
               {/* Site Header / Nav */}
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <div className="h-5 w-24 bg-gray-300 rounded font-bold text-[10px] flex items-center justify-center text-gray-500">PAIRO</div>
-                <div className="hidden sm:flex items-center gap-3">
-                  <div className="h-3 w-12 bg-gray-200 rounded" />
-                  <div className="h-3 w-12 bg-gray-200 rounded" />
-                  <div className="h-3 w-12 bg-gray-200 rounded" />
-                  <div className="h-3 w-12 bg-gray-200 rounded" />
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3 pt-1">
+                <div className="font-extrabold tracking-widest text-[14px] text-gray-900 font-serif">
+                  PAIRO LIFESTYLE
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 bg-gray-200 rounded-full" />
-                  <div className="h-4 w-4 bg-gray-300 rounded-full" />
+                <div className="hidden sm:flex items-center gap-4 text-[11px] font-semibold text-gray-700">
+                  <span className="text-gray-900 border-b-2 border-black pb-0.5">New Arrivals</span>
+                  <span>Apparel</span>
+                  <span>Footwear</span>
+                  <span>Accessories</span>
+                  <span className="text-red-600 font-bold">Sale</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-[11px] text-gray-700">
+                  <div className="h-6 w-24 bg-gray-100 border border-gray-300 rounded px-2 text-[10px] text-gray-400 flex items-center">
+                    Search...
+                  </div>
+                  <div className="font-semibold">Bag (2)</div>
                 </div>
               </div>
 
               {/* Hero Banner Area */}
-              <div className="h-44 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-[4px] border border-gray-200/60 p-5 flex flex-col justify-center items-center text-center">
-                <div className="h-4 w-48 bg-gray-300 rounded mb-2" />
-                <div className="h-3 w-32 bg-gray-200 rounded mb-4" />
-                <div className="h-7 w-28 bg-[#2271b1]/80 rounded-[3px] text-white text-[11px] font-bold flex items-center justify-center shadow-xs">
-                  Shop Now
+              <div className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-[4px] p-6 text-white text-center flex flex-col justify-center items-center shadow-inner">
+                <span className="text-[10px] uppercase font-bold tracking-widest text-gray-300 mb-1">
+                  Spring / Summer 2026 Collection
+                </span>
+                <h4 className="text-[18px] sm:text-[22px] font-extrabold tracking-tight mb-2">
+                  Elevated Streetwear & Minimalist Luxury
+                </h4>
+                <p className="text-[11px] text-gray-300 max-w-md mx-auto mb-4 leading-relaxed">
+                  Crafted with heavyweight fabrics, architectural silhouettes, and bespoke tailoring.
+                </p>
+                <div className="flex items-center gap-2.5">
+                  <span className="bg-white text-gray-900 px-4 py-1.5 rounded-[3px] text-[11px] font-bold shadow-sm">
+                    Shop Collection
+                  </span>
+                  <span className="border border-white/50 text-white px-3 py-1.5 rounded-[3px] text-[11px] font-semibold">
+                    Explore Lookbook
+                  </span>
                 </div>
               </div>
 
-              {/* The Fold Line Indicator (at ~650px) */}
-              <div className="relative py-2 my-2 border-t-2 border-dashed border-red-400/80 flex items-center justify-between">
-                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
-                  ── AVERAGE FOLD LINE ──
+              {/* The Fold Line Indicator (at ~600px viewport cutoff) */}
+              <div className="relative py-2 my-2 border-t-2 border-dashed border-red-500 flex items-center justify-between">
+                <span className="bg-red-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded shadow-sm">
+                  AVERAGE FOLD LINE (600px)
                 </span>
-                <span className="text-[10px] text-red-600 font-semibold bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
-                  Visible without scrolling
+                <span className="text-[10px] text-red-700 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-300">
+                  {aboveFoldPct}% Clicks Above Fold · {belowFoldPct}% Below Fold
                 </span>
               </div>
 
-              {/* Product Grid Wireframe */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-                {[1, 2, 3, 4, 5, 6].map((idx) => (
-                  <div key={idx} className="border border-gray-200 rounded p-2.5 space-y-2 bg-gray-50/50">
-                    <div className="h-28 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-[10px]">
-                      Product {idx}
-                    </div>
-                    <div className="h-3 w-3/4 bg-gray-300 rounded" />
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="h-3 w-12 bg-gray-300 rounded" />
-                      <div className="h-5 w-16 bg-[#2271b1]/70 rounded text-[9px] text-white flex items-center justify-center font-bold">
-                        Add to Cart
+              {/* Trending Products Grid */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[12px] font-bold uppercase tracking-wider text-gray-900">
+                    Trending Essentials
+                  </span>
+                  <span className="text-[11px] text-blue-600 font-semibold">View All</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { name: "Heavyweight Boxy Hoodie", price: "$89.00", tag: "Best Seller" },
+                    { name: "Tailored Wide Trouser", price: "$115.00", tag: "New" },
+                    { name: "Minimal Leather Sneaker", price: "$145.00", tag: "Restocked" },
+                    { name: "Washed Vintage Cotton Tee", price: "$45.00", tag: "Essential" },
+                  ].map((p, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded p-2.5 space-y-1.5 bg-gray-50/60">
+                      <div className="h-28 bg-gray-200 rounded flex flex-col justify-between p-2">
+                        <span className="text-[9px] font-bold bg-white/90 text-gray-800 px-1.5 py-0.5 rounded self-start">
+                          {p.tag}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-bold text-gray-900 truncate">{p.name}</div>
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-[11px] font-semibold text-gray-700">{p.price}</span>
+                        <span className="bg-gray-900 text-white text-[9px] font-bold px-2 py-1 rounded">
+                          Add to Cart
+                        </span>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+
+              {/* Trust & Shipping Banner */}
+              <div className="bg-gray-100 border border-gray-200 rounded p-3 grid grid-cols-3 gap-2 text-center text-[10px] text-gray-700 font-semibold">
+                <div>Express Worldwide Delivery</div>
+                <div>100% Sustainable Fabrics</div>
+                <div>Secure 256-Bit Checkout</div>
               </div>
 
               {/* Footer Skeleton */}
-              <div className="pt-6 border-t border-gray-200 grid grid-cols-3 gap-2">
-                <div className="space-y-1.5">
-                  <div className="h-3 w-16 bg-gray-300 rounded" />
-                  <div className="h-2 w-20 bg-gray-200 rounded" />
-                  <div className="h-2 w-16 bg-gray-200 rounded" />
+              <div className="pt-4 border-t border-gray-200 grid grid-cols-3 gap-2 text-[10px] text-gray-500">
+                <div className="space-y-1">
+                  <div className="font-bold text-gray-700">Shop</div>
+                  <div>All Collections</div>
+                  <div>Gift Cards</div>
                 </div>
-                <div className="space-y-1.5">
-                  <div className="h-3 w-16 bg-gray-300 rounded" />
-                  <div className="h-2 w-20 bg-gray-200 rounded" />
-                  <div className="h-2 w-16 bg-gray-200 rounded" />
+                <div className="space-y-1">
+                  <div className="font-bold text-gray-700">Support</div>
+                  <div>Track Order</div>
+                  <div>Returns & Exchange</div>
                 </div>
-                <div className="space-y-1.5">
-                  <div className="h-3 w-16 bg-gray-300 rounded" />
-                  <div className="h-2 w-20 bg-gray-200 rounded" />
-                  <div className="h-2 w-16 bg-gray-200 rounded" />
+                <div className="space-y-1">
+                  <div className="font-bold text-gray-700">Newsletter</div>
+                  <div className="h-5 bg-gray-200 rounded text-[9px] flex items-center px-2 text-gray-400">
+                    email@example.com
+                  </div>
                 </div>
               </div>
             </div>
@@ -1496,7 +1629,7 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
                         width: `${sizePx}px`,
                         height: `${sizePx}px`,
                         background: style.bg,
-                        filter: "blur(4px)",
+                        filter: "blur(5px)",
                       }}
                     />
 
@@ -1529,7 +1662,9 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
               >
                 <div className="font-bold text-[12px] text-white flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-red-400" />
-                  <span>{hoveredCell.count} Clicks ({pctText((hoveredCell.count / total) * 100)})</span>
+                  <span>
+                    {hoveredCell.count} Clicks ({pctText((hoveredCell.count / total) * 100)})
+                  </span>
                 </div>
                 <div className="text-gray-300 text-[10px] mt-0.5">
                   Column {hoveredCell.col + 1} ({hoveredCell.col * 5}% - {(hoveredCell.col + 1) * 5}% width)
@@ -1537,7 +1672,7 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
                 <div className="text-gray-300 text-[10px]">
                   Depth: ~{hoveredCell.row * 200}px ({hoveredCell.row < 3 ? "Above the fold" : "Below the fold"})
                 </div>
-                <div className="text-[#a7aaad] text-[9px] mt-1 italic font-medium">
+                <div className="text-[#a7aaad] text-[9px] mt-1 font-semibold uppercase">
                   {hoveredCell.style?.level}
                 </div>
               </div>
@@ -1569,12 +1704,18 @@ function HeatmapElementsTable({ topElements = [], cells = [], totalClicks = 1, p
       action={
         <button
           type="button"
-          onClick={() => downloadCsv(`top-clicked-elements.csv`, [
-            { key: "label", label: "Element" },
-            { key: "section", label: "Section" },
-            { key: "href", label: "Destination" },
-            { key: "count", label: "Clicks" },
-          ], topElements)}
+          onClick={() =>
+            downloadCsv(
+              `top-clicked-elements.csv`,
+              [
+                { key: "label", label: "Element" },
+                { key: "section", label: "Section" },
+                { key: "href", label: "Destination" },
+                { key: "count", label: "Clicks" },
+              ],
+              topElements
+            )
+          }
           disabled={topElements.length === 0}
           className="text-[11px] font-bold uppercase text-[#2271b1] hover:underline disabled:text-gray-300"
         >
@@ -1597,9 +1738,22 @@ function HeatmapElementsTable({ topElements = [], cells = [], totalClicks = 1, p
             <tbody className="divide-y divide-[#f0f0f1]">
               {topElements.map((el, i) => {
                 const sharePct = Math.round((el.count / Math.max(1, totalClicks)) * 100);
+                const badgeColor =
+                  i === 0
+                    ? "bg-amber-100 text-amber-800 border-amber-300"
+                    : i === 1
+                    ? "bg-slate-100 text-slate-800 border-slate-300"
+                    : i === 2
+                    ? "bg-orange-100 text-orange-800 border-orange-300"
+                    : "bg-gray-100 text-gray-600 border-gray-200";
+
                 return (
                   <tr key={i} className="hover:bg-[#f0f6fb] transition-colors">
-                    <td className="px-3 py-2 font-bold text-[#8c8f94]">{i + 1}</td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeColor}`}>
+                        #{i + 1}
+                      </span>
+                    </td>
                     <td className="px-3 py-2">
                       <div className="font-semibold text-[#1d2327]">{el.label || "(unlabeled element)"}</div>
                       {el.href && (
@@ -1650,7 +1804,10 @@ function HeatmapElementsTable({ topElements = [], cells = [], totalClicks = 1, p
               .sort((a, b) => b.count - a.count)
               .slice(0, 6)
               .map((c, i) => (
-                <div key={i} className="flex items-center justify-between text-[11px] bg-white border border-[#e5e5e5] px-2.5 py-1.5 rounded-[2px]">
+                <div
+                  key={i}
+                  className="flex items-center justify-between text-[11px] bg-white border border-[#e5e5e5] px-2.5 py-1.5 rounded-[2px]"
+                >
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full bg-[#2271b1]" />
                     <span className="font-semibold text-[#1d2327]">
@@ -1666,6 +1823,168 @@ function HeatmapElementsTable({ topElements = [], cells = [], totalClicks = 1, p
         </div>
       </div>
     </Panel>
+  );
+}
+
+function TrackingFeaturesMatrix() {
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredCategories = useMemo(() => {
+    return TRACKING_CATEGORIES.map((cat) => {
+      if (activeCategory !== "all" && cat.id !== activeCategory) {
+        return null;
+      }
+      const matchingItems = cat.items.filter((item) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return item.name.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+      });
+      if (matchingItems.length === 0) return null;
+      return { ...cat, items: matchingItems };
+    }).filter(Boolean);
+  }, [activeCategory, searchQuery]);
+
+  const totalTrackedCount = TRACKING_CATEGORIES.reduce((acc, cat) => acc + cat.items.length, 0);
+
+  return (
+    <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] overflow-hidden">
+      {/* WordPress-style Header with Filter controls */}
+      <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-[#2271b1]" />
+          <h3 className="text-[13px] font-bold text-[#1d2327]">
+            Active Tracking Capabilities & System Features
+          </h3>
+          <span className="bg-emerald-50 text-emerald-700 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            {totalTrackedCount} Metrics Tracking Live
+          </span>
+        </div>
+
+        {/* Search */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-[#8c8f94] absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Filter features (e.g. heatmap, cart)..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-2.5 py-1 text-[11px] border border-[#8c8f94] rounded-[3px] bg-white text-[#2c3338] outline-none focus:border-[#2271b1] w-48 sm:w-60"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Category Filter Pills */}
+      <div className="px-4 py-2 bg-white border-b border-[#f0f0f1] flex flex-wrap items-center gap-1.5 text-[11px]">
+        <button
+          type="button"
+          onClick={() => setActiveCategory("all")}
+          className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors cursor-pointer ${
+            activeCategory === "all"
+              ? "bg-[#2271b1] text-white"
+              : "text-[#50575e] bg-[#f0f0f1] hover:bg-[#e0e0e1]"
+          }`}
+        >
+          All Capabilities ({totalTrackedCount})
+        </button>
+        {TRACKING_CATEGORIES.map((cat) => {
+          const Icon = cat.icon;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setActiveCategory(cat.id)}
+              className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeCategory === cat.id
+                  ? "bg-[#2271b1] text-white"
+                  : "text-[#50575e] bg-[#f0f0f1] hover:bg-[#e0e0e1]"
+              }`}
+            >
+              <Icon className="w-3 h-3" />
+              <span>{cat.title.split(" ")[0]} ({cat.items.length})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Feature Cards Grid */}
+      <div className="p-4 bg-[#fbfbfb]">
+        {filteredCategories.length === 0 ? (
+          <div className="p-8 text-center text-[#646970] text-[12px] bg-white border border-[#e5e5e5] rounded-[3px]">
+            No tracking features match your search "{searchQuery}".
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredCategories.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <div
+                  key={cat.id}
+                  className="bg-white border border-[#dcdcde] rounded-[3px] p-4 shadow-xs flex flex-col justify-between hover:border-[#2271b1] transition-colors"
+                >
+                  <div>
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-[#f0f0f1]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded bg-[#f0f6fb] text-[#2271b1] flex items-center justify-center shrink-0">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-[13px] font-bold text-[#1d2327]">
+                            {cat.title}
+                          </h4>
+                          <p className="text-[11px] text-[#646970]">
+                            {cat.description}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        Active
+                      </span>
+                    </div>
+
+                    {/* Features List */}
+                    <div className="mt-3 space-y-2.5">
+                      {cat.items.map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-[12px]">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold text-[#1d2327] mr-1.5">
+                              {item.name}:
+                            </span>
+                            <span className="text-[#50575e] leading-relaxed">
+                              {item.desc}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Card Footer */}
+                  <div className="mt-3.5 pt-2 border-t border-[#f0f0f1] flex items-center justify-between text-[11px] text-[#8c8f94]">
+                    <span>Automated Real-Time Telemetry</span>
+                    <span className="font-semibold text-[#2271b1]">{cat.items.length} monitored metrics</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1755,39 +2074,42 @@ function OverviewTab({ data }) {
         </div>
       </Panel>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Panel title="Conversion funnel">
-          <table className="w-full text-[12px] text-left">
-            <thead className="text-[11px] uppercase text-[#646970] bg-[#fbfbfb]">
-              <tr><th className="px-3 py-2">Step</th><th className="px-3 py-2">Sessions</th><th className="px-3 py-2">Events</th><th className="px-3 py-2">Of product viewers</th></tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {data.funnel.map((f) => (
-                <tr key={f.name}>
-                  <td className="px-3 py-2 font-bold text-[#1d2327]">{FUNNEL_LABELS[f.name]}</td>
-                  <td className="px-3 py-2">{f.sessions}</td>
-                  <td className="px-3 py-2">{f.events}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 bg-[#2271b1] rounded" style={{ width: `${funnelBase ? (f.sessions / funnelBase) * 120 : 0}px`, minWidth: 2 }} />
-                      <span className="text-[#646970]">{funnelBase ? Math.round((f.sessions / funnelBase) * 100) : 0}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Panel>
-        <Panel title="What is tracked">
-          <ul className="divide-y divide-[#f0f0f1]">
-            {FEATURES.map(([title, text]) => (
-              <li key={title} className="px-4 py-2.5 text-[12px]">
-                <span className="font-bold text-[#1d2327]">{title}.</span> <span className="text-[#646970]">{text}</span>
-              </li>
+      {/* Conversion Funnel */}
+      <Panel title="Conversion funnel">
+        <table className="w-full text-[12px] text-left">
+          <thead className="text-[11px] uppercase text-[#646970] bg-[#fbfbfb]">
+            <tr>
+              <th className="px-3 py-2">Step</th>
+              <th className="px-3 py-2">Sessions</th>
+              <th className="px-3 py-2">Events</th>
+              <th className="px-3 py-2">Of product viewers</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#f0f0f1]">
+            {data.funnel.map((f) => (
+              <tr key={f.name}>
+                <td className="px-3 py-2 font-bold text-[#1d2327]">{FUNNEL_LABELS[f.name]}</td>
+                <td className="px-3 py-2">{f.sessions}</td>
+                <td className="px-3 py-2">{f.events}</td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-2 bg-[#2271b1] rounded"
+                      style={{ width: `${funnelBase ? (f.sessions / funnelBase) * 120 : 0}px`, minWidth: 2 }}
+                    />
+                    <span className="text-[#646970]">
+                      {funnelBase ? Math.round((f.sessions / funnelBase) * 100) : 0}%
+                    </span>
+                  </div>
+                </td>
+              </tr>
             ))}
-          </ul>
-        </Panel>
-      </div>
+          </tbody>
+        </table>
+      </Panel>
+
+      {/* Tracking Engine & Feature Matrix */}
+      <TrackingFeaturesMatrix />
     </div>
   );
 }
