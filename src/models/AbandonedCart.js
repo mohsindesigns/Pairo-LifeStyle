@@ -30,6 +30,7 @@ const AbandonedCartSchema = new mongoose.Schema({
     street: String,
     city: String,
     state: String,
+    county: String,
     zip: String,
     country: String,
     phone: String,

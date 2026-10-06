@@ -8,6 +8,7 @@ import stripe from "@/lib/stripe";
 import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { getContextLogger, LogCategory } from "@/lib/logger";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
+import { getClientIp } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
@@ -51,7 +52,7 @@ export async function POST(req) {
     if (!checkoutEmail) {
       return NextResponse.json({ error: "A valid email address is required to place an order." }, { status: 400 });
     }
-    const ipAddress = req.headers.get("x-forwarded-for") || "unknown";
+    const ipAddress = getClientIp(req);
 
     const itemProductIds = items.map(item => item.id || item._id);
     const foundProducts = await Product.find({ _id: { $in: itemProductIds } });

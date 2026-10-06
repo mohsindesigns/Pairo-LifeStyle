@@ -10,6 +10,7 @@ import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { reconcilePaymentLinkOrder } from "@/lib/stripeFulfillment";
 import { reconcilePromotionUsage, isUsageReleasingTransition, isUsageRestoringTransition } from "@/lib/promotionUsageReconciliation";
 import pairoEvents from "@/lib/events";
+import { resolveIpLocation } from "@/lib/geoIp";
 
 export async function GET(req, { params }) {
   try {
@@ -32,6 +33,19 @@ export async function GET(req, { params }) {
     // check Stripe directly in case the checkout.session.completed webhook
     // never arrived. No-op once the order is Paid or has no payment link.
     order = await reconcilePaymentLinkOrder(order, null);
+
+    // Auto-resolve pinpoint IP geolocation if order has an IP address but no stored location yet
+    if (order.customer?.ipAddress && order.customer.ipAddress !== "unknown" && (!order.customer?.ipLocation || !order.customer?.ipLocation?.city)) {
+      try {
+        const location = await resolveIpLocation(order.customer.ipAddress);
+        if (location) {
+          order.customer.ipLocation = location;
+          await Order.updateOne({ _id: order._id }, { $set: { "customer.ipLocation": location } });
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
 
     return NextResponse.json({ success: true, order });
 

@@ -63,7 +63,7 @@ export async function POST(req) {
         orderUserId,
         checkoutEmail,
         isGuestSession: !orderUserId,
-        ipAddress: req.headers.get("x-forwarded-for") || "unknown",
+        ipAddress: getClientIp(req),
         clientUserAgent: req.headers.get("user-agent") || null,
       });
 

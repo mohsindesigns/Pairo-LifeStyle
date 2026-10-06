@@ -263,6 +263,7 @@ export default function CheckoutPage() {
     stateCode: "",
     street: "",
     city: "",
+    county: "",
     zip: "",
     customerNote: ""
   });
@@ -712,6 +713,7 @@ export default function CheckoutPage() {
       fullName: `${formData.firstName} ${formData.lastName}`,
       street: formData.street,
       city: formData.city,
+      county: formData.county || "",
       state: formData.state,
       zip: formData.zip,
       phone: formData.phone,
@@ -828,6 +830,7 @@ export default function CheckoutPage() {
             fullName: `${formData.firstName} ${formData.lastName}`.trim(),
             street: formData.street,
             city: formData.city,
+            county: formData.county || "",
             state: formData.state,
             zip: formData.zip,
             country: formData.country,
@@ -1256,6 +1259,19 @@ export default function CheckoutPage() {
                     />
                     {errors.zip && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.zip}</p>}
                   </div>
+                </div>
+
+                {/* County */}
+                <div className="space-y-1">
+                  <label className={labelClass}>County / District</label>
+                  <input
+                    type="text"
+                    name="county"
+                    value={formData.county}
+                    onChange={handleInputChange}
+                    placeholder="County (optional)"
+                    className={inputClass}
+                  />
                 </div>
 
                 {/* Phone */}

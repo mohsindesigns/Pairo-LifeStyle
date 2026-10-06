@@ -14,6 +14,7 @@ import {
   Send,
   FileText,
   Sparkles,
+  Globe,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -396,7 +397,7 @@ export default function OrderDetailPage() {
                   {order.createdAt ? new Date(order.createdAt).toLocaleString() : "N/A"}
                 </span>
               </div>
-              <div className="p-3 xs:p-5 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-8">
+              <div className="p-3 xs:p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
 
                 {/* Customer */}
                 <div className="space-y-3">
@@ -435,6 +436,7 @@ export default function OrderDetailPage() {
                     <p>{order.shippingAddress?.street || "—"}</p>
                     <p>
                       {order.shippingAddress?.city || "—"}
+                      {order.shippingAddress?.county ? `, ${order.shippingAddress.county}` : ""}
                       {order.shippingAddress?.state ? `, ${order.shippingAddress.state}` : ""}
                       {order.shippingAddress?.zip ? ` ${order.shippingAddress.zip}` : ""}
                     </p>
@@ -489,6 +491,89 @@ export default function OrderDetailPage() {
                     <p className="text-[10px] text-[#8c8f94] font-mono break-all pt-2">
                       ID: {order._id}
                     </p>
+                  </div>
+                </div>
+
+                {/* Pinpoint IP & Location */}
+                <div className="space-y-3">
+                  <h3 className="text-[13px] font-bold flex items-center gap-2 text-gray-700">
+                    <Globe className="w-4 h-4 text-[#8c8f94]" /> IP & Pinpoint Location
+                  </h3>
+                  <div className="text-[13px] space-y-1.5 leading-relaxed">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[#646970] text-[12px]">IP:</span>
+                      <span className="font-mono font-semibold text-[#1d2327] bg-gray-100 px-1.5 py-0.5 rounded text-[12px]">
+                        {order.customer?.ipAddress || "—"}
+                      </span>
+                      {order.customer?.ipAddress && order.customer?.ipAddress !== "unknown" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(order.customer.ipAddress);
+                            toast.success("IP copied!");
+                          }}
+                          title="Copy IP"
+                          className="text-[#8c8f94] hover:text-black transition-colors"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {order.customer?.ipLocation ? (
+                      <div className="space-y-1 pt-1.5 border-t border-[#f0f0f1] text-[12px]">
+                        <p className="text-[#1d2327]">
+                          <span className="text-[#646970]">City: </span>
+                          <span className="font-medium">{order.customer.ipLocation.city || "—"}</span>
+                        </p>
+                        <p className="text-[#1d2327]">
+                          <span className="text-[#646970]">State: </span>
+                          <span className="font-medium">{order.customer.ipLocation.state || order.customer.ipLocation.region || "—"}</span>
+                        </p>
+                        <p className="text-[#1d2327]">
+                          <span className="text-[#646970]">County: </span>
+                          <span className="font-semibold text-blue-900 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                            {order.customer.ipLocation.county || "—"}
+                          </span>
+                        </p>
+                        <p className="text-[#1d2327]">
+                          <span className="text-[#646970]">Country: </span>
+                          <span className="font-medium">
+                            {order.customer.ipLocation.country || "—"}
+                            {order.customer.ipLocation.countryCode ? ` (${order.customer.ipLocation.countryCode})` : ""}
+                          </span>
+                        </p>
+                        {(order.customer.ipLocation.postal || order.customer.ipLocation.zip) && (
+                          <p className="text-[#1d2327]">
+                            <span className="text-[#646970]">Postal / Zip: </span>
+                            <span className="font-mono">{order.customer.ipLocation.postal || order.customer.ipLocation.zip}</span>
+                          </p>
+                        )}
+                        {order.customer.ipLocation.isp && (
+                          <p className="text-[#646970] text-[11px] truncate" title={order.customer.ipLocation.isp}>
+                            ISP: <span className="text-gray-800">{order.customer.ipLocation.isp}</span>
+                          </p>
+                        )}
+                        {(order.customer.ipLocation.lat != null && order.customer.ipLocation.lon != null) && (
+                          <div className="pt-2">
+                            <a
+                              href={order.customer.ipLocation.mapsUrl || `https://www.google.com/maps?q=${order.customer.ipLocation.lat},${order.customer.ipLocation.lon}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-red-500" />
+                              Pinpoint Map ({Number(order.customer.ipLocation.lat).toFixed(4)}, {Number(order.customer.ipLocation.lon).toFixed(4)})
+                              <ExternalLink className="w-3 h-3 ml-0.5" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-[#646970] italic pt-1">
+                        {order.customer?.ipAddress ? "Location lookup pending or unavailable" : "No IP address captured"}
+                      </p>
+                    )}
                   </div>
                 </div>
 

@@ -16,6 +16,7 @@ import {
   buildGuestCheckoutAccountPayload,
   resolveGuestCheckoutCustomerAction,
 } from "@/lib/guestCheckoutAccount";
+import { resolveIpLocation } from "@/lib/geoIp";
 
 /**
  * Ensures the order-number counter exists, seeded from the highest existing
@@ -199,6 +200,15 @@ export async function createOrderFromCheckoutPayload(payload, {
           ? 'Payment confirmed via Card. Order is being processed.'
           : 'Order placed successfully. Pending confirmation.';
 
+      let ipLocation = null;
+      if (ipAddress && ipAddress !== "unknown") {
+        try {
+          ipLocation = await resolveIpLocation(ipAddress);
+        } catch {
+          // Non-blocking
+        }
+      }
+
       const orderDoc = {
         orderNumber,
         idempotencyKey,
@@ -228,7 +238,8 @@ export async function createOrderFromCheckoutPayload(payload, {
           userId: orderUserId,
           email: customerEmail || checkoutEmail,
           isGuest: isGuestSession,
-          ipAddress
+          ipAddress,
+          ipLocation
         },
         shippingAddress,
         shippingSnapshot: shippingSnapshot || (authoritativeShippingCost === 0 ? {

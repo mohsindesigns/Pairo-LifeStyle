@@ -133,7 +133,21 @@ const OrderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', index: true },
     email: { type: String, index: true },
     isGuest: { type: Boolean, default: false },
-    ipAddress: String
+    ipAddress: String,
+    ipLocation: {
+      city: String,
+      state: String,
+      county: String,
+      country: String,
+      countryCode: String,
+      postal: String,
+      lat: Number,
+      lon: Number,
+      mapsUrl: String,
+      isp: String,
+      timezone: String,
+      isLocal: Boolean
+    }
   },
 
   shippingAddress: {
@@ -141,6 +155,7 @@ const OrderSchema = new mongoose.Schema({
     street: String,
     city: String,
     state: String,
+    county: String,
     zip: String,
     country: String,
     phone: String
