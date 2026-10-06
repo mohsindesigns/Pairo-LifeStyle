@@ -5,13 +5,6 @@ import Staff from '@/models/Staff';
 import Role from '@/models/Role';
 import { escapeHtml } from './sanitize';
 
-const smtpHost = process.env.AWS_SMTP_HOST || process.env.EMAIL_SERVER || 'email-smtp.eu-north-1.amazonaws.com';
-const smtpPort = parseInt(process.env.AWS_SMTP_PORT || process.env.EMAIL_PORT || '465');
-
-// Extract AWS SES Region from SMTP Host to derive signing key correctly
-const regionMatch = smtpHost.match(/email-smtp\.(.*?)\.amazonaws\.com/);
-const sesRegion = regionMatch ? regionMatch[1] : 'eu-north-1';
-
 function getSmtpPassword(secretKey, region) {
   if (!secretKey) return '';
   const date = "11111111";
@@ -33,18 +26,72 @@ function getSmtpPassword(secretKey, region) {
   return signatureAndVersion.toString('base64');
 }
 
-const smtpUser = process.env.EMAIL_USER || process.env.AWS_ACCESS_KEY_ID;
-const smtpPass = process.env.EMAIL_PASS 
-  || (process.env.AWS_SECRET_ACCESS_KEY ? getSmtpPassword(process.env.AWS_SECRET_ACCESS_KEY, sesRegion) : undefined);
+function resolveSmtpConfig() {
+  const emailUser = process.env.EMAIL_USER || '';
+  const emailPass = process.env.EMAIL_PASS || '';
+  const emailServer = process.env.EMAIL_SERVER || '';
+  const emailPort = process.env.EMAIL_PORT ? parseInt(process.env.EMAIL_PORT) : undefined;
+
+  // 1. If Brevo credentials are provided
+  if (emailServer.includes('brevo') || emailUser.includes('brevo')) {
+    return {
+      host: emailServer || 'smtp-relay.brevo.com',
+      port: emailPort || 587,
+      secure: false,
+      auth: { user: emailUser, pass: emailPass },
+    };
+  }
+
+  // 2. If standard generic SMTP server is explicitly configured
+  if (emailServer && emailUser && emailPass) {
+    const port = emailPort || 587;
+    return {
+      host: emailServer,
+      port,
+      secure: port === 465,
+      auth: { user: emailUser, pass: emailPass },
+    };
+  }
+
+  // 3. If AWS SES is configured and user is an AWS key
+  const awsKeyId = process.env.AWS_ACCESS_KEY_ID || (emailUser.startsWith('AKIA') ? emailUser : '');
+  const awsSecret = process.env.AWS_SECRET_ACCESS_KEY;
+  if (awsKeyId && awsSecret) {
+    const host = process.env.AWS_SMTP_HOST || 'email-smtp.eu-north-1.amazonaws.com';
+    const regionMatch = host.match(/email-smtp\.(.*?)\.amazonaws\.com/);
+    const sesRegion = regionMatch ? regionMatch[1] : 'eu-north-1';
+    const pass = getSmtpPassword(awsSecret, sesRegion);
+    return {
+      host,
+      port: 465,
+      secure: true,
+      auth: { user: awsKeyId, pass },
+    };
+  }
+
+  // 4. Fallback: Gmail or generic user & pass
+  if (emailUser && emailPass) {
+    const host = emailServer || (emailUser.includes('@gmail.com') ? 'smtp.gmail.com' : 'smtp-relay.brevo.com');
+    const port = emailPort || (host === 'smtp.gmail.com' ? 465 : 587);
+    return {
+      host,
+      port,
+      secure: port === 465,
+      auth: { user: emailUser, pass: emailPass },
+    };
+  }
+
+  return null;
+}
+
+const smtpConfig = resolveSmtpConfig();
 
 const transporter = nodemailer.createTransport({
-  host: smtpHost,
-  port: smtpPort,
-  secure: smtpPort === 465,
-  auth: smtpUser && smtpPass ? {
-    user: smtpUser,
-    pass: smtpPass,
-  } : undefined,
+  ...(smtpConfig || {
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
+  }),
   tls: {
     rejectUnauthorized: false,
   },
@@ -117,7 +164,7 @@ export async function sendEmailVerification(toEmail, name, verificationUrl) {
 
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
 
-  if (!smtpUser || !smtpPass) {
+  if (!smtpConfig?.auth?.user || !smtpConfig?.auth?.pass) {
     console.log(`[Email Simulation] Verification Email → ${toEmail} | URL: ${verificationUrl}`);
     return;
   }
@@ -178,7 +225,7 @@ export async function sendAffiliateEmailVerification(toEmail, name, verification
     </div>
   `;
 
-  if (!smtpUser || !smtpPass) {
+  if (!smtpConfig?.auth?.user || !smtpConfig?.auth?.pass) {
     console.log(`[Email Simulation] Affiliate Verification Email → ${toEmail} | URL: ${verificationUrl}`);
     return;
   }
