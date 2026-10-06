@@ -275,17 +275,35 @@ function JourneyPanel({ visitorId, onClose }) {
   );
 }
 
-function FilterSelect({ label, paramKey, value, onChange, options }) {
+const FILTER_LABELS = {
+  range: "Date Range",
+  from: "From",
+  to: "To",
+  device: "Device",
+  segment: "Shopper",
+  source: "Source",
+  medium: "Medium",
+  campaign: "Campaign",
+  country: "Country",
+  browser: "Browser",
+  os: "OS",
+  pageType: "Page Type",
+  category: "Category",
+  priceBand: "Price Range",
+  productId: "Product",
+};
+
+function FilterSelect({ label, paramKey, value, onChange, options = [] }) {
   return (
-    <label className="flex flex-col gap-1 min-w-[140px]">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">{label}</span>
+    <label className="flex flex-col gap-1 min-w-[130px] flex-1">
+      <span className="text-[11px] font-bold text-[#646970]">{label}</span>
       <select
         value={value || "all"}
         onChange={(e) => onChange(paramKey, e.target.value)}
-        className="border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[12px] bg-white"
+        className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2 py-1.5 text-[12px] bg-white text-[#2c3338] outline-none truncate"
       >
         <option value="all">All</option>
-        {options.map((o) => (
+        {(options || []).map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
@@ -295,6 +313,7 @@ function FilterSelect({ label, paramKey, value, onChange, options }) {
 
 function SiteAnalyticsView() {
   const router = useRouter();
+  const pathname = usePathname() || "/admin/site-analytics";
   const searchParams = useSearchParams();
   const params = useParams();
 
@@ -314,6 +333,7 @@ function SiteAnalyticsView() {
   const [options, setOptions] = useState(null);
   const [journeyId, setJourneyId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/site-analytics?tab=options")
@@ -379,70 +399,176 @@ function SiteAnalyticsView() {
   const activeFilters = ["device", "segment", "browser", "os", "source", "medium", "campaign", "country", "pageType", "category", "priceBand", "productId"]
     .filter((k) => searchParams.get(k));
 
+  const secondaryKeys = ["source", "medium", "campaign", "country", "browser", "os", "pageType", "category", "priceBand", "productId"];
+  const secondaryActiveCount = secondaryKeys.filter((k) => searchParams.get(k)).length;
+
   const openJourney = (visitorId) => setJourneyId(visitorId);
   const pinProduct = (row) => setParams({ productId: row.productId });
   const pinCategory = (row) => setParams({ category: row.category });
   const pinPriceBand = (row) => setParams({ priceBand: row.key });
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px] p-4 space-y-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 min-w-[160px]">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Date range</span>
+    <div className="space-y-5">
+      {/* WordPress Tablenav Filter Bar */}
+      <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] p-3 text-[13px] text-[#2c3338] space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Primary Quick Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Date Preset */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold uppercase text-[#646970] hidden sm:inline">Dates:</span>
+              <select
+                value={rangeValue}
+                onChange={(e) => onRangeChange(e.target.value)}
+                className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] font-medium bg-white text-[#2c3338] outline-none"
+              >
+                {DATE_PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+
+            {/* Custom Dates inline */}
+            {hasCustom && (
+              <div className="flex items-center gap-1.5 bg-[#f6f7f7] border border-[#dcdcde] px-2 py-1 rounded-[3px]">
+                <span className="text-[11px] font-bold text-[#646970]">From</span>
+                <input
+                  type="date"
+                  value={searchParams.get("from") || ""}
+                  onChange={(e) => setParams({ from: e.target.value })}
+                  className="border border-[#8c8f94] rounded-[2px] px-1.5 py-0.5 text-[11px] bg-white text-[#2c3338]"
+                />
+                <span className="text-[11px] font-bold text-[#646970]">To</span>
+                <input
+                  type="date"
+                  value={searchParams.get("to") || ""}
+                  onChange={(e) => setParams({ to: e.target.value })}
+                  className="border border-[#8c8f94] rounded-[2px] px-1.5 py-0.5 text-[11px] bg-white text-[#2c3338]"
+                />
+              </div>
+            )}
+
+            {/* Shopper Type */}
             <select
-              value={rangeValue}
-              onChange={(e) => onRangeChange(e.target.value)}
-              className="border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[12px] bg-white"
+              value={searchParams.get("segment") || "all"}
+              onChange={(e) => onFilter("segment", e.target.value)}
+              className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] bg-white text-[#2c3338] outline-none"
             >
-              {DATE_PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+              <option value="all">All Shoppers</option>
+              <option value="customer">Logged-in Customers</option>
+              <option value="guest">Guests</option>
             </select>
-          </label>
-          {hasCustom && (
-            <>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">From</span>
-                <input type="date" value={searchParams.get("from") || ""} onChange={(e) => setParams({ from: e.target.value })} className="border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[12px]" />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">To</span>
-                <input type="date" value={searchParams.get("to") || ""} onChange={(e) => setParams({ to: e.target.value })} className="border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[12px]" />
-              </label>
-            </>
-          )}
-          <FilterSelect label="Device" paramKey="device" value={searchParams.get("device")} onChange={onFilter} options={DEVICES.map((d) => ({ value: d, label: d }))} />
-          <FilterSelect label="Shopper" paramKey="segment" value={searchParams.get("segment")} onChange={onFilter} options={[{ value: "customer", label: "Logged-in customers" }, { value: "guest", label: "Guests" }]} />
-          <FilterSelect label="Source" paramKey="source" value={searchParams.get("source")} onChange={onFilter} options={(options?.sources || []).map((v) => ({ value: v, label: v }))} />
-          <FilterSelect label="Medium" paramKey="medium" value={searchParams.get("medium")} onChange={onFilter} options={(options?.mediums || []).map((v) => ({ value: v, label: v }))} />
-          <FilterSelect label="Campaign" paramKey="campaign" value={searchParams.get("campaign")} onChange={onFilter} options={(options?.campaigns || []).map((v) => ({ value: v, label: v }))} />
-          <FilterSelect label="Country" paramKey="country" value={searchParams.get("country")} onChange={onFilter} options={(options?.countries || []).map((v) => ({ value: v, label: v }))} />
-          <FilterSelect label="Browser" paramKey="browser" value={searchParams.get("browser")} onChange={onFilter} options={(options?.browsers || []).map((v) => ({ value: v, label: v }))} />
-          <FilterSelect label="OS" paramKey="os" value={searchParams.get("os")} onChange={onFilter} options={(options?.oses || []).map((v) => ({ value: v, label: v }))} />
-          <FilterSelect label="Page type" paramKey="pageType" value={searchParams.get("pageType")} onChange={onFilter} options={(options?.pageTypes || []).map((v) => ({ value: v, label: v }))} />
-          <FilterSelect label="Category" paramKey="category" value={searchParams.get("category")} onChange={onFilter} options={(options?.categories || []).map((v) => ({ value: v, label: v }))} />
-          <FilterSelect label="Price range" paramKey="priceBand" value={searchParams.get("priceBand")} onChange={onFilter} options={(options?.priceBands || []).map((b) => ({ value: b.key, label: b.label }))} />
-          <FilterSelect label="Product" paramKey="productId" value={searchParams.get("productId")} onChange={onFilter} options={(options?.products || []).map((p) => ({ value: p.id, label: p.name }))} />
-          <button
-            type="button"
-            onClick={() => router.replace(`${pathname}?tab=${tab}`, { scroll: false })}
-            disabled={!activeFilters.length && !hasCustom && !searchParams.get("range")}
-            className="px-3 py-1.5 text-[12px] font-bold border border-[#8c8f94] rounded-[3px] bg-white hover:bg-[#f6f7f7] disabled:text-gray-300 disabled:border-gray-200"
-          >
-            Reset filters
-          </button>
-        </div>
-        {activeFilters.length > 0 && (
-          <div className="flex flex-wrap gap-2 text-[11px]">
-            {activeFilters.map((k) => (
-              <button key={k} type="button" onClick={() => setParams({ [k]: null })} className="px-2 py-1 rounded-[2px] bg-[#f0f6fb] text-[#135e96] font-bold">
-                {k}: {searchParams.get(k)} ×
+
+            {/* Device */}
+            <select
+              value={searchParams.get("device") || "all"}
+              onChange={(e) => onFilter("device", e.target.value)}
+              className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] bg-white text-[#2c3338] outline-none capitalize"
+            >
+              <option value="all">All Devices</option>
+              {DEVICES.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+
+            {/* Toggle More Filters */}
+            <button
+              type="button"
+              onClick={() => setShowMoreFilters(!showMoreFilters)}
+              className={`px-3 py-1.5 text-[12px] font-semibold border rounded-[3px] transition-colors flex items-center gap-1.5 ${
+                secondaryActiveCount > 0 || showMoreFilters
+                  ? "bg-[#f0f6fb] border-[#2271b1] text-[#2271b1]"
+                  : "bg-[#f6f7f7] border-[#c3c4c7] text-[#2c3338] hover:bg-[#f0f0f1]"
+              }`}
+            >
+              <span>More Filters</span>
+              {secondaryActiveCount > 0 && (
+                <span className="bg-[#2271b1] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                  {secondaryActiveCount}
+                </span>
+              )}
+              <span className="text-[9px]">{showMoreFilters ? "▲" : "▼"}</span>
+            </button>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setRefreshKey((k) => k + 1)}
+              className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[#2c3338] font-semibold transition-colors"
+              title="Refresh data"
+            >
+              ↻ Refresh
+            </button>
+            {(activeFilters.length > 0 || hasCustom || (rangeValue !== "30" && !hasCustom)) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const p = new URLSearchParams();
+                  p.set("tab", tab);
+                  p.set("range", "30");
+                  router.replace(`${pathname}?${p.toString()}`, { scroll: false });
+                }}
+                className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-white hover:bg-[#f6f7f7] text-[#d63638] font-semibold transition-colors"
+              >
+                Reset
               </button>
+            )}
+          </div>
+        </div>
+
+        {/* Expandable Secondary Filters */}
+        {showMoreFilters && (
+          <div className="pt-3 border-t border-[#f0f0f1] bg-[#fbfbfb] -mx-3 -mb-3 p-3 rounded-b-[3px]">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              <FilterSelect label="Traffic Source" paramKey="source" value={searchParams.get("source")} onChange={onFilter} options={(options?.sources || []).map((v) => ({ value: v, label: v }))} />
+              <FilterSelect label="UTM Medium" paramKey="medium" value={searchParams.get("medium")} onChange={onFilter} options={(options?.mediums || []).map((v) => ({ value: v, label: v }))} />
+              <FilterSelect label="Campaign" paramKey="campaign" value={searchParams.get("campaign")} onChange={onFilter} options={(options?.campaigns || []).map((v) => ({ value: v, label: v }))} />
+              <FilterSelect label="Country" paramKey="country" value={searchParams.get("country")} onChange={onFilter} options={(options?.countries || []).map((v) => ({ value: v, label: v }))} />
+              <FilterSelect label="Page Type" paramKey="pageType" value={searchParams.get("pageType")} onChange={onFilter} options={(options?.pageTypes || []).map((v) => ({ value: v, label: v }))} />
+              <FilterSelect label="Browser" paramKey="browser" value={searchParams.get("browser")} onChange={onFilter} options={(options?.browsers || []).map((v) => ({ value: v, label: v }))} />
+              <FilterSelect label="Operating System" paramKey="os" value={searchParams.get("os")} onChange={onFilter} options={(options?.oses || []).map((v) => ({ value: v, label: v }))} />
+              <FilterSelect label="Product Category" paramKey="category" value={searchParams.get("category")} onChange={onFilter} options={(options?.categories || []).map((v) => ({ value: v, label: v }))} />
+              <FilterSelect label="Price Range" paramKey="priceBand" value={searchParams.get("priceBand")} onChange={onFilter} options={(options?.priceBands || []).map((b) => ({ value: b.key, label: b.label }))} />
+              <FilterSelect label="Specific Product" paramKey="productId" value={searchParams.get("productId")} onChange={onFilter} options={(options?.products || []).map((p) => ({ value: p.id, label: p.name }))} />
+            </div>
+          </div>
+        )}
+
+        {/* Active Filter Badges */}
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[12px]">
+            <span className="text-[11px] font-bold text-[#646970] uppercase mr-1">Active:</span>
+            {activeFilters.map((k) => (
+              <span
+                key={k}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[2px] bg-[#f0f6fb] border border-[#c5d9e8] text-[#135e96] font-medium"
+              >
+                <span className="text-[#646970]">{FILTER_LABELS[k] || k}:</span>
+                <span className="font-semibold">{searchParams.get(k)}</span>
+                <button
+                  type="button"
+                  onClick={() => setParams({ [k]: null })}
+                  className="text-[#646970] hover:text-[#d63638] ml-0.5 font-bold"
+                  title="Remove filter"
+                >
+                  ×
+                </button>
+              </span>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                const clearObj = Object.fromEntries(activeFilters.map((k) => [k, null]));
+                setParams(clearObj);
+              }}
+              className="text-[11px] text-[#2271b1] hover:underline ml-1 font-semibold"
+            >
+              Clear all
+            </button>
           </div>
         )}
       </div>
 
-      <nav className="flex flex-wrap gap-1 border-b border-[#ccd0d4]">
+      {/* WordPress Nav-Tabs */}
+      <nav className="flex flex-wrap items-center gap-1 border-b border-[#c3c4c7] pt-1">
         {TABS.map((t) => {
           const isActive = tab === t.key;
           const p = new URLSearchParams(searchParams.toString());
@@ -456,10 +582,10 @@ function SiteAnalyticsView() {
                 e.preventDefault();
                 setParams({ tab: t.key });
               }}
-              className={`px-3 py-2 text-[12px] font-bold border-b-2 -mb-px transition-colors ${
+              className={`px-3 py-1.5 text-[13px] font-medium rounded-t-[3px] transition-all -mb-[1px] ${
                 isActive
-                  ? "border-[#2271b1] text-[#2271b1]"
-                  : "border-transparent text-[#646970] hover:text-[#1d2327]"
+                  ? "bg-white border-t border-l border-r border-[#c3c4c7] border-b-white text-[#1d2327] font-bold shadow-xs"
+                  : "bg-[#f0f0f1] hover:bg-white/80 text-[#50575e] hover:text-[#1d2327] border border-transparent"
               }`}
             >
               {t.label}
@@ -908,36 +1034,7 @@ function SiteAnalyticsView() {
           <p className="text-[12px] text-[#646970]">A dead click is a click on a button or link that gave no visible response within 1.5 seconds. A rage click is three or more rapid clicks on the same element.</p>
         </div>
       )}
-      {isReady && tab === "heatmap" && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 min-w-[260px]">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Page</span>
-              <select
-                value={data.path || ""}
-                onChange={(e) => setParams({ heatPath: e.target.value })}
-                className="border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[12px] bg-white"
-              >
-                {(data.pages || []).length === 0 && <option value="">No clicks yet</option>}
-                {(data.pages || []).map((p) => (
-                  <option key={p.path} value={p.path}>{p.path} ({p.clicks} clicks)</option>
-                ))}
-              </select>
-            </label>
-            <p className="text-[12px] text-[#646970]">{fmtNum(data.total)} clicks on this page</p>
-          </div>
-          <Panel title="Click heatmap">
-            <div className="p-4">
-              {!data.rows ? (
-                <p className="text-center italic text-[#8c8f94] text-[12px] py-10">No clicks recorded for this page yet.</p>
-              ) : (
-                <HeatGrid data={data} />
-              )}
-              <p className="mt-3 text-[11px] text-[#8c8f94]">Each column is 5% of the page width and each row is 200px of page height. Darker cells had more clicks.</p>
-            </div>
-          </Panel>
-        </div>
-      )}
+      {isReady && tab === "heatmap" && <HeatmapTab data={data} setParams={setParams} />}
       {isReady && tab === "live" && (
         <DataTable
           title={`Live now (${fmtNum(data.count)} active in the last 5 minutes)`}
@@ -962,26 +1059,522 @@ function SiteAnalyticsView() {
   );
 }
 
-function HeatGrid({ data }) {
-  const cellMap = new Map(data.cells.map((c) => [c.col + ":" + c.row, c]));
-  const cells = [];
-  for (let row = 0; row < data.rows; row++) {
-    for (let col = 0; col < data.cols; col++) {
-      const cell = cellMap.get(col + ":" + row);
-      const alpha = cell ? 0.15 + 0.85 * (cell.count / data.max) : 0;
-      cells.push(
-        <div
-          key={col + ":" + row}
-          title={cell ? cell.count + " clicks" : ""}
-          style={{ height: 14, background: cell ? "rgba(34,113,177," + alpha + ")" : "#f6f7f7" }}
-        />
-      );
-    }
-  }
+function HeatmapTab({ data, setParams }) {
+  const [viewMode, setViewMode] = useState("split");
+  const [deviceMode, setDeviceMode] = useState("desktop");
+  const [showGrid, setShowGrid] = useState(false);
+  const [hoveredCell, setHoveredCell] = useState(null);
+
+  const pages = data.pages || [];
+  const currentPath = data.path || "";
+  const totalClicks = data.total || 0;
+  const maxClicks = data.max || 1;
+  const cells = data.cells || [];
+  const topElements = data.topElements || [];
+
   return (
-    <div className="grid gap-px bg-[#e5e5e5]" style={{ gridTemplateColumns: "repeat(" + data.cols + ", minmax(0, 1fr))" }}>
-      {cells}
+    <div className="space-y-4">
+      {/* WordPress Heatmap Studio Control Toolbar */}
+      <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] p-3 flex flex-wrap items-center justify-between gap-3 text-[13px]">
+        {/* Left: Page Selector */}
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2">
+            <span className="text-[12px] font-bold text-[#1d2327]">Page:</span>
+            <select
+              value={currentPath}
+              onChange={(e) => setParams({ heatPath: e.target.value })}
+              className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] bg-white font-medium text-[#2c3338] outline-none min-w-[220px]"
+            >
+              {pages.length === 0 && <option value="">No pages with clicks</option>}
+              {pages.map((p) => (
+                <option key={p.path} value={p.path}>
+                  {p.path} ({fmtNum(p.clicks)} clicks)
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* Quick Metrics */}
+          <div className="flex items-center gap-2 text-[12px]">
+            <span className="bg-[#f0f6fb] text-[#135e96] border border-[#c5d9e8] px-2 py-0.5 rounded-[2px] font-semibold">
+              {fmtNum(totalClicks)} Total Clicks
+            </span>
+            <span className="bg-[#f6f7f7] text-[#50575e] border border-[#dcdcde] px-2 py-0.5 rounded-[2px] font-medium">
+              {cells.length} Active Hotspots
+            </span>
+            <span className="bg-[#f6f7f7] text-[#50575e] border border-[#dcdcde] px-2 py-0.5 rounded-[2px] font-medium hidden sm:inline">
+              Peak: {fmtNum(maxClicks)} clicks
+            </span>
+          </div>
+        </div>
+
+        {/* Right: Controls & View toggles */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Device Selector */}
+          <div className="flex items-center border border-[#8c8f94] rounded-[3px] overflow-hidden text-[11px] font-semibold bg-white">
+            <button
+              type="button"
+              onClick={() => setDeviceMode("desktop")}
+              className={`px-2.5 py-1 transition-colors ${deviceMode === "desktop" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+            >
+              🖥 Desktop
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeviceMode("mobile")}
+              className={`px-2.5 py-1 transition-colors ${deviceMode === "mobile" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+            >
+              📱 Mobile
+            </button>
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center border border-[#8c8f94] rounded-[3px] overflow-hidden text-[11px] font-semibold bg-white">
+            <button
+              type="button"
+              onClick={() => setViewMode("split")}
+              className={`px-2.5 py-1 transition-colors ${viewMode === "split" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+              title="Split View"
+            >
+              Split View
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("visual")}
+              className={`px-2.5 py-1 transition-colors ${viewMode === "visual" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+              title="Visual Heatmap Only"
+            >
+              Visual
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("elements")}
+              className={`px-2.5 py-1 transition-colors ${viewMode === "elements" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+              title="Top Clicked Elements List"
+            >
+              Elements
+            </button>
+          </div>
+
+          {/* Grid lines toggle */}
+          <label className="flex items-center gap-1.5 text-[11px] font-medium text-[#646970] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showGrid}
+              onChange={(e) => setShowGrid(e.target.checked)}
+              className="rounded border-[#8c8f94] text-[#2271b1] focus:ring-0"
+            />
+            Grid
+          </label>
+        </div>
+      </div>
+
+      {totalClicks === 0 ? (
+        <div className="bg-white border border-[#c3c4c7] p-8 text-center rounded-[3px] shadow-sm">
+          <p className="text-[14px] font-semibold text-[#1d2327]">No click coordinates recorded for this page yet.</p>
+          <p className="text-[12px] text-[#646970] mt-1.5">
+            Clicks are recorded in real-time as visitors interact with buttons, links, banners, and forms on <span className="font-mono text-[#2271b1]">{currentPath || "this page"}</span>.
+          </p>
+        </div>
+      ) : (
+        <div className={`grid gap-4 ${viewMode === "split" ? "grid-cols-1 xl:grid-cols-12" : "grid-cols-1"}`}>
+          {/* Visual Heatmap Canvas */}
+          {(viewMode === "split" || viewMode === "visual") && (
+            <div className={viewMode === "split" ? "xl:col-span-7" : "w-full"}>
+              <HeatmapVisualizer
+                data={data}
+                deviceMode={deviceMode}
+                showGrid={showGrid}
+                hoveredCell={hoveredCell}
+                setHoveredCell={setHoveredCell}
+              />
+            </div>
+          )}
+
+          {/* Top Clicked Elements Table */}
+          {(viewMode === "split" || viewMode === "elements") && (
+            <div className={viewMode === "split" ? "xl:col-span-5" : "w-full"}>
+              <HeatmapElementsTable
+                topElements={topElements}
+                cells={cells}
+                totalClicks={totalClicks}
+                path={currentPath}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHoveredCell }) {
+  const isMobile = deviceMode === "mobile";
+  const rows = Math.max(4, data.rows || 4);
+  const cols = data.cols || 20;
+  const max = Math.max(1, data.max || 1);
+  const total = data.total || 1;
+  const cells = data.cells || [];
+
+  const getHeatStyle = (count) => {
+    const ratio = count / max;
+    if (ratio >= 0.75) {
+      return {
+        bg: "radial-gradient(circle, rgba(239,68,68,0.92) 0%, rgba(245,158,11,0.65) 45%, rgba(239,68,68,0.15) 75%, transparent 100%)",
+        border: "#ef4444",
+        badgeBg: "bg-red-600 text-white",
+        level: "Hot (High Activity)",
+      };
+    }
+    if (ratio >= 0.45) {
+      return {
+        bg: "radial-gradient(circle, rgba(245,158,11,0.88) 0%, rgba(234,179,8,0.55) 45%, rgba(245,158,11,0.15) 75%, transparent 100%)",
+        border: "#f59e0b",
+        badgeBg: "bg-amber-500 text-white",
+        level: "Warm (Medium Activity)",
+      };
+    }
+    if (ratio >= 0.2) {
+      return {
+        bg: "radial-gradient(circle, rgba(16,185,129,0.82) 0%, rgba(6,182,212,0.45) 45%, rgba(16,185,129,0.1) 75%, transparent 100%)",
+        border: "#10b981",
+        badgeBg: "bg-emerald-600 text-white",
+        level: "Moderate Activity",
+      };
+    }
+    return {
+      bg: "radial-gradient(circle, rgba(59,130,246,0.78) 0%, rgba(147,197,253,0.4) 45%, rgba(59,130,246,0.08) 75%, transparent 100%)",
+      border: "#3b82f6",
+      badgeBg: "bg-blue-500 text-white",
+      level: "Low Activity",
+    };
+  };
+
+  return (
+    <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] overflow-hidden">
+      {/* Panel Header */}
+      <div className="px-4 py-2.5 border-b border-[#c3c4c7] bg-[#f6f7f7] flex items-center justify-between">
+        <h3 className="text-[12px] font-bold uppercase tracking-wider text-[#1d2327]">
+          Visual Click Density ({isMobile ? "Mobile 390px" : "Desktop View"})
+        </h3>
+        <span className="text-[11px] text-[#646970] font-medium">
+          {fmtNum(data.total)} clicks across ~{rows * 200}px page depth
+        </span>
+      </div>
+
+      <div className="p-4 bg-[#f0f0f1] flex justify-center overflow-x-auto">
+        {/* Browser Mockup Window */}
+        <div
+          className={`bg-white rounded-[6px] border border-[#ccd0d4] shadow-md transition-all ${
+            isMobile ? "w-[390px]" : "w-full max-w-[860px]"
+          }`}
+        >
+          {/* Browser Chrome Header */}
+          <div className="bg-[#f6f7f7] border-b border-[#e5e5e5] px-3 py-2 flex items-center gap-2 select-none">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] inline-block" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f] inline-block" />
+            </div>
+            <div className="flex-1 max-w-md mx-auto bg-white border border-[#dcdcde] rounded px-2.5 py-0.5 text-[11px] font-mono text-[#50575e] truncate flex items-center gap-1.5">
+              <span className="text-emerald-600 text-[10px]">🔒</span>
+              <span className="truncate">https://pairo-lifestyle.com{data.path || "/"}</span>
+            </div>
+            <span className="text-[10px] text-[#8c8f94] font-medium hidden sm:inline">
+              {isMobile ? "390px" : "100%"}
+            </span>
+          </div>
+
+          {/* Webpage Mock Content Container with Heatmap Overlay */}
+          <div className="relative bg-white select-none overflow-hidden" style={{ minHeight: `${rows * 150}px` }}>
+            {/* 1. Underlying Webpage Skeleton Wireframe */}
+            <div className="p-4 space-y-4 opacity-75 pointer-events-none">
+              {/* Site Header / Nav */}
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div className="h-5 w-24 bg-gray-300 rounded font-bold text-[10px] flex items-center justify-center text-gray-500">PAIRO</div>
+                <div className="hidden sm:flex items-center gap-3">
+                  <div className="h-3 w-12 bg-gray-200 rounded" />
+                  <div className="h-3 w-12 bg-gray-200 rounded" />
+                  <div className="h-3 w-12 bg-gray-200 rounded" />
+                  <div className="h-3 w-12 bg-gray-200 rounded" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 bg-gray-200 rounded-full" />
+                  <div className="h-4 w-4 bg-gray-300 rounded-full" />
+                </div>
+              </div>
+
+              {/* Hero Banner Area */}
+              <div className="h-44 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-[4px] border border-gray-200/60 p-5 flex flex-col justify-center items-center text-center">
+                <div className="h-4 w-48 bg-gray-300 rounded mb-2" />
+                <div className="h-3 w-32 bg-gray-200 rounded mb-4" />
+                <div className="h-7 w-28 bg-[#2271b1]/80 rounded-[3px] text-white text-[11px] font-bold flex items-center justify-center shadow-xs">
+                  Shop Now
+                </div>
+              </div>
+
+              {/* The Fold Line Indicator (at ~650px) */}
+              <div className="relative py-2 my-2 border-t-2 border-dashed border-red-400/80 flex items-center justify-between">
+                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
+                  ── AVERAGE FOLD LINE ──
+                </span>
+                <span className="text-[10px] text-red-600 font-semibold bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
+                  Visible without scrolling
+                </span>
+              </div>
+
+              {/* Product Grid Wireframe */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+                {[1, 2, 3, 4, 5, 6].map((idx) => (
+                  <div key={idx} className="border border-gray-200 rounded p-2.5 space-y-2 bg-gray-50/50">
+                    <div className="h-28 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-[10px]">
+                      Product {idx}
+                    </div>
+                    <div className="h-3 w-3/4 bg-gray-300 rounded" />
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="h-3 w-12 bg-gray-300 rounded" />
+                      <div className="h-5 w-16 bg-[#2271b1]/70 rounded text-[9px] text-white flex items-center justify-center font-bold">
+                        Add to Cart
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer Skeleton */}
+              <div className="pt-6 border-t border-gray-200 grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                  <div className="h-3 w-16 bg-gray-300 rounded" />
+                  <div className="h-2 w-20 bg-gray-200 rounded" />
+                  <div className="h-2 w-16 bg-gray-200 rounded" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="h-3 w-16 bg-gray-300 rounded" />
+                  <div className="h-2 w-20 bg-gray-200 rounded" />
+                  <div className="h-2 w-16 bg-gray-200 rounded" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="h-3 w-16 bg-gray-300 rounded" />
+                  <div className="h-2 w-20 bg-gray-200 rounded" />
+                  <div className="h-2 w-16 bg-gray-200 rounded" />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Grid Lines Overlay (optional toggle) */}
+            {showGrid && (
+              <div
+                className="absolute inset-0 grid pointer-events-none border-b border-gray-200/60"
+                style={{
+                  gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                  gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+                }}
+              >
+                {Array.from({ length: cols * rows }).map((_, i) => (
+                  <div key={i} className="border-r border-b border-blue-400/10" />
+                ))}
+              </div>
+            )}
+
+            {/* 3. Heatmap Glowing Radiant Hotspots Layer */}
+            <div className="absolute inset-0 pointer-events-none">
+              {cells.map((c) => {
+                const style = getHeatStyle(c.count);
+                const leftPct = (c.col / cols) * 100;
+                const topPct = (c.row / rows) * 100;
+                const widthPct = (1 / cols) * 100;
+                const heightPct = (1 / rows) * 100;
+                const intensity = c.count / max;
+                const sizePx = Math.max(50, Math.min(120, 50 + intensity * 60));
+
+                return (
+                  <div
+                    key={`${c.col}:${c.row}`}
+                    className="absolute"
+                    style={{
+                      left: `${leftPct}%`,
+                      top: `${topPct}%`,
+                      width: `${widthPct}%`,
+                      height: `${heightPct}%`,
+                    }}
+                  >
+                    {/* Glowing radial gradient circle centered */}
+                    <div
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none transition-all duration-300"
+                      style={{
+                        width: `${sizePx}px`,
+                        height: `${sizePx}px`,
+                        background: style.bg,
+                        filter: "blur(4px)",
+                      }}
+                    />
+
+                    {/* Interactive Click hotspot target button */}
+                    <button
+                      type="button"
+                      onMouseEnter={() => setHoveredCell({ ...c, style })}
+                      onMouseLeave={() => setHoveredCell(null)}
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto group z-20"
+                    >
+                      <div
+                        className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] shadow-sm border border-white cursor-pointer transition-transform group-hover:scale-125 ${style.badgeBg}`}
+                      >
+                        {c.count}
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 4. Active Hover Tooltip floating over canvas */}
+            {hoveredCell && (
+              <div
+                className="absolute z-30 pointer-events-none bg-[#1d2327] text-white p-2.5 rounded shadow-xl text-[11px] border border-gray-700 transition-all"
+                style={{
+                  left: `${Math.min(75, Math.max(10, (hoveredCell.col / cols) * 100))}%`,
+                  top: `${Math.min(85, Math.max(5, (hoveredCell.row / rows) * 100))}%`,
+                }}
+              >
+                <div className="font-bold text-[12px] text-white flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400" />
+                  <span>{hoveredCell.count} Clicks ({pctText((hoveredCell.count / total) * 100)})</span>
+                </div>
+                <div className="text-gray-300 text-[10px] mt-0.5">
+                  Column {hoveredCell.col + 1} ({hoveredCell.col * 5}% - {(hoveredCell.col + 1) * 5}% width)
+                </div>
+                <div className="text-gray-300 text-[10px]">
+                  Depth: ~{hoveredCell.row * 200}px ({hoveredCell.row < 3 ? "Above the fold" : "Below the fold"})
+                </div>
+                <div className="text-[#a7aaad] text-[9px] mt-1 italic font-medium">
+                  {hoveredCell.style?.level}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Heatmap Legend Bar */}
+      <div className="px-4 py-3 bg-white border-t border-[#ccd0d4] flex flex-wrap items-center justify-between gap-3 text-[12px]">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-[#1d2327] text-[11px] uppercase">Heat Intensity:</span>
+          <span className="text-[11px] text-[#646970]">Low (1 click)</span>
+          <div className="h-3 w-36 rounded-full bg-gradient-to-r from-blue-500 via-emerald-500 via-amber-500 to-red-500 shadow-inner" />
+          <span className="text-[11px] text-[#646970]">High ({max} clicks)</span>
+        </div>
+        <p className="text-[11px] text-[#8c8f94]">
+          Hover on any hotspot marker to inspect exact coordinates and click density.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function HeatmapElementsTable({ topElements = [], cells = [], totalClicks = 1, path }) {
+  return (
+    <Panel
+      title={`Top Clicked Elements on ${path || "this page"}`}
+      action={
+        <button
+          type="button"
+          onClick={() => downloadCsv(`top-clicked-elements.csv`, [
+            { key: "label", label: "Element" },
+            { key: "section", label: "Section" },
+            { key: "href", label: "Destination" },
+            { key: "count", label: "Clicks" },
+          ], topElements)}
+          disabled={topElements.length === 0}
+          className="text-[11px] font-bold uppercase text-[#2271b1] hover:underline disabled:text-gray-300"
+        >
+          Export CSV
+        </button>
+      }
+    >
+      <div className="divide-y divide-[#f0f0f1]">
+        {topElements.length > 0 ? (
+          <table className="w-full text-[12px] text-left">
+            <thead className="text-[11px] uppercase text-[#646970] bg-[#fbfbfb]">
+              <tr>
+                <th className="px-3 py-2 font-bold">#</th>
+                <th className="px-3 py-2 font-bold">Element / Label</th>
+                <th className="px-3 py-2 font-bold">Section</th>
+                <th className="px-3 py-2 font-bold">Clicks</th>
+                <th className="px-3 py-2 font-bold">Share</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#f0f0f1]">
+              {topElements.map((el, i) => {
+                const sharePct = Math.round((el.count / Math.max(1, totalClicks)) * 100);
+                return (
+                  <tr key={i} className="hover:bg-[#f0f6fb] transition-colors">
+                    <td className="px-3 py-2 font-bold text-[#8c8f94]">{i + 1}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-semibold text-[#1d2327]">{el.label || "(unlabeled element)"}</div>
+                      {el.href && (
+                        <div className="font-mono text-[10px] text-[#2271b1] truncate max-w-[180px]">
+                          {el.href}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-[#646970]">
+                      {el.section ? (
+                        <span className="bg-[#f0f0f1] px-1.5 py-0.5 rounded text-[11px] font-medium text-[#1d2327]">
+                          {el.section}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-bold text-[#1d2327]">{fmtNum(el.count)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-[#f0f0f1] rounded-[2px] overflow-hidden">
+                          <div
+                            className="h-full bg-[#2271b1] rounded-[2px]"
+                            style={{ width: `${Math.min(100, Math.max(4, sharePct))}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] text-[#646970] font-semibold">{sharePct}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <div className="p-6 text-center italic text-[#8c8f94] text-[12px]">
+            No labeled element clicks recorded yet for this page.
+          </div>
+        )}
+
+        {/* Hotspot Coordinate Zones ranking */}
+        <div className="p-3 bg-[#fbfbfb]">
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">
+            Top Hotspot Coordinates (Click Zones)
+          </h4>
+          <div className="space-y-1.5">
+            {[...cells]
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 6)
+              .map((c, i) => (
+                <div key={i} className="flex items-center justify-between text-[11px] bg-white border border-[#e5e5e5] px-2.5 py-1.5 rounded-[2px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-[#2271b1]" />
+                    <span className="font-semibold text-[#1d2327]">
+                      Zone: {c.col * 5}% - {(c.col + 1) * 5}% width, Depth ~{c.row * 200}px
+                    </span>
+                  </div>
+                  <span className="font-bold text-[#2271b1]">
+                    {fmtNum(c.count)} clicks ({pctText((c.count / Math.max(1, totalClicks)) * 100)})
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }
 

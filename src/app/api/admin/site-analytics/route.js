@@ -1014,18 +1014,30 @@ async function heatmap(f) {
     { $limit: 50 },
   ]);
   const path = f.heatPath || pages[0]?._id || "";
-  const cells = path
-    ? await AnalyticsEvent.aggregate([
-      { $match: eventMatch(f, { name: "heat_click", path, clickX: { $ne: null }, clickY: { $ne: null } }) },
-      {
-        $project: {
-          col: { $min: [COLS - 1, { $floor: { $divide: ["$clickX", 100 / COLS] } }] },
-          row: { $min: [MAX_ROWS - 1, { $floor: { $divide: ["$clickY", ROW_PX] } }] },
+  const [cells, topElements] = await Promise.all([
+    path
+      ? AnalyticsEvent.aggregate([
+        { $match: eventMatch(f, { name: "heat_click", path, clickX: { $ne: null }, clickY: { $ne: null } }) },
+        {
+          $project: {
+            col: { $min: [COLS - 1, { $floor: { $divide: ["$clickX", 100 / COLS] } }] },
+            row: { $min: [MAX_ROWS - 1, { $floor: { $divide: ["$clickY", ROW_PX] } }] },
+          },
         },
-      },
-      { $group: { _id: { col: "$col", row: "$row" }, count: { $sum: 1 } } },
-    ])
-    : [];
+        { $group: { _id: { col: "$col", row: "$row" }, count: { $sum: 1 } } },
+      ])
+      : [],
+    path
+      ? AnalyticsEvent.aggregate([
+        { $match: eventMatch(f, { name: "click", path }) },
+        { $group: { _id: { label: "$label", href: "$href", section: "$section" }, count: { $sum: 1 } } },
+        { $project: { label: "$_id.label", href: "$_id.href", section: "$_id.section", count: 1 } },
+        { $sort: { count: -1 } },
+        { $limit: 20 },
+      ])
+      : [],
+  ]);
+
   return {
     path,
     pages: pages.map((p) => ({ path: p._id, clicks: p.clicks })),
@@ -1033,6 +1045,7 @@ async function heatmap(f) {
     rowPx: ROW_PX,
     rows: cells.length ? Math.max(...cells.map((c) => c._id.row)) + 1 : 0,
     cells: cells.map((c) => ({ col: c._id.col, row: c._id.row, count: c.count })),
+    topElements: topElements || [],
     max: Math.max(1, ...cells.map((c) => c.count)),
     total: cells.reduce((s, c) => s + c.count, 0),
   };
