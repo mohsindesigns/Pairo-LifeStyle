@@ -76,17 +76,20 @@ const fmtWhen = (value) => (value
   ? new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
   : "—");
 const fmtMoney = (v) => `$${Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtNum = (v) => (Number(v) || 0).toLocaleString();
 const pctText = (v) => `${Number(v || 0)}%`;
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const daysAgoIso = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
-function downloadCsv(filename, columns, rows) {
+function downloadCsv(filename, columns = [], rows = []) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const safeColumns = Array.isArray(columns) ? columns : [];
   const esc = (v) => {
     const s = v === null || v === undefined ? "" : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const header = columns.map((c) => esc(c.label)).join(",");
-  const lines = rows.map((r) => columns.map((c) => esc(c.csv ? c.csv(r) : r[c.key])).join(","));
+  const header = safeColumns.map((c) => esc(c.label)).join(",");
+  const lines = safeRows.map((r) => safeColumns.map((c) => esc(c.csv ? c.csv(r) : r[c.key])).join(","));
   const blob = new Blob([[header, ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -100,7 +103,7 @@ function Kpi({ label, value, hint }) {
   return (
     <div className="bg-white border border-[#ccd0d4] p-4 shadow-sm rounded-[2px]">
       <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-      <p className="text-[22px] font-bold text-[#1d2327] mt-1">{value}</p>
+      <p className="text-[22px] font-bold text-[#1d2327] mt-1">{value ?? "0"}</p>
       {hint && <p className="text-[11px] text-[#8c8f94] mt-1">{hint}</p>}
     </div>
   );
@@ -118,15 +121,17 @@ function Panel({ title, action, children }) {
   );
 }
 
-function DataTable({ title, columns, rows, empty = "No data for these filters.", onRowClick, rowHint }) {
+function DataTable({ title, columns = [], rows = [], empty = "No data for these filters.", onRowClick, rowHint }) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const safeColumns = Array.isArray(columns) ? columns : [];
   return (
     <Panel
       title={title}
       action={
         <button
           type="button"
-          onClick={() => downloadCsv(`${title.replace(/\W+/g, "-").toLowerCase()}.csv`, columns, rows)}
-          disabled={!rows.length}
+          onClick={() => downloadCsv(`${title.replace(/\W+/g, "-").toLowerCase()}.csv`, safeColumns, safeRows)}
+          disabled={safeRows.length === 0}
           className="text-[11px] font-bold uppercase text-[#2271b1] hover:underline disabled:text-gray-300"
         >
           Export CSV
@@ -135,20 +140,20 @@ function DataTable({ title, columns, rows, empty = "No data for these filters.",
     >
       <table className="w-full text-[12px] text-left">
         <thead className="text-[11px] uppercase text-[#646970] bg-[#fbfbfb]">
-          <tr>{columns.map((c) => <th key={c.key} className="px-3 py-2 font-bold whitespace-nowrap">{c.label}</th>)}</tr>
+          <tr>{safeColumns.map((c) => <th key={c.key} className="px-3 py-2 font-bold whitespace-nowrap">{c.label}</th>)}</tr>
         </thead>
         <tbody className="divide-y divide-[#f0f0f1]">
-          {rows.length === 0 && (
-            <tr><td colSpan={columns.length} className="px-3 py-6 text-center italic text-[#8c8f94]">{empty}</td></tr>
+          {safeRows.length === 0 && (
+            <tr><td colSpan={safeColumns.length || 1} className="px-3 py-6 text-center italic text-[#8c8f94]">{empty}</td></tr>
           )}
-          {rows.map((row, i) => (
+          {safeRows.map((row, i) => (
             <tr
               key={i}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               title={rowHint}
               className={onRowClick ? "cursor-pointer hover:bg-[#f0f6fb]" : ""}
             >
-              {columns.map((c) => (
+              {safeColumns.map((c) => (
                 <td key={c.key} className="px-3 py-2 align-top">{c.render ? c.render(row) : row[c.key]}</td>
               ))}
             </tr>
@@ -159,12 +164,13 @@ function DataTable({ title, columns, rows, empty = "No data for these filters.",
   );
 }
 
-function BarRows({ rows, valueKey, labelKey, format = (v) => v }) {
-  const max = Math.max(1, ...rows.map((r) => Number(r[valueKey]) || 0));
+function BarRows({ rows = [], valueKey, labelKey, format = (v) => v }) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const max = Math.max(1, ...safeRows.map((r) => Number(r[valueKey]) || 0));
   return (
     <ul className="p-4 space-y-2">
-      {rows.length === 0 && <li className="text-center italic text-[12px] text-[#8c8f94]">No data.</li>}
-      {rows.map((r) => (
+      {safeRows.length === 0 && <li className="text-center italic text-[12px] text-[#8c8f94]">No data.</li>}
+      {safeRows.map((r) => (
         <li key={String(r[labelKey])} className="text-[12px]">
           <div className="flex justify-between mb-0.5">
             <span className="text-[#1d2327] truncate pr-2">{r[labelKey] || "(none)"}</span>
@@ -321,16 +327,24 @@ function SiteAnalyticsView() {
     setLoading(true);
     setError(false);
     fetch(`/api/admin/site-analytics?${query}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
       .then((j) => {
         if (cancelled) return;
-        if (j.success) setData(j.data);
+        if (j.success) setData({ ...j.data, _tab: j.tab });
         else setError(true);
       })
-      .catch(() => { if (!cancelled) setError(true); })
+      .catch((err) => {
+        console.error("Site analytics fetch error:", err);
+        if (!cancelled) setError(true);
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [query, refreshKey]);
+
+  const isReady = Boolean(data && data._tab === tab);
 
   useEffect(() => {
     if (tab !== "live") return undefined;
@@ -454,15 +468,15 @@ function SiteAnalyticsView() {
         })}
       </nav>
 
-      {loading && !data && <div className="p-16 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">Crunching visitor data…</div>}
+      {(!isReady || loading) && !error && <div className="p-16 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">Crunching visitor data…</div>}
       {error && <div className="p-16 text-center text-[13px] text-red-500 font-bold bg-white border border-[#ccd0d4]">Failed to load this view.</div>}
 
-      {data && tab === "overview" && <OverviewTab data={data} />}
-      {data && tab === "pages" && (
+      {isReady && tab === "overview" && <OverviewTab data={data} />}
+      {isReady && tab === "pages" && (
         <div className="space-y-6">
           <DataTable
             title="Pages"
-            rows={data.pages}
+            rows={data.pages || []}
             columns={[
               { key: "path", label: "Path", render: (r) => <span className="font-mono break-all">{r.path}</span> },
               { key: "pageType", label: "Type" },
@@ -478,7 +492,7 @@ function SiteAnalyticsView() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <DataTable
               title="Entry pages (bounce)"
-              rows={data.entries}
+              rows={data.entries || []}
               columns={[
                 { key: "path", label: "Landing page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
                 { key: "sessions", label: "Sessions" },
@@ -489,7 +503,7 @@ function SiteAnalyticsView() {
             />
             <DataTable
               title="Page types"
-              rows={data.pageTypes}
+              rows={data.pageTypes || []}
               columns={[
                 { key: "pageType", label: "Type" },
                 { key: "views", label: "Views" },
@@ -500,10 +514,10 @@ function SiteAnalyticsView() {
           </div>
         </div>
       )}
-      {data && tab === "sections" && (
+      {isReady && tab === "sections" && (
         <DataTable
           title="Sections"
-          rows={data.sections}
+          rows={data.sections || []}
           empty="No section views yet. Sections appear once visitors scroll them into view for at least a second."
           columns={[
             { key: "section", label: "Section" },
@@ -515,11 +529,11 @@ function SiteAnalyticsView() {
           ]}
         />
       )}
-      {data && tab === "clicks" && (
+      {isReady && tab === "clicks" && (
         <div className="space-y-6">
           <DataTable
             title="Clicks"
-            rows={data.labels}
+            rows={data.labels || []}
             empty="No clicks recorded yet."
             columns={[
               { key: "label", label: "Clicked" },
@@ -531,7 +545,7 @@ function SiteAnalyticsView() {
           />
           <DataTable
             title="Links followed"
-            rows={data.links}
+            rows={data.links || []}
             columns={[
               { key: "href", label: "Destination", render: (r) => <span className="font-mono break-all">{r.href}</span> },
               { key: "clicks", label: "Clicks" },
@@ -540,10 +554,10 @@ function SiteAnalyticsView() {
           />
         </div>
       )}
-      {data && tab === "products" && (
+      {isReady && tab === "products" && (
         <DataTable
           title="Products"
-          rows={data.products}
+          rows={data.products || []}
           onRowClick={pinProduct}
           rowHint="Click to filter the whole dashboard to this product"
           columns={[
@@ -560,11 +574,11 @@ function SiteAnalyticsView() {
           ]}
         />
       )}
-      {data && tab === "categories" && (
+      {isReady && tab === "categories" && (
         <div className="space-y-6">
           <DataTable
             title="Categories"
-            rows={data.categories}
+            rows={data.categories || []}
             onRowClick={pinCategory}
             rowHint="Click to filter the whole dashboard to this category"
             columns={[
@@ -581,7 +595,7 @@ function SiteAnalyticsView() {
           />
           <DataTable
             title="Category pages"
-            rows={data.categoryPages}
+            rows={data.categoryPages || []}
             columns={[
               { key: "categorySlug", label: "Category page", render: (r) => <span className="font-mono">/{r.categorySlug}</span> },
               { key: "views", label: "Views" },
@@ -590,15 +604,15 @@ function SiteAnalyticsView() {
           />
         </div>
       )}
-      {data && tab === "prices" && (
+      {isReady && tab === "prices" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Panel title="Product views by price range"><BarRows rows={data.bands} valueKey="views" labelKey="label" /></Panel>
-            <Panel title="Revenue by price range"><BarRows rows={data.bands} valueKey="revenue" labelKey="label" format={fmtMoney} /></Panel>
+            <Panel title="Product views by price range"><BarRows rows={data.bands || []} valueKey="views" labelKey="label" /></Panel>
+            <Panel title="Revenue by price range"><BarRows rows={data.bands || []} valueKey="revenue" labelKey="label" format={fmtMoney} /></Panel>
           </div>
           <DataTable
             title="Price ranges"
-            rows={data.bands}
+            rows={data.bands || []}
             onRowClick={pinPriceBand}
             rowHint="Click to filter the whole dashboard to this price range"
             columns={[
@@ -614,11 +628,11 @@ function SiteAnalyticsView() {
           />
         </div>
       )}
-      {data && tab === "search" && (
+      {isReady && tab === "search" && (
         <div className="space-y-6">
           <DataTable
             title="Zero-result searches"
-            rows={data.zeroSearches}
+            rows={data.zeroSearches || []}
             empty="No searches with zero results."
             columns={[
               { key: "term", label: "Search" },
@@ -630,7 +644,7 @@ function SiteAnalyticsView() {
           />
           <DataTable
             title="Search terms"
-            rows={data.searches}
+            rows={data.searches || []}
             columns={[
               { key: "term", label: "Search" },
               { key: "searches", label: "Searches" },
@@ -639,7 +653,7 @@ function SiteAnalyticsView() {
           />
           <DataTable
             title="Form fields"
-            rows={data.fields}
+            rows={data.fields || []}
             empty="No form interactions yet. Fields are recorded when a visitor leaves them."
             columns={[
               { key: "field", label: "Field" },
@@ -652,7 +666,7 @@ function SiteAnalyticsView() {
           />
         </div>
       )}
-      {data && tab === "audience" && (
+      {isReady && tab === "audience" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[
             ["segment", "Shopper type"], ["device", "Device"], ["browser", "Browser"], ["os", "Operating system"],
@@ -661,7 +675,7 @@ function SiteAnalyticsView() {
             <DataTable
               key={key}
               title={title}
-              rows={data.breakdowns[key] || []}
+              rows={(data.breakdowns && data.breakdowns[key]) || []}
               columns={[
                 { key: "value", label: title },
                 { key: "sessions", label: "Sessions" },
@@ -673,11 +687,11 @@ function SiteAnalyticsView() {
           ))}
         </div>
       )}
-      {data && tab === "users" && (
+      {isReady && tab === "users" && (
         <div className="space-y-6">
           <DataTable
             title="Logged-in customers"
-            rows={data.customers}
+            rows={data.customers || []}
             columns={[
               { key: "name", label: "Customer", render: (r) => <div><div className="font-bold text-[#1d2327]">{r.name || "—"}</div><div className="text-[11px] text-[#8c8f94]">{r.email}</div></div> },
               { key: "sessions", label: "Sessions" },
@@ -692,7 +706,7 @@ function SiteAnalyticsView() {
           />
           <DataTable
             title="Recent visitors"
-            rows={data.recent}
+            rows={data.recent || []}
             columns={[
               { key: "visitorId", label: "Visitor", render: (r) => <span className="font-mono text-[11px]">{r.visitorId.slice(0, 8)}…</span> },
               { key: "who", label: "Who", render: (r) => r.userEmail || <span className="text-[#8c8f94]">Guest</span>, csv: (r) => r.userEmail || "Guest" },
@@ -708,16 +722,16 @@ function SiteAnalyticsView() {
           />
         </div>
       )}
-      {data && tab === "variants" && (
+      {isReady && tab === "variants" && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <Kpi label="Visitors who viewed a product" value={data.viewerSessions.toLocaleString()} />
-            <Kpi label="Visitors who chose a size or colour" value={data.pickerSessions.toLocaleString()} />
+            <Kpi label="Visitors who viewed a product" value={fmtNum(data.viewerSessions)} />
+            <Kpi label="Visitors who chose a size or colour" value={fmtNum(data.pickerSessions)} />
             <Kpi label="Choice rate" value={pctText(data.pickRate)} hint="Of product viewers" />
           </div>
           <DataTable
             title="Size & colour choices"
-            rows={data.options}
+            rows={data.options || []}
             empty="No choices yet. A choice is recorded when a shopper picks a size or colour on a product page."
             columns={[
               { key: "path", label: "Product page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
@@ -729,16 +743,16 @@ function SiteAnalyticsView() {
           />
         </div>
       )}
-      {data && tab === "errors" && (
+      {isReady && tab === "errors" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <Kpi label="Sessions that hit an error" value={data.errorSessions.toLocaleString()} />
+            <Kpi label="Sessions that hit an error" value={fmtNum(data.errorSessions)} />
             <Kpi label="Conversion: sessions with an error" value={pctText(data.errorConversionRate)} />
             <Kpi label="Conversion: all sessions" value={pctText(data.overallConversionRate)} />
           </div>
           <DataTable
             title="API errors"
-            rows={data.api}
+            rows={data.api || []}
             empty="No failed requests. Tracked: server errors and 400, 409, 422 and 429 responses."
             columns={[
               { key: "message", label: "Request" },
@@ -749,7 +763,7 @@ function SiteAnalyticsView() {
           />
           <DataTable
             title="Form validation messages"
-            rows={data.form}
+            rows={data.form || []}
             empty="No form validation messages shown."
             columns={[
               { key: "message", label: "Message" },
@@ -759,7 +773,7 @@ function SiteAnalyticsView() {
           />
           <DataTable
             title="Script errors"
-            rows={data.js}
+            rows={data.js || []}
             empty="No script errors."
             columns={[
               { key: "message", label: "Error" },
@@ -770,19 +784,19 @@ function SiteAnalyticsView() {
           />
         </div>
       )}
-      {data && tab === "checkout" && (
+      {isReady && tab === "checkout" && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-            <Kpi label="Started checkout" value={data.kpis.started.toLocaleString()} />
-            <Kpi label="Purchased" value={data.kpis.purchased.toLocaleString()} />
-            <Kpi label="Checkout conversion" value={pctText(data.kpis.conversionRate)} />
-            <Kpi label="Abandoned" value={data.kpis.abandoned.toLocaleString()} hint={`${pctText(data.kpis.abandonRate)} of checkouts`} />
-            <Kpi label="Saw an error" value={data.kpis.errorSessions.toLocaleString()} />
+            <Kpi label="Started checkout" value={fmtNum(data.kpis?.started)} />
+            <Kpi label="Purchased" value={fmtNum(data.kpis?.purchased)} />
+            <Kpi label="Checkout conversion" value={pctText(data.kpis?.conversionRate)} />
+            <Kpi label="Abandoned" value={fmtNum(data.kpis?.abandoned)} hint={`${pctText(data.kpis?.abandonRate)} of checkouts`} />
+            <Kpi label="Saw an error" value={fmtNum(data.kpis?.errorSessions)} />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <DataTable
               title="Checkout funnel"
-              rows={data.steps}
+              rows={data.steps || []}
               columns={[
                 { key: "step", label: "Step" },
                 { key: "sessions", label: "Sessions" },
@@ -791,7 +805,7 @@ function SiteAnalyticsView() {
             />
             <DataTable
               title="Why shoppers left"
-              rows={data.reasons}
+              rows={data.reasons || []}
               empty="No abandoned checkouts for these filters."
               columns={[
                 { key: "reason", label: "Likely reason" },
@@ -802,7 +816,7 @@ function SiteAnalyticsView() {
           </div>
           <DataTable
             title="Last field touched before leaving"
-            rows={data.leftAt}
+            rows={data.leftAt || []}
             empty="No abandoned checkouts with field activity."
             columns={[
               { key: "field", label: "Field" },
@@ -812,7 +826,7 @@ function SiteAnalyticsView() {
           />
           <DataTable
             title="Checkout errors"
-            rows={data.errors}
+            rows={data.errors || []}
             empty="No checkout errors."
             columns={[
               { key: "type", label: "Type", render: (r) => (r.type === "api_error" ? "Request" : "Form") },
@@ -825,21 +839,21 @@ function SiteAnalyticsView() {
           <p className="text-[12px] text-[#646970]">Reasons are inferred from what a shopper did just before leaving, so they show likely causes, not confirmed ones.</p>
         </div>
       )}
-      {data && tab === "retention" && (
+      {isReady && tab === "retention" && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <Kpi label="Customers (first order in range)" value={data.kpis.cohortCustomers.toLocaleString()} />
-            <Kpi label="Bought again" value={pctText(data.kpis.repeatRate)} hint="Ever, to date" />
-            <Kpi label="Bought again within 30 days" value={pctText(data.kpis.repeat30Rate)} />
-            <Kpi label="Bought again within 90 days" value={pctText(data.kpis.repeat90Rate)} />
-            <Kpi label="Median days to second order" value={data.kpis.medianDaysToSecondOrder} />
-            <Kpi label="Avg orders per customer" value={data.kpis.avgOrders} />
-            <Kpi label="Avg lifetime revenue" value={fmtMoney(data.kpis.avgRevenue)} />
-            <Kpi label="Accounts created → purchased" value={`${data.kpis.accountsCreated} → ${data.kpis.accountsPurchased}`} />
+            <Kpi label="Customers (first order in range)" value={fmtNum(data.kpis?.cohortCustomers)} />
+            <Kpi label="Bought again" value={pctText(data.kpis?.repeatRate)} hint="Ever, to date" />
+            <Kpi label="Bought again within 30 days" value={pctText(data.kpis?.repeat30Rate)} />
+            <Kpi label="Bought again within 90 days" value={pctText(data.kpis?.repeat90Rate)} />
+            <Kpi label="Median days to second order" value={data.kpis?.medianDaysToSecondOrder ?? "—"} />
+            <Kpi label="Avg orders per customer" value={data.kpis?.avgOrders ?? "0"} />
+            <Kpi label="Avg lifetime revenue" value={fmtMoney(data.kpis?.avgRevenue)} />
+            <Kpi label="Accounts created → purchased" value={`${data.kpis?.accountsCreated || 0} → ${data.kpis?.accountsPurchased || 0}`} />
           </div>
           <DataTable
             title="Monthly cohorts"
-            rows={data.cohorts}
+            rows={data.cohorts || []}
             columns={[
               { key: "month", label: "First order month" },
               { key: "customers", label: "Customers" },
@@ -851,7 +865,7 @@ function SiteAnalyticsView() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <DataTable
               title="First visit: where customers came from"
-              rows={data.firstTouch}
+              rows={data.firstTouch || []}
               columns={[
                 { key: "source", label: "Source" },
                 { key: "customers", label: "Customers" },
@@ -861,7 +875,7 @@ function SiteAnalyticsView() {
             />
             <DataTable
               title="Last visit before the repeat order"
-              rows={data.lastTouch}
+              rows={data.lastTouch || []}
               empty="No repeat orders yet."
               columns={[
                 { key: "source", label: "Source" },
@@ -872,16 +886,16 @@ function SiteAnalyticsView() {
           <p className="text-[12px] text-[#646970]">Only the date range applies on this tab. Customers count when their first order falls in the range. Guest orders aren't linked to an account, and visit sources only exist for visits made while logged in.</p>
         </div>
       )}
-      {data && tab === "friction" && (
+      {isReady && tab === "friction" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            <Kpi label="Dead clicks" value={data.kpis.deadClicks.toLocaleString()} hint="Clicks that got no response" />
-            <Kpi label="Rage-click bursts" value={data.kpis.rageBursts.toLocaleString()} hint="Three or more rapid clicks on one element" />
-            <Kpi label="Sessions with friction" value={pctText(data.kpis.sessionsHitPct)} hint={data.kpis.sessionsHit + " sessions"} />
+            <Kpi label="Dead clicks" value={fmtNum(data.kpis?.deadClicks)} hint="Clicks that got no response" />
+            <Kpi label="Rage-click bursts" value={fmtNum(data.kpis?.rageBursts)} hint="Three or more rapid clicks on one element" />
+            <Kpi label="Sessions with friction" value={pctText(data.kpis?.sessionsHitPct)} hint={(data.kpis?.sessionsHit || 0) + " sessions"} />
           </div>
           <DataTable
             title="Friction points"
-            rows={data.rows}
+            rows={data.rows || []}
             empty="No dead or rage clicks recorded for these filters."
             columns={[
               { key: "type", label: "Type", render: (r) => (r.type === "rage_click" ? "Rage click" : "Dead click") },
@@ -894,27 +908,27 @@ function SiteAnalyticsView() {
           <p className="text-[12px] text-[#646970]">A dead click is a click on a button or link that gave no visible response within 1.5 seconds. A rage click is three or more rapid clicks on the same element.</p>
         </div>
       )}
-      {data && tab === "heatmap" && (
+      {isReady && tab === "heatmap" && (
         <div className="space-y-6">
           <div className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1 min-w-[260px]">
               <span className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Page</span>
               <select
-                value={data.path}
+                value={data.path || ""}
                 onChange={(e) => setParams({ heatPath: e.target.value })}
                 className="border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[12px] bg-white"
               >
-                {data.pages.length === 0 && <option value="">No clicks yet</option>}
-                {data.pages.map((p) => (
+                {(data.pages || []).length === 0 && <option value="">No clicks yet</option>}
+                {(data.pages || []).map((p) => (
                   <option key={p.path} value={p.path}>{p.path} ({p.clicks} clicks)</option>
                 ))}
               </select>
             </label>
-            <p className="text-[12px] text-[#646970]">{data.total.toLocaleString()} clicks on this page</p>
+            <p className="text-[12px] text-[#646970]">{fmtNum(data.total)} clicks on this page</p>
           </div>
           <Panel title="Click heatmap">
             <div className="p-4">
-              {data.rows === 0 ? (
+              {!data.rows ? (
                 <p className="text-center italic text-[#8c8f94] text-[12px] py-10">No clicks recorded for this page yet.</p>
               ) : (
                 <HeatGrid data={data} />
@@ -924,10 +938,10 @@ function SiteAnalyticsView() {
           </Panel>
         </div>
       )}
-      {data && tab === "live" && (
+      {isReady && tab === "live" && (
         <DataTable
-          title={`Live now (${data.count} active in the last 5 minutes)`}
-          rows={data.sessions}
+          title={`Live now (${fmtNum(data.count)} active in the last 5 minutes)`}
+          rows={data.sessions || []}
           empty="No visitors are active right now. This list refreshes every 15 seconds."
           columns={[
             { key: "visitorId", label: "Visitor", render: (r) => <span className="font-mono text-[11px]">{r.visitorId.slice(0, 8)}…</span> },
