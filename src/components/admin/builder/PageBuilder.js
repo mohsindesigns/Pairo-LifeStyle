@@ -304,7 +304,21 @@ export default function PageBuilder({ initialPage }) {
       case "textarea":
         return <textarea rows={3} value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} resize-none`} />;
       case "number":
-        return <input type="number" min={1} max={12} value={value !== undefined && value !== null ? value : (field.default ?? 1)} onChange={(e) => onChange(Number(e.target.value))} className={inputClass} />;
+        return (
+          <input
+            type="number"
+            min={field.min !== undefined ? field.min : 0}
+            max={field.max !== undefined ? field.max : undefined}
+            step={field.step || "any"}
+            placeholder={field.placeholder || ""}
+            value={value !== undefined && value !== null ? value : (field.default !== undefined ? field.default : "")}
+            onChange={(e) => {
+              const v = e.target.value;
+              onChange(v === "" ? "" : Number(v));
+            }}
+            className={inputClass}
+          />
+        );
       case "image":
         return (
           <div className="flex flex-col gap-2">
@@ -338,7 +352,12 @@ export default function PageBuilder({ initialPage }) {
             {opts.length === 0 && <span className="text-[11px] text-gray-400 italic p-2">No options available</span>}
             {opts.map(opt => (
               <label key={opt.value} className="flex items-center gap-2 text-[13px] hover:bg-gray-50 px-2 py-1 cursor-pointer transition-colors rounded">
-                <input type="checkbox" className="rounded-sm border-gray-300 text-[#2271b1] focus:ring-[#2271b1]" checked={selected.includes(opt.value)} onChange={(e) => onChange(e.target.checked ? [...selected, opt.value] : selected.filter(v => v !== opt.value))} />
+                <input
+                  type="checkbox"
+                  className="rounded-sm border-gray-300 text-[#2271b1] focus:ring-[#2271b1]"
+                  checked={selected.some(v => String(v) === String(opt.value))}
+                  onChange={(e) => onChange(e.target.checked ? [...selected, opt.value] : selected.filter(v => String(v) !== String(opt.value)))}
+                />
                 <span>{opt.label}</span>
               </label>
             ))}

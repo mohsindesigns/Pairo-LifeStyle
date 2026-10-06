@@ -36,7 +36,9 @@ function RangeBlock({ range, index, layout, columns, exploreLabel, showCount, al
     setItems(range.randomize ? shuffle(range.products || []) : range.products || []);
   }, [range.products, range.randomize]);
 
-  const exploreHref = `/shop?priceMin=${range.minPrice}${range.maxPrice !== null && range.maxPrice !== undefined ? `&priceMax=${range.maxPrice}` : ""}`;
+  const exploreHref = range.categorySlug
+    ? `/shop?category=${encodeURIComponent(range.categorySlug)}&priceMin=${range.minPrice || 0}${range.maxPrice !== null && range.maxPrice !== undefined ? `&priceMax=${range.maxPrice}` : ""}`
+    : `/shop?priceMin=${range.minPrice || 0}${range.maxPrice !== null && range.maxPrice !== undefined ? `&priceMax=${range.maxPrice}` : ""}`;
   const countText = `${range.total} ${range.total === 1 ? "piece" : "pieces"}`;
 
   return (

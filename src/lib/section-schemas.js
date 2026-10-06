@@ -112,6 +112,8 @@ export const SECTION_SCHEMAS = {
         { name: "badge", label: "Badge (optional, e.g. Best Seller)", type: "text" },
         { name: "minPrice", label: "Min Price ($)", type: "number" },
         { name: "maxPrice", label: "Max Price ($) - leave empty for no upper limit", type: "number" },
+        { name: "category", label: "Filter by Particular Category (optional)", type: "select", options: "categories" },
+        { name: "productIds", label: "Select Particular Products for this range (optional)", type: "multiselect", options: "products" },
         { name: "sort", label: "Product order", type: "select", default: "shuffle", options: [
           { label: "Shuffle", value: "shuffle" },
           { label: "Newest first", value: "newest" },

@@ -110,6 +110,29 @@ export async function resolvePageSections(sections) {
           if (max !== null) priceQuery.$lte = max;
           const baseQuery = { isDeleted: false, status: 'Published', price: priceQuery };
 
+          // Filter by particular Category if chosen
+          let categorySlug = null;
+          if (range.category) {
+            try {
+              const mongoose = (await import("mongoose")).default;
+              const Category = mongoose.models.Category || (await import("@/models/Category")).default;
+              const catDoc = await Category.findById(range.category).lean().catch(() => null);
+              if (catDoc) categorySlug = catDoc.slug;
+            } catch {
+              // Ignore
+            }
+            baseQuery.$or = [
+              { categories: range.category },
+              { primaryCategory: range.category },
+              { category: range.category }
+            ];
+          }
+
+          // Filter by particular Products if chosen
+          if (Array.isArray(range.productIds) && range.productIds.length > 0) {
+            baseQuery._id = { $in: range.productIds };
+          }
+
           const sortKey = range.sort || 'shuffle';
           const randomize = sortKey === 'shuffle' && shuffleAll;
           const sortSpec = sortKey === 'price_asc' ? { price: 1 } : sortKey === 'price_desc' ? { price: -1 } : { createdAt: -1 };
@@ -133,6 +156,8 @@ export async function resolvePageSections(sections) {
             badge: range.badge || '',
             minPrice: min,
             maxPrice: max,
+            category: range.category || null,
+            categorySlug: categorySlug || null,
             total,
             randomize,
             products: JSON.parse(JSON.stringify(picked.map((p) => ({ ...p, imageAlts: altMap })))),

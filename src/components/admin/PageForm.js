@@ -403,6 +403,22 @@ export default function PageForm({ pageId }) {
       switch (field.type) {
          case "text":
             return <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} />;
+         case "number":
+            return (
+               <input
+                  type="number"
+                  value={value !== undefined && value !== null ? value : ""}
+                  onChange={(e) => {
+                     const v = e.target.value;
+                     onChange(v === "" ? "" : Number(v));
+                  }}
+                  min={field.min !== undefined ? field.min : 0}
+                  max={field.max !== undefined ? field.max : undefined}
+                  step={field.step || "any"}
+                  placeholder={field.placeholder || ""}
+                  className={inputClass}
+               />
+            );
          case "textarea":
             return <textarea rows={3} value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} resize-none`} />;
          case "image":
@@ -460,11 +476,11 @@ export default function PageForm({ pageId }) {
                         <input
                            type="checkbox"
                            className="rounded-sm border-gray-300 text-[#2271b1] focus:ring-[#2271b1]"
-                           checked={selected.includes(opt.value)}
+                           checked={selected.some(v => String(v) === String(opt.value))}
                            onChange={(e) => onChange(
                               e.target.checked
                                  ? [...selected, opt.value]
-                                 : selected.filter(v => v !== opt.value)
+                                 : selected.filter(v => String(v) !== String(opt.value))
                            )}
                         />
                         <span>{opt.label}</span>
