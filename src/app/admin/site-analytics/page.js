@@ -31,6 +31,7 @@ import {
   User,
   Globe,
   AlertCircle,
+  History,
   X 
 } from "lucide-react";
 
@@ -350,6 +351,7 @@ function describeEvent(e) {
 function JourneyPanel({ visitorId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expandedSessions, setExpandedSessions] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -357,7 +359,17 @@ function JourneyPanel({ visitorId, onClose }) {
     fetch(`/api/admin/site-analytics/visitor?visitorId=${encodeURIComponent(visitorId)}`)
       .then((r) => r.json())
       .then((d) => {
-        if (!cancelled) setData(d.success ? d : null);
+        if (!cancelled) {
+          if (d.success) {
+            setData(d);
+            // Default: Only expand the latest session (first item), older sessions start collapsed
+            if (d.sessions && d.sessions.length > 0) {
+              setExpandedSessions({ [d.sessions[0].session.sessionId]: true });
+            }
+          } else {
+            setData(null);
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setData(null);
@@ -378,39 +390,62 @@ function JourneyPanel({ visitorId, onClose }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  const toggleSession = (sessionId) => {
+    setExpandedSessions((prev) => ({
+      ...prev,
+      [sessionId]: !prev[sessionId],
+    }));
+  };
+
+  const expandAllSessions = () => {
+    if (!data?.sessions) return;
+    const all = {};
+    data.sessions.forEach((s) => {
+      all[s.session.sessionId] = true;
+    });
+    setExpandedSessions(all);
+  };
+
+  const collapseOlderSessions = () => {
+    if (!data?.sessions || data.sessions.length === 0) return;
+    setExpandedSessions({
+      [data.sessions[0].session.sessionId]: true,
+    });
+  };
+
   const totalSessions = data?.sessions?.length || 0;
   const totalViews = data?.sessions?.reduce((acc, s) => acc + (s.pageViews?.length || 0), 0) || 0;
   const totalActiveMs = data?.sessions?.reduce((acc, s) => acc + (s.session?.activeMs || 0), 0) || 0;
   const hasConverted = data?.sessions?.some((s) => s.session?.conversionCount > 0);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-xs flex justify-end animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[99999] overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-150">
       {/* Background click overlay */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      {/* Slide-over Drawer Panel */}
-      <div className="relative w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-200">
+      {/* Slide-over Drawer Panel - Fixed Viewport Bounds */}
+      <div className="relative w-full max-w-full sm:max-w-xl md:max-w-2xl h-screen max-h-screen bg-white shadow-2xl flex flex-col z-10 box-border overflow-hidden animate-in slide-in-from-right duration-200">
         {/* Drawer Header */}
-        <div className="p-4 sm:p-5 border-b border-[#c3c4c7] bg-[#f6f7f7] flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#2271b1] text-white flex items-center justify-center font-bold text-[14px] shadow-xs shrink-0">
-              {data?.user?.name ? data.user.name.slice(0, 2).toUpperCase() : <User className="w-5 h-5" />}
+        <div className="p-3.5 sm:p-4 border-b border-[#c3c4c7] bg-[#f6f7f7] flex items-center justify-between gap-3 shrink-0 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-9 h-9 rounded-full bg-[#2271b1] text-white flex items-center justify-center font-bold text-[13px] shadow-xs shrink-0">
+              {data?.user?.name ? data.user.name.slice(0, 2).toUpperCase() : <User className="w-4 h-4" />}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-[15px] font-bold text-[#1d2327]">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h3 className="text-[14px] font-bold text-[#1d2327] truncate">
                   {data?.user ? data.user.name : "Guest Visitor"}
                 </h3>
                 {hasConverted && (
-                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                     Converted
                   </span>
                 )}
               </div>
-              <p className="text-[12px] text-[#646970] mt-0.5 font-mono truncate max-w-md">
+              <p className="text-[11px] text-[#646970] mt-0.5 font-mono truncate min-w-0">
                 {data?.user?.email ? (
-                  <span>{data.user.email} · ID: {visitorId.slice(0, 10)}…</span>
+                  <span>{data.user.email} · <span className="opacity-70">ID: {visitorId.slice(0, 10)}…</span></span>
                 ) : (
                   <span>Visitor ID: {visitorId}</span>
                 )}
@@ -421,7 +456,7 @@ function JourneyPanel({ visitorId, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-[3px] transition-colors cursor-pointer"
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-[3px] transition-colors cursor-pointer shrink-0"
             title="Close Drawer (Esc)"
           >
             <X className="w-5 h-5" />
@@ -429,23 +464,23 @@ function JourneyPanel({ visitorId, onClose }) {
         </div>
 
         {/* Quick Highlights Summary Strip */}
-        <div className="grid grid-cols-3 border-b border-[#e5e5e5] bg-white divide-x divide-[#e5e5e5] text-center py-2.5">
-          <div>
+        <div className="grid grid-cols-3 border-b border-[#e5e5e5] bg-white divide-x divide-[#e5e5e5] text-center py-2.5 shrink-0 text-[#1d2327]">
+          <div className="px-2">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Sessions</div>
-            <div className="text-[16px] font-bold text-[#1d2327] mt-0.5">{totalSessions}</div>
+            <div className="text-[15px] font-bold text-[#1d2327] mt-0.5">{totalSessions}</div>
           </div>
-          <div>
+          <div className="px-2">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Pageviews</div>
-            <div className="text-[16px] font-bold text-[#1d2327] mt-0.5">{totalViews}</div>
+            <div className="text-[15px] font-bold text-[#1d2327] mt-0.5">{totalViews}</div>
           </div>
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Total Dwell Time</div>
-            <div className="text-[16px] font-bold text-[#1d2327] mt-0.5">{fmtDuration(totalActiveMs)}</div>
+          <div className="px-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Total Dwell</div>
+            <div className="text-[15px] font-bold text-[#1d2327] mt-0.5">{fmtDuration(totalActiveMs)}</div>
           </div>
         </div>
 
         {/* Scrollable Content: Sessions & Journey Steps */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6 bg-[#f8f9fa]">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 sm:p-4 space-y-4 bg-[#f8f9fa] min-w-0">
           {loading && (
             <div className="p-12 text-center text-[13px] text-[#646970] italic">
               Loading visitor chronological timeline…
@@ -453,44 +488,102 @@ function JourneyPanel({ visitorId, onClose }) {
           )}
 
           {!loading && !data && (
-            <div className="p-8 text-center bg-red-50 text-red-700 border border-red-200 rounded text-[13px]">
+            <div className="p-6 text-center bg-red-50 text-red-700 border border-red-200 rounded text-[13px]">
               Could not load visitor journey details.
             </div>
           )}
 
           {!loading && data && data.sessions?.length === 0 && (
-            <div className="p-8 text-center text-gray-500 italic text-[13px]">
+            <div className="p-6 text-center text-gray-500 italic text-[13px]">
               No sessions found for this visitor.
+            </div>
+          )}
+
+          {/* Multiple Sessions Toolbar */}
+          {!loading && totalSessions > 1 && (
+            <div className="flex items-center justify-between gap-2 px-1 text-[12px] bg-white border border-[#e5e5e5] rounded-[4px] p-2.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 font-semibold text-[#1d2327]">
+                <History className="w-3.5 h-3.5 text-[#2271b1]" />
+                <span>{totalSessions} Visits Recorded</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={collapseOlderSessions}
+                  className="text-[#50575e] hover:text-[#1d2327] hover:underline font-medium cursor-pointer"
+                  title="Keep only the latest session open and collapse earlier visits"
+                >
+                  Latest Only
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={expandAllSessions}
+                  className="text-[#2271b1] hover:underline font-semibold cursor-pointer"
+                  title="Expand all visits in full"
+                >
+                  Expand All
+                </button>
+              </div>
             </div>
           )}
 
           {!loading &&
             data?.sessions?.map(({ session, pageViews, unassigned }, sIdx) => {
+              const isLatest = sIdx === 0;
+              const isExpanded = !!expandedSessions[session.sessionId];
               const isConvertedSession = session.conversionCount > 0;
+              const sessionNum = data.sessions.length - sIdx;
+
               return (
                 <div
                   key={session.sessionId}
-                  className="bg-white border border-[#dcdcde] rounded-[4px] shadow-xs overflow-hidden"
+                  className={`bg-white border rounded-[4px] shadow-xs overflow-hidden transition-all ${
+                    isLatest
+                      ? "border-[#2271b1]/50 ring-1 ring-[#2271b1]/20"
+                      : "border-[#dcdcde]"
+                  }`}
                 >
-                  {/* Session Card Header */}
-                  <div className="p-3.5 bg-[#f6f7f7] border-b border-[#e5e5e5]">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-[#1d2327] text-white text-[10px] font-bold flex items-center justify-center">
-                          {data.sessions.length - sIdx}
+                  {/* Session Card Header / Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => toggleSession(session.sessionId)}
+                    className={`w-full text-left p-3 sm:p-3.5 transition-colors cursor-pointer select-none flex flex-col gap-2 min-w-0 ${
+                      isLatest ? "bg-white hover:bg-slate-50/80" : "bg-[#fbfbfb] hover:bg-[#f3f4f6]"
+                    }`}
+                    aria-expanded={isExpanded}
+                  >
+                    {/* Top Row: Chevron, Session Badge, Time, and Status Badges */}
+                    <div className="flex items-center justify-between gap-2 w-full min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-[#8c8f94] shrink-0">
+                          {isExpanded ? (
+                            <ChevronUp className="w-4 h-4 text-[#2271b1]" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
                         </span>
-                        <span className="font-bold text-[13px] text-[#1d2327]">
-                          Session {data.sessions.length - sIdx}
-                        </span>
-                        <span className="text-[11px] text-[#646970] flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-[#8c8f94]" />
-                          {fmtWhen(session.startedAt)}
+
+                        {isLatest ? (
+                          <span className="bg-[#2271b1] text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            Latest Visit
+                          </span>
+                        ) : (
+                          <span className="bg-[#e0e2e5] text-[#2c3338] text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            Visit #{sessionNum}
+                          </span>
+                        )}
+
+                        <span className="text-[12px] font-bold text-[#1d2327] truncate flex items-center gap-1.5 min-w-0">
+                          <Clock className="w-3.5 h-3.5 text-[#8c8f94] shrink-0" />
+                          <span className="truncate">{fmtWhen(session.startedAt)}</span>
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-[11px]">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         {isConvertedSession && (
-                          <span className="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px]">
+                          <span className="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
                             Converted
                           </span>
                         )}
@@ -499,140 +592,181 @@ function JourneyPanel({ visitorId, onClose }) {
                             Bounced
                           </span>
                         )}
+                        <span className="text-[11px] text-[#646970] font-medium hidden sm:inline-block">
+                          {pageViews.length} {pageViews.length === 1 ? "page" : "pages"} · {fmtDuration(session.activeMs)}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Session Metadata Badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px] text-[#50575e]">
-                      <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] font-medium flex items-center gap-1">
-                        <Globe className="w-3 h-3 text-[#2271b1]" />
-                        Source: {session.source || "Direct"}{session.medium ? ` / ${session.medium}` : ""}
+                    {/* Metadata Summary Line */}
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#50575e] pl-6 min-w-0">
+                      <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] font-medium flex items-center gap-1 truncate max-w-full">
+                        <Globe className="w-3 h-3 text-[#2271b1] shrink-0" />
+                        <span className="truncate">
+                          Source: {session.source || "Direct"}{session.medium ? ` / ${session.medium}` : ""}
+                        </span>
                       </span>
-                      <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] capitalize">
+
+                      <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] capitalize truncate">
                         {session.device || "Desktop"} · {session.browser || "Browser"}
                       </span>
+
                       {session.country && (
-                        <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px]">
+                        <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] shrink-0">
                           {session.country}
                         </span>
                       )}
-                      <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] font-semibold text-[#1d2327]">
-                        {session.pageViews} pages · {fmtDuration(session.activeMs)} active · {session.clickCount || 0} clicks
+
+                      <span className="text-[11px] text-[#646970] sm:hidden">
+                        {pageViews.length} pages · {fmtDuration(session.activeMs)}
                       </span>
+
+                      {!isExpanded && (
+                        <span className="ml-auto text-[11px] text-[#2271b1] font-semibold flex items-center gap-0.5 shrink-0">
+                          <span>View steps</span>
+                          <ChevronDown className="w-3 h-3" />
+                        </span>
+                      )}
                     </div>
-                  </div>
+                  </button>
 
-                  {/* Step-by-Step Chronological Journey Timeline */}
-                  <div className="p-4 space-y-4">
-                    {pageViews.length === 0 ? (
-                      <p className="text-[12px] text-gray-400 italic">No page navigation captured.</p>
-                    ) : (
-                      <div className="relative border-l-2 border-[#e5e5e5] ml-3.5 space-y-4 py-1">
-                        {pageViews.map((pv, pIdx) => (
-                          <div key={pv._id} className="relative pl-6">
-                            {/* Step Node Dot */}
-                            <div className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-[#2271b1]" />
+                  {/* Expanded Step-by-Step Chronological Journey Timeline */}
+                  {isExpanded && (
+                    <div className="border-t border-[#e5e5e5] p-3 sm:p-4 bg-white space-y-4">
+                      {pageViews.length === 0 ? (
+                        <p className="text-[12px] text-gray-400 italic pl-2">No page navigation captured for this session.</p>
+                      ) : (
+                        <div className="relative border-l-2 border-[#2271b1]/30 ml-3.5 space-y-4 py-1">
+                          {pageViews.map((pv, pIdx) => (
+                            <div key={pv._id} className="relative pl-5 sm:pl-6">
+                              {/* Step Node Dot */}
+                              <div className="absolute -left-[7px] top-2 w-3 h-3 rounded-full bg-white border-2 border-[#2271b1] shadow-xs" />
 
-                            {/* Page View Card */}
-                            <div className="bg-[#fbfbfb] border border-[#e5e5e5] rounded-[3px] p-3 text-[12px] space-y-2">
-                              {/* Page Header */}
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="bg-[#f0f6fb] text-[#135e96] border border-[#c5d9e8] text-[10px] font-bold px-1.5 py-0.2 rounded uppercase">
-                                    {pv.pageType || "Page"}
-                                  </span>
-                                  <a
-                                    href={pv.path}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="font-mono font-bold text-[#1d2327] hover:text-[#2271b1] hover:underline break-all"
-                                  >
-                                    {pv.path}
-                                  </a>
-                                </div>
-                                <span className="text-[11px] text-[#8c8f94]">
-                                  {fmtWhen(pv.enteredAt)}
-                                </span>
-                              </div>
-
-                              {/* Engagement details */}
-                              <div className="flex items-center gap-3 text-[11px] text-[#646970]">
-                                <span>Engaged: {fmtDuration(pv.engagedMs)}</span>
-                                <span>·</span>
-                                <span>Scroll: {Math.round(pv.maxScrollPct || 0)}%</span>
-                              </div>
-
-                              {/* On-Page Child Actions / Events */}
-                              {pv.activity?.length > 0 && (
-                                <div className="pt-2 border-t border-[#f0f0f1] space-y-1.5">
-                                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#8c8f94]">
-                                    Actions on this page ({pv.activity.length})
+                              {/* Page View Card */}
+                              <div className="bg-[#fcfcfc] border border-[#e5e5e5] rounded-[4px] p-3 text-[12px] space-y-2.5 shadow-2xs hover:border-[#ccd0d4] transition-colors">
+                                {/* Page Header */}
+                                <div className="flex flex-wrap items-start justify-between gap-2 min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <span className="bg-[#1d2327] text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                      Step {pIdx + 1}
+                                    </span>
+                                    <span className="bg-[#f0f6fb] text-[#135e96] border border-[#c5d9e8] text-[10px] font-bold px-1.5 py-0.2 rounded uppercase shrink-0">
+                                      {pv.pageType || "Page"}
+                                    </span>
+                                    <a
+                                      href={pv.path}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="font-mono font-bold text-[#1d2327] hover:text-[#2271b1] hover:underline break-all inline-flex items-center gap-1"
+                                    >
+                                      <span>{pv.path}</span>
+                                      <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
+                                    </a>
                                   </div>
-                                  {pv.activity.map((act, aIdx) => {
-                                    const parsed = describeEvent(act);
-                                    const ActIcon = parsed.icon;
-                                    return (
-                                      <div
-                                        key={aIdx}
-                                        className={`flex items-start gap-2 p-1.5 rounded-[2px] border text-[11px] ${parsed.color}`}
-                                      >
-                                        <ActIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                                        <div className="flex-1">
-                                          <div className="font-semibold">{parsed.title}</div>
-                                          {parsed.detail && (
-                                            <div className="text-[10px] opacity-80 mt-0.5">
-                                              {parsed.detail}
-                                            </div>
-                                          )}
-                                        </div>
-                                        <span className="text-[9px] opacity-70 whitespace-nowrap">
-                                          {fmtWhen(act.createdAt).slice(-8)}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
 
-                    {/* Unassigned Session Actions */}
-                    {unassigned?.length > 0 && (
-                      <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-[3px] text-[11px] space-y-1.5">
-                        <div className="font-bold text-[#646970]">Other Session Events</div>
-                        {unassigned.map((e, idx) => {
-                          const parsed = describeEvent(e);
-                          const ActIcon = parsed.icon;
-                          return (
-                            <div key={idx} className="flex items-center gap-2 text-[#1d2327]">
-                              <ActIcon className="w-3 h-3 text-[#8c8f94]" />
-                              <span>{parsed.title}</span>
-                              <span className="text-[10px] text-[#8c8f94] ml-auto">
-                                {fmtWhen(e.createdAt)}
-                              </span>
+                                  <span className="text-[11px] text-[#8c8f94] shrink-0 font-medium">
+                                    {fmtWhen(pv.enteredAt)}
+                                  </span>
+                                </div>
+
+                                {/* Engagement details */}
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#50575e] bg-white p-2 rounded border border-[#f0f0f1]">
+                                  <span className="flex items-center gap-1 font-medium">
+                                    <Clock className="w-3 h-3 text-[#2271b1]" />
+                                    Time on page: <strong className="text-[#1d2327]">{fmtDuration(pv.engagedMs)}</strong>
+                                  </span>
+                                  <span>·</span>
+                                  <span className="flex items-center gap-1 font-medium">
+                                    Scroll depth: <strong className="text-[#1d2327]">{Math.round(pv.maxScrollPct || 0)}%</strong>
+                                  </span>
+                                  {pv.referrer && (
+                                    <>
+                                      <span>·</span>
+                                      <span className="text-[#8c8f94] truncate max-w-xs" title={pv.referrer}>
+                                        From: {pv.referrer}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+
+                                {/* On-Page Child Actions / Events */}
+                                {pv.activity?.length > 0 && (
+                                  <div className="pt-2 border-t border-[#f0f0f1] space-y-1.5">
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#8c8f94] flex items-center justify-between">
+                                      <span>Actions Captured on Page ({pv.activity.length})</span>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      {pv.activity.map((act, aIdx) => {
+                                        const parsed = describeEvent(act);
+                                        const ActIcon = parsed.icon;
+                                        return (
+                                          <div
+                                            key={aIdx}
+                                            className={`flex items-start gap-2 p-2 rounded-[3px] border text-[11px] ${parsed.color}`}
+                                          >
+                                            <ActIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="font-semibold break-words">{parsed.title}</div>
+                                              {parsed.detail && (
+                                                <div className="text-[10px] opacity-85 mt-0.5 break-words">
+                                                  {parsed.detail}
+                                                </div>
+                                              )}
+                                            </div>
+                                            <span className="text-[10px] opacity-75 shrink-0 font-mono">
+                                              {fmtWhen(act.createdAt).slice(-8)}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Unassigned Session Actions */}
+                      {unassigned?.length > 0 && (
+                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-[3px] text-[11px] space-y-1.5">
+                          <div className="font-bold text-[#646970] text-[10px] uppercase tracking-wider">
+                            Other Session Events ({unassigned.length})
+                          </div>
+                          <div className="space-y-1">
+                            {unassigned.map((e, idx) => {
+                              const parsed = describeEvent(e);
+                              const ActIcon = parsed.icon;
+                              return (
+                                <div key={idx} className="flex items-center gap-2 text-[#1d2327]">
+                                  <ActIcon className="w-3 h-3 text-[#8c8f94] shrink-0" />
+                                  <span className="truncate">{parsed.title}</span>
+                                  <span className="text-[10px] text-[#8c8f94] ml-auto shrink-0 font-mono">
+                                    {fmtWhen(e.createdAt)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
         </div>
 
         {/* Drawer Footer */}
-        <div className="p-3 bg-[#f6f7f7] border-t border-[#c3c4c7] flex items-center justify-between text-[11px] text-[#646970]">
-          <span>Full Event Telemetry Feed</span>
+        <div className="p-3 sm:p-3.5 bg-[#f6f7f7] border-t border-[#c3c4c7] flex items-center justify-between text-[11px] text-[#646970] shrink-0">
+          <span className="truncate">Visitor Journey Telemetry</span>
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1 bg-[#2271b1] text-white font-semibold rounded-[3px] hover:bg-[#135e96] transition-colors cursor-pointer"
+            className="px-3.5 py-1.5 bg-[#2271b1] text-white font-semibold rounded-[3px] hover:bg-[#135e96] transition-colors cursor-pointer shrink-0"
           >
-            Done
+            Close
           </button>
         </div>
       </div>
