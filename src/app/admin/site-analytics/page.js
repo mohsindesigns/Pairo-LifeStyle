@@ -5,26 +5,87 @@ import { usePathname, useRouter, useSearchParams, useParams } from "next/navigat
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { 
+  BarChart3, 
+  FileText, 
+  ShoppingBag, 
+  Users, 
+  Flame, 
+  Radio, 
+  RefreshCw, 
+  Filter, 
+  ChevronDown, 
+  ChevronUp, 
+  Monitor, 
+  Smartphone, 
+  Lock, 
+  ExternalLink,
+  X 
+} from "lucide-react";
 
-const TABS = [
-  { key: "overview", label: "Overview" },
-  { key: "pages", label: "Pages" },
-  { key: "sections", label: "Sections" },
-  { key: "clicks", label: "Clicks" },
-  { key: "products", label: "Products" },
-  { key: "categories", label: "Categories" },
-  { key: "prices", label: "Price ranges" },
-  { key: "search", label: "Search & forms" },
-  { key: "audience", label: "Audience" },
-  { key: "users", label: "Users & visitors" },
-  { key: "live", label: "Live" },
-  { key: "variants", label: "Size & colour" },
-  { key: "errors", label: "Errors" },
-  { key: "checkout", label: "Checkout" },
-  { key: "retention", label: "Repeat buyers" },
-  { key: "friction", label: "Friction" },
-  { key: "heatmap", label: "Heatmap" },
+const TAB_GROUPS = [
+  {
+    id: "overview",
+    label: "Overview",
+    icon: BarChart3,
+    tabs: [
+      { key: "overview", label: "Dashboard Overview" },
+    ],
+  },
+  {
+    id: "content",
+    label: "Pages & Content",
+    icon: FileText,
+    tabs: [
+      { key: "pages", label: "Pages" },
+      { key: "sections", label: "Page Sections" },
+      { key: "clicks", label: "Button & Link Clicks" },
+      { key: "search", label: "Search & Forms" },
+    ],
+  },
+  {
+    id: "ecommerce",
+    label: "E-Commerce",
+    icon: ShoppingBag,
+    tabs: [
+      { key: "products", label: "Products" },
+      { key: "categories", label: "Categories" },
+      { key: "prices", label: "Price Ranges" },
+      { key: "variants", label: "Sizes & Colours" },
+      { key: "checkout", label: "Checkout Funnel" },
+    ],
+  },
+  {
+    id: "audience",
+    label: "Audience & Traffic",
+    icon: Users,
+    tabs: [
+      { key: "audience", label: "Audience & Devices" },
+      { key: "users", label: "Visitors & Journeys" },
+      { key: "retention", label: "Repeat Buyers" },
+    ],
+  },
+  {
+    id: "heatmap",
+    label: "Heatmap & UX",
+    icon: Flame,
+    tabs: [
+      { key: "heatmap", label: "Click Heatmap" },
+      { key: "friction", label: "Friction & Rage Clicks" },
+      { key: "errors", label: "Errors" },
+    ],
+  },
+  {
+    id: "live",
+    label: "Live Traffic",
+    icon: Radio,
+    tabs: [
+      { key: "live", label: "Realtime Active" },
+    ],
+  },
 ];
+
+const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 
 const FUNNEL_LABELS = {
   view_item: "Viewed product",
@@ -471,19 +532,20 @@ function SiteAnalyticsView() {
             <button
               type="button"
               onClick={() => setShowMoreFilters(!showMoreFilters)}
-              className={`px-3 py-1.5 text-[12px] font-semibold border rounded-[3px] transition-colors flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 text-[12px] font-semibold border rounded-[3px] transition-colors flex items-center gap-1.5 cursor-pointer ${
                 secondaryActiveCount > 0 || showMoreFilters
                   ? "bg-[#f0f6fb] border-[#2271b1] text-[#2271b1]"
                   : "bg-[#f6f7f7] border-[#c3c4c7] text-[#2c3338] hover:bg-[#f0f0f1]"
               }`}
             >
+              <Filter className="w-3.5 h-3.5 text-[#2271b1]" />
               <span>More Filters</span>
               {secondaryActiveCount > 0 && (
                 <span className="bg-[#2271b1] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
                   {secondaryActiveCount}
                 </span>
               )}
-              <span className="text-[9px]">{showMoreFilters ? "▲" : "▼"}</span>
+              {showMoreFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           </div>
 
@@ -492,10 +554,11 @@ function SiteAnalyticsView() {
             <button
               type="button"
               onClick={() => setRefreshKey((k) => k + 1)}
-              className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[#2c3338] font-semibold transition-colors"
+              className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[#2c3338] font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
               title="Refresh data"
             >
-              ↻ Refresh
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh</span>
             </button>
             {(activeFilters.length > 0 || hasCustom || (rangeValue !== "30" && !hasCustom)) && (
               <button
@@ -506,9 +569,10 @@ function SiteAnalyticsView() {
                   p.set("range", "30");
                   router.replace(`${pathname}?${p.toString()}`, { scroll: false });
                 }}
-                className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-white hover:bg-[#f6f7f7] text-[#d63638] font-semibold transition-colors"
+                className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-white hover:bg-[#f6f7f7] text-[#d63638] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
               >
-                Reset
+                <X className="w-3.5 h-3.5" />
+                <span>Reset</span>
               </button>
             )}
           </div>
@@ -567,32 +631,57 @@ function SiteAnalyticsView() {
         )}
       </div>
 
-      {/* WordPress Nav-Tabs */}
-      <nav className="flex flex-wrap items-center gap-1 border-b border-[#c3c4c7] pt-1">
-        {TABS.map((t) => {
-          const isActive = tab === t.key;
-          const p = new URLSearchParams(searchParams.toString());
-          p.set("tab", t.key);
-          const href = `/admin/site-analytics?${p.toString()}`;
+      {/* WordPress Categorized Nav-Tabs */}
+      <div className="space-y-2">
+        <nav className="flex flex-wrap items-center gap-1.5 border-b border-[#c3c4c7] pb-0">
+          {TAB_GROUPS.map((group) => {
+            const isGroupActive = group.tabs.some((t) => t.key === tab);
+            return (
+              <button
+                key={group.id}
+                type="button"
+                onClick={() => setParams({ tab: group.tabs[0].key })}
+                className={`px-3.5 py-2 text-[13px] font-semibold rounded-t-[4px] transition-all flex items-center gap-2 cursor-pointer -mb-[1px] ${
+                  isGroupActive
+                    ? "bg-white border-t-2 border-t-[#2271b1] border-l border-r border-[#c3c4c7] border-b-white text-[#1d2327] shadow-xs"
+                    : "bg-[#f6f7f7] hover:bg-white text-[#50575e] hover:text-[#1d2327] border border-transparent"
+                }`}
+              >
+                <group.icon className={`w-4 h-4 ${isGroupActive ? "text-[#2271b1]" : "text-[#646970]"}`} />
+                <span>{group.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Secondary Sub-Tabs (WordPress subsubsub style) */}
+        {(() => {
+          const currentGroup = TAB_GROUPS.find((g) => g.tabs.some((t) => t.key === tab)) || TAB_GROUPS[0];
+          if (currentGroup.tabs.length <= 1) return null;
           return (
-            <Link
-              key={t.key}
-              href={href}
-              onClick={(e) => {
-                e.preventDefault();
-                setParams({ tab: t.key });
-              }}
-              className={`px-3 py-1.5 text-[13px] font-medium rounded-t-[3px] transition-all -mb-[1px] ${
-                isActive
-                  ? "bg-white border-t border-l border-r border-[#c3c4c7] border-b-white text-[#1d2327] font-bold shadow-xs"
-                  : "bg-[#f0f0f1] hover:bg-white/80 text-[#50575e] hover:text-[#1d2327] border border-transparent"
-              }`}
-            >
-              {t.label}
-            </Link>
+            <div className="flex flex-wrap items-center gap-1.5 py-1 px-1 text-[12px]">
+              <span className="text-[#646970] font-bold text-[11px] uppercase mr-1">Views:</span>
+              {currentGroup.tabs.map((t) => {
+                const isSubActive = tab === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setParams({ tab: t.key })}
+                    className={`px-2.5 py-1 rounded-[3px] font-medium transition cursor-pointer ${
+                      isSubActive
+                        ? "bg-[#2271b1] text-white font-bold shadow-xs"
+                        : "bg-white border border-[#dcdcde] text-[#50575e] hover:text-[#1d2327] hover:border-[#c3c4c7]"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
           );
-        })}
-      </nav>
+        })()}
+      </div>
 
       {(!isReady || loading) && !error && <div className="p-16 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">Crunching visitor data…</div>}
       {error && <div className="p-16 text-center text-[13px] text-red-500 font-bold bg-white border border-[#ccd0d4]">Failed to load this view.</div>}
@@ -1115,16 +1204,18 @@ function HeatmapTab({ data, setParams }) {
             <button
               type="button"
               onClick={() => setDeviceMode("desktop")}
-              className={`px-2.5 py-1 transition-colors ${deviceMode === "desktop" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+              className={`px-2.5 py-1 transition-colors flex items-center gap-1.5 cursor-pointer ${deviceMode === "desktop" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
             >
-              🖥 Desktop
+              <Monitor className="w-3.5 h-3.5" />
+              <span>Desktop</span>
             </button>
             <button
               type="button"
               onClick={() => setDeviceMode("mobile")}
-              className={`px-2.5 py-1 transition-colors ${deviceMode === "mobile" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
+              className={`px-2.5 py-1 transition-colors flex items-center gap-1.5 cursor-pointer ${deviceMode === "mobile" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
             >
-              📱 Mobile
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Mobile</span>
             </button>
           </div>
 
@@ -1277,7 +1368,7 @@ function HeatmapVisualizer({ data, deviceMode, showGrid, hoveredCell, setHovered
               <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f] inline-block" />
             </div>
             <div className="flex-1 max-w-md mx-auto bg-white border border-[#dcdcde] rounded px-2.5 py-0.5 text-[11px] font-mono text-[#50575e] truncate flex items-center gap-1.5">
-              <span className="text-emerald-600 text-[10px]">🔒</span>
+              <Lock className="w-3 h-3 text-emerald-600 shrink-0" />
               <span className="truncate">https://pairo-lifestyle.com{data.path || "/"}</span>
             </div>
             <span className="text-[10px] text-[#8c8f94] font-medium hidden sm:inline">
