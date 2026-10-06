@@ -29,6 +29,7 @@ function isEnabled() {
   try {
     if (localStorage.getItem(CONSENT_KEY) === "declined") return false;
     if (window.location.pathname.startsWith("/admin")) return false;
+    if (window.self !== window.top) return false;
   } catch {
     return false;
   }
