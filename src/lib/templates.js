@@ -15,6 +15,7 @@ export const TEMPLATE_REGISTRY = {
       "trust_badges",
       "dual_category_banner",
       "product_grid",
+      "price_range_showcase",
       "feature_marquee",
       "banner_feature",
       "category_showcase",

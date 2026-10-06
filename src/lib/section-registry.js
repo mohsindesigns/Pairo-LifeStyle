@@ -5,6 +5,7 @@ export const SECTION_REGISTRY = {
   trust_badges: dynamic(() => import("@/components/home/TrustBadges")),
   dual_category_banner: dynamic(() => import("@/components/home/DualCategoryBanner")),
   product_grid: dynamic(() => import("@/components/home/ProductSection")),
+  price_range_showcase: dynamic(() => import("@/components/home/PriceRangeShowcase")),
   feature_marquee: dynamic(() => import("@/components/home/FeatureMarquee")),
   banner_feature: dynamic(() => import("@/components/home/FeaturedBanner")),
   category_showcase: dynamic(() => import("@/components/home/CategoryBanner")),

@@ -311,6 +311,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
   // States for filters
   const [maxPrice, setMaxPrice] = useState(2000);
+  const [minPrice, setMinPrice] = useState(0);
   const [sliderValue, setSliderValue] = useState(2000);
   const [selectedColors, setSelectedColors] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -332,8 +333,12 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   // Sync price limits on product load
   useEffect(() => {
     if (products.length > 0) {
-      setMaxPrice(priceLimits.max);
-      setSliderValue(priceLimits.max);
+      const urlMax = searchParams.get("priceMax");
+      const urlMin = searchParams.get("priceMin");
+      const max = urlMax !== null && !Number.isNaN(Number(urlMax)) ? Number(urlMax) : priceLimits.max;
+      setMaxPrice(max);
+      setSliderValue(max);
+      setMinPrice(urlMin !== null && !Number.isNaN(Number(urlMin)) ? Number(urlMin) : 0);
     }
   }, [priceLimits, products.length]);
 
@@ -386,7 +391,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     }
 
     // Price filter
-    result = result.filter(p => p.price <= maxPrice);
+    result = result.filter(p => p.price <= maxPrice && p.price >= minPrice);
 
     // Color filter
     if (selectedColors.length > 0) {
@@ -460,7 +465,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     }
 
     return result;
-  }, [products, selectedCategory, maxPrice, selectedColors, selectedSizes, selectedTypes, selectedCustomAttrs, sortBy, searchQuery]);
+  }, [products, selectedCategory, maxPrice, minPrice, selectedColors, selectedSizes, selectedTypes, selectedCustomAttrs, sortBy, searchQuery]);
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
   const paginatedProducts = filteredProducts.slice(
@@ -547,6 +552,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setTimeout(() => {
       setSliderValue(priceLimits.max);
       setMaxPrice(priceLimits.max);
+      setMinPrice(0);
       setSelectedColors([]);
       setSelectedSizes([]);
       setSelectedTypes([]);
@@ -568,6 +574,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     if (selectedTypes.length > 0) count++;
     if (searchQuery.trim()) count++;
     if (maxPrice < priceLimits.max) count++;
+    if (minPrice > 0) count++;
     Object.keys(selectedCustomAttrs).forEach(k => {
       if (selectedCustomAttrs[k].length > 0) count++;
     });

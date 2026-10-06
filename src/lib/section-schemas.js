@@ -77,6 +77,54 @@ export const SECTION_SCHEMAS = {
       { name: "limit", label: "Product Limit (Collection only, Max 16)", type: "number", default: 16, dependsOn: "showType", visibleIf: "collection" }
     ]
   },
+  price_range_showcase: {
+    name: "Price Range Showcase",
+    icon: "ShoppingBag",
+    fields: [
+      { name: "eyebrow", label: "Eyebrow Text (small line above the title)", type: "text", default: "Shop by budget" },
+      { name: "title", label: "Section Title", type: "text", default: "Find your piece" },
+      { name: "subtitle", label: "Subtitle", type: "textarea" },
+      { name: "background", label: "Background", type: "select", default: "light", options: [
+        { label: "Light", value: "light" },
+        { label: "Dark", value: "dark" }
+      ]},
+      { name: "layout", label: "Product Layout", type: "select", default: "grid", options: [
+        { label: "Grid", value: "grid" },
+        { label: "Horizontal scroll", value: "scroller" }
+      ]},
+      { name: "columns", label: "Columns on desktop (grid layout)", type: "select", default: "4", options: [
+        { label: "2 columns", value: "2" },
+        { label: "3 columns", value: "3" },
+        { label: "4 columns", value: "4" }
+      ]},
+      { name: "productsPerRange", label: "Products shown per range (max 16)", type: "number", default: 8 },
+      { name: "exploreLabel", label: "Explore Button Text", type: "text", default: "Explore More" },
+      { name: "shuffle", label: "Shuffle products on every visit", type: "select", default: "yes", options: [
+        { label: "Yes", value: "yes" },
+        { label: "No", value: "no" }
+      ]},
+      { name: "showCount", label: "Show product count per range", type: "select", default: "yes", options: [
+        { label: "Yes", value: "yes" },
+        { label: "No", value: "no" }
+      ]},
+      { name: "ranges", label: "Price Ranges (add as many as you want)", type: "repeater", fields: [
+        { name: "label", label: "Range Label (e.g. Everyday Essentials)", type: "text" },
+        { name: "badge", label: "Badge (optional, e.g. Best Seller)", type: "text" },
+        { name: "minPrice", label: "Min Price ($)", type: "number" },
+        { name: "maxPrice", label: "Max Price ($) - leave empty for no upper limit", type: "number" },
+        { name: "sort", label: "Product order", type: "select", default: "shuffle", options: [
+          { label: "Shuffle", value: "shuffle" },
+          { label: "Newest first", value: "newest" },
+          { label: "Price: low to high", value: "price_asc" },
+          { label: "Price: high to low", value: "price_desc" }
+        ]},
+        { name: "visible", label: "Show this range on the site", type: "select", default: "yes", options: [
+          { label: "Yes", value: "yes" },
+          { label: "No (hidden)", value: "no" }
+        ]}
+      ]}
+    ]
+  },
   feature_marquee: {
     name: "Feature Marquee",
     icon: "Zap",

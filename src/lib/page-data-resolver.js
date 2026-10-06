@@ -92,6 +92,54 @@ export async function resolvePageSections(sections) {
         config.products = JSON.parse(JSON.stringify(enriched));
       }
 
+      // Resolve Price Range Showcase Data
+      if (section.type === 'price_range_showcase') {
+        const { getAltTextMap } = await import("@/lib/mediaUsage");
+        const perRange = Math.min(Number(config.productsPerRange) || 8, 16);
+        const shuffleAll = config.shuffle !== 'no';
+        const showCount = config.showCount !== 'no';
+        const ranges = (Array.isArray(config.ranges) ? config.ranges : [])
+          .filter((range) => range && range.visible !== 'no')
+          .slice(0, 20);
+
+        config.ranges = await Promise.all(ranges.map(async (range) => {
+          const min = Number(range.minPrice) || 0;
+          const hasMax = range.maxPrice !== '' && range.maxPrice !== null && range.maxPrice !== undefined && !Number.isNaN(Number(range.maxPrice));
+          const max = hasMax ? Number(range.maxPrice) : null;
+          const priceQuery = { $gte: min };
+          if (max !== null) priceQuery.$lte = max;
+          const baseQuery = { isDeleted: false, status: 'Published', price: priceQuery };
+
+          const sortKey = range.sort || 'shuffle';
+          const randomize = sortKey === 'shuffle' && shuffleAll;
+          const sortSpec = sortKey === 'price_asc' ? { price: 1 } : sortKey === 'price_desc' ? { price: -1 } : { createdAt: -1 };
+
+          const [total, pool] = await Promise.all([
+            showCount ? Product.countDocuments(baseQuery) : Promise.resolve(0),
+            Product.find(baseQuery)
+              .populate('categories')
+              .populate('primaryCategory')
+              .sort(sortSpec)
+              .limit(randomize ? 60 : perRange)
+              .lean(),
+          ]);
+          const picked = randomize
+            ? [...pool].sort(() => Math.random() - 0.5).slice(0, perRange)
+            : pool.slice(0, perRange);
+
+          const altMap = await getAltTextMap(picked.flatMap((p) => [...(p.images || []), p.image].filter(Boolean)));
+          return {
+            label: range.label || '',
+            badge: range.badge || '',
+            minPrice: min,
+            maxPrice: max,
+            total,
+            randomize,
+            products: JSON.parse(JSON.stringify(picked.map((p) => ({ ...p, imageAlts: altMap })))),
+          };
+        }));
+      }
+
       // Resolve Banner Feature Data
       if (section.type === 'banner_feature') {
          if (config.productId) {
