@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams, useParams } from "next/navigation";
+import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import RequirePermission from "@/components/admin/RequirePermission";
 
@@ -288,10 +289,11 @@ function FilterSelect({ label, paramKey, value, onChange, options }) {
 
 function SiteAnalyticsView() {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const params = useParams();
 
-  const tab = searchParams.get("tab") || "overview";
+  const rawTab = params?.tab || searchParams.get("tab") || "overview";
+  const tab = typeof rawTab === "string" ? rawTab : "overview";
   const hasCustom = Boolean(searchParams.get("from") && searchParams.get("to"));
   const query = useMemo(() => {
     const p = new URLSearchParams(searchParams.toString());
@@ -342,8 +344,8 @@ function SiteAnalyticsView() {
       if (v === null || v === undefined || v === "" || v === "all") p.delete(k);
       else p.set(k, v);
     }
-    router.replace(`${pathname}?${p.toString()}`, { scroll: false });
-  }, [router, pathname, searchParams]);
+    router.replace(`/admin/site-analytics?${p.toString()}`, { scroll: false });
+  }, [router, searchParams]);
 
   const onFilter = (key, value) => setParams({ [key]: value });
   const rangeValue = hasCustom ? "custom" : (searchParams.get("range") || "30");
@@ -427,16 +429,29 @@ function SiteAnalyticsView() {
       </div>
 
       <nav className="flex flex-wrap gap-1 border-b border-[#ccd0d4]">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setParams({ tab: t.key })}
-            className={`px-3 py-2 text-[12px] font-bold border-b-2 -mb-px ${tab === t.key ? "border-[#2271b1] text-[#2271b1]" : "border-transparent text-[#646970] hover:text-[#1d2327]"}`}
-          >
-            {t.label}
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const isActive = tab === t.key;
+          const p = new URLSearchParams(searchParams.toString());
+          p.set("tab", t.key);
+          const href = `/admin/site-analytics?${p.toString()}`;
+          return (
+            <Link
+              key={t.key}
+              href={href}
+              onClick={(e) => {
+                e.preventDefault();
+                setParams({ tab: t.key });
+              }}
+              className={`px-3 py-2 text-[12px] font-bold border-b-2 -mb-px transition-colors ${
+                isActive
+                  ? "border-[#2271b1] text-[#2271b1]"
+                  : "border-transparent text-[#646970] hover:text-[#1d2327]"
+              }`}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
       </nav>
 
       {loading && !data && <div className="p-16 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">Crunching visitor data…</div>}
@@ -977,20 +992,66 @@ function OverviewTab({ data }) {
         <Kpi label="Logged-in sessions" value={pctText(k.identifiedPct)} />
       </div>
 
-      <Panel title="Daily sessions and sales">
-        <div className="p-4">
+      <Panel
+        title="Daily sessions and sales"
+        action={
+          <div className="flex items-center gap-4 text-[11px]">
+            <span className="flex items-center gap-1.5 text-[#1d2327]">
+              <span className="w-2.5 h-2.5 rounded-sm bg-[#2271b1]" /> Sessions
+            </span>
+            <span className="flex items-center gap-1.5 text-[#1d2327]">
+              <span className="w-2.5 h-2.5 rounded-sm bg-[#10b981]" /> Converted
+            </span>
+          </div>
+        }
+      >
+        <div className="p-4 sm:p-6">
           {data.daily.length === 0 ? (
-            <p className="text-center italic text-[#8c8f94] text-[12px] py-6">No sessions for these filters.</p>
+            <p className="text-center italic text-[#8c8f94] text-[12px] py-8">No sessions for these filters.</p>
           ) : (
-            <div className="flex items-end gap-1 h-44">
-              {data.daily.map((d) => (
-                <div key={d.day} className="flex-1 min-w-[6px] h-full flex flex-col justify-end items-center group relative">
-                  <div className="w-full bg-[#2271b1] rounded-t-[2px]" style={{ height: `${(d.sessions / maxSessions) * 100}%` }} />
-                  <span className="absolute -top-8 hidden group-hover:block text-[10px] bg-black text-white px-1.5 py-0.5 rounded whitespace-nowrap">
-                    {d.day}: {d.sessions} sessions · {d.converted} converted · {fmtMoney(d.revenue)}
-                  </span>
-                </div>
-              ))}
+            <div>
+              <div className="flex items-end gap-1.5 sm:gap-2 h-48 border-b border-[#e5e5e5] pb-1 px-1">
+                {data.daily.map((d, idx) => {
+                  const sessionHeight = maxSessions > 0 ? (d.sessions / maxSessions) * 100 : 0;
+                  const convHeight = maxSessions > 0 ? (d.converted / maxSessions) * 100 : 0;
+                  const showLabel = data.daily.length <= 14 || idx % Math.ceil(data.daily.length / 10) === 0 || idx === data.daily.length - 1;
+                  const dateShort = d.day ? d.day.slice(5) : "";
+                  return (
+                    <div
+                      key={d.day}
+                      className="flex-1 min-w-[8px] max-w-[36px] h-full flex flex-col justify-end items-center group relative mx-auto"
+                    >
+                      {/* Hover Tooltip */}
+                      <div className="absolute -top-12 z-30 hidden group-hover:flex flex-col items-center bg-[#1d2327] text-white text-[10px] px-2.5 py-1.5 rounded shadow-lg pointer-events-none whitespace-nowrap">
+                        <span className="font-bold">{d.day}</span>
+                        <span>{d.sessions} sessions · {d.converted} converted · {fmtMoney(d.revenue)}</span>
+                      </div>
+
+                      {/* Bar Container */}
+                      <div className="w-full h-full flex items-end justify-center gap-0.5 bg-gray-50/80 rounded-t-[2px] p-[1px] hover:bg-gray-100 transition-colors">
+                        {/* Sessions Bar */}
+                        <div
+                          className="w-full bg-[#2271b1] rounded-t-[2px] transition-all min-h-[2px]"
+                          style={{ height: `${Math.max(sessionHeight, d.sessions > 0 ? 4 : 0)}%` }}
+                        />
+                        {/* Converted Bar */}
+                        {d.converted > 0 && (
+                          <div
+                            className="w-1.5 bg-[#10b981] rounded-t-[2px] transition-all min-h-[4px]"
+                            style={{ height: `${Math.max(convHeight, 4)}%` }}
+                          />
+                        )}
+                      </div>
+
+                      {/* X-axis Date label */}
+                      <span className="absolute -bottom-5 text-[9px] text-[#8c8f94] truncate select-none">
+                        {showLabel ? dateShort : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="h-5" />
             </div>
           )}
         </div>

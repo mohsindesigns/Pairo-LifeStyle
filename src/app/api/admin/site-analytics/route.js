@@ -196,6 +196,24 @@ async function overview(f) {
   const addToCartSessions = funnelMap.add_to_cart?.sessions || 0;
   const viewerSessions = funnelMap.view_item?.sessions || 0;
 
+  const dailyMap = new Map((facet.daily || []).map((d) => [d._id, d]));
+  const fullDaily = [];
+  const curr = new Date(f.since);
+  curr.setUTCHours(0, 0, 0, 0);
+  const end = new Date(f.until);
+  end.setUTCHours(23, 59, 59, 999);
+  while (curr <= end) {
+    const dayStr = curr.toISOString().slice(0, 10);
+    const existing = dailyMap.get(dayStr);
+    fullDaily.push({
+      day: dayStr,
+      sessions: existing?.sessions || 0,
+      converted: existing?.converted || 0,
+      revenue: money(revByDay.get(dayStr)?.revenue),
+    });
+    curr.setUTCDate(curr.getUTCDate() + 1);
+  }
+
   return {
     kpis: {
       sessions: s.sessions,
@@ -216,12 +234,7 @@ async function overview(f) {
       identifiedPct: pct(s.identified, s.sessions),
       liveNow: liveCount,
     },
-    daily: (facet.daily || []).map((d) => ({
-      day: d._id,
-      sessions: d.sessions,
-      converted: d.converted,
-      revenue: money(revByDay.get(d._id)?.revenue),
-    })),
+    daily: fullDaily,
     funnel: FUNNEL_EVENTS.map((name) => ({
       name,
       sessions: funnelMap[name]?.sessions || 0,

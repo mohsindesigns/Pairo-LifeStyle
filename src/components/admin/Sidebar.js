@@ -158,7 +158,7 @@ export default function AdminSidebar({ open = false, onClose }) {
     setOpenAccordion(prev => prev === id ? "" : id);
   };
 
-  const isDashboardActive = pathname === "/admin" || pathname === "/admin/analytics";
+  const isDashboardActive = pathname === "/admin" || pathname === "/admin/analytics" || pathname.startsWith("/admin/site-analytics");
 
   return (
     <>
