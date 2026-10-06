@@ -189,6 +189,7 @@ export default function AdminSidebar({ open = false, onClose }) {
               <div className="bg-[#32373c] py-1.5">
                 <NavLink href="/admin" exact isSubmenu>Home</NavLink>
                 {perms.analyticsView && <NavLink href="/admin/analytics" exact isSubmenu>Analytics</NavLink>}
+                {perms.analyticsView && <NavLink href="/admin/site-analytics" isSubmenu>Visitor Analytics</NavLink>}
               </div>
             )}
           </div>

@@ -17,6 +17,7 @@ import { PopupProvider } from "@/context/PopupContext";
 import { cache, Suspense } from "react";
 import CookieConsent from "@/components/common/CookieConsent";
 import AffiliateTracker from "@/components/common/AffiliateTracker";
+import SiteAnalyticsTracker from "@/components/common/SiteAnalyticsTracker";
 import SecurityShield from "@/components/common/SecurityShield";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -330,6 +331,9 @@ export default async function RootLayout({ children }) {
             <CookieConsent />
             <Suspense fallback={null}>
               <AffiliateTracker />
+            </Suspense>
+            <Suspense fallback={null}>
+              <SiteAnalyticsTracker />
             </Suspense>
             <SiteProvider initialData={sanitizedConfig}>
               <CartProvider>

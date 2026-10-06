@@ -4,6 +4,8 @@
  * and fail-safe execution.
  */
 
+import { recordSiteEvent } from "@/lib/siteAnalytics";
+
 function safeNumber(val, fallback = 0) {
   if (typeof val === "number") return Number.isFinite(val) ? val : fallback;
   if (typeof val === "string") {
@@ -37,6 +39,8 @@ export function trackGAEvent(eventName, params = {}) {
   } catch (e) {
     // ignore
   }
+
+  recordSiteEvent(eventName, params);
 
   try {
     // Always push to the dataLayer in GA4 ecommerce format so Google Tag Manager can pick up,

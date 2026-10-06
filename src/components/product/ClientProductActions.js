@@ -13,6 +13,8 @@ import CustomizeProductModal from "@/components/product/CustomizeProductModal";
 import SizeGuideModal from "@/components/product/SizeGuideModal";
 import SelectOptionsPopup from "@/components/product/SelectOptionsPopup";
 
+import { recordOptionSelect } from "@/lib/siteAnalytics";
+
 export default function ClientProductActions({ product, onVariantChange }) {
   const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
@@ -150,6 +152,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
 
   const handleOptionSelect = (attrName, option) => {
     const newOptions = { ...selectedOptions, [attrName]: option.label };
+    recordOptionSelect(attrName, option.label, product);
     setSelectedOptions(newOptions);
 
     const attr = attributes.find((a) => a.name === attrName);
