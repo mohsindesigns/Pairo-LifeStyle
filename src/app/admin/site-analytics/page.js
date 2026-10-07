@@ -198,6 +198,21 @@ const fmtWhen = (value) => (value
 const fmtMoney = (v) => `$${Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtNum = (v) => (Number(v) || 0).toLocaleString();
 const pctText = (v) => `${Number(v || 0)}%`;
+let regionNames = null;
+const countryName = (code) => {
+  const c = String(code || "").trim();
+  if (!c || c === "(none)" || c.toLowerCase() === "none") return "Unknown";
+  if (!regionNames && typeof Intl !== "undefined" && Intl.DisplayNames) {
+    try { regionNames = new Intl.DisplayNames(["en"], { type: "region" }); } catch { regionNames = false; }
+  }
+  if (regionNames) {
+    try {
+      const name = regionNames.of(c.toUpperCase());
+      if (name && name !== c.toUpperCase()) return name;
+    } catch {}
+  }
+  return c;
+};
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const daysAgoIso = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
@@ -1517,7 +1532,9 @@ function SiteAnalyticsView() {
               title={title}
               rows={(data.breakdowns && data.breakdowns[key]) || []}
               columns={[
-                { key: "value", label: title },
+                key === "country"
+                  ? { key: "value", label: title, render: (r) => countryName(r.value), csv: (r) => countryName(r.value) }
+                  : { key: "value", label: title },
                 { key: "sessions", label: "Sessions" },
                 { key: "conversionRate", label: "Converted", render: (r) => pctText(r.conversionRate) },
                 { key: "bounceRate", label: "Bounce", render: (r) => pctText(r.bounceRate) },
