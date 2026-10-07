@@ -121,823 +121,105 @@ export function getFromAddress(displayName = 'PAIRO Lifestyle') {
   return `"${storeName}" <${cleanEmail}>`;
 }
 
+// ─── SHARED BRAND EMAIL DESIGN SYSTEM ─────────────────────────────────────────
+// Every email the store sends (customer or admin facing) is built from these
+// same pieces, so the look stays identical everywhere instead of each message
+// having its own hand-built header/footer. Colors match the storefront's warm
+// ink/cream palette rather than generic black-and-grey.
+
+const BRAND = {
+  ink: '#4A2E1D',
+  paper: '#FFFFFF',
+  pageBg: '#F3EFE7',
+  surface: '#F6F2EA',
+  border: '#E3DACB',
+  muted: '#6F655B',
+  faint: '#9C9388',
+  danger: '#9A3B3B',
+};
+
+function isSmtpConfigured() {
+  return Boolean(smtpConfig?.auth?.user && smtpConfig?.auth?.pass);
+}
+
 /**
- * Send Email Verification to New Customer
+ * Wraps a block of content in the standard branded email shell: dark header
+ * with the store name, white content card, and a consistent footer. Every
+ * send* function below builds its own `bodyHtml` and passes it in here.
  */
-export async function sendEmailVerification(toEmail, name, verificationUrl) {
-  const firstName = name?.split(' ')[0] || 'there';
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; color: #1a1a1a; background: #fff;">
-      <div style="background: #1a1a1a; padding: 28px 32px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 6px; font-size: 22px; font-weight: 800; text-transform: uppercase;">PAIRO</h1>
-        <p style="color: #888; margin: 6px 0 0; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;">Lifestyle Collection</p>
-      </div>
-      <div style="padding: 48px 40px; background: #fff;">
-        <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.5px;">Verify Your Email</h2>
-        <p style="color: #555; font-size: 15px; line-height: 1.7; margin: 0 0 32px;">
-          Hi ${firstName}, welcome to PAIRO Lifestyle.<br/>
-          Please verify your email address to activate your account and start shopping.
-        </p>
-        <div style="text-align: center; margin: 36px 0;">
-          <a href="${verificationUrl}"
-             style="display: inline-block; background: #1a1a1a; color: #fff; padding: 16px 40px; border-radius: 3px; font-size: 12px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; text-decoration: none;">
-            Verify Email Address
-          </a>
-        </div>
-        <p style="color: #999; font-size: 12px; line-height: 1.6; border-top: 1px solid #f0f0f0; padding-top: 24px; margin: 0;">
-          This link expires in <strong>24 hours</strong>.<br/>
-          If you did not create an account at PAIRO, you can safely ignore this email.
-        </p>
-        <p style="color: #bbb; font-size: 11px; margin-top: 12px;">
-          Or copy this link into your browser:<br/>
-          <span style="color: #555; word-break: break-all;">${verificationUrl}</span>
-        </p>
-      </div>
-      <div style="border-top: 1px solid #eee; padding: 18px 32px; text-align: center; background: #fafafa;">
-        <p style="font-size: 11px; color: #bbb; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
-          PAIRO Lifestyle • pairolifestyle.com
-        </p>
-      </div>
-    </div>
-  `;
-
+function emailShell({ eyebrow, heading, subheading, bodyHtml, preheader = '' }) {
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
 
-  if (!smtpConfig?.auth?.user || !smtpConfig?.auth?.pass) {
-    console.log(`[Email Simulation] Verification Email → ${toEmail} | URL: ${verificationUrl}`);
-    return;
-  }
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${escapeHtml(heading || storeName)}</title>
+</head>
+<body style="margin:0;padding:0;background:${BRAND.pageBg};font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>` : ''}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.pageBg};padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${BRAND.paper};border-radius:16px;overflow:hidden;border:1px solid ${BRAND.border};">
+  <tr><td style="background:${BRAND.ink};padding:36px 40px;text-align:center;">
+    <p style="margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">${escapeHtml(eyebrow || storeName)}</p>
+    <h1 style="margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">${escapeHtml(storeName)}</h1>
+  </td></tr>
+  <tr><td style="padding:44px 40px 36px;">
+    ${heading ? `<h2 style="margin:0 0 14px;color:${BRAND.ink};font-size:21px;font-weight:700;letter-spacing:-0.3px;">${heading}</h2>` : ''}
+    ${subheading ? `<p style="margin:0 0 28px;color:${BRAND.muted};font-size:14px;line-height:1.7;">${subheading}</p>` : ''}
+    ${bodyHtml || ''}
+  </td></tr>
+  <tr><td style="background:${BRAND.surface};border-top:1px solid ${BRAND.border};padding:26px 40px;text-align:center;">
+    <p style="margin:0;color:${BRAND.ink};font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;">${escapeHtml(storeName)}</p>
+    <p style="margin:8px 0 0;color:${BRAND.faint};font-size:11px;">&copy; ${new Date().getFullYear()} ${escapeHtml(storeName)} &middot; <a href="${storeUrl}" style="color:${BRAND.faint};text-decoration:underline;">${storeUrl.replace(/^https?:\/\//, '')}</a></p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
 
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress(storeName),
-      to: toEmail,
-      subject: `Verify your email — ${storeName}`,
-      html,
-    });
-    console.log(`[Email] ✅ Verification email sent to ${toEmail} | MsgID: ${info.messageId}`);
-    return info;
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send verification email:', err.message);
-    throw err;
-  }
+/** A single brand-colored pill button, centered by default. */
+function emailButton(url, label, { align = 'center', secondary = false } = {}) {
+  const bg = secondary ? BRAND.paper : BRAND.ink;
+  const color = secondary ? BRAND.ink : '#ffffff';
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:${align === 'center' ? '0 auto' : '0'};"><tr><td style="border-radius:999px;background:${bg};border:1px solid ${BRAND.ink};">
+<a href="${url}" style="display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:${color};text-decoration:none;">${escapeHtml(label)}</a>
+</td></tr></table>`;
+}
+
+function buttonBlock(url, label, opts) {
+  return `<div style="text-align:center;margin:30px 0;">${emailButton(url, label, opts)}</div>`;
+}
+
+/** A soft bordered card used for order details, specs, notes, credentials, etc. */
+function emailPanel(innerHtml, { title, accentColor } = {}) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.surface};border:1px solid ${BRAND.border};border-radius:10px;margin:0 0 24px;${accentColor ? `border-left:4px solid ${accentColor};` : ''}">
+<tr><td style="padding:20px 22px;">
+${title ? `<p style="margin:0 0 12px;color:${BRAND.ink};font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">${escapeHtml(title)}</p>` : ''}
+${innerHtml}
+</td></tr></table>`;
+}
+
+/** One label/value row for the field tables used inside panels. `value` may contain trusted HTML. */
+function fieldRow(label, value) {
+  if (value === undefined || value === null || value === '') return '';
+  return `<tr><td style="padding:6px 0;color:${BRAND.muted};font-size:13px;width:38%;vertical-align:top;">${escapeHtml(label)}</td><td style="padding:6px 0;color:${BRAND.ink};font-size:13px;font-weight:600;">${value}</td></tr>`;
+}
+
+function fieldTable(rowsHtml) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rowsHtml}</table>`;
 }
 
 /**
- * Send Email Verification to New Affiliate Applicant
+ * Looks up the admin notification address: ADMIN_EMAIL env var, falling back
+ * to whichever staff account holds the super-admin role.
  */
-export async function sendAffiliateEmailVerification(toEmail, name, verificationUrl) {
-  const firstName = name?.split(' ')[0] || 'there';
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; color: #1a1a1a; background: #fff;">
-      <div style="background: #1a1a1a; padding: 28px 32px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 6px; font-size: 22px; font-weight: 800; text-transform: uppercase;">PAIRO</h1>
-        <p style="color: #888; margin: 6px 0 0; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;">Affiliate Partners</p>
-      </div>
-      <div style="padding: 48px 40px; background: #fff;">
-        <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.5px;">Verify Your Email</h2>
-        <p style="color: #555; font-size: 15px; line-height: 1.7; margin: 0 0 32px;">
-          Hi ${firstName}, thank you for applying to the PAIRO Affiliate Program.<br/>
-          Please verify your email address to submit your application for review.
-        </p>
-        <div style="text-align: center; margin: 36px 0;">
-          <a href="${verificationUrl}"
-             style="display: inline-block; background: #1a1a1a; color: #fff; padding: 16px 40px; border-radius: 3px; font-size: 12px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; text-decoration: none;">
-            Verify Email Address
-          </a>
-        </div>
-        <p style="color: #999; font-size: 12px; line-height: 1.6; border-top: 1px solid #f0f0f0; padding-top: 24px; margin: 0;">
-          This link expires in <strong>24 hours</strong>.<br/>
-          If you did not apply for the Pairo Affiliate Program, you can safely ignore this email.
-        </p>
-        <p style="color: #bbb; font-size: 11px; margin-top: 12px;">
-          Or copy this link into your browser:<br/>
-          <span style="color: #555; word-break: break-all;">${verificationUrl}</span>
-        </p>
-      </div>
-      <div style="border-top: 1px solid #eee; padding: 18px 32px; text-align: center; background: #fafafa;">
-        <p style="font-size: 11px; color: #bbb; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
-          PAIRO Lifestyle • pairolifestyle.com
-        </p>
-      </div>
-    </div>
-  `;
-
-  if (!smtpConfig?.auth?.user || !smtpConfig?.auth?.pass) {
-    console.log(`[Email Simulation] Affiliate Verification Email → ${toEmail} | URL: ${verificationUrl}`);
-    return;
-  }
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO Affiliates"),
-      to: toEmail,
-      subject: `Verify your email — PAIRO Affiliates`,
-      html,
-    });
-    console.log(`[Email] ✅ Affiliate verification email sent to ${toEmail} | MsgID: ${info.messageId}`);
-    return info;
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send affiliate verification email:', err.message);
-    throw err;
-  }
-}
-
-
-/**
- * Send Order Confirmation Email to Customer
- */
-export async function sendOrderConfirmation(order) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Confirmation → ${order.customer?.email}`);
-    return;
-  }
-
-  const itemsHtml = (order.items || []).map(item => `
-    <tr>
-      <td style="padding: 12px 10px; border-bottom: 1px solid #eee;">
-        <strong>${item.name}</strong><br/>
-        <small style="color:#666;">${item.selectedVariant?.title || ''}</small>
-      </td>
-      <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
-      <td style="padding: 12px 10px; border-bottom: 1px solid #eee; text-align: right;">$${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}</td>
-    </tr>
-  `).join('');
-
-  const accountSectionHtml = order.guestAccount?.created && order.guestAccount?.temporaryPassword
-    ? `
-      <div style="margin-top: 32px; background: linear-gradient(135deg, #f8f5f0 0%, #fff 100%); border: 1px solid #e7dfd3; border-radius: 14px; padding: 24px;">
-        <h3 style="margin: 0 0 10px; font-size: 18px; color: #1a1a1a;">Your Customer Account Has Been Created</h3>
-        <p style="margin: 0 0 14px; color: #5f574d; line-height: 1.6;">
-          Thank you for your order! We created your customer account so you can track orders, view your order history, save addresses, and checkout faster next time.
-        </p>
-        <div style="background: #fff; border: 1px solid #efe6da; border-radius: 10px; padding: 16px;">
-          <p style="margin: 0 0 8px; color: #222; font-size: 14px;"><strong>Login Email:</strong> ${order.guestAccount.loginEmail || order.customer?.email}</p>
-          <p style="margin: 0 0 8px; color: #222; font-size: 14px;"><strong>Temporary Password:</strong> <span style="font-family: monospace; background: #f6f2ec; padding: 2px 6px; border-radius: 4px;">${order.guestAccount.temporaryPassword}</span></p>
-          <p style="margin: 12px 0 0;">
-            <a href="${order.guestAccount.loginUrl || 'https://yourdomain.com/login'}" style="display: inline-block; background: #1a1a1a; color: #fff; text-decoration: none; padding: 10px 16px; border-radius: 999px; font-weight: 600;">Log in to your account</a>
-          </p>
-        </div>
-        <p style="margin: 12px 0 0; color: #7a705f; font-size: 13px;">For security, we recommend changing your password after your first login.</p>
-      </div>
-    ` : '';
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a;">
-      <div style="background: #1a1a1a; padding: 30px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: -1px; font-size: 28px;">PAIRO</h1>
-      </div>
-      <div style="padding: 40px 30px;">
-        <h2 style="font-size: 20px; margin-bottom: 8px;">Order Confirmed ✓</h2>
-        <p style="color: #555; margin-bottom: 24px;">
-          Hi ${order.shippingAddress?.fullName?.split(' ')[0] || 'there'}, thank you for your acquisition.<br/>
-          Your order <strong>#${order.orderNumber}</strong> has been confirmed and is being prepared for dispatch.
-        </p>
-        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-          <thead>
-            <tr style="background: #f5f5f5;">
-              <th style="text-align: left; padding: 10px; font-size: 11px; text-transform: uppercase; color: #888;">Product</th>
-              <th style="padding: 10px; font-size: 11px; text-transform: uppercase; color: #888;">Qty</th>
-              <th style="text-align: right; padding: 10px; font-size: 11px; text-transform: uppercase; color: #888;">Total</th>
-            </tr>
-          </thead>
-          <tbody>${itemsHtml}</tbody>
-          <tfoot>
-            <tr>
-              <td colspan="2" style="padding: 14px 10px; text-align: right; font-weight: 700;">Total Paid</td>
-              <td style="padding: 14px 10px; text-align: right; font-weight: 700;">$${(order.financials?.total || 0).toLocaleString()}</td>
-            </tr>
-          </tfoot>
-        </table>
-        ${accountSectionHtml}
-        <div style="background: #f9f9f9; border-left: 4px solid #1a1a1a; padding: 20px; border-radius: 4px; margin-top: 30px;">
-          <h3 style="margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Shipping To</h3>
-          <p style="margin: 0; font-size: 14px; line-height: 1.7; color: #333;">
-            ${order.shippingAddress?.fullName || ''}<br/>
-            ${order.shippingAddress?.street || ''}<br/>
-            ${order.shippingAddress?.city || ''}, ${order.shippingAddress?.zip || ''}<br/>
-            ${order.shippingAddress?.country || ''}
-          </p>
-        </div>
-      </div>
-      <div style="border-top: 1px solid #eee; padding: 20px 30px; text-align: center;">
-        <p style="font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
-          Pairo Excellence • Global Acquisition Logistics
-        </p>
-      </div>
-    </div>
-  `;
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO Store"),
-      to: order.customer?.email,
-      subject: `Order Confirmed: #${order.orderNumber}`,
-      html,
-    });
-    console.log(`[Email] ✅ Confirmation sent to ${order.customer?.email} | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send confirmation:', err.message);
-    throw err;
-  }
-}
-
-/**
- * Send Admin Notification for New Order
- */
-export async function sendAdminOrderNotification(order) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Admin notified of Order ${order.orderNumber}`);
-    return;
-  }
-
-  let adminEmail = process.env.ADMIN_EMAIL;
-
-  // Fallback: If ADMIN_EMAIL is not set, try to find the Super Admin
-  if (!adminEmail) {
-    try {
-        await dbConnect();
-        const superAdminRole = await Role.findOne({ slug: 'super-admin' });
-        if (superAdminRole) {
-            const superAdmin = await Staff.findOne({ roleId: superAdminRole._id });
-            if (superAdmin) adminEmail = superAdmin.email;
-        }
-    } catch (e) {
-        console.error("Failed to fetch super admin for email fallback:", e.message);
-    }
-  }
-
-  if (!adminEmail) {
-    console.warn('[Email] ADMIN_EMAIL and Super Admin not found — skipping admin notification.');
-    return;
-  }
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 500px; margin: auto; color: #1a1a1a;">
-      <div style="background: #1a1a1a; padding: 20px 30px;">
-        <h2 style="color: #fff; margin: 0; font-size: 18px;">🛍 New Order Received</h2>
-      </div>
-      <div style="padding: 30px; background: #f9f9f9; border: 1px solid #eee;">
-        <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
-          <tr><td style="padding: 8px 0; color: #666;">Order Number</td><td style="padding: 8px 0; font-weight: 700;">#${order.orderNumber}</td></tr>
-          <tr><td style="padding: 8px 0; color: #666;">Customer</td><td style="padding: 8px 0;">${order.shippingAddress?.fullName || 'N/A'}</td></tr>
-          <tr><td style="padding: 8px 0; color: #666;">Email</td><td style="padding: 8px 0;">${order.customer?.email || 'N/A'}</td></tr>
-          <tr><td style="padding: 8px 0; color: #666;">Items</td><td style="padding: 8px 0;">${(order.items || []).length}</td></tr>
-          <tr>
-            <td style="padding: 12px 0; font-weight: 700; font-size: 16px;">Total</td>
-            <td style="padding: 12px 0; font-weight: 700; font-size: 16px;">$${(order.financials?.total || 0).toLocaleString()}</td>
-          </tr>
-        </table>
-        <div style="margin-top: 24px;">
-          <a href="${process.env.NEXTAUTH_URL}/admin/orders/${order._id}"
-             style="background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-size: 13px; font-weight: 700;">
-            View Order in Dashboard →
-          </a>
-        </div>
-      </div>
-    </div>
-  `;
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO System"),
-      to: adminEmail,
-      subject: `🛍 New Order: #${order.orderNumber} — $${(order.financials?.total || 0).toLocaleString()}`,
-      html,
-    });
-    console.log(`[Email] ✅ Admin notified (${adminEmail}) | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send admin notification:', err.message);
-    throw err;
-  }
-}
-
-/**
- * Send CRM Reply to Customer Submission
- */
-export async function sendSubmissionReply(toEmail, subject, message, customerName) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] CRM Reply → ${toEmail} | Subject: ${subject}`);
-    return;
-  }
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
-      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO CONCIERGE</h1>
-      </div>
-      <div style="padding: 40px 30px; background: #fff;">
-        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Dear ${customerName || 'Customer'},</p>
-        <div style="font-size: 15px; color: #1a1a1a; white-space: pre-wrap;">${message}</div>
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
-          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
-          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
-        </div>
-      </div>
-      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
-        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
-      </div>
-    </div>
-  `;
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO Support"),
-      to: toEmail,
-      subject: subject,
-      html,
-    });
-    console.log(`[Email] ✅ CRM Reply sent to ${toEmail} | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send CRM reply:', err.message);
-    throw err;
-  }
-}
-
-/**
- * Send Affiliate Application Received email
- */
-export async function sendAffiliateApplicationReceived(toEmail, affiliateName) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Affiliate Application Received → ${toEmail}`);
-    return;
-  }
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
-      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO AFFILIATES</h1>
-      </div>
-      <div style="padding: 40px 30px; background: #fff;">
-        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Hi ${affiliateName},</p>
-        <p style="font-size: 15px; color: #1a1a1a;">
-          Thank you for applying to the Pairo Affiliate Program! We have received your application and identity documents.
-        </p>
-        <p style="font-size: 15px; color: #1a1a1a; margin-top: 15px;">
-          Our review team is auditing your details. You will receive an email update with your login credentials as soon as your account is approved.
-        </p>
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
-          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
-          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
-        </div>
-      </div>
-      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
-        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
-      </div>
-    </div>
-  `;
-
-  try {
-    await transporter.sendMail({
-      from: getFromAddress("PAIRO Affiliates"),
-      to: toEmail,
-      subject: "Affiliate Application Received — Pairo Lifestyle",
-      html,
-    });
-    console.log(`[Email] ✅ Affiliate Application Received sent to ${toEmail}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send application received email:', err.message);
-  }
-}
-
-/**
- * Send Affiliate Application Approved email
- */
-export async function sendAffiliateApplicationApproved(toEmail, affiliateName, referralCode, tempPassword, commissionType = 'Percentage', commissionRate = 5) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Affiliate Application Approved → ${toEmail} | Temp Pass: ${tempPassword}`);
-    return;
-  }
-
-  const loginUrl = `${process.env.NEXTAUTH_URL || "https://pairolifestyle.com"}/affiliate-login`;
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
-      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO AFFILIATES</h1>
-      </div>
-      <div style="padding: 40px 30px; background: #fff;">
-        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Dear ${affiliateName},</p>
-        <p style="font-size: 15px; color: #1a1a1a; font-weight: bold;">
-          Congratulations! Your application has been approved.
-        </p>
-        <p style="font-size: 15px; color: #1a1a1a; margin-top: 15px;">
-          You can now log in to your dedicated Affiliate Portal to start generating links, tracking conversions, and viewing commissions.
-        </p>
-        
-        <div style="background: #f9f9f9; padding: 20px; margin: 20px 0; border-radius: 4px; border-left: 4px solid #1a1a1a;">
-          <h4 style="margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Your Account Details</h4>
-          <p style="margin: 4px 0; font-size: 14px;"><strong>Portal Login URL:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
-          <p style="margin: 4px 0; font-size: 14px;"><strong>Login Email Address:</strong> ${toEmail}</p>
-          <p style="margin: 4px 0; font-size: 14px;"><strong>Temporary Password:</strong> <code style="background:#eee; padding:2px 6px; font-weight:bold; font-size:14px; border-radius:3px; font-family:monospace;">${tempPassword}</code></p>
-          <p style="margin: 4px 0; font-size: 14px;"><strong>Referral Code:</strong> ${referralCode}</p>
-          <p style="margin: 4px 0; font-size: 14px;"><strong>Commission rate:</strong> ${commissionType === 'Fixed' ? `$${commissionRate} Fixed per product sold` : `${commissionRate}% on all delivered orders`}</p>
-        </div>
-
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
-          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
-          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
-        </div>
-      </div>
-      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
-        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
-      </div>
-    </div>
-  `;
-
-  try {
-    await transporter.sendMail({
-      from: getFromAddress("PAIRO Affiliates"),
-      to: toEmail,
-      subject: "Affiliate Account Approved! — Pairo Lifestyle",
-      html,
-    });
-    console.log(`[Email] ✅ Affiliate Application Approved sent to ${toEmail}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send application approved email:', err.message);
-  }
-}
-
-/**
- * Send Affiliate Application Rejected email
- */
-export async function sendAffiliateApplicationRejected(toEmail, affiliateName, reason) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Affiliate Application Rejected → ${toEmail}`);
-    return;
-  }
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
-      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO AFFILIATES</h1>
-      </div>
-      <div style="padding: 40px 30px; background: #fff;">
-        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Dear ${affiliateName},</p>
-        <p style="font-size: 15px; color: #1a1a1a;">
-          Thank you for your interest in the Pairo Affiliate Program.
-        </p>
-        <p style="font-size: 15px; color: #1a1a1a; margin-top: 15px;">
-          After reviewing your application details and marketing channels, we regret to inform you that we are unable to accept your application at this time.
-        </p>
-        ${reason ? `
-        <div style="background: #fff5f5; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0; border-radius: 4px; font-size: 14px; color: #991b1b;">
-          <strong>Review Notes:</strong> ${reason}
-        </div>
-        ` : ''}
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
-          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
-          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
-        </div>
-      </div>
-      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
-        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
-      </div>
-    </div>
-  `;
-
-  try {
-    await transporter.sendMail({
-      from: getFromAddress("PAIRO Affiliates"),
-      to: toEmail,
-      subject: "Affiliate Application Update — Pairo Lifestyle",
-      html,
-    });
-    console.log(`[Email] ✅ Affiliate Application Rejected sent to ${toEmail}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send application rejected email:', err.message);
-  }
-}
-
-/**
- * Send Affiliate Payout Update email
- */
-export async function sendAffiliatePayoutUpdate(toEmail, affiliateName, amount, status, notes) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Affiliate Payout Update → ${toEmail}`);
-    return;
-  }
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; line-height: 1.6;">
-      <div style="background: #1a1a1a; padding: 25px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 20px; font-weight: 300;">PAIRO AFFILIATES</h1>
-      </div>
-      <div style="padding: 40px 30px; background: #fff;">
-        <p style="font-size: 14px; color: #666; margin-bottom: 20px;">Dear ${affiliateName},</p>
-        <p style="font-size: 15px; color: #1a1a1a;">
-          This is an update regarding your affiliate payout request of <strong>$${amount.toLocaleString()}</strong>.
-        </p>
-        <p style="font-size: 15px; color: #1a1a1a; margin-top: 10px;">
-          Status: <strong style="text-transform: uppercase;">${status}</strong>
-        </p>
-        ${notes ? `
-        <div style="background: #f9f9f9; padding: 15px; border-left: 4px solid #1a1a1a; margin: 20px 0; border-radius: 4px; font-size: 14px; color: #374151;">
-          <strong>Notes:</strong> ${notes}
-        </div>
-        ` : ''}
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0;">
-          <p style="font-size: 13px; color: #888; margin: 0;">Kind Regards,</p>
-          <p style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin: 5px 0;">The Pairo Team</p>
-        </div>
-      </div>
-      <div style="background: #f9f9f9; padding: 20px; text-align: center; font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;">
-        © ${new Date().getFullYear()} PAIRO — Artisanal Heritage • Modern Lifestyle
-      </div>
-    </div>
-  `;
-
-  try {
-    await transporter.sendMail({
-      from: getFromAddress("PAIRO Affiliates"),
-      to: toEmail,
-      subject: `Affiliate Payout Update: $${amount} — Pairo Lifestyle`,
-      html,
-    });
-    console.log(`[Email] ✅ Affiliate Payout Update sent to ${toEmail}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send payout update email:', err.message);
-  }
-}
-
-/**
- * Send Affiliate Password Reset Email
- */
-export async function sendAffiliatePasswordReset(toEmail, name, resetUrl) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Password Reset → ${toEmail} | Reset URL: ${resetUrl}`);
-    return;
-  }
-
-  const firstName = name?.split(' ')[0] || 'Partner';
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; color: #1a1a1a; background: #fff;">
-      <div style="background: #1a1a1a; padding: 28px 32px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 6px; font-size: 20px; font-weight: 800; text-transform: uppercase;">PAIRO</h1>
-        <p style="color: #888; margin: 6px 0 0; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;">Partner Portal</p>
-      </div>
-      <div style="padding: 40px 32px;">
-        <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 8px;">Reset Your Password</h2>
-        <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 28px;">
-          Hi ${firstName}, we received a request to reset the password for your PAIRO Partner account.<br/>
-          Click the button below to create a new password. This link expires in <strong>1 hour</strong>.
-        </p>
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${resetUrl}" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 14px 36px; border-radius: 3px; font-size: 13px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; text-decoration: none;">
-            Reset Password
-          </a>
-        </div>
-        <p style="color: #888; font-size: 12px; line-height: 1.6; border-top: 1px solid #eee; padding-top: 20px; margin: 0;">
-          If you did not request a password reset, please ignore this email — your account is safe.<br/>
-          For security, do not share this link with anyone.
-        </p>
-      </div>
-      <div style="border-top: 1px solid #eee; padding: 18px 32px; text-align: center;">
-        <p style="font-size: 11px; color: #bbb; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
-          Pairo Excellence • Partner Programme
-        </p>
-      </div>
-    </div>
-  `;
-
-  try {
-    await transporter.sendMail({
-      from: getFromAddress("PAIRO Partners"),
-      to: toEmail,
-      subject: `Reset Your PAIRO Partner Password`,
-      html,
-    });
-    console.log(`[Email] ✅ Password reset email sent to ${toEmail}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send password reset email:', err.message);
-    throw err;
-  }
-}
-
-/**
- * Send Custom Order / Bespoke Design Request Confirmation Email to Customer
- */
-export async function sendCustomOrderConfirmation(order) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Custom Order Confirmation → ${order.customer?.email}`);
-    return;
-  }
-
-  const item = order.items?.[0] || {};
-  const c = item.customization || {};
-
-  let customizationsHtml = '';
-  if (c.leatherColor && c.leatherColor !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Leather Color:</strong> ${c.leatherColor} ${c.leatherColorNote ? `(${c.leatherColorNote})` : ''}</p>`;
-  }
-  if (c.leatherType && c.leatherType !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Leather Type:</strong> ${c.leatherType} ${c.leatherTypeNote ? `(${c.leatherTypeNote})` : ''}</p>`;
-  }
-  if (c.innerLining && c.innerLining !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Inner Lining:</strong> ${c.innerLining} ${c.innerLiningNote ? `(${c.innerLiningNote})` : ''}</p>`;
-  }
-  if (c.hardwareColor && c.hardwareColor !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Hardware Color:</strong> ${c.hardwareColor} ${c.hardwareColorNote ? `(${c.hardwareColorNote})` : ''}</p>`;
-  }
-  if (c.fur?.type && c.fur.type !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Fur Type:</strong> ${c.fur.type} ${c.fur.typeNote ? `(${c.fur.typeNote})` : ''}</p>`;
-    if (c.fur.color) customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Fur Color:</strong> ${c.fur.color}</p>`;
-    if (c.fur.placement?.length) customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Fur Placement:</strong> ${c.fur.placement.join(', ')}</p>`;
-    if (c.fur.density) customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Fur Density:</strong> ${c.fur.density}</p>`;
-    if (c.fur.removable !== null) customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Removable Fur:</strong> ${c.fur.removable ? 'Yes' : 'No'}</p>`;
-  }
-
-  let artworkHtml = '';
-  if (c.artwork && Object.values(c.artwork).some(Boolean)) {
-    artworkHtml += '<h4 style="margin:15px 0 5px; font-size:12px; text-transform:uppercase; color:#666; letter-spacing:0.5px;">Uploaded Artwork</h4>';
-    Object.entries(c.artwork).forEach(([key, art]) => {
-      if (art && art.url) {
-        artworkHtml += `<p style="margin:4px 0; font-size:13px;"><strong>${key.replace(/([A-Z])/g, ' $1')}:</strong> <a href="${art.url}" style="color:#2271b1; text-decoration:underline;">${art.name || 'View File'}</a></p>`;
-      }
-    });
-  }
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a;">
-      <div style="background: #1a1a1a; padding: 30px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 2px; font-size: 24px;">PAIRO LIFESTYLE</h1>
-      </div>
-      <div style="padding: 40px 30px; background: #fff; border: 1px solid #eee; border-top: none;">
-        <h2 style="font-size: 18px; margin-top:0; margin-bottom: 12px; color:#1a1a1a; font-weight:700;">Bespoke Design Request Received</h2>
-        <p style="color: #555; margin-bottom: 24px; font-size:14px; line-height:1.6;">
-          Hi ${order.shippingAddress?.fullName?.split(' ')[0] || 'there'}, thank you for your custom design request.<br/>
-          We have received your customization parameters for the product <strong>${item.name || ''}</strong>. Your Design Request ID is <strong>#${order.orderNumber}</strong>, submitted on ${new Date(order.createdAt).toLocaleDateString()}.
-        </p>
-        <div style="background: #f9f9f9; padding: 20px; border-radius: 3px; margin-bottom: 24px; border: 1px solid #eee;">
-          <h3 style="margin-top: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color:#333; border-bottom:1px solid #eee; padding-bottom:8px;">Custom Selections</h3>
-          ${customizationsHtml}
-          ${artworkHtml}
-          ${order.customerNote ? `<p style="margin:10px 0 0; font-size:13px; border-top:1px dashed #ddd; padding-top:8px;"><strong>Additional Notes:</strong> <em>${order.customerNote}</em></p>` : ''}
-        </div>
-        <p style="color: #555; font-size:14px; line-height:1.6;">
-          Our master artisans and design team are already reviewing your customization. We will contact you via email or phone shortly to discuss pricing, options, and timeline.
-        </p>
-      </div>
-      <div style="background: #f9f9f9; border-top:1px solid #eee; padding: 20px 30px; text-align: center;">
-        <p style="font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
-          Pairo Concierge • Bespoke Artisanal Tailoring & Heritage
-        </p>
-      </div>
-    </div>
-  `;
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO Custom Design"),
-      to: order.customer?.email,
-      subject: `PAIRO Bespoke Design Request Received: #${order.orderNumber}`,
-      html,
-    });
-    console.log(`[Email] ✅ Custom confirmation sent to ${order.customer?.email} | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send custom confirmation email:', err.message);
-    throw err;
-  }
-}
-
-/**
- * Send Admin Notification for Custom Order Design Request
- */
-export async function sendAdminCustomOrderNotification(order) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Admin notified of Custom Order ${order.orderNumber}`);
-    return;
-  }
-
-  let adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) {
-    try {
-        await dbConnect();
-        const superAdminRole = await Role.findOne({ slug: 'super-admin' });
-        if (superAdminRole) {
-            const superAdmin = await Staff.findOne({ roleId: superAdminRole._id });
-            if (superAdmin) adminEmail = superAdmin.email;
-        }
-    } catch (e) {
-        console.error("Failed to fetch super admin for email fallback:", e.message);
-    }
-  }
-
-  if (!adminEmail) {
-    console.warn('[Email] ADMIN_EMAIL and Super Admin not found — skipping admin custom notification.');
-    return;
-  }
-
-  const item = order.items?.[0] || {};
-  const c = item.customization || {};
-
-  let customizationsHtml = '';
-  if (c.leatherColor && c.leatherColor !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Leather Color:</strong> ${c.leatherColor} ${c.leatherColorNote ? `(${c.leatherColorNote})` : ''}</p>`;
-  }
-  if (c.leatherType && c.leatherType !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Leather Type:</strong> ${c.leatherType} ${c.leatherTypeNote ? `(${c.leatherTypeNote})` : ''}</p>`;
-  }
-  if (c.innerLining && c.innerLining !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Inner Lining:</strong> ${c.innerLining} ${c.innerLiningNote ? `(${c.innerLiningNote})` : ''}</p>`;
-  }
-  if (c.hardwareColor && c.hardwareColor !== 'None') {
-    customizationsHtml += `<p style="margin:4px 0; font-size:13px;"><strong>Hardware Color:</strong> ${c.hardwareColor} ${c.hardwareColorNote ? `(${c.hardwareColorNote})` : ''}</p>`;
-  }
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 500px; margin: auto; color: #1a1a1a;">
-      <div style="background: #8b5cf6; padding: 20px 30px;">
-        <h2 style="color: #fff; margin: 0; font-size: 18px;">✨ New Custom Order Request</h2>
-      </div>
-      <div style="padding: 30px; background: #f9f9f9; border: 1px solid #eee; border-top: none;">
-        <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
-          <tr><td style="padding: 6px 0; color: #666;">Request Number</td><td style="padding: 6px 0; font-weight: 700;">#${order.orderNumber}</td></tr>
-          <tr><td style="padding: 6px 0; color: #666;">Customer</td><td style="padding: 6px 0;">${order.shippingAddress?.fullName || 'N/A'}</td></tr>
-          <tr><td style="padding: 6px 0; color: #666;">Email</td><td style="padding: 6px 0;">${order.customer?.email || 'N/A'}</td></tr>
-          <tr><td style="padding: 6px 0; color: #666;">Phone</td><td style="padding: 6px 0;">${order.shippingAddress?.phone || 'N/A'}</td></tr>
-          <tr><td style="padding: 6px 0; color: #666;">Product</td><td style="padding: 6px 0; font-weight:700;">${item.name || 'N/A'}</td></tr>
-        </table>
-        <div style="margin-top: 20px; background: #fff; padding: 15px; border: 1px solid #eee; border-radius:3px;">
-          <h4 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; color:#888;">Design Specifications</h4>
-          ${customizationsHtml}
-        </div>
-        <div style="margin-top: 24px;">
-          <a href="${process.env.NEXTAUTH_URL}/admin/orders/${order._id}"
-             style="display:inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: 700; text-transform:uppercase; letter-spacing:1px;">
-            View Order & Specifications →
-          </a>
-        </div>
-      </div>
-    </div>
-  `;
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO System"),
-      to: adminEmail,
-      subject: `✨ New Custom Order: #${order.orderNumber} by ${order.shippingAddress?.fullName || 'Guest'}`,
-      html,
-    });
-    console.log(`[Email] ✅ Admin notified of custom order (${adminEmail}) | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send admin custom notification:', err.message);
-  }
-}
-
-/**
- * Send Question Submission Confirmation Email to Customer
- */
-export async function sendQuestionConfirmationEmail({ customerEmail, customerName, productName }) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Q&A Confirmation → ${customerEmail}`);
-    return;
-  }
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; padding: 20px; border: 1px solid #eaeaea;">
-      <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #eaeaea;">
-        <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 2px;">PAIRO</h1>
-      </div>
-      <div style="padding: 30px 10px;">
-        <p style="font-size: 15px; line-height: 1.6;">Dear ${customerName || 'Customer'},</p>
-        <p style="font-size: 15px; line-height: 1.6;">Thank you for your question.</p>
-        <p style="font-size: 15px; line-height: 1.6;">We have received your question regarding <strong>${productName}</strong>.</p>
-        <p style="font-size: 15px; line-height: 1.6; color: #666;">Our team will review it and get back to you shortly.</p>
-      </div>
-      <div style="border-top: 1px solid #eaeaea; padding-top: 20px; text-align: center;">
-        <p style="font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
-          PAIRO Store • Customer Experience Team
-        </p>
-      </div>
-    </div>
-  `;
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO Store"),
-      to: customerEmail,
-      subject: `We have received your question regarding ${productName}`,
-      html,
-    });
-    console.log(`[Email] ✅ Q&A confirmation sent to ${customerEmail} | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send Q&A confirmation:', err.message);
-  }
-}
-
-/**
- * Send Admin Notification for a New Customer Question
- */
-export async function sendAdminQuestionNotification({ customerName, customerEmail, productName, questionText }) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Admin notified of new question by ${customerName}`);
-    return;
-  }
-
+async function resolveAdminEmail(label) {
   let adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) {
     try {
@@ -948,111 +230,102 @@ export async function sendAdminQuestionNotification({ customerName, customerEmai
         if (superAdmin) adminEmail = superAdmin.email;
       }
     } catch (e) {
-      console.error("Failed to fetch super admin for email fallback:", e.message);
+      console.error('Failed to fetch super admin for email fallback:', e.message);
     }
   }
-
   if (!adminEmail) {
-    console.warn('[Email] ADMIN_EMAIL and Super Admin not found — skipping admin Q&A notification.');
-    return;
+    console.warn(`[Email] ADMIN_EMAIL and Super Admin not found — skipping ${label}.`);
   }
-
-  const dateStr = new Date().toLocaleString();
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 500px; margin: auto; color: #1a1a1a;">
-      <div style="background: #1a1a1a; padding: 20px 30px; text-align: center;">
-        <h2 style="color: #fff; margin: 0; font-size: 18px; letter-spacing: 1px;">❓ New Product Question</h2>
-      </div>
-      <div style="padding: 30px; background: #f9f9f9; border: 1px solid #eee; border-top: none;">
-        <table style="width: 100%; font-size: 14px; border-collapse: collapse; margin-bottom: 20px;">
-          <tr><td style="padding: 6px 0; color: #666;">Customer Name</td><td style="padding: 6px 0; font-weight: 700;">${customerName}</td></tr>
-          <tr><td style="padding: 6px 0; color: #666;">Customer Email</td><td style="padding: 6px 0;">${customerEmail}</td></tr>
-          <tr><td style="padding: 6px 0; color: #666;">Product Name</td><td style="padding: 6px 0; font-weight: 700;">${productName}</td></tr>
-          <tr><td style="padding: 6px 0; color: #666;">Submitted Date</td><td style="padding: 6px 0;">${dateStr}</td></tr>
-        </table>
-        <div style="background: #fff; padding: 15px; border: 1px solid #eee; border-radius:3px;">
-          <h4 style="margin:0 0 10px; font-size:11px; text-transform:uppercase; color:#888;">Submitted Question</h4>
-          <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #1a1a1a; font-style: italic;">"${questionText}"</p>
-        </div>
-        <div style="margin-top: 24px; text-align: center;">
-          <a href="${process.env.NEXTAUTH_URL || 'https://pairolifestyle.com'}/admin/products/questions"
-             style="display:inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 3px; font-size: 12px; font-weight: 700; text-transform:uppercase; letter-spacing:1px;">
-            Moderate Questions & Answers →
-          </a>
-        </div>
-      </div>
-    </div>
-  `;
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO Store System"),
-      to: adminEmail,
-      subject: `❓ New Q&A Question on ${productName} by ${customerName}`,
-      html,
-    });
-    console.log(`[Email] ✅ Admin notified of new question | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send admin Q&A notification:', err.message);
-  }
+  return adminEmail;
 }
 
 /**
- * Send Question Reply Email to Customer
+ * Single send path for every email in this file: simulates (logs only) when
+ * no SMTP provider is configured, otherwise sends and logs the result the
+ * same way everywhere. `critical: true` rethrows on failure, matching the
+ * functions that previously threw so callers can react to a hard failure.
  */
-export async function sendQuestionReplyEmail({ customerEmail, customerName, originalQuestion, replyText, productName, productSlug }) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Reply Email → ${customerEmail}`);
-    return;
+async function dispatchEmail({ to, subject, html, from, label, critical = false }) {
+  if (!to) {
+    console.warn(`[Email] ${label}: no recipient address — skipped.`);
+    return null;
   }
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com';
-  const productLink = `${siteUrl}/product/${productSlug}`;
-
-  const html = `
-    <div style="font-family: 'Helvetica Neue', sans-serif; max-width: 600px; margin: auto; color: #1a1a1a; padding: 20px; border: 1px solid #eaeaea;">
-      <div style="text-align: center; padding-bottom: 20px; border-bottom: 1px solid #eaeaea;">
-        <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 2px;">PAIRO</h1>
-      </div>
-      <div style="padding: 30px 10px;">
-        <p style="font-size: 15px; line-height: 1.6;">Dear ${customerName || 'Customer'},</p>
-        <p style="font-size: 15px; line-height: 1.6;">We have answered your question regarding <strong>${productName}</strong>.</p>
-        
-        <div style="margin: 20px 0; padding: 15px; background-color: #f9f9f9; border-left: 3px solid #ccc; font-style: italic;">
-          <p style="margin: 0 0 5px 0; font-size: 12px; color: #888; text-transform: uppercase;">Your Question:</p>
-          <p style="margin: 0; font-size: 14px; color: #555;">"${originalQuestion}"</p>
-        </div>
-
-        <div style="margin: 20px 0; padding: 15px; background-color: #f0f7ff; border-left: 3px solid #0070f3;">
-          <p style="margin: 0 0 5px 0; font-size: 12px; color: #0070f3; text-transform: uppercase; font-weight: bold;">PAIRO Store Reply:</p>
-          <p style="margin: 0; font-size: 14px; color: #111; font-weight: 500;">${replyText}</p>
-        </div>
-
-        <p style="font-size: 14px; margin-top: 30px;">
-          You can view this Q&A directly on the product detail page here: <br/>
-          <a href="${productLink}" style="color: #0070f3; text-decoration: underline; font-weight: bold;">${productName} Page</a>
-        </p>
-      </div>
-      <div style="border-top: 1px solid #eaeaea; padding-top: 20px; text-align: center;">
-        <p style="font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
-          PAIRO Store • Customer Experience Team
-        </p>
-      </div>
-    </div>
-  `;
-
+  if (!isSmtpConfigured()) {
+    console.log(`[Email Simulation] ${label} → ${to}`);
+    return null;
+  }
   try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO Support"),
-      to: customerEmail,
-      subject: `Answered: Your question regarding ${productName}`,
-      html,
-    });
-    console.log(`[Email] ✅ Q&A reply email sent to ${customerEmail} | MsgID: ${info.messageId}`);
+    const info = await transporter.sendMail({ from: from || getFromAddress(), to, subject, html });
+    console.log(`[Email] ✅ ${label} sent to ${to} | MsgID: ${info.messageId}`);
+    return info;
   } catch (err) {
-    console.error('[Email] ❌ Failed to send Q&A reply email:', err.message);
+    console.error(`[Email] ❌ Failed to send ${label}:`, err.message);
+    if (critical) throw err;
+    return null;
   }
+}
+
+// ─── ACCOUNT EMAILS ────────────────────────────────────────────────────────────
+
+/**
+ * Send Email Verification to New Customer
+ */
+export async function sendEmailVerification(toEmail, name, verificationUrl) {
+  const firstName = name?.split(' ')[0] || 'there';
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+
+  const html = emailShell({
+    eyebrow: 'Lifestyle Collection',
+    heading: 'Verify Your Email',
+    subheading: `Hi ${escapeHtml(firstName)}, welcome to ${escapeHtml(storeName)}. Please verify your email address to activate your account and start shopping.`,
+    bodyHtml: `
+      ${buttonBlock(verificationUrl, 'Verify Email Address')}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:24px;">
+        This link expires in <strong>24 hours</strong>. If you did not create an account at ${escapeHtml(storeName)}, you can safely ignore this email.
+      </p>
+      <p style="margin:12px 0 0;color:${BRAND.faint};font-size:11px;word-break:break-all;">${verificationUrl}</p>
+    `,
+    preheader: 'Verify your email to activate your account.',
+  });
+
+  await dispatchEmail({
+    to: toEmail,
+    subject: `Verify your email — ${storeName}`,
+    html,
+    from: getFromAddress(storeName),
+    label: 'Verification email',
+    critical: true,
+  });
+}
+
+/**
+ * Send Email Verification to New Affiliate Applicant
+ */
+export async function sendAffiliateEmailVerification(toEmail, name, verificationUrl) {
+  const firstName = name?.split(' ')[0] || 'there';
+
+  const html = emailShell({
+    eyebrow: 'Affiliate Partners',
+    heading: 'Verify Your Email',
+    subheading: `Hi ${escapeHtml(firstName)}, thank you for applying to the PAIRO Affiliate Program. Please verify your email address to submit your application for review.`,
+    bodyHtml: `
+      ${buttonBlock(verificationUrl, 'Verify Email Address')}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:24px;">
+        This link expires in <strong>24 hours</strong>. If you did not apply for the Pairo Affiliate Program, you can safely ignore this email.
+      </p>
+      <p style="margin:12px 0 0;color:${BRAND.faint};font-size:11px;word-break:break-all;">${verificationUrl}</p>
+    `,
+    preheader: 'Verify your email to submit your affiliate application.',
+  });
+
+  await dispatchEmail({
+    to: toEmail,
+    subject: 'Verify your email — PAIRO Affiliates',
+    html,
+    from: getFromAddress('PAIRO Affiliates'),
+    label: 'Affiliate verification email',
+    critical: true,
+  });
 }
 
 /**
@@ -1061,127 +334,502 @@ export async function sendQuestionReplyEmail({ customerEmail, customerName, orig
 export async function sendCustomerPasswordReset(toEmail, name, resetUrl) {
   const firstName = name?.split(' ')[0] || 'there';
 
-  const html = `
-    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 560px; margin: auto; color: #1a1a1a; background: #fff;">
-      <div style="background: #1a1a1a; padding: 28px 32px; text-align: center;">
-        <h1 style="color: #fff; margin: 0; letter-spacing: 6px; font-size: 22px; font-weight: 800; text-transform: uppercase;">PAIRO</h1>
-        <p style="color: #888; margin: 6px 0 0; font-size: 11px; letter-spacing: 3px; text-transform: uppercase;">Lifestyle Collection</p>
-      </div>
-      <div style="padding: 48px 40px; background: #fff;">
-        <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 12px; letter-spacing: -0.5px;">Reset Your Password</h2>
-        <p style="color: #555; font-size: 15px; line-height: 1.7; margin: 0 0 32px;">
-          Hi ${firstName},<br/>
-          We received a request to reset the password for your PAIRO account. Click the button below to set a new password.
-        </p>
-        <div style="text-align: center; margin: 36px 0;">
-          <a href="${resetUrl}"
-             style="display: inline-block; background: #1a1a1a; color: #fff; padding: 16px 40px; border-radius: 3px; font-size: 12px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; text-decoration: none;">
-            Reset Password
-          </a>
-        </div>
-        <p style="color: #999; font-size: 12px; line-height: 1.6; border-top: 1px solid #f0f0f0; padding-top: 24px; margin: 0;">
-          This link expires in <strong>1 hour</strong>.<br/>
-          If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.
-        </p>
-        <p style="color: #bbb; font-size: 11px; margin-top: 12px;">
-          Or copy this link into your browser:<br/>
-          <span style="color: #555; word-break: break-all;">${resetUrl}</span>
-        </p>
-      </div>
-      <div style="border-top: 1px solid #eee; padding: 18px 32px; text-align: center; background: #fafafa;">
-        <p style="font-size: 11px; color: #bbb; text-transform: uppercase; letter-spacing: 2px; margin: 0;">
-          PAIRO Lifestyle • pairolifestyle.com
-        </p>
-      </div>
-    </div>
-  `;
+  const html = emailShell({
+    eyebrow: 'Lifestyle Collection',
+    heading: 'Reset Your Password',
+    subheading: `Hi ${escapeHtml(firstName)}, we received a request to reset the password for your PAIRO account. This link expires in <strong>1 hour</strong>.`,
+    bodyHtml: `
+      ${buttonBlock(resetUrl, 'Reset Password')}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:24px;">
+        If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.
+      </p>
+      <p style="margin:12px 0 0;color:${BRAND.faint};font-size:11px;word-break:break-all;">${resetUrl}</p>
+    `,
+    preheader: 'Reset your PAIRO account password.',
+  });
 
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log(`[Email Simulation] Customer Password Reset → ${toEmail} | URL: ${resetUrl}`);
+  await dispatchEmail({
+    to: toEmail,
+    subject: 'Reset your password — PAIRO Lifestyle',
+    html,
+    from: getFromAddress('PAIRO Lifestyle'),
+    label: 'Customer password reset',
+    critical: true,
+  });
+}
+
+/**
+ * Send Affiliate Password Reset Email
+ */
+export async function sendAffiliatePasswordReset(toEmail, name, resetUrl) {
+  const firstName = name?.split(' ')[0] || 'Partner';
+
+  const html = emailShell({
+    eyebrow: 'Partner Portal',
+    heading: 'Reset Your Password',
+    subheading: `Hi ${escapeHtml(firstName)}, we received a request to reset the password for your PAIRO Partner account. This link expires in <strong>1 hour</strong>.`,
+    bodyHtml: `
+      ${buttonBlock(resetUrl, 'Reset Password')}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:24px;">
+        If you did not request a password reset, please ignore this email — your account is safe. For security, do not share this link with anyone.
+      </p>
+    `,
+    preheader: 'Reset your PAIRO Partner account password.',
+  });
+
+  await dispatchEmail({
+    to: toEmail,
+    subject: 'Reset Your PAIRO Partner Password',
+    html,
+    from: getFromAddress('PAIRO Partners'),
+    label: 'Affiliate password reset',
+    critical: true,
+  });
+}
+
+// ─── ORDER EMAILS ──────────────────────────────────────────────────────────────
+
+/**
+ * Send Order Confirmation Email to Customer
+ */
+export async function sendOrderConfirmation(order) {
+  const itemsRows = (order.items || []).map((item) => `
+    <tr>
+      <td style="padding:12px 10px;border-bottom:1px solid ${BRAND.border};">
+        <strong style="color:${BRAND.ink};">${escapeHtml(item.name || '')}</strong><br/>
+        <span style="color:${BRAND.muted};font-size:12px;">${escapeHtml(item.selectedVariant?.title || '')}</span>
+      </td>
+      <td style="padding:12px 10px;border-bottom:1px solid ${BRAND.border};text-align:center;color:${BRAND.ink};">${item.quantity}</td>
+      <td style="padding:12px 10px;border-bottom:1px solid ${BRAND.border};text-align:right;color:${BRAND.ink};font-weight:700;">$${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}</td>
+    </tr>`).join('');
+
+  const itemsTable = `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin-bottom:8px;">
+      <thead><tr style="background:${BRAND.surface};">
+        <th style="text-align:left;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Product</th>
+        <th style="padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Qty</th>
+        <th style="text-align:right;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Total</th>
+      </tr></thead>
+      <tbody>${itemsRows}</tbody>
+      <tfoot><tr>
+        <td colspan="2" style="padding:16px 10px;text-align:right;font-weight:700;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">Total Paid</td>
+        <td style="padding:16px 10px;text-align:right;font-weight:800;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">$${(order.financials?.total || 0).toLocaleString()}</td>
+      </tr></tfoot>
+    </table>`;
+
+  const accountSectionHtml = order.guestAccount?.created && order.guestAccount?.temporaryPassword
+    ? emailPanel(`
+        <p style="margin:0 0 14px;color:${BRAND.muted};font-size:13px;line-height:1.6;">Thank you for your order! We created your customer account so you can track orders, view your order history, save addresses, and checkout faster next time.</p>
+        ${fieldTable(
+          fieldRow('Login Email', escapeHtml(order.guestAccount.loginEmail || order.customer?.email || '')) +
+          fieldRow('Temporary Password', `<span style="font-family:monospace;background:${BRAND.paper};border:1px solid ${BRAND.border};padding:3px 8px;border-radius:4px;">${escapeHtml(order.guestAccount.temporaryPassword)}</span>`)
+        )}
+        <div style="margin-top:14px;">${emailButton(order.guestAccount.loginUrl || 'https://pairolifestyle.com/login', 'Log In To Your Account', { align: 'left' })}</div>
+      `, { title: 'Your Customer Account Has Been Created' })
+    : '';
+
+  const shippingHtml = emailPanel(`
+    <p style="margin:0;font-size:14px;line-height:1.8;color:${BRAND.ink};">
+      ${escapeHtml(order.shippingAddress?.fullName || '')}<br/>
+      ${escapeHtml(order.shippingAddress?.street || '')}<br/>
+      ${escapeHtml(order.shippingAddress?.city || '')}${order.shippingAddress?.zip ? `, ${escapeHtml(order.shippingAddress.zip)}` : ''}<br/>
+      ${escapeHtml(order.shippingAddress?.country || '')}
+    </p>
+  `, { title: 'Shipping To', accentColor: BRAND.ink });
+
+  const html = emailShell({
+    eyebrow: 'Order Confirmed',
+    heading: 'Thank You For Your Order',
+    subheading: `Hi ${escapeHtml(order.shippingAddress?.fullName?.split(' ')[0] || 'there')}, your order <strong>#${escapeHtml(order.orderNumber)}</strong> has been confirmed and is being prepared for dispatch.`,
+    bodyHtml: `${itemsTable}<div style="margin-top:28px;">${accountSectionHtml}${shippingHtml}</div>`,
+    preheader: `Your order #${order.orderNumber} has been confirmed.`,
+  });
+
+  await dispatchEmail({
+    to: order.customer?.email,
+    subject: `Order Confirmed: #${order.orderNumber}`,
+    html,
+    from: getFromAddress('PAIRO Store'),
+    label: `Order confirmation (#${order.orderNumber})`,
+    critical: true,
+  });
+}
+
+/**
+ * Send Admin Notification for New Order
+ */
+export async function sendAdminOrderNotification(order) {
+  if (!isSmtpConfigured()) {
+    console.log(`[Email Simulation] Admin notified of Order ${order.orderNumber}`);
     return;
   }
 
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO Lifestyle"),
-      to: toEmail,
-      subject: `Reset your password — PAIRO Lifestyle`,
-      html,
-    });
-    console.log(`[Email] ✅ Customer password reset email sent to ${toEmail} | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send customer password reset email:', err.message);
-    throw err;
-  }
+  const adminEmail = await resolveAdminEmail(`order notification #${order.orderNumber}`);
+  if (!adminEmail) return;
+
+  const dashboardUrl = `${process.env.NEXTAUTH_URL || 'https://pairolifestyle.com'}/admin/orders/${order._id}`;
+  const html = emailShell({
+    eyebrow: 'Admin Notification',
+    heading: 'New Order Received',
+    subheading: `Order <strong>#${escapeHtml(order.orderNumber)}</strong> has just been placed.`,
+    bodyHtml: `
+      ${emailPanel(fieldTable(
+        fieldRow('Order Number', `#${escapeHtml(order.orderNumber)}`) +
+        fieldRow('Customer', escapeHtml(order.shippingAddress?.fullName || 'N/A')) +
+        fieldRow('Email', escapeHtml(order.customer?.email || 'N/A')) +
+        fieldRow('Items', String((order.items || []).length)) +
+        fieldRow('Total', `<span style="font-size:16px;font-weight:800;">$${(order.financials?.total || 0).toLocaleString()}</span>`)
+      ))}
+      ${buttonBlock(dashboardUrl, 'View Order In Dashboard')}
+    `,
+  });
+
+  await dispatchEmail({
+    to: adminEmail,
+    subject: `New Order: #${order.orderNumber} — $${(order.financials?.total || 0).toLocaleString()}`,
+    html,
+    from: getFromAddress('PAIRO System'),
+    label: `Admin order notification (#${order.orderNumber})`,
+  });
 }
 
-// ─── CUSTOM JACKET INQUIRY EMAILS ─────────────────────────────────────────────
+/**
+ * Send a reply to a customer submission (CRM / contact form thread)
+ */
+export async function sendSubmissionReply(toEmail, subject, message, customerName) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const html = emailShell({
+    eyebrow: 'Concierge',
+    heading: 'A Message From Our Team',
+    bodyHtml: `
+      <p style="margin:0 0 20px;color:${BRAND.muted};font-size:14px;">Dear ${escapeHtml(customerName || 'Customer')},</p>
+      <div style="font-size:15px;color:${BRAND.ink};line-height:1.8;white-space:pre-wrap;">${escapeHtml(message)}</div>
+      <div style="margin-top:36px;padding-top:20px;border-top:1px solid ${BRAND.border};">
+        <p style="margin:0;color:${BRAND.muted};font-size:13px;">Kind regards,</p>
+        <p style="margin:4px 0 0;color:${BRAND.ink};font-size:14px;font-weight:700;">The ${escapeHtml(storeName)} Team</p>
+      </div>
+    `,
+    preheader: (message || '').slice(0, 120),
+  });
+
+  await dispatchEmail({ to: toEmail, subject, html, from: getFromAddress('PAIRO Support'), label: 'CRM reply' });
+}
+
+// ─── AFFILIATE EMAILS ──────────────────────────────────────────────────────────
+
+/**
+ * Send Affiliate Application Received email
+ */
+export async function sendAffiliateApplicationReceived(toEmail, affiliateName) {
+  const html = emailShell({
+    eyebrow: 'Affiliate Partners',
+    heading: 'Application Received',
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:${BRAND.muted};font-size:14px;">Hi ${escapeHtml(affiliateName)},</p>
+      <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.7;">Thank you for applying to the Pairo Affiliate Program. We have received your application and identity documents.</p>
+      <p style="margin:0;color:${BRAND.ink};font-size:15px;line-height:1.7;">Our review team is auditing your details. You will receive an email update with your login credentials as soon as your account is approved.</p>
+      <div style="margin-top:36px;padding-top:20px;border-top:1px solid ${BRAND.border};">
+        <p style="margin:0;color:${BRAND.muted};font-size:13px;">Kind regards,</p>
+        <p style="margin:4px 0 0;color:${BRAND.ink};font-size:14px;font-weight:700;">The Pairo Team</p>
+      </div>
+    `,
+  });
+
+  await dispatchEmail({ to: toEmail, subject: 'Affiliate Application Received — Pairo Lifestyle', html, from: getFromAddress('PAIRO Affiliates'), label: 'Affiliate application received' });
+}
+
+/**
+ * Send Affiliate Application Approved email
+ */
+export async function sendAffiliateApplicationApproved(toEmail, affiliateName, referralCode, tempPassword, commissionType = 'Percentage', commissionRate = 5) {
+  const loginUrl = `${process.env.NEXTAUTH_URL || 'https://pairolifestyle.com'}/affiliate-login`;
+
+  const html = emailShell({
+    eyebrow: 'Affiliate Partners',
+    heading: 'Your Application Has Been Approved',
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:${BRAND.muted};font-size:14px;">Dear ${escapeHtml(affiliateName)},</p>
+      <p style="margin:0 0 20px;color:${BRAND.ink};font-size:15px;line-height:1.7;">Congratulations! You can now log in to your dedicated Affiliate Portal to start generating links, tracking conversions, and viewing commissions.</p>
+      ${emailPanel(fieldTable(
+        fieldRow('Portal Login URL', `<a href="${loginUrl}" style="color:${BRAND.ink};">${loginUrl}</a>`) +
+        fieldRow('Login Email', escapeHtml(toEmail)) +
+        fieldRow('Temporary Password', `<span style="font-family:monospace;background:${BRAND.paper};border:1px solid ${BRAND.border};padding:3px 8px;border-radius:4px;">${escapeHtml(tempPassword)}</span>`) +
+        fieldRow('Referral Code', escapeHtml(referralCode)) +
+        fieldRow('Commission Rate', commissionType === 'Fixed' ? `$${commissionRate} fixed per product sold` : `${commissionRate}% on all delivered orders`)
+      ), { title: 'Your Account Details' })}
+      <div style="padding-top:20px;border-top:1px solid ${BRAND.border};">
+        <p style="margin:0;color:${BRAND.muted};font-size:13px;">Kind regards,</p>
+        <p style="margin:4px 0 0;color:${BRAND.ink};font-size:14px;font-weight:700;">The Pairo Team</p>
+      </div>
+    `,
+  });
+
+  await dispatchEmail({ to: toEmail, subject: 'Affiliate Account Approved! — Pairo Lifestyle', html, from: getFromAddress('PAIRO Affiliates'), label: 'Affiliate application approved' });
+}
+
+/**
+ * Send Affiliate Application Rejected email
+ */
+export async function sendAffiliateApplicationRejected(toEmail, affiliateName, reason) {
+  const html = emailShell({
+    eyebrow: 'Affiliate Partners',
+    heading: 'Application Update',
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:${BRAND.muted};font-size:14px;">Dear ${escapeHtml(affiliateName)},</p>
+      <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.7;">Thank you for your interest in the Pairo Affiliate Program.</p>
+      <p style="margin:0 0 ${reason ? '20px' : '0'};color:${BRAND.ink};font-size:15px;line-height:1.7;">After reviewing your application details and marketing channels, we regret to inform you that we are unable to accept your application at this time.</p>
+      ${reason ? emailPanel(`<p style="margin:0;color:${BRAND.danger};font-size:14px;line-height:1.6;"><strong>Review notes:</strong> ${escapeHtml(reason)}</p>`, { accentColor: BRAND.danger }) : ''}
+      <div style="padding-top:20px;border-top:1px solid ${BRAND.border};">
+        <p style="margin:0;color:${BRAND.muted};font-size:13px;">Kind regards,</p>
+        <p style="margin:4px 0 0;color:${BRAND.ink};font-size:14px;font-weight:700;">The Pairo Team</p>
+      </div>
+    `,
+  });
+
+  await dispatchEmail({ to: toEmail, subject: 'Affiliate Application Update — Pairo Lifestyle', html, from: getFromAddress('PAIRO Affiliates'), label: 'Affiliate application rejected' });
+}
+
+/**
+ * Send Affiliate Payout Update email
+ */
+export async function sendAffiliatePayoutUpdate(toEmail, affiliateName, amount, status, notes) {
+  const html = emailShell({
+    eyebrow: 'Affiliate Partners',
+    heading: 'Payout Update',
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:${BRAND.muted};font-size:14px;">Dear ${escapeHtml(affiliateName)},</p>
+      <p style="margin:0 0 8px;color:${BRAND.ink};font-size:15px;line-height:1.7;">This is an update regarding your affiliate payout request of <strong>$${Number(amount).toLocaleString()}</strong>.</p>
+      <p style="margin:0 0 ${notes ? '20px' : '0'};color:${BRAND.ink};font-size:15px;">Status: <strong style="text-transform:uppercase;">${escapeHtml(status)}</strong></p>
+      ${notes ? emailPanel(`<p style="margin:0;color:${BRAND.ink};font-size:14px;line-height:1.6;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>`) : ''}
+      <div style="padding-top:20px;border-top:1px solid ${BRAND.border};">
+        <p style="margin:0;color:${BRAND.muted};font-size:13px;">Kind regards,</p>
+        <p style="margin:4px 0 0;color:${BRAND.ink};font-size:14px;font-weight:700;">The Pairo Team</p>
+      </div>
+    `,
+  });
+
+  await dispatchEmail({ to: toEmail, subject: `Affiliate Payout Update: $${amount} — Pairo Lifestyle`, html, from: getFromAddress('PAIRO Affiliates'), label: 'Affiliate payout update' });
+}
+
+// ─── CUSTOM ORDER EMAILS ───────────────────────────────────────────────────────
+
+/**
+ * Send Custom Order / Bespoke Design Request Confirmation Email to Customer
+ */
+export async function sendCustomOrderConfirmation(order) {
+  const item = order.items?.[0] || {};
+  const c = item.customization || {};
+
+  const rows = [];
+  if (c.leatherColor && c.leatherColor !== 'None') rows.push(fieldRow('Leather Color', escapeHtml(c.leatherColor) + (c.leatherColorNote ? ` (${escapeHtml(c.leatherColorNote)})` : '')));
+  if (c.leatherType && c.leatherType !== 'None') rows.push(fieldRow('Leather Type', escapeHtml(c.leatherType) + (c.leatherTypeNote ? ` (${escapeHtml(c.leatherTypeNote)})` : '')));
+  if (c.innerLining && c.innerLining !== 'None') rows.push(fieldRow('Inner Lining', escapeHtml(c.innerLining) + (c.innerLiningNote ? ` (${escapeHtml(c.innerLiningNote)})` : '')));
+  if (c.hardwareColor && c.hardwareColor !== 'None') rows.push(fieldRow('Hardware Color', escapeHtml(c.hardwareColor) + (c.hardwareColorNote ? ` (${escapeHtml(c.hardwareColorNote)})` : '')));
+  if (c.fur?.type && c.fur.type !== 'None') {
+    rows.push(fieldRow('Fur Type', escapeHtml(c.fur.type) + (c.fur.typeNote ? ` (${escapeHtml(c.fur.typeNote)})` : '')));
+    if (c.fur.color) rows.push(fieldRow('Fur Color', escapeHtml(c.fur.color)));
+    if (c.fur.placement?.length) rows.push(fieldRow('Fur Placement', escapeHtml(c.fur.placement.join(', '))));
+    if (c.fur.density) rows.push(fieldRow('Fur Density', escapeHtml(c.fur.density)));
+    if (c.fur.removable !== null && c.fur.removable !== undefined) rows.push(fieldRow('Removable Fur', c.fur.removable ? 'Yes' : 'No'));
+  }
+
+  let artworkHtml = '';
+  if (c.artwork && Object.values(c.artwork).some(Boolean)) {
+    const links = Object.entries(c.artwork)
+      .filter(([, art]) => art?.url)
+      .map(([key, art]) => `<p style="margin:4px 0;font-size:13px;color:${BRAND.ink};"><strong>${escapeHtml(key.replace(/([A-Z])/g, ' $1'))}:</strong> <a href="${art.url}" style="color:${BRAND.ink};text-decoration:underline;">${escapeHtml(art.name || 'View File')}</a></p>`)
+      .join('');
+    artworkHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px dashed ${BRAND.border};"><p style="margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Uploaded Artwork</p>${links}</div>`;
+  }
+
+  const notesHtml = order.customerNote
+    ? `<p style="margin:12px 0 0;padding-top:12px;border-top:1px dashed ${BRAND.border};font-size:13px;color:${BRAND.ink};"><strong>Additional Notes:</strong> <em>${escapeHtml(order.customerNote)}</em></p>`
+    : '';
+
+  const html = emailShell({
+    eyebrow: 'Bespoke Design Service',
+    heading: `Thank You, ${escapeHtml(order.shippingAddress?.fullName?.split(' ')[0] || 'there')}!`,
+    subheading: `We've received your custom design request for <strong>${escapeHtml(item.name || '')}</strong>. Your request ID is <strong>#${escapeHtml(order.orderNumber)}</strong>, submitted on ${new Date(order.createdAt).toLocaleDateString()}.`,
+    bodyHtml: `
+      ${emailPanel(fieldTable(rows.join('')) + artworkHtml + notesHtml, { title: 'Your Custom Selections' })}
+      <p style="margin:0;color:${BRAND.muted};font-size:14px;line-height:1.7;">Our master artisans and design team are already reviewing your customization. We will contact you via email or phone shortly to discuss pricing, options, and timeline.</p>
+    `,
+    preheader: `Request #${order.orderNumber} received.`,
+  });
+
+  await dispatchEmail({
+    to: order.customer?.email,
+    subject: `PAIRO Bespoke Design Request Received: #${order.orderNumber}`,
+    html,
+    from: getFromAddress('PAIRO Custom Design'),
+    label: `Custom order confirmation (#${order.orderNumber})`,
+    critical: true,
+  });
+}
+
+/**
+ * Send Admin Notification for Custom Order Design Request
+ */
+export async function sendAdminCustomOrderNotification(order) {
+  if (!isSmtpConfigured()) {
+    console.log(`[Email Simulation] Admin notified of Custom Order ${order.orderNumber}`);
+    return;
+  }
+
+  const adminEmail = await resolveAdminEmail(`custom order notification #${order.orderNumber}`);
+  if (!adminEmail) return;
+
+  const item = order.items?.[0] || {};
+  const c = item.customization || {};
+  const rows = [
+    c.leatherColor && c.leatherColor !== 'None' && fieldRow('Leather Color', escapeHtml(c.leatherColor) + (c.leatherColorNote ? ` (${escapeHtml(c.leatherColorNote)})` : '')),
+    c.leatherType && c.leatherType !== 'None' && fieldRow('Leather Type', escapeHtml(c.leatherType) + (c.leatherTypeNote ? ` (${escapeHtml(c.leatherTypeNote)})` : '')),
+    c.innerLining && c.innerLining !== 'None' && fieldRow('Inner Lining', escapeHtml(c.innerLining) + (c.innerLiningNote ? ` (${escapeHtml(c.innerLiningNote)})` : '')),
+    c.hardwareColor && c.hardwareColor !== 'None' && fieldRow('Hardware Color', escapeHtml(c.hardwareColor) + (c.hardwareColorNote ? ` (${escapeHtml(c.hardwareColorNote)})` : '')),
+  ].filter(Boolean).join('');
+
+  const dashboardUrl = `${process.env.NEXTAUTH_URL || 'https://pairolifestyle.com'}/admin/orders/${order._id}`;
+  const html = emailShell({
+    eyebrow: 'Admin Notification',
+    heading: 'New Custom Order Request',
+    bodyHtml: `
+      ${emailPanel(fieldTable(
+        fieldRow('Request Number', `#${escapeHtml(order.orderNumber)}`) +
+        fieldRow('Customer', escapeHtml(order.shippingAddress?.fullName || 'N/A')) +
+        fieldRow('Email', escapeHtml(order.customer?.email || 'N/A')) +
+        fieldRow('Phone', escapeHtml(order.shippingAddress?.phone || 'N/A')) +
+        fieldRow('Product', escapeHtml(item.name || 'N/A'))
+      ))}
+      ${emailPanel(fieldTable(rows), { title: 'Design Specifications' })}
+      ${buttonBlock(dashboardUrl, 'View Order & Specifications')}
+    `,
+  });
+
+  await dispatchEmail({
+    to: adminEmail,
+    subject: `New Custom Order: #${order.orderNumber} by ${order.shippingAddress?.fullName || 'Guest'}`,
+    html,
+    from: getFromAddress('PAIRO System'),
+    label: `Admin custom order notification (#${order.orderNumber})`,
+  });
+}
+
+// ─── PRODUCT Q&A EMAILS ────────────────────────────────────────────────────────
+
+/**
+ * Send Question Submission Confirmation Email to Customer
+ */
+export async function sendQuestionConfirmationEmail({ customerEmail, customerName, productName }) {
+  const html = emailShell({
+    eyebrow: 'Customer Experience',
+    heading: 'We’ve Received Your Question',
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:${BRAND.muted};font-size:14px;">Dear ${escapeHtml(customerName || 'Customer')},</p>
+      <p style="margin:0 0 10px;color:${BRAND.ink};font-size:15px;line-height:1.7;">Thank you for your question regarding <strong>${escapeHtml(productName)}</strong>.</p>
+      <p style="margin:0;color:${BRAND.muted};font-size:14px;line-height:1.7;">Our team will review it and get back to you shortly.</p>
+    `,
+  });
+
+  await dispatchEmail({ to: customerEmail, subject: `We have received your question regarding ${productName}`, html, from: getFromAddress('PAIRO Store'), label: 'Question confirmation' });
+}
+
+/**
+ * Send Admin Notification for a New Customer Question
+ */
+export async function sendAdminQuestionNotification({ customerName, customerEmail, productName, questionText }) {
+  if (!isSmtpConfigured()) {
+    console.log(`[Email Simulation] Admin notified of new question by ${customerName}`);
+    return;
+  }
+
+  const adminEmail = await resolveAdminEmail('new product question');
+  if (!adminEmail) return;
+
+  const dateStr = new Date().toLocaleString();
+  const html = emailShell({
+    eyebrow: 'Admin Notification',
+    heading: 'New Product Question',
+    bodyHtml: `
+      ${emailPanel(fieldTable(
+        fieldRow('Customer Name', escapeHtml(customerName)) +
+        fieldRow('Customer Email', escapeHtml(customerEmail)) +
+        fieldRow('Product Name', escapeHtml(productName)) +
+        fieldRow('Submitted Date', dateStr)
+      ))}
+      ${emailPanel(`<p style="margin:0;color:${BRAND.ink};font-size:14px;line-height:1.6;font-style:italic;">“${escapeHtml(questionText)}”</p>`, { title: 'Submitted Question' })}
+      ${buttonBlock(`${process.env.NEXTAUTH_URL || 'https://pairolifestyle.com'}/admin/products/questions`, 'Moderate Questions & Answers')}
+    `,
+  });
+
+  await dispatchEmail({
+    to: adminEmail,
+    subject: `New Q&A Question on ${productName} by ${customerName}`,
+    html,
+    from: getFromAddress('PAIRO Store System'),
+    label: 'Admin question notification',
+  });
+}
+
+/**
+ * Send Question Reply Email to Customer
+ */
+export async function sendQuestionReplyEmail({ customerEmail, customerName, originalQuestion, replyText, productName, productSlug }) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com';
+  const productLink = `${siteUrl}/product/${productSlug}`;
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+
+  const html = emailShell({
+    eyebrow: 'Customer Experience',
+    heading: 'Your Question Has Been Answered',
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:${BRAND.muted};font-size:14px;">Dear ${escapeHtml(customerName || 'Customer')},</p>
+      <p style="margin:0 0 20px;color:${BRAND.ink};font-size:15px;line-height:1.7;">We've answered your question regarding <strong>${escapeHtml(productName)}</strong>.</p>
+      ${emailPanel(`<p style="margin:0;font-size:14px;color:${BRAND.muted};font-style:italic;">“${escapeHtml(originalQuestion)}”</p>`, { title: 'Your Question' })}
+      ${emailPanel(`<p style="margin:0;font-size:14px;color:${BRAND.ink};font-weight:600;">${escapeHtml(replyText)}</p>`, { title: `${escapeHtml(storeName)} Store Reply`, accentColor: BRAND.ink })}
+      <p style="margin:24px 0 0;font-size:14px;color:${BRAND.ink};">View this Q&amp;A on the product page: <a href="${productLink}" style="color:${BRAND.ink};font-weight:700;text-decoration:underline;">${escapeHtml(productName)}</a></p>
+    `,
+  });
+
+  await dispatchEmail({ to: customerEmail, subject: `Answered: Your question regarding ${productName}`, html, from: getFromAddress('PAIRO Support'), label: 'Question reply' });
+}
+
+// ─── CUSTOM JACKET INQUIRY EMAILS ──────────────────────────────────────────────
 
 /**
  * Send a confirmation email to the customer who submitted a Custom Jacket inquiry.
  */
 export async function sendCustomJacketConfirmation(toEmail, firstName, inquiry) {
-  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'support@pairolifestyle.com';
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const storeUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pairolifestyle.com';
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Custom Jacket Inquiry Received</title></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 16px;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.08);">
-  <!-- Header -->
-  <tr><td style="background:#1a1a1a;padding:32px 40px;text-align:center;">
-    <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:4px;text-transform:uppercase;">${storeName}</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Bespoke Jacket Service</p>
-  </td></tr>
-  <!-- Body -->
-  <tr><td style="padding:40px;">
-    <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:700;">Thank you, ${firstName}!</h2>
-    <p style="margin:0 0 16px;color:#555;font-size:14px;line-height:1.7;">We've received your custom jacket inquiry and are thrilled to help you create something truly special. Our expert team will review your specifications and contact you within <strong>24 hours</strong>.</p>
+  const rows = [
+    inquiry.jacketType && fieldRow('Jacket Type', escapeHtml(inquiry.jacketType)),
+    inquiry.preferredLeather && fieldRow('Leather', escapeHtml(inquiry.preferredLeather)),
+    inquiry.preferredColor && fieldRow('Color', escapeHtml(inquiry.preferredColor)),
+    inquiry.size && fieldRow('Size', escapeHtml(inquiry.size)),
+    inquiry.budget && fieldRow('Budget', escapeHtml(inquiry.budget)),
+  ].filter(Boolean).join('');
 
-    <!-- Summary Box -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;margin:24px 0;">
-      <tr><td style="padding:20px;">
-        <p style="margin:0 0 12px;color:#1a1a1a;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Your Inquiry Summary</p>
-        ${inquiry.jacketType ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Jacket Type:</strong> ${inquiry.jacketType}</p>` : ''}
-        ${inquiry.preferredLeather ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Leather:</strong> ${inquiry.preferredLeather}</p>` : ''}
-        ${inquiry.preferredColor ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Color:</strong> ${inquiry.preferredColor}</p>` : ''}
-        ${inquiry.size ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Size:</strong> ${inquiry.size}</p>` : ''}
-        ${inquiry.budget ? `<p style="margin:0 0 0;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Budget:</strong> ${inquiry.budget}</p>` : ''}
-      </td></tr>
-    </table>
+  const html = emailShell({
+    eyebrow: 'Bespoke Jacket Service',
+    heading: `Thank You, ${escapeHtml(firstName)}!`,
+    subheading: `We've received your custom jacket inquiry and are thrilled to help you create something truly special. Our expert team will review your specifications and contact you within <strong>24 hours</strong>.`,
+    bodyHtml: `
+      ${emailPanel(fieldTable(rows), { title: 'Your Inquiry Summary' })}
+      <p style="margin:0 0 24px;color:${BRAND.muted};font-size:14px;line-height:1.7;">While you wait, feel free to explore our existing collection for inspiration.</p>
+      ${buttonBlock(`${storeUrl}/shop`, 'Explore Collection')}
+    `,
+    preheader: 'We’ve received your custom jacket inquiry.',
+  });
 
-    <p style="margin:0 0 24px;color:#555;font-size:14px;line-height:1.7;">While you wait, feel free to explore our existing collection for inspiration.</p>
-    <a href="${storeUrl}/shop" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;padding:14px 32px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:4px;">Explore Collection</a>
-  </td></tr>
-  <!-- Footer -->
-  <tr><td style="background:#f9f9f9;border-top:1px solid #e8e8e8;padding:24px 40px;text-align:center;">
-    <p style="margin:0;color:#999;font-size:12px;">You received this because you submitted an inquiry at <a href="${storeUrl}" style="color:#1a1a1a;">${storeName}</a>.</p>
-    <p style="margin:8px 0 0;color:#999;font-size:11px;">&copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.</p>
-  </td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>
-  `.trim();
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress(storeName),
-      to: toEmail,
-      subject: `Your Custom Jacket Inquiry — We'll Be In Touch!`,
-      html
-    });
-    console.log(`[Email] ✅ Custom jacket confirmation sent to ${toEmail} | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send custom jacket confirmation:', err.message);
-    throw err;
-  }
+  await dispatchEmail({
+    to: toEmail,
+    subject: `Your Custom Jacket Inquiry — We'll Be In Touch!`,
+    html,
+    from: getFromAddress(storeName),
+    label: 'Custom jacket confirmation',
+    critical: true,
+  });
 }
 
 /**
@@ -1189,75 +837,46 @@ export async function sendCustomJacketConfirmation(toEmail, firstName, inquiry) 
  */
 export async function sendCustomJacketAdminNotification(inquiry) {
   const adminEmail = process.env.ADMIN_EMAIL || process.env.STORE_EMAIL || 'support@pairolifestyle.com';
-  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'support@pairolifestyle.com';
-  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const storeUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pairolifestyle.com';
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>New Custom Jacket Inquiry</title></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 16px;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.08);">
-  <tr><td style="background:#1a1a1a;padding:28px 40px;">
-    <p style="margin:0;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Admin Notification</p>
-    <h1 style="margin:6px 0 0;color:#ffffff;font-size:20px;font-weight:700;">New Custom Jacket Inquiry</h1>
-  </td></tr>
-  <tr><td style="padding:32px 40px;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;margin:0 0 24px;">
-      <tr><td style="padding:20px;">
-        <p style="margin:0 0 12px;color:#1a1a1a;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Customer</p>
-        <p style="margin:0 0 4px;font-size:14px;color:#1a1a1a;font-weight:700;">${inquiry.firstName} ${inquiry.lastName}</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#555;">${inquiry.email}</p>
-        ${inquiry.phone ? `<p style="margin:0;font-size:13px;color:#555;">${inquiry.phone}</p>` : ''}
-        ${inquiry.country ? `<p style="margin:4px 0 0;font-size:13px;color:#555;">${inquiry.city ? inquiry.city + ', ' : ''}${inquiry.country}</p>` : ''}
-      </td></tr>
-    </table>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;margin:0 0 24px;">
-      <tr><td style="padding:20px;">
-        <p style="margin:0 0 12px;color:#1a1a1a;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Specifications</p>
-        ${inquiry.jacketType ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Type:</strong> ${inquiry.jacketType}</p>` : ''}
-        ${inquiry.gender ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Gender:</strong> ${inquiry.gender}</p>` : ''}
-        ${inquiry.preferredLeather ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Leather:</strong> ${inquiry.preferredLeather}</p>` : ''}
-        ${inquiry.preferredColor ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Color:</strong> ${inquiry.preferredColor}</p>` : ''}
-        ${inquiry.size ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Size:</strong> ${inquiry.size}</p>` : ''}
-        ${inquiry.budget ? `<p style="margin:0 0 6px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Budget:</strong> ${inquiry.budget}</p>` : ''}
-        ${inquiry.deadline ? `<p style="margin:0 0 0;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Deadline:</strong> ${inquiry.deadline}</p>` : ''}
-      </td></tr>
-    </table>
-    ${inquiry.additionalNotes ? `
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;margin:0 0 24px;">
-      <tr><td style="padding:20px;">
-        <p style="margin:0 0 8px;color:#1a1a1a;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Additional Notes</p>
-        <p style="margin:0;font-size:13px;color:#555;line-height:1.7;">${inquiry.additionalNotes}</p>
-      </td></tr>
-    </table>` : ''}
-    ${inquiry.referenceImages?.length > 0 ? `<p style="margin:0 0 16px;font-size:13px;color:#555;"><strong style="color:#1a1a1a;">Reference Images:</strong> ${inquiry.referenceImages.length} uploaded</p>` : ''}
-    <a href="${storeUrl}/admin/custom-jacket-inquiries" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;padding:12px 28px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:4px;">View in Dashboard</a>
-  </td></tr>
-  <tr><td style="background:#f9f9f9;border-top:1px solid #e8e8e8;padding:20px 40px;text-align:center;">
-    <p style="margin:0;color:#999;font-size:11px;">${storeName} Admin Notification &mdash; ${new Date().toLocaleString()}</p>
-  </td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>
-  `.trim();
+  const customerRows = [
+    fieldRow('Name', `${escapeHtml(inquiry.firstName)} ${escapeHtml(inquiry.lastName)}`),
+    fieldRow('Email', escapeHtml(inquiry.email)),
+    inquiry.phone && fieldRow('Phone', escapeHtml(inquiry.phone)),
+    inquiry.country && fieldRow('Location', `${inquiry.city ? escapeHtml(inquiry.city) + ', ' : ''}${escapeHtml(inquiry.country)}`),
+  ].filter(Boolean).join('');
 
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress("PAIRO System"),
-      to: adminEmail,
-      subject: `🧥 New Custom Jacket Inquiry — ${inquiry.firstName} ${inquiry.lastName}`,
-      html
-    });
-    console.log(`[Email] ✅ Admin custom jacket notification sent | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send custom jacket admin notification:', err.message);
-    throw err;
-  }
+  const specRows = [
+    inquiry.jacketType && fieldRow('Type', escapeHtml(inquiry.jacketType)),
+    inquiry.gender && fieldRow('Gender', escapeHtml(inquiry.gender)),
+    inquiry.preferredLeather && fieldRow('Leather', escapeHtml(inquiry.preferredLeather)),
+    inquiry.preferredColor && fieldRow('Color', escapeHtml(inquiry.preferredColor)),
+    inquiry.size && fieldRow('Size', escapeHtml(inquiry.size)),
+    inquiry.budget && fieldRow('Budget', escapeHtml(inquiry.budget)),
+    inquiry.deadline && fieldRow('Deadline', escapeHtml(inquiry.deadline)),
+  ].filter(Boolean).join('');
+
+  const html = emailShell({
+    eyebrow: 'Admin Notification',
+    heading: 'New Custom Jacket Inquiry',
+    bodyHtml: `
+      ${emailPanel(fieldTable(customerRows), { title: 'Customer' })}
+      ${emailPanel(fieldTable(specRows), { title: 'Specifications' })}
+      ${inquiry.additionalNotes ? emailPanel(`<p style="margin:0;font-size:13px;color:${BRAND.ink};line-height:1.7;">${escapeHtml(inquiry.additionalNotes)}</p>`, { title: 'Additional Notes' }) : ''}
+      ${inquiry.referenceImages?.length > 0 ? `<p style="margin:0 0 16px;font-size:13px;color:${BRAND.muted};"><strong>Reference Images:</strong> ${inquiry.referenceImages.length} uploaded</p>` : ''}
+      ${buttonBlock(`${storeUrl}/admin/custom-jacket-inquiries`, 'View In Dashboard')}
+    `,
+    preheader: `New inquiry from ${inquiry.firstName} ${inquiry.lastName}.`,
+  });
+
+  await dispatchEmail({
+    to: adminEmail,
+    subject: `New Custom Jacket Inquiry — ${inquiry.firstName} ${inquiry.lastName}`,
+    html,
+    from: getFromAddress('PAIRO System'),
+    label: 'Custom jacket admin notification',
+    critical: true,
+  });
 }
 
 // ─── CUSTOM ORDER: PAYMENT LINK & INVOICE EMAILS ──────────────────────────────
@@ -1266,149 +885,98 @@ export async function sendCustomJacketAdminNotification(inquiry) {
  * Email a Stripe Payment Link to the customer for an admin-finalized Custom Order.
  */
 export async function sendPaymentLinkEmail(order, paymentLinkUrl) {
-  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'info@pairolifestyle.com';
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const firstName = escapeHtml((order.shippingAddress?.fullName || '').split(' ')[0] || 'there');
   const item = order.items?.[0] || {};
   const total = order.financials?.total || 0;
   const currency = order.financials?.currency || 'USD';
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Complete Your Payment</title></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 16px;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.08);">
-  <tr><td style="background:#1a1a1a;padding:32px 40px;text-align:center;">
-    <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:4px;text-transform:uppercase;">${storeName}</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Bespoke Jacket Service</p>
-  </td></tr>
-  <tr><td style="padding:40px;">
-    <h2 style="margin:0 0 16px;color:#1a1a1a;font-size:20px;font-weight:700;">Hi ${firstName}, your jacket is ready to order!</h2>
-    <p style="margin:0 0 16px;color:#555;font-size:14px;line-height:1.7;">Your bespoke <strong>${escapeHtml(item.name || 'Custom Jacket')}</strong> has been finalized. Please complete your payment below to confirm and begin production of Order <strong>#${order.orderNumber}</strong>.</p>
+  const html = emailShell({
+    eyebrow: 'Bespoke Jacket Service',
+    heading: `Hi ${firstName}, Your Jacket Is Ready To Order!`,
+    subheading: `Your bespoke <strong>${escapeHtml(item.name || 'Custom Jacket')}</strong> has been finalized. Please complete your payment below to confirm and begin production of order <strong>#${escapeHtml(order.orderNumber)}</strong>.`,
+    bodyHtml: `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.surface};border:1px solid ${BRAND.border};border-radius:10px;margin:0 0 28px;">
+        <tr><td style="padding:24px;text-align:center;">
+          <p style="margin:0 0 6px;color:${BRAND.muted};font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Amount Due</p>
+          <p style="margin:0;color:${BRAND.ink};font-size:34px;font-weight:800;">${currency} ${total.toLocaleString()}</p>
+        </td></tr>
+      </table>
+      ${buttonBlock(paymentLinkUrl, 'Pay Now')}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;">If the button above doesn't work, copy and paste this link into your browser:<br/><a href="${paymentLinkUrl}" style="color:${BRAND.ink};word-break:break-all;">${paymentLinkUrl}</a></p>
+    `,
+    preheader: `Complete your payment for order #${order.orderNumber}.`,
+  });
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border:1px solid #e8e8e8;border-radius:8px;margin:24px 0;">
-      <tr><td style="padding:20px;text-align:center;">
-        <p style="margin:0 0 6px;color:#999;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Amount Due</p>
-        <p style="margin:0;color:#1a1a1a;font-size:32px;font-weight:800;">${currency} ${total.toLocaleString()}</p>
-      </td></tr>
-    </table>
-
-    <div style="text-align:center;margin:32px 0;">
-      <a href="${paymentLinkUrl}" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;padding:16px 40px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:4px;">Pay Now</a>
-    </div>
-
-    <p style="margin:0;color:#999;font-size:12px;line-height:1.6;">If the button above doesn't work, copy and paste this link into your browser:<br/><a href="${paymentLinkUrl}" style="color:#1a1a1a;word-break:break-all;">${paymentLinkUrl}</a></p>
-  </td></tr>
-  <tr><td style="background:#f9f9f9;border-top:1px solid #e8e8e8;padding:24px 40px;text-align:center;">
-    <p style="margin:0;color:#999;font-size:12px;">Questions about your order? Reply to this email and our team will assist you.</p>
-    <p style="margin:8px 0 0;color:#999;font-size:11px;">&copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.</p>
-  </td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>
-  `.trim();
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress(storeName),
-      to: order.customer?.email,
-      subject: `Complete Your Payment — Order #${order.orderNumber}`,
-      html
-    });
-    console.log(`[Email] ✅ Payment link sent to ${order.customer?.email} | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send payment link email:', err.message);
-    throw err;
-  }
+  await dispatchEmail({
+    to: order.customer?.email,
+    subject: `Complete Your Payment — Order #${order.orderNumber}`,
+    html,
+    from: getFromAddress(storeName),
+    label: `Payment link (#${order.orderNumber})`,
+    critical: true,
+  });
 }
 
 /**
  * Email an HTML invoice to the customer for an order (used for admin-triggered "Send Invoice").
  */
 export async function sendOrderInvoiceEmail(order) {
-  const storeEmail = process.env.STORE_EMAIL || process.env.FROM_EMAIL || 'info@pairolifestyle.com';
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const currency = order.financials?.currency || 'USD';
   const fullName = escapeHtml(order.shippingAddress?.fullName || 'Customer');
 
-  const itemsHtml = (order.items || []).map(item => `
+  const itemsRows = (order.items || []).map((item) => `
     <tr>
-      <td style="padding:12px 0;border-bottom:1px solid #eee;font-size:13px;color:#1a1a1a;">${escapeHtml(item.name || '')}</td>
-      <td style="padding:12px 0;border-bottom:1px solid #eee;font-size:13px;color:#555;text-align:center;">${item.quantity || 1}</td>
-      <td style="padding:12px 0;border-bottom:1px solid #eee;font-size:13px;color:#1a1a1a;text-align:right;font-weight:700;">${currency} ${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}</td>
-    </tr>
-  `).join('');
+      <td style="padding:12px 0;border-bottom:1px solid ${BRAND.border};font-size:13px;color:${BRAND.ink};">${escapeHtml(item.name || '')}</td>
+      <td style="padding:12px 0;border-bottom:1px solid ${BRAND.border};font-size:13px;color:${BRAND.muted};text-align:center;">${item.quantity || 1}</td>
+      <td style="padding:12px 0;border-bottom:1px solid ${BRAND.border};font-size:13px;color:${BRAND.ink};text-align:right;font-weight:700;">${currency} ${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}</td>
+    </tr>`).join('');
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Invoice #${order.orderNumber}</title></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 16px;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.08);">
-  <tr><td style="background:#1a1a1a;padding:32px 40px;">
-    <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">${storeName}</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,0.5);font-size:12px;">Invoice for Order #${order.orderNumber}</p>
-  </td></tr>
-  <tr><td style="padding:40px;">
-    <div style="margin-bottom:24px;">
-      <p style="margin:0 0 4px;color:#999;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Billed To</p>
-      <p style="margin:0;color:#1a1a1a;font-size:14px;font-weight:700;">${fullName}</p>
-      <p style="margin:2px 0 0;color:#555;font-size:13px;">${order.customer?.email || ''}</p>
-    </div>
+  const totalsRows = `
+    <tr><td style="padding:4px 0;font-size:13px;color:${BRAND.muted};">Subtotal</td><td style="padding:4px 0;font-size:13px;color:${BRAND.ink};text-align:right;">${currency} ${(order.financials?.subtotal || 0).toLocaleString()}</td></tr>
+    ${order.financials?.shippingCost ? `<tr><td style="padding:4px 0;font-size:13px;color:${BRAND.muted};">Shipping</td><td style="padding:4px 0;font-size:13px;color:${BRAND.ink};text-align:right;">${currency} ${order.financials.shippingCost.toLocaleString()}</td></tr>` : ''}
+    ${order.financials?.tax ? `<tr><td style="padding:4px 0;font-size:13px;color:${BRAND.muted};">Tax</td><td style="padding:4px 0;font-size:13px;color:${BRAND.ink};text-align:right;">${currency} ${order.financials.tax.toLocaleString()}</td></tr>` : ''}
+    <tr><td style="padding:14px 0 0;font-size:15px;font-weight:800;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">Total</td><td style="padding:14px 0 0;font-size:15px;font-weight:800;color:${BRAND.ink};text-align:right;border-top:2px solid ${BRAND.ink};">${currency} ${(order.financials?.total || 0).toLocaleString()}</td></tr>
+  `;
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
-      <thead>
-        <tr>
-          <th style="text-align:left;padding-bottom:8px;border-bottom:2px solid #1a1a1a;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;">Item</th>
-          <th style="text-align:center;padding-bottom:8px;border-bottom:2px solid #1a1a1a;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;">Qty</th>
-          <th style="text-align:right;padding-bottom:8px;border-bottom:2px solid #1a1a1a;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#999;">Total</th>
-        </tr>
-      </thead>
-      <tbody>${itemsHtml}</tbody>
-    </table>
+  const paymentCta = order.payment?.status !== 'Paid' && order.paymentLink?.url
+    ? `<div style="margin:28px 0 0;padding-top:24px;border-top:1px solid ${BRAND.border};">
+        ${buttonBlock(order.paymentLink.url, 'Pay Now')}
+        <p style="margin:0;color:${BRAND.faint};font-size:11px;line-height:1.6;text-align:center;">Or copy this link into your browser:<br/><a href="${order.paymentLink.url}" style="color:${BRAND.ink};word-break:break-all;">${order.paymentLink.url}</a></p>
+      </div>`
+    : '';
 
-    <table width="100%" cellpadding="0" cellspacing="0">
-      <tr><td style="padding:4px 0;font-size:13px;color:#555;">Subtotal</td><td style="padding:4px 0;font-size:13px;color:#1a1a1a;text-align:right;">${currency} ${(order.financials?.subtotal || 0).toLocaleString()}</td></tr>
-      ${order.financials?.shippingCost ? `<tr><td style="padding:4px 0;font-size:13px;color:#555;">Shipping</td><td style="padding:4px 0;font-size:13px;color:#1a1a1a;text-align:right;">${currency} ${order.financials.shippingCost.toLocaleString()}</td></tr>` : ''}
-      ${order.financials?.tax ? `<tr><td style="padding:4px 0;font-size:13px;color:#555;">Tax</td><td style="padding:4px 0;font-size:13px;color:#1a1a1a;text-align:right;">${currency} ${order.financials.tax.toLocaleString()}</td></tr>` : ''}
-      <tr><td style="padding:12px 0 0;font-size:15px;font-weight:800;color:#1a1a1a;border-top:2px solid #1a1a1a;">Total</td><td style="padding:12px 0 0;font-size:15px;font-weight:800;color:#1a1a1a;text-align:right;border-top:2px solid #1a1a1a;">${currency} ${(order.financials?.total || 0).toLocaleString()}</td></tr>
-    </table>
+  const html = emailShell({
+    eyebrow: `Invoice #${order.orderNumber}`,
+    heading: 'Your Invoice',
+    bodyHtml: `
+      <div style="margin-bottom:24px;">
+        <p style="margin:0 0 4px;color:${BRAND.muted};font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Billed To</p>
+        <p style="margin:0;color:${BRAND.ink};font-size:14px;font-weight:700;">${fullName}</p>
+        <p style="margin:2px 0 0;color:${BRAND.muted};font-size:13px;">${escapeHtml(order.customer?.email || '')}</p>
+      </div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;border-collapse:collapse;">
+        <thead><tr>
+          <th style="text-align:left;padding-bottom:8px;border-bottom:2px solid ${BRAND.ink};font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Item</th>
+          <th style="text-align:center;padding-bottom:8px;border-bottom:2px solid ${BRAND.ink};font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Qty</th>
+          <th style="text-align:right;padding-bottom:8px;border-bottom:2px solid ${BRAND.ink};font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Total</th>
+        </tr></thead>
+        <tbody>${itemsRows}</tbody>
+      </table>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${totalsRows}</table>
+      <p style="margin:24px 0 0;color:${BRAND.muted};font-size:12px;">Payment status: <strong style="color:${BRAND.ink};">${escapeHtml(order.payment?.status || 'Pending')}</strong></p>
+      ${paymentCta}
+    `,
+    preheader: `Invoice for order #${order.orderNumber}.`,
+  });
 
-    <p style="margin:24px 0 0;color:#999;font-size:12px;">Payment status: <strong style="color:#1a1a1a;">${order.payment?.status || 'Pending'}</strong></p>
-
-    ${order.payment?.status !== 'Paid' && order.paymentLink?.url ? `
-    <div style="text-align:center;margin:28px 0 4px;padding-top:24px;border-top:1px solid #eee;">
-      <a href="${order.paymentLink.url}" style="display:inline-block;background:#1a1a1a;color:#ffffff;text-decoration:none;padding:14px 36px;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;border-radius:4px;">Pay Now</a>
-      <p style="margin:12px 0 0;color:#999;font-size:11px;line-height:1.6;">Or copy this link into your browser:<br/><a href="${order.paymentLink.url}" style="color:#1a1a1a;word-break:break-all;">${order.paymentLink.url}</a></p>
-    </div>` : ''}
-  </td></tr>
-  <tr><td style="background:#f9f9f9;border-top:1px solid #e8e8e8;padding:20px 40px;text-align:center;">
-    <p style="margin:0;color:#999;font-size:11px;">&copy; ${new Date().getFullYear()} ${storeName}. All rights reserved.</p>
-  </td></tr>
-</table>
-</td></tr>
-</table>
-</body></html>
-  `.trim();
-
-  try {
-    const info = await transporter.sendMail({
-      from: getFromAddress(storeName),
-      to: order.customer?.email,
-      subject: `Invoice — Order #${order.orderNumber}`,
-      html
-    });
-    console.log(`[Email] ✅ Invoice sent to ${order.customer?.email} | MsgID: ${info.messageId}`);
-  } catch (err) {
-    console.error('[Email] ❌ Failed to send invoice email:', err.message);
-    throw err;
-  }
+  await dispatchEmail({
+    to: order.customer?.email,
+    subject: `Invoice — Order #${order.orderNumber}`,
+    html,
+    from: getFromAddress(storeName),
+    label: `Invoice (#${order.orderNumber})`,
+    critical: true,
+  });
 }
