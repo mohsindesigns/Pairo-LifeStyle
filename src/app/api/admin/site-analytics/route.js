@@ -58,7 +58,6 @@ function parseFilters(sp) {
     category: pick("category"),
     priceBand: pick("priceBand", PRICE_BANDS.map((b) => b.key)),
     productId: pick("productId"),
-    heatPath: sp.get("heatPath") ? sp.get("heatPath").slice(0, 300) : null,
   };
 }
 
@@ -979,6 +978,66 @@ async function retention(f) {
   };
 }
 
+async function speed(f) {
+  const [rows, overallAgg] = await Promise.all([
+    AnalyticsEvent.aggregate([
+      { $match: eventMatch(f, { name: "web_vitals" }) },
+      {
+        $group: {
+          _id: { path: "$path", device: "$device" },
+          sessions: { $addToSet: "$sessionId" },
+          samples: { $sum: 1 },
+          avgLcp: { $avg: "$lcp" },
+          avgCls: { $avg: "$cls" },
+          avgFid: { $avg: "$fid" },
+          avgTtfb: { $avg: "$ttfb" },
+        },
+      },
+      {
+        $project: {
+          path: "$_id.path",
+          device: "$_id.device",
+          sessions: { $size: "$sessions" },
+          samples: 1,
+          avgLcp: { $round: ["$avgLcp", 0] },
+          avgCls: { $round: ["$avgCls", 3] },
+          avgFid: { $round: ["$avgFid", 0] },
+          avgTtfb: { $round: ["$avgTtfb", 0] },
+        },
+      },
+      { $sort: { samples: -1 } },
+      { $limit: 200 },
+    ]),
+    AnalyticsEvent.aggregate([
+      { $match: eventMatch(f, { name: "web_vitals" }) },
+      {
+        $group: {
+          _id: null,
+          samples: { $sum: 1 },
+          avgLcp: { $avg: "$lcp" },
+          avgCls: { $avg: "$cls" },
+          avgFid: { $avg: "$fid" },
+          avgTtfb: { $avg: "$ttfb" },
+        },
+      },
+    ]),
+  ]);
+
+  const overall = overallAgg[0] || {};
+  const round = (v, d = 0) => (v === null || v === undefined ? null : Math.round(v * 10 ** d) / 10 ** d);
+
+  return {
+    kpis: {
+      sampleSize: overall.samples || 0,
+      avgLcp: round(overall.avgLcp),
+      avgCls: round(overall.avgCls, 3),
+      avgFid: round(overall.avgFid),
+      avgTtfb: round(overall.avgTtfb),
+    },
+    rows,
+  };
+}
+
 async function friction(f) {
   const names = ["dead_click", "rage_click"];
   const [rows, hitSessions, totalSessions] = await Promise.all([
@@ -1003,104 +1062,6 @@ async function friction(f) {
   };
 }
 
-async function heatmap(f) {
-  const COLS = 20;
-  const ROW_PX = 200;
-  const MAX_ROWS = 60;
-  const X_STEP = 0.5;
-  const Y_STEP = 10;
-  const [clickPages, viewPages] = await Promise.all([
-    AnalyticsEvent.aggregate([
-      { $match: eventMatch(f, { name: "heat_click" }) },
-      { $group: { _id: "$path", clicks: { $sum: 1 } } },
-    ]),
-    AnalyticsPageView.aggregate([
-      { $match: pageviewMatch(f) },
-      { $group: { _id: "$path", views: { $sum: 1 } } },
-    ]),
-  ]);
-  const merged = new Map();
-  for (const r of clickPages) merged.set(r._id, { path: r._id, clicks: r.clicks, views: 0 });
-  for (const r of viewPages) {
-    const row = merged.get(r._id) || { path: r._id, clicks: 0, views: 0 };
-    row.views = r.views;
-    merged.set(r._id, row);
-  }
-  const pages = [...merged.values()]
-    .filter((p) => p.path)
-    .sort((a, b) => b.clicks - a.clicks || b.views - a.views)
-    .slice(0, 500);
-  const path = f.heatPath || pages[0]?.path || "";
-
-  const [cells, topElements, points, sections] = await Promise.all([
-    path
-      ? AnalyticsEvent.aggregate([
-        { $match: eventMatch(f, { name: "heat_click", path, clickX: { $ne: null }, clickY: { $ne: null } }) },
-        {
-          $project: {
-            col: { $min: [COLS - 1, { $floor: { $divide: ["$clickX", 100 / COLS] } }] },
-            row: { $min: [MAX_ROWS - 1, { $floor: { $divide: ["$clickY", ROW_PX] } }] },
-          },
-        },
-        { $group: { _id: { col: "$col", row: "$row" }, count: { $sum: 1 } } },
-      ])
-      : [],
-    path
-      ? AnalyticsEvent.aggregate([
-        { $match: eventMatch(f, { name: "click", path }) },
-        { $group: { _id: { label: "$label", href: "$href", section: "$section" }, count: { $sum: 1 } } },
-        { $project: { label: "$_id.label", href: "$_id.href", section: "$_id.section", count: 1 } },
-        { $sort: { count: -1 } },
-        { $limit: 200 },
-      ])
-      : [],
-    path
-      ? AnalyticsEvent.aggregate([
-        { $match: eventMatch(f, { name: "heat_click", path, clickX: { $ne: null }, clickY: { $ne: null } }) },
-        {
-          $project: {
-            x: { $multiply: [{ $floor: { $divide: ["$clickX", X_STEP] } }, X_STEP] },
-            y: { $multiply: [{ $floor: { $divide: ["$clickY", Y_STEP] } }, Y_STEP] },
-          },
-        },
-        { $group: { _id: { x: "$x", y: "$y" }, count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 3000 },
-      ])
-      : [],
-    path
-      ? AnalyticsEvent.aggregate([
-        { $match: eventMatch(f, { name: { $in: ["click", "section_view"] }, path }) },
-        {
-          $group: {
-            _id: { section: { $cond: [{ $eq: ["$name", "section_view"] }, "$label", "$section"] } },
-            clicks: { $sum: { $cond: [{ $eq: ["$name", "click"] }, 1, 0] } },
-            views: { $sum: { $cond: [{ $eq: ["$name", "section_view"] }, 1, 0] } },
-            avgMs: { $avg: { $cond: [{ $eq: ["$name", "section_view"] }, "$durationMs", null] } },
-          },
-        },
-        { $project: { section: "$_id.section", clicks: 1, views: 1, avgMs: { $round: ["$avgMs", 0] } } },
-        { $sort: { clicks: -1, views: -1 } },
-        { $limit: 200 },
-      ])
-      : [],
-  ]);
-
-  return {
-    path,
-    pages,
-    cols: COLS,
-    rowPx: ROW_PX,
-    rows: cells.length ? Math.max(...cells.map((c) => c._id.row)) + 1 : 0,
-    cells: cells.map((c) => ({ col: c._id.col, row: c._id.row, count: c.count })),
-    topElements: topElements || [],
-    sections: sections.map((s) => ({ section: s.section, clicks: s.clicks, views: s.views, avgMs: s.avgMs || 0 })),
-    points: points.map((p) => ({ x: p._id.x, y: p._id.y, count: p.count })),
-    max: Math.max(1, ...cells.map((c) => c.count)),
-    total: cells.reduce((s, c) => s + c.count, 0),
-  };
-}
-
 const TABS = {
   overview,
   pages,
@@ -1118,7 +1079,7 @@ const TABS = {
   checkout,
   retention,
   friction,
-  heatmap,
+  speed,
 };
 
 export async function GET(req) {

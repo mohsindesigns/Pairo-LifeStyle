@@ -301,12 +301,6 @@ export function initSiteAnalytics() {
   const onClick = (e) => {
     const target = e.target instanceof Element ? e.target : null;
     const pathNow = window.location.pathname.slice(0, 300);
-    enqueue({
-      name: "heat_click",
-      path: pathNow,
-      clickX: Math.round((e.pageX / Math.max(1, document.documentElement.scrollWidth)) * 100),
-      clickY: Math.round(e.pageY),
-    });
     const el = target?.closest("a, button, [data-track], [role='button'], label, input[type='submit'], input[type='button']");
     if (!el || el.closest("[data-track-ignore]")) return;
 
@@ -478,6 +472,66 @@ export function initSiteAnalytics() {
     subtree: true,
   });
 
+  // Core Web Vitals for the page the visitor landed on (first real page load only;
+  // these are standards-defined for a single navigation, not every SPA route change).
+  const vitalsPath = window.location.pathname.slice(0, 300);
+  let lcpValue = null;
+  let clsValue = 0;
+  let fidValue = null;
+  let vitalsReported = false;
+  const vitalsObservers = [];
+
+  if (typeof PerformanceObserver !== "undefined") {
+    try {
+      const lcpObserver = new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        const last = entries[entries.length - 1];
+        if (last) lcpValue = Math.round(last.renderTime || last.loadTime || last.startTime);
+      });
+      lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+      vitalsObservers.push(lcpObserver);
+    } catch {}
+    try {
+      const clsObserver = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (!entry.hadRecentInput) clsValue += entry.value;
+        }
+      });
+      clsObserver.observe({ type: "layout-shift", buffered: true });
+      vitalsObservers.push(clsObserver);
+    } catch {}
+    try {
+      const fidObserver = new PerformanceObserver((list) => {
+        const entry = list.getEntries()[0];
+        if (entry && fidValue === null) fidValue = Math.round(entry.processingStart - entry.startTime);
+      });
+      fidObserver.observe({ type: "first-input", buffered: true });
+      vitalsObservers.push(fidObserver);
+    } catch {}
+  }
+
+  const reportVitals = () => {
+    if (vitalsReported || !isEnabled()) return;
+    if (lcpValue === null && fidValue === null && !clsValue) return;
+    vitalsReported = true;
+    let ttfb = null;
+    try {
+      const nav = performance.getEntriesByType("navigation")[0];
+      if (nav) ttfb = Math.round(nav.responseStart);
+    } catch {}
+    enqueue({
+      name: "web_vitals",
+      path: vitalsPath,
+      lcp: lcpValue,
+      cls: clsValue ? Math.round(clsValue * 1000) / 1000 : 0,
+      fid: fidValue,
+      ttfb,
+    });
+  };
+  const onVitalsHidden = () => { if (document.visibilityState === "hidden") reportVitals(); };
+  document.addEventListener("visibilitychange", onVitalsHidden);
+  window.addEventListener("pagehide", reportVitals);
+
   window.addEventListener("scroll", onScroll, { passive: true });
   document.addEventListener("click", onClick, true);
   document.addEventListener("blur", onBlur, true);
@@ -491,6 +545,9 @@ export function initSiteAnalytics() {
     document.removeEventListener("blur", onBlur, true);
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("pagehide", onPageHide);
+    document.removeEventListener("visibilitychange", onVitalsHidden);
+    window.removeEventListener("pagehide", reportVitals);
+    vitalsObservers.forEach((o) => { try { o.disconnect(); } catch {} });
     clearInterval(interval);
     if (observer) observer.disconnect();
     window.removeEventListener("error", onWindowError);

@@ -5,21 +5,16 @@ import { usePathname, useRouter, useSearchParams, useParams } from "next/navigat
 import Link from "next/link";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import RequirePermission from "@/components/admin/RequirePermission";
-import { 
-  BarChart3, 
-  FileText, 
-  ShoppingBag, 
-  Users, 
-  Flame, 
-  Radio, 
-  RefreshCw, 
-  Filter, 
-  ChevronDown, 
-  ChevronUp, 
-  Monitor, 
-  Smartphone, 
-  Tablet,
-  Lock, 
+import {
+  BarChart3,
+  FileText,
+  ShoppingBag,
+  Users,
+  Radio,
+  RefreshCw,
+  Filter,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   CheckCircle2,
   MousePointer,
@@ -32,7 +27,7 @@ import {
   Globe,
   AlertCircle,
   History,
-  X 
+  X
 } from "lucide-react";
 
 const TAB_GROUPS = [
@@ -78,15 +73,23 @@ const TAB_GROUPS = [
     ],
   },
   {
-    id: "heatmap",
-    label: "Heatmap & UX",
-    icon: Flame,
+    id: "health",
+    label: "UX Health",
+    icon: AlertCircle,
     tabs: [
-      { key: "heatmap", label: "Click Heatmap" },
       { key: "friction", label: "Friction & Rage Clicks" },
       { key: "errors", label: "Errors" },
     ],
   },
+  // Page Speed / Core Web Vitals tab — disabled for now, not removed.
+  // {
+  //   id: "performance",
+  //   label: "Performance",
+  //   icon: Activity,
+  //   tabs: [
+  //     { key: "speed", label: "Page Speed" },
+  //   ],
+  // },
   {
     id: "live",
     label: "Live Traffic",
@@ -148,18 +151,29 @@ const TRACKING_CATEGORIES = [
     ],
   },
   {
-    id: "heatmap",
-    title: "Heatmaps, Friction & Health",
-    description: "Visual click coordinate heatmaps and UX friction diagnostics.",
-    icon: Flame,
+    id: "health",
+    title: "UX Health & Friction",
+    description: "Rage clicks, dead clicks, and error diagnostics across the storefront.",
+    icon: AlertCircle,
     items: [
-      { name: "Visual Click Heatmaps", desc: "High-resolution coordinate click density grid by page width and height across devices." },
-      { name: "Fold-Line Analysis", desc: "Calculates the ratio of above-the-fold vs below-the-fold clicks based on viewport height." },
       { name: "Rage Clicks", desc: "Flags rapid, repeated clicks on unresponsive elements indicating user frustration." },
       { name: "Dead Clicks", desc: "Detects clicks on non-interactive elements that visitors expected to be clickable." },
       { name: "Errors & Form Friction", desc: "Monitors JavaScript runtime errors, failed API calls, and abandoned checkout form fields." },
     ],
   },
+  // Page Speed / Core Web Vitals feature index entry — disabled for now, not removed.
+  // {
+  //   id: "performance",
+  //   title: "Page Speed & Core Web Vitals",
+  //   description: "Real-user load performance captured on every page view.",
+  //   icon: Activity,
+  //   items: [
+  //     { name: "Largest Contentful Paint", desc: "Time for the biggest visible element to render — the main loading-speed signal." },
+  //     { name: "Cumulative Layout Shift", desc: "Measures unexpected layout movement that frustrates shoppers while a page loads." },
+  //     { name: "First Input Delay", desc: "How long the page takes to respond to a shopper's first click or tap." },
+  //     { name: "Time To First Byte", desc: "Server response speed, broken down by page and device." },
+  //   ],
+  // },
 ];
 
 const DEVICES = ["desktop", "mobile", "tablet"];
@@ -834,7 +848,6 @@ function SiteAnalyticsView() {
   const hasCustom = Boolean(paramsState.get("from") && paramsState.get("to"));
   const query = (() => {
     const q = new URLSearchParams(paramsState.toString());
-    if (tab === "heatmap" && !q.get("device")) q.set("device", "desktop");
     return q.toString();
   })();
 
@@ -1735,14 +1748,7 @@ function SiteAnalyticsView() {
           <p className="text-[12px] text-[#646970]">A dead click is a click on a button or link that gave no visible response within 1.5 seconds. A rage click is three or more rapid clicks on the same element.</p>
         </div>
       )}
-      {isReady && tab === "heatmap" && (
-        <HeatmapTab
-          data={data}
-          setParams={setParams}
-          deviceMode={paramsState.get("device") || "desktop"}
-          setDeviceMode={(m) => setParams({ device: m })}
-        />
-      )}
+      {/* Page Speed tab — disabled for now, not removed. {isReady && tab === "speed" && <SpeedTab data={data} />} */}
       {isReady && tab === "live" && (
         <DataTable
           title={`Live now (${fmtNum(data.count)} active in the last 5 minutes)`}
@@ -1767,458 +1773,71 @@ function SiteAnalyticsView() {
   );
 }
 
-function HeatmapTab({ data, setParams, deviceMode, setDeviceMode }) {
-  const [viewMode, setViewMode] = useState("split");
-  const [showGrid, setShowGrid] = useState(false);
+// Page Speed / Core Web Vitals tab UI — disabled for now, not removed.
+/*
+const VITALS_THRESHOLDS = {
+  avgLcp: { good: 2500, ok: 4000 },
+  avgCls: { good: 0.1, ok: 0.25 },
+  avgFid: { good: 100, ok: 300 },
+  avgTtfb: { good: 800, ok: 1800 },
+};
 
-  const pages = data.pages || [];
-  const currentPath = data.path || "";
-  const totalClicks = data.total || 0;
-  const maxClicks = data.max || 1;
-  const cells = data.cells || [];
-  const topElements = data.topElements || [];
+function vitalsRating(key, value) {
+  if (value === null || value === undefined) return null;
+  const t = VITALS_THRESHOLDS[key];
+  if (!t) return null;
+  if (value <= t.good) return "good";
+  if (value <= t.ok) return "needs-improvement";
+  return "poor";
+}
 
-  const aboveFoldClicks = useMemo(() => {
-    return cells.filter((c) => c.row < 3).reduce((sum, c) => sum + c.count, 0);
-  }, [cells]);
-  const belowFoldClicks = totalClicks > 0 ? totalClicks - aboveFoldClicks : 0;
-  const aboveFoldPct = totalClicks > 0 ? Math.round((aboveFoldClicks / totalClicks) * 100) : 0;
-  const belowFoldPct = totalClicks > 0 ? 100 - aboveFoldPct : 0;
-  const topElement = topElements[0]?.label || "None recorded";
+const VITALS_RATING_STYLE = {
+  good: "text-emerald-700",
+  "needs-improvement": "text-amber-600",
+  poor: "text-red-600",
+};
 
+function VitalKpi({ label, value, unit, hint, ratingKey }) {
+  const rating = ratingKey ? vitalsRating(ratingKey, value) : null;
+  const display = value === null || value === undefined ? "—" : `${value}${unit || ""}`;
   return (
-    <div className="space-y-4">
-      {/* KPI Highlights for Selected Page */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white border border-[#c3c4c7] p-3 rounded-[3px] shadow-xs">
-          <div className="text-[11px] font-bold uppercase text-[#646970]">Total Page Clicks</div>
-          <div className="text-[20px] font-bold text-[#1d2327] mt-0.5">{fmtNum(totalClicks)}</div>
-          <div className="text-[11px] text-[#2271b1] truncate font-mono mt-0.5">{currentPath || "/"}</div>
-        </div>
-        <div className="bg-white border border-[#c3c4c7] p-3 rounded-[3px] shadow-xs">
-          <div className="text-[11px] font-bold uppercase text-[#646970]">Active Hotspots</div>
-          <div className="text-[20px] font-bold text-[#1d2327] mt-0.5">{cells.length} zones</div>
-          <div className="text-[11px] text-[#646970] mt-0.5">Peak hotspot: {fmtNum(maxClicks)} clicks</div>
-        </div>
-        <div className="bg-white border border-[#c3c4c7] p-3 rounded-[3px] shadow-xs">
-          <div className="text-[11px] font-bold uppercase text-[#646970]">Above-The-Fold Share</div>
-          <div className="text-[20px] font-bold text-emerald-700 mt-0.5">{aboveFoldPct}%</div>
-          <div className="text-[11px] text-[#646970] mt-0.5">{fmtNum(aboveFoldClicks)} clicks (visible viewport)</div>
-        </div>
-        <div className="bg-white border border-[#c3c4c7] p-3 rounded-[3px] shadow-xs">
-          <div className="text-[11px] font-bold uppercase text-[#646970]">Top Clicked Target</div>
-          <div className="text-[14px] font-bold text-[#1d2327] truncate mt-1" title={topElement}>{topElement}</div>
-          <div className="text-[11px] text-[#2271b1] mt-0.5">
-            {topElements[0] ? `${fmtNum(topElements[0].count)} clicks (${Math.round((topElements[0].count / Math.max(1, totalClicks)) * 100)}%)` : "No elements"}
-          </div>
-        </div>
+    <Kpi
+      label={label}
+      value={<span className={rating ? VITALS_RATING_STYLE[rating] : undefined}>{display}</span>}
+      hint={hint}
+    />
+  );
+}
+
+function SpeedTab({ data }) {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <VitalKpi label="Largest Contentful Paint" value={data.kpis?.avgLcp} unit="ms" ratingKey="avgLcp" hint={`${fmtNum(data.kpis?.sampleSize)} samples`} />
+        <VitalKpi label="Cumulative Layout Shift" value={data.kpis?.avgCls} unit="" ratingKey="avgCls" hint="Lower is better" />
+        <VitalKpi label="First Input Delay" value={data.kpis?.avgFid} unit="ms" ratingKey="avgFid" hint="Lower is better" />
+        <VitalKpi label="Time To First Byte" value={data.kpis?.avgTtfb} unit="ms" ratingKey="avgTtfb" hint="Server response time" />
       </div>
-
-      {/* WordPress Heatmap Studio Control Toolbar */}
-      <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] p-3 flex flex-wrap items-center justify-between gap-3 text-[13px]">
-        {/* Left: Page Selector & Live Link */}
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2">
-            <span className="text-[12px] font-bold text-[#1d2327]">Page:</span>
-            <select
-              value={currentPath}
-              onChange={(e) => setParams({ heatPath: e.target.value })}
-              className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] bg-white font-medium text-[#2c3338] outline-none min-w-[220px]"
-            >
-              {pages.length === 0 && <option value="">No pages with clicks</option>}
-              {pages.map((p) => (
-                <option key={p.path} value={p.path}>
-                  {p.path} ({fmtNum(p.clicks)} clicks · {fmtNum(p.views)} views)
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <a
-            href={currentPath || "/"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-[11px] font-semibold text-[#2271b1] bg-[#f0f6fb] hover:bg-[#e7f1f9] border border-[#c5d9e8] px-2.5 py-1.5 rounded-[3px] transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Open Live Page</span>
-          </a>
-        </div>
-
-        {/* Right: Controls & View toggles */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Device Selector */}
-          <div className="flex items-center border border-[#8c8f94] rounded-[3px] overflow-hidden text-[11px] font-semibold bg-white">
-            <button
-              type="button"
-              onClick={() => setDeviceMode("desktop")}
-              className={`px-2.5 py-1 transition-colors flex items-center gap-1.5 cursor-pointer ${deviceMode === "desktop" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
-              title="Desktop 100% Viewport"
-            >
-              <Monitor className="w-3.5 h-3.5" />
-              <span>Desktop</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeviceMode("tablet")}
-              className={`px-2.5 py-1 transition-colors flex items-center gap-1.5 cursor-pointer ${deviceMode === "tablet" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
-              title="Tablet 768px Viewport"
-            >
-              <Tablet className="w-3.5 h-3.5" />
-              <span>Tablet</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeviceMode("mobile")}
-              className={`px-2.5 py-1 transition-colors flex items-center gap-1.5 cursor-pointer ${deviceMode === "mobile" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
-              title="Mobile 390px Viewport"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Mobile</span>
-            </button>
-          </div>
-
-          {/* View Mode Toggle */}
-          <div className="flex items-center border border-[#8c8f94] rounded-[3px] overflow-hidden text-[11px] font-semibold bg-white">
-            <button
-              type="button"
-              onClick={() => setViewMode("split")}
-              className={`px-2.5 py-1 transition-colors ${viewMode === "split" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
-              title="Split View"
-            >
-              Split View
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("visual")}
-              className={`px-2.5 py-1 transition-colors ${viewMode === "visual" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
-              title="Visual Heatmap Only"
-            >
-              Visual
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("elements")}
-              className={`px-2.5 py-1 transition-colors ${viewMode === "elements" ? "bg-[#2271b1] text-white" : "text-[#50575e] hover:bg-[#f0f0f1]"}`}
-              title="Top Clicked Elements List"
-            >
-              Elements
-            </button>
-          </div>
-
-          {/* Grid lines toggle */}
-          <label className="flex items-center gap-1.5 text-[11px] font-medium text-[#646970] cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={showGrid}
-              onChange={(e) => setShowGrid(e.target.checked)}
-              className="rounded border-[#8c8f94] text-[#2271b1] focus:ring-0"
-            />
-            Grid
-          </label>
-        </div>
-      </div>
-
-      {totalClicks === 0 ? (
-        <div className="bg-white border border-[#c3c4c7] p-8 text-center rounded-[3px] shadow-sm">
-          <Flame className="w-8 h-8 text-[#8c8f94] mx-auto mb-2" />
-          <p className="text-[14px] font-semibold text-[#1d2327]">No click coordinates recorded for this page yet.</p>
-          <p className="text-[12px] text-[#646970] mt-1.5">
-            Clicks are recorded in real-time as visitors interact with buttons, links, banners, and forms on{" "}
-            <span className="font-mono text-[#2271b1]">{currentPath || "this page"}</span>.
-          </p>
-        </div>
-      ) : (
-        <div className={`grid gap-4 ${viewMode === "split" ? "grid-cols-1 xl:grid-cols-12" : "grid-cols-1"}`}>
-          {/* Visual Heatmap Canvas */}
-          {(viewMode === "split" || viewMode === "visual") && (
-            <div className={viewMode === "split" ? "xl:col-span-7" : "w-full"}>
-              <HeatmapVisualizer
-                data={data}
-                deviceMode={deviceMode}
-                showGrid={showGrid}
-                aboveFoldPct={aboveFoldPct}
-                belowFoldPct={belowFoldPct}
-              />
-            </div>
-          )}
-
-          {/* Top Clicked Elements Table */}
-          {(viewMode === "split" || viewMode === "elements") && (
-            <div className={viewMode === "split" ? "xl:col-span-5" : "w-full"}>
-              <HeatmapElementsTable
-                topElements={topElements}
-                cells={cells}
-                totalClicks={totalClicks}
-                path={currentPath}
-              />
-            </div>
-          )}
-        </div>
-      )}
-      <HeatmapSectionsPanel sections={data.sections || []} totalClicks={totalClicks} />
+      <DataTable
+        title="Page speed by page & device"
+        rows={data.rows || []}
+        empty="No Core Web Vitals recorded for these filters yet."
+        columns={[
+          { key: "path", label: "Page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+          { key: "device", label: "Device" },
+          { key: "sessions", label: "Sessions" },
+          { key: "samples", label: "Samples" },
+          { key: "avgLcp", label: "LCP", render: (r) => <span className={r.avgLcp !== null ? VITALS_RATING_STYLE[vitalsRating("avgLcp", r.avgLcp)] : ""}>{r.avgLcp ?? "—"}ms</span> },
+          { key: "avgCls", label: "CLS", render: (r) => <span className={r.avgCls !== null ? VITALS_RATING_STYLE[vitalsRating("avgCls", r.avgCls)] : ""}>{r.avgCls ?? "—"}</span> },
+          { key: "avgFid", label: "FID", render: (r) => <span className={r.avgFid !== null ? VITALS_RATING_STYLE[vitalsRating("avgFid", r.avgFid)] : ""}>{r.avgFid ?? "—"}ms</span> },
+          { key: "avgTtfb", label: "TTFB", render: (r) => <span className={r.avgTtfb !== null ? VITALS_RATING_STYLE[vitalsRating("avgTtfb", r.avgTtfb)] : ""}>{r.avgTtfb ?? "—"}ms</span> },
+        ]}
+      />
+      <p className="text-[12px] text-[#646970]">Core Web Vitals are captured directly from real shoppers&apos; browsers. Green is good, amber needs improvement, red is poor, per Google&apos;s standard thresholds.</p>
     </div>
   );
 }
-
-function HeatmapSectionsPanel({ sections, totalClicks }) {
-  if (sections.length === 0) return null;
-  return (
-    <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] overflow-hidden mt-4">
-      <div className="px-4 py-2.5 border-b border-[#c3c4c7] bg-[#f6f7f7]">
-        <h3 className="text-[12px] font-bold uppercase tracking-wider text-[#1d2327]">Every section on this page</h3>
-      </div>
-      <table className="w-full text-[12px] text-left">
-        <thead className="text-[11px] uppercase text-[#646970] bg-[#fbfbfb]">
-          <tr>
-            <th className="px-3 py-2 font-bold">Section</th>
-            <th className="px-3 py-2 font-bold">Clicks</th>
-            <th className="px-3 py-2 font-bold">Share of clicks</th>
-            <th className="px-3 py-2 font-bold">Views</th>
-            <th className="px-3 py-2 font-bold">Avg time in view</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#f0f0f1]">
-          {sections.map((sec, i) => (
-            <tr key={i}>
-              <td className="px-3 py-2 font-bold text-[#1d2327]">{sec.section || "(unnamed section)"}</td>
-              <td className="px-3 py-2">{fmtNum(sec.clicks)}</td>
-              <td className="px-3 py-2">{Math.round((sec.clicks / Math.max(1, totalClicks)) * 100)}%</td>
-              <td className="px-3 py-2">{fmtNum(sec.views)}</td>
-              <td className="px-3 py-2">{sec.avgMs ? Math.round(sec.avgMs / 1000) + "s" : "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function HeatmapVisualizer({ data, deviceMode, showGrid, aboveFoldPct = 0, belowFoldPct = 0 }) {
-  const frameWidth = deviceMode === "mobile" ? 390 : deviceMode === "tablet" ? 768 : 1280;
-  const displayWidth = deviceMode === "desktop" ? 880 : frameWidth;
-  const scale = displayWidth / frameWidth;
-  const [pageHeight, setPageHeight] = useState(900);
-  const points = data.points || [];
-  const pointMax = Math.max(1, ...points.map((p) => p.count));
-  const radius = 16;
-  const colorFor = (count) => {
-    const ratio = count / pointMax;
-    if (ratio >= 0.75) return "239,68,68";
-    if (ratio >= 0.45) return "245,158,11";
-    if (ratio >= 0.2) return "16,185,129";
-    return "59,130,246";
-  };
-  const frameLabel = deviceMode === "mobile" ? "Mobile 390px" : deviceMode === "tablet" ? "Tablet 768px" : "Desktop 1280px";
-  const gridRows = Math.ceil(pageHeight / 200);
-
-  return (
-    <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-[#c3c4c7] bg-[#f6f7f7] flex items-center justify-between">
-        <h3 className="text-[12px] font-bold uppercase tracking-wider text-[#1d2327]">Click Heatmap ({frameLabel})</h3>
-        <span className="text-[11px] text-[#646970] font-medium">{fmtNum(data.total)} clicks · {Math.round(pageHeight)}px page</span>
-      </div>
-
-      <div className="p-4 bg-[#f0f0f1] flex justify-center overflow-x-auto">
-        <div className="bg-white rounded-[6px] border border-[#ccd0d4] shadow-md" style={{ width: displayWidth }}>
-          <div className="bg-[#f6f7f7] border-b border-[#e5e5e5] px-3 py-2 flex items-center gap-2 select-none">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56] inline-block" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e] inline-block" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f] inline-block" />
-            <div className="flex-1 bg-white border border-[#dcdcde] rounded px-2.5 py-0.5 text-[11px] font-mono text-[#50575e] truncate">{data.path || "/"}</div>
-          </div>
-
-          <div className="relative bg-white overflow-hidden" style={{ width: displayWidth, height: pageHeight * scale }}>
-            <iframe
-              key={data.path + "|" + deviceMode}
-              src={data.path || "/"}
-              title="Live page preview"
-              onLoad={(e) => {
-                try {
-                  const h = e.currentTarget.contentDocument?.documentElement?.scrollHeight;
-                  if (h) setPageHeight(h);
-                } catch {}
-              }}
-              style={{
-                width: frameWidth,
-                height: pageHeight,
-                transform: "scale(" + scale + ")",
-                transformOrigin: "top left",
-                border: 0,
-                pointerEvents: "none",
-              }}
-            />
-            {showGrid && (
-              <div className="absolute inset-0 pointer-events-none">
-                {Array.from({ length: 19 }, (_, i) => (
-                  <div key={"v" + i} className="absolute top-0 bottom-0 border-l border-dashed border-[#2271b1]/30" style={{ left: (i + 1) * 5 + "%" }} />
-                ))}
-                {Array.from({ length: gridRows }, (_, i) => (
-                  <div key={"h" + i} className="absolute left-0 right-0 border-t border-dashed border-[#2271b1]/30" style={{ top: (i + 1) * 200 * scale }} />
-                ))}
-              </div>
-            )}
-            <div className="absolute inset-0 pointer-events-none">
-              {points.map((p, i) => (
-                <div
-                  key={i}
-                  title={p.count + " clicks"}
-                  className="absolute rounded-full pointer-events-auto"
-                  style={{
-                    left: (p.x / 100) * displayWidth - radius,
-                    top: p.y * scale - radius,
-                    width: radius * 2,
-                    height: radius * 2,
-                    background: "radial-gradient(circle, rgba(" + colorFor(p.count) + "," + (0.35 + 0.6 * (p.count / pointMax)) + ") 0%, rgba(" + colorFor(p.count) + ",0) 70%)",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-4 py-3 border-t border-[#e5e5e5] flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#646970]">
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[rgb(239,68,68)]" />Hot</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[rgb(245,158,11)]" />Warm</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[rgb(16,185,129)]" />Moderate</span>
-          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[rgb(59,130,246)]" />Low</span>
-        </div>
-        <span>Above the fold {aboveFoldPct}% · below {belowFoldPct}%</span>
-      </div>
-    </div>
-  );
-}
-
-function HeatmapElementsTable({ topElements = [], cells = [], totalClicks = 1, path }) {
-  return (
-    <Panel
-      title={`Top Clicked Elements on ${path || "this page"}`}
-      action={
-        <button
-          type="button"
-          onClick={() =>
-            downloadCsv(
-              `top-clicked-elements.csv`,
-              [
-                { key: "label", label: "Element" },
-                { key: "section", label: "Section" },
-                { key: "href", label: "Destination" },
-                { key: "count", label: "Clicks" },
-              ],
-              topElements
-            )
-          }
-          disabled={topElements.length === 0}
-          className="text-[11px] font-bold uppercase text-[#2271b1] hover:underline disabled:text-gray-300"
-        >
-          Export CSV
-        </button>
-      }
-    >
-      <div className="divide-y divide-[#f0f0f1]">
-        {topElements.length > 0 ? (
-          <table className="w-full text-[12px] text-left">
-            <thead className="text-[11px] uppercase text-[#646970] bg-[#fbfbfb]">
-              <tr>
-                <th className="px-3 py-2 font-bold">#</th>
-                <th className="px-3 py-2 font-bold">Element / Label</th>
-                <th className="px-3 py-2 font-bold">Section</th>
-                <th className="px-3 py-2 font-bold">Clicks</th>
-                <th className="px-3 py-2 font-bold">Share</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {topElements.map((el, i) => {
-                const sharePct = Math.round((el.count / Math.max(1, totalClicks)) * 100);
-                const badgeColor =
-                  i === 0
-                    ? "bg-amber-100 text-amber-800 border-amber-300"
-                    : i === 1
-                    ? "bg-slate-100 text-slate-800 border-slate-300"
-                    : i === 2
-                    ? "bg-orange-100 text-orange-800 border-orange-300"
-                    : "bg-gray-100 text-gray-600 border-gray-200";
-
-                return (
-                  <tr key={i} className="hover:bg-[#f0f6fb] transition-colors">
-                    <td className="px-3 py-2">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeColor}`}>
-                        #{i + 1}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="font-semibold text-[#1d2327]">{el.label || "(unlabeled element)"}</div>
-                      {el.href && (
-                        <div className="font-mono text-[10px] text-[#2271b1] truncate max-w-[180px]">
-                          {el.href}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-[#646970]">
-                      {el.section ? (
-                        <span className="bg-[#f0f0f1] px-1.5 py-0.5 rounded text-[11px] font-medium text-[#1d2327]">
-                          {el.section}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-3 py-2 font-bold text-[#1d2327]">{fmtNum(el.count)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-[#f0f0f1] rounded-[2px] overflow-hidden">
-                          <div
-                            className="h-full bg-[#2271b1] rounded-[2px]"
-                            style={{ width: `${Math.min(100, Math.max(4, sharePct))}%` }}
-                          />
-                        </div>
-                        <span className="text-[11px] text-[#646970] font-semibold">{sharePct}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : (
-          <div className="p-6 text-center italic text-[#8c8f94] text-[12px]">
-            No labeled element clicks recorded yet for this page.
-          </div>
-        )}
-
-        {/* Hotspot Coordinate Zones ranking */}
-        <div className="p-3 bg-[#fbfbfb]">
-          <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">
-            Top Hotspot Coordinates (Click Zones)
-          </h4>
-          <div className="space-y-1.5">
-            {[...cells]
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 6)
-              .map((c, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between text-[11px] bg-white border border-[#e5e5e5] px-2.5 py-1.5 rounded-[2px]"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#2271b1]" />
-                    <span className="font-semibold text-[#1d2327]">
-                      Zone: {c.col * 5}% - {(c.col + 1) * 5}% width, Depth ~{c.row * 200}px
-                    </span>
-                  </div>
-                  <span className="font-bold text-[#2271b1]">
-                    {fmtNum(c.count)} clicks ({pctText((c.count / Math.max(1, totalClicks)) * 100)})
-                  </span>
-                </div>
-              ))}
-          </div>
-        </div>
-      </div>
-    </Panel>
-  );
-}
+*/
 
 function TrackingFeaturesMatrix() {
   const [activeCategory, setActiveCategory] = useState("all");
@@ -2262,7 +1881,7 @@ function TrackingFeaturesMatrix() {
             <Search className="w-3.5 h-3.5 text-[#8c8f94] absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Filter features (e.g. heatmap, cart)..."
+              placeholder="Filter features (e.g. friction, cart)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-2.5 py-1 text-[11px] border border-[#8c8f94] rounded-[3px] bg-white text-[#2c3338] outline-none focus:border-[#2271b1] w-48 sm:w-60"

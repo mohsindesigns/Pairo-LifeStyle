@@ -20,6 +20,7 @@ const MAX_ITEMS = 24;
 
 const str = (v, max) => (typeof v === "string" ? v.slice(0, max) : "");
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+const numOrNull = (v) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v));
 
 const productCache = new Map();
 let categoryCache = { slugs: new Set(), expires: 0 };
@@ -152,8 +153,10 @@ async function storeEvents(rawEvents, ctx, now, slugs) {
       variant: str(raw.variant, 80),
       statusCode: Math.max(0, Math.min(999, num(raw.statusCode))),
       resultCount: raw.resultCount === null || raw.resultCount === undefined || !Number.isFinite(Number(raw.resultCount)) ? null : Number(raw.resultCount),
-      clickX: raw.clickX === null || raw.clickX === undefined || !Number.isFinite(Number(raw.clickX)) ? null : Number(raw.clickX),
-      clickY: raw.clickY === null || raw.clickY === undefined || !Number.isFinite(Number(raw.clickY)) ? null : Number(raw.clickY),
+      lcp: numOrNull(raw.lcp),
+      cls: numOrNull(raw.cls),
+      fid: numOrNull(raw.fid),
+      ttfb: numOrNull(raw.ttfb),
       createdAt: now,
     });
   }

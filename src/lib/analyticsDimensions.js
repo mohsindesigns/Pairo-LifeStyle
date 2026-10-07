@@ -91,7 +91,7 @@ export const ALLOWED_EVENTS = new Set([
   "view_item", "view_item_list", "select_item", "add_to_cart", "remove_from_cart",
   "view_cart", "begin_checkout", "add_shipping_info", "add_payment_info", "purchase",
   "search", "sign_up", "section_view", "click", "field_interaction",
-  "option_select", "js_error", "api_error", "form_error", "search_result", "heat_click", "rage_click", "dead_click",
+  "option_select", "js_error", "api_error", "form_error", "search_result", "rage_click", "dead_click", "web_vitals",
 ]);
 
 export const CONVERSION_EVENTS = new Set(["add_to_cart", "begin_checkout", "add_payment_info", "purchase", "sign_up"]);
