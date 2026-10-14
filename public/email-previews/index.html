@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAIRO Lifestyle — Complete Email System Preview Gallery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #4A2E1D;
+      --ink-dark: #2A170C;
+      --paper: #FFFFFF;
+      --page-bg: #F4EFE6;
+      --surface: #F9F6F0;
+      --border: #E5DCce;
+      --border-dark: #D4C6B3;
+      --muted: #7A6F64;
+      --accent-gold: #C5A059;
+      --accent-light: #FDFBF7;
+      --tag-cust: #2D6A4F;
+      --tag-admin: #B23A22;
+      --tag-aff: #7B2CBF;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--page-bg);
+      color: var(--ink);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TOP BRAND BAR */
+    header {
+      background: var(--ink-dark);
+      color: #fff;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--accent-gold);
+      flex-shrink: 0;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    }
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .brand-logo {
+      font-family: 'Cinzel', serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #fff;
+    }
+    .brand-pill {
+      background: rgba(197, 160, 89, 0.2);
+      border: 1px solid var(--accent-gold);
+      color: var(--accent-gold);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 600;
+    }
+    .top-stats {
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .top-stats span b {
+      color: #fff;
+    }
+
+    /* MAIN WORKSPACE */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* SIDEBAR */
+    aside {
+      width: 360px;
+      background: #FFFFFF;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .sidebar-header h3 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--ink);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .search-input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-dark);
+      font-size: 13px;
+      outline: none;
+      background: #fff;
+      font-family: inherit;
+    }
+    .search-input:focus {
+      border-color: var(--ink);
+    }
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .category-group {
+      margin-bottom: 18px;
+    }
+    .cat-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .email-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .email-item:hover {
+      background: var(--surface);
+      border-color: var(--border);
+    }
+    .email-item.active {
+      background: #F4EFE6;
+      border-color: var(--accent-gold);
+      box-shadow: 0 2px 8px rgba(74, 46, 29, 0.08);
+    }
+    .email-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .email-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .role-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .role-Customer { background: #E8F5E9; color: var(--tag-cust); border: 1px solid #C8E6C9; }
+    .role-Admin { background: #FFEBEE; color: var(--tag-admin); border: 1px solid #FFCDD2; }
+    .role-Affiliate { background: #F3E5F5; color: var(--tag-aff); border: 1px solid #E1BEE7; }
+
+    /* PREVIEW CONTAINER */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #EFE9DE;
+      overflow: hidden;
+    }
+
+    /* PREVIEW META TOOLBAR */
+    .meta-toolbar {
+      background: #FFFFFF;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    }
+    .meta-left {
+      max-width: 65%;
+    }
+    .meta-subject {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .meta-details {
+      display: flex;
+      gap: 18px;
+      font-size: 12px;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+    .meta-details span b {
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .meta-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .device-switcher {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .device-btn {
+      padding: 6px 12px;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .device-btn.active {
+      background: #FFFFFF;
+      color: var(--ink);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .action-btn {
+      padding: 7px 14px;
+      border: 1px solid var(--border-dark);
+      background: #FFFFFF;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .action-btn:hover {
+      background: var(--surface);
+      border-color: var(--ink);
+    }
+    .action-btn.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    .action-btn.primary:hover {
+      background: var(--ink-dark);
+    }
+
+    /* IFRAME STAGE */
+    .stage {
+      flex: 1;
+      overflow-y: auto;
+      padding: 30px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background: #EFE9DE;
+    }
+    .iframe-wrapper {
+      transition: width 0.25s ease;
+      background: #FFFFFF;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 14px 40px rgba(74, 46, 29, 0.12), 0 2px 6px rgba(0,0,0,0.05);
+      border: 1px solid var(--border);
+      height: 100%;
+      min-height: 720px;
+      display: flex;
+      flex-direction: column;
+    }
+    .iframe-wrapper.desktop { width: 680px; }
+    .iframe-wrapper.mobile { width: 390px; }
+    .iframe-wrapper.full { width: 100%; max-width: 960px; }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      min-height: 720px;
+      border: none;
+      background: var(--page-bg);
+      flex: 1;
+    }
+
+    /* RAW CODE MODAL / VIEW */
+    .code-view {
+      display: none;
+      width: 100%;
+      max-width: 900px;
+      height: 100%;
+      background: #1E1E1E;
+      color: #E0E0E0;
+      border-radius: 12px;
+      padding: 20px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 12px;
+      overflow: auto;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+      border: 1px solid #333;
+    }
+
+    /* TOAST */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--ink-dark);
+      color: #FFFFFF;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 1000;
+    }
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand-wrap">
+      <div class="brand-logo">PAIRO</div>
+      <div class="brand-pill">Email System Suite &middot; 20 Templates</div>
+    </div>
+    <div class="top-stats">
+      <span>Total Templates: <b>20</b></span>
+      <span>Palette: <b style="color:var(--accent-gold);">Ink (#4A2E1D) &middot; Sand (#F3EFE7)</b></span>
+      <span>Brand Standard: <b>RFC Compliant Shell</b></span>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="app-body">
+    <!-- SIDEBAR -->
+    <aside>
+      <div class="sidebar-header">
+        <h3>Email Templates</h3>
+        <input type="text" id="search" class="search-input" placeholder="Filter by name, customer, subject..." oninput="filterEmails()">
+      </div>
+      <div class="sidebar-scroll" id="sidebar-list">
+        <!-- Rendered by JS -->
+      </div>
+    </aside>
+
+    <!-- PREVIEW AREA -->
+    <main>
+      <div class="meta-toolbar">
+        <div class="meta-left">
+          <div class="meta-subject" id="disp-subject">Loading Subject...</div>
+          <div class="meta-details">
+            <span>To: <b id="disp-to">-</b></span>
+            <span>From: <b id="disp-from">-</b></span>
+            <span>Trigger: <b id="disp-trigger">-</b></span>
+          </div>
+        </div>
+        <div class="meta-right">
+          <div class="device-switcher">
+            <button class="device-btn active" id="btn-desktop" onclick="setDevice('desktop')">Desktop (680px)</button>
+            <button class="device-btn" id="btn-mobile" onclick="setDevice('mobile')">Mobile (390px)</button>
+            <button class="device-btn" id="btn-full" onclick="setDevice('full')">Full View</button>
+          </div>
+          <button class="action-btn" id="btn-toggle-code" onclick="toggleCodeView()">View HTML</button>
+          <button class="action-btn" onclick="copyCurrentHtml()">Copy HTML</button>
+          <a class="action-btn primary" id="btn-open-tab" href="#" target="_blank">Open in New Tab &nearr;</a>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="iframe-wrapper desktop" id="iframe-wrap">
+          <iframe id="preview-frame" src=""></iframe>
+        </div>
+        <pre class="code-view" id="code-view"></pre>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast">Copied to clipboard!</div>
+
+  <script>
+    const emailsData = [{"id":"01-order-confirmation-customer","category":"Store Orders","role":"Customer","title":"Order Confirmation (Customer)","subject":"Order Confirmed: #PL-84920","from":"\"PAIRO Store\" <support@pairolifestyle.com>","to":"alex.mercer@gmail.com","trigger":"Customer successfully completes checkout on storefront","fileName":"01-order-confirmation-customer.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Thank You For Your Order</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Your order #PL-84920 has been confirmed.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Order Confirmed</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Thank You For Your Order</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">Hi Alex, your order <strong>#PL-84920</strong> has been confirmed and is being prepared for dispatch.</p>\n    \n        <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;font-size:14px;margin-bottom:8px;\">\n          <thead><tr style=\"background:#F6F2EA;\">\n            <th style=\"text-align:left;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6F655B;\">Product</th>\n            <th style=\"padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6F655B;\">Qty</th>\n            <th style=\"text-align:right;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6F655B;\">Total</th>\n          </tr></thead>\n          <tbody>\n        <tr>\n          <td style=\"padding:12px 10px;border-bottom:1px solid #E3DACB;\">\n            <strong style=\"color:#4A2E1D;\">The Vanguard Double-Rider Leather Jacket</strong><br/>\n            <span style=\"color:#6F655B;font-size:12px;\">Vintage Espresso &#x2F; Size L</span>\n          </td>\n          <td style=\"padding:12px 10px;border-bottom:1px solid #E3DACB;text-align:center;color:#4A2E1D;\">1</td>\n          <td style=\"padding:12px 10px;border-bottom:1px solid #E3DACB;text-align:right;color:#4A2E1D;font-weight:700;\">$580</td>\n        </tr>\n        <tr>\n          <td style=\"padding:12px 10px;border-bottom:1px solid #E3DACB;\">\n            <strong style=\"color:#4A2E1D;\">Handcrafted Italian Leather Conditioning Balm</strong><br/>\n            <span style=\"color:#6F655B;font-size:12px;\">100ml Tin</span>\n          </td>\n          <td style=\"padding:12px 10px;border-bottom:1px solid #E3DACB;text-align:center;color:#4A2E1D;\">2</td>\n          <td style=\"padding:12px 10px;border-bottom:1px solid #E3DACB;text-align:right;color:#4A2E1D;font-weight:700;\">$70</td>\n        </tr></tbody>\n          <tfoot><tr>\n            <td colspan=\"2\" style=\"padding:16px 10px;text-align:right;font-weight:700;color:#4A2E1D;border-top:2px solid #4A2E1D;\">Total Paid</td>\n            <td style=\"padding:16px 10px;text-align:right;font-weight:800;color:#4A2E1D;border-top:2px solid #4A2E1D;\">$650</td>\n          </tr></tfoot>\n        </table><div style=\"margin-top:28px;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Your Customer Account Has Been Created</p>\n\n            <p style=\"margin:0 0 14px;color:#6F655B;font-size:13px;line-height:1.6;\">Thank you for your order! We created your customer account so you can track orders, view your order history, save addresses, and checkout faster next time.</p>\n            <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Login Email</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">alex.mercer@gmail.com</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Temporary Password</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\"><span style=\"font-family:monospace;background:#FFFFFF;border:1px solid #E3DACB;padding:3px 8px;border-radius:4px;\">pairo-SecurePass-882</span></td></tr></table>\n            <div style=\"margin-top:14px;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/login\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Log In To Your Account</a>\n</td></tr></table></div>\n          \n</td></tr></table><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;border-left:4px solid #4A2E1D;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Shipping To</p>\n\n        <p style=\"margin:0;font-size:14px;line-height:1.8;color:#4A2E1D;\">\n          Alex Mercer<br/>\n          742 Evergreen Terrace, Apt 4B<br/>\n          Springfield, OR, 97477<br/>\n          United States\n        </p>\n      \n</td></tr></table></div>\n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"02-order-notification-admin","category":"Store Orders","role":"Admin","title":"New Order Notification (Admin)","subject":"New Order: #PL-84920 — $650","from":"\"PAIRO System\" <support@pairolifestyle.com>","to":"admin@pairolifestyle.com","trigger":"Fired immediately upon paid order placement via internal order listener","fileName":"02-order-notification-admin.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>New Order Received</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Admin Notification</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">New Order Received</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">Order <strong>#PL-84920</strong> has just been placed.</p>\n    \n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Order Number</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">#PL-84920</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Customer</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Alex Mercer</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Email</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">alex.mercer@gmail.com</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Items</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">2</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Total</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\"><span style=\"font-size:16px;font-weight:800;\">$650</span></td></tr></table>\n</td></tr></table>\n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/admin/orders/670c3e9821f0814bb5e40a12\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">View Order In Dashboard</a>\n</td></tr></table></div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"03-order-invoice-customer","category":"Store Orders","role":"Customer","title":"Order Invoice Email (Customer)","subject":"Invoice — Order #PL-84921","from":"\"PAIRO Lifestyle\" <support@pairolifestyle.com>","to":"alex.mercer@gmail.com","trigger":"Admin clicks 'Send Invoice' or 'Convert to Card Payment' in admin dashboard","fileName":"03-order-invoice-customer.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Your Invoice</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Invoice for order #PL-84921.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Invoice #PL-84921</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Your Invoice</h2>\n    \n    \n          <div style=\"margin-bottom:24px;\">\n            <p style=\"margin:0 0 4px;color:#6F655B;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;\">Billed To</p>\n            <p style=\"margin:0;color:#4A2E1D;font-size:14px;font-weight:700;\">Alex Mercer</p>\n            <p style=\"margin:2px 0 0;color:#6F655B;font-size:13px;\">alex.mercer@gmail.com</p>\n          </div>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:16px;border-collapse:collapse;\">\n            <thead><tr>\n              <th style=\"text-align:left;padding-bottom:8px;border-bottom:2px solid #4A2E1D;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6F655B;\">Item</th>\n              <th style=\"text-align:center;padding-bottom:8px;border-bottom:2px solid #4A2E1D;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6F655B;\">Qty</th>\n              <th style=\"text-align:right;padding-bottom:8px;border-bottom:2px solid #4A2E1D;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#6F655B;\">Total</th>\n            </tr></thead>\n            <tbody>\n        <tr>\n          <td style=\"padding:12px 0;border-bottom:1px solid #E3DACB;font-size:13px;color:#4A2E1D;\">The Vanguard Double-Rider Leather Jacket</td>\n          <td style=\"padding:12px 0;border-bottom:1px solid #E3DACB;font-size:13px;color:#6F655B;text-align:center;\">1</td>\n          <td style=\"padding:12px 0;border-bottom:1px solid #E3DACB;font-size:13px;color:#4A2E1D;text-align:right;font-weight:700;\">USD 580</td>\n        </tr>\n        <tr>\n          <td style=\"padding:12px 0;border-bottom:1px solid #E3DACB;font-size:13px;color:#4A2E1D;\">Handcrafted Italian Leather Conditioning Balm</td>\n          <td style=\"padding:12px 0;border-bottom:1px solid #E3DACB;font-size:13px;color:#6F655B;text-align:center;\">2</td>\n          <td style=\"padding:12px 0;border-bottom:1px solid #E3DACB;font-size:13px;color:#4A2E1D;text-align:right;font-weight:700;\">USD 70</td>\n        </tr></tbody>\n          </table>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\">\n        <tr><td style=\"padding:4px 0;font-size:13px;color:#6F655B;\">Subtotal</td><td style=\"padding:4px 0;font-size:13px;color:#4A2E1D;text-align:right;\">USD 650</td></tr>\n        \n        \n        <tr><td style=\"padding:14px 0 0;font-size:15px;font-weight:800;color:#4A2E1D;border-top:2px solid #4A2E1D;\">Total</td><td style=\"padding:14px 0 0;font-size:15px;font-weight:800;color:#4A2E1D;text-align:right;border-top:2px solid #4A2E1D;\">USD 650</td></tr>\n      </table>\n          <p style=\"margin:24px 0 0;color:#6F655B;font-size:12px;\">Payment status: <strong style=\"color:#4A2E1D;\">Pending</strong></p>\n          <div style=\"margin:28px 0 0;padding-top:24px;border-top:1px solid #E3DACB;\">\n            <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://buy.stripe.com/test_00g4hA4yB8nK3P2\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Pay Now</a>\n</td></tr></table></div>\n            <p style=\"margin:0;color:#9C9388;font-size:11px;line-height:1.6;text-align:center;\">Or copy this link into your browser:<br/><a href=\"https://buy.stripe.com/test_00g4hA4yB8nK3P2\" style=\"color:#4A2E1D;word-break:break-all;\">https://buy.stripe.com/test_00g4hA4yB8nK3P2</a></p>\n          </div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"04-custom-order-confirmation-customer","category":"Bespoke & Custom Jackets","role":"Customer","title":"Bespoke Design Request Confirmation (Customer)","subject":"PAIRO Bespoke Design Request Received: #BPS-1049","from":"\"PAIRO Custom Design\" <support@pairolifestyle.com>","to":"sophia.laurent@luxurymail.com","trigger":"Customer submits a custom design configuration request on product page","fileName":"04-custom-order-confirmation-customer.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Thank You, Sophia!</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Request #BPS-1049 received.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Bespoke Design Service</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Thank You, Sophia!</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">We've received your custom design request for <strong>The Monarch Bespoke Leather Trench</strong>. Your request ID is <strong>#BPS-1049</strong>, submitted on 14/10/2026.</p>\n    \n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Your Custom Selections</p>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Leather Color</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Cognac Brown (Hand-patinated antique finish)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Leather Type</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Full-Grain Italian Calfskin (1.2mm supple vegetable tan)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Inner Lining</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Burgundy Pure Silk Jacquard (Monogram woven lining)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Hardware Color</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Antiqued Brass (YKK Excella heavy-duty zips)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Fur Type</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Shearling Collar (Natural Spanish Merino)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Fur Color</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Deep Caramel</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Fur Placement</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Collar, Lapel Facing</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Fur Density</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Heavy Winter Density</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Removable Fur</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Yes</td></tr></table><div style=\"margin-top:12px;padding-top:12px;border-top:1px dashed #E3DACB;\"><p style=\"margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#6F655B;\">Uploaded Artwork</p><p style=\"margin:4px 0;font-size:13px;color:#4A2E1D;\"><strong>front Chest:</strong> <a href=\"https://pairolifestyle.com/uploads/custom-crest-monogram.pdf\" style=\"color:#4A2E1D;text-decoration:underline;\">custom-crest-monogram.pdf</a></p><p style=\"margin:4px 0;font-size:13px;color:#4A2E1D;\"><strong>inside Patch:</strong> <a href=\"https://pairolifestyle.com/uploads/signature-leather-patch.png\" style=\"color:#4A2E1D;text-decoration:underline;\">signature-leather-patch.png</a></p></div><p style=\"margin:12px 0 0;padding-top:12px;border-top:1px dashed #E3DACB;font-size:13px;color:#4A2E1D;\"><strong>Additional Notes:</strong> <em>Please ensure double-stitched reinforced lapels and antiqued brass hardware finish. Extra sleeve length of +1 inch.</em></p>\n</td></tr></table>\n          <p style=\"margin:0;color:#6F655B;font-size:14px;line-height:1.7;\">Our master artisans and design team are already reviewing your customization. We will contact you via email or phone shortly to discuss pricing, options, and timeline.</p>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"05-custom-order-notification-admin","category":"Bespoke & Custom Jackets","role":"Admin","title":"New Custom Order Notification (Admin)","subject":"New Custom Order: #BPS-1049 by Sophia Laurent","from":"\"PAIRO System\" <support@pairolifestyle.com>","to":"admin@pairolifestyle.com","trigger":"Fired when customer submits a custom design configuration","fileName":"05-custom-order-notification-admin.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>New Custom Order Request</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Admin Notification</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">New Custom Order Request</h2>\n    \n    \n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Request Number</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">#BPS-1049</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Customer</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Sophia Laurent</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Email</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">sophia.laurent@luxurymail.com</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Phone</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">+33 1 42 68 55 00</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Product</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">The Monarch Bespoke Leather Trench</td></tr></table>\n</td></tr></table>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Design Specifications</p>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Leather Color</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Cognac Brown (Hand-patinated antique finish)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Leather Type</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Full-Grain Italian Calfskin (1.2mm supple vegetable tan)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Inner Lining</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Burgundy Pure Silk Jacquard (Monogram woven lining)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Hardware Color</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Antiqued Brass (YKK Excella heavy-duty zips)</td></tr></table>\n</td></tr></table>\n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/admin/orders/670c4f1021f0814bb5e40b34\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">View Order &amp; Specifications</a>\n</td></tr></table></div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"06-custom-jacket-inquiry-customer","category":"Bespoke & Custom Jackets","role":"Customer","title":"Custom Jacket Inquiry Confirmation (Customer)","subject":"Your Custom Jacket Inquiry — We'll Be In Touch!","from":"\"PAIRO Lifestyle\" <support@pairolifestyle.com>","to":"julian.vance@studio.co","trigger":"Customer submits bespoke jacket inquiry form (/custom-jacket)","fileName":"06-custom-jacket-inquiry-customer.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Thank You, Julian!</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">We’ve received your custom jacket inquiry.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Bespoke Jacket Service</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Thank You, Julian!</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">We've received your custom jacket inquiry and are thrilled to help you create something truly special. Our expert team will review your specifications and contact you within <strong>24 hours</strong>.</p>\n    \n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Your Inquiry Summary</p>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Jacket Type</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Bespoke Café Racer Jacket</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Leather</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Full-Grain Horween Chromexcel Leather</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Color</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Midnight Obsidian Black</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Size</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Custom Tailored (Measurements Provided)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Budget</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">$750 - $1,200</td></tr></table>\n</td></tr></table>\n          <p style=\"margin:0 0 24px;color:#6F655B;font-size:14px;line-height:1.7;\">While you wait, feel free to explore our existing collection for inspiration.</p>\n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/shop\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Explore Collection</a>\n</td></tr></table></div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"07-custom-jacket-inquiry-admin","category":"Bespoke & Custom Jackets","role":"Admin","title":"New Custom Jacket Inquiry (Admin)","subject":"New Custom Jacket Inquiry — Julian Vance","from":"\"PAIRO System\" <support@pairolifestyle.com>","to":"admin@pairolifestyle.com","trigger":"Fired when customer submits bespoke jacket inquiry form","fileName":"07-custom-jacket-inquiry-admin.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>New Custom Jacket Inquiry</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">New inquiry from Julian Vance.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Admin Notification</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">New Custom Jacket Inquiry</h2>\n    \n    \n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Customer</p>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Name</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Julian Vance</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Email</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">julian.vance@studio.co</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Phone</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">+1 (415) 890-1234</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Location</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">San Francisco, United States</td></tr></table>\n</td></tr></table>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Specifications</p>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Type</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Bespoke Café Racer Jacket</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Gender</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Men</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Leather</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Full-Grain Horween Chromexcel Leather</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Color</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Midnight Obsidian Black</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Size</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Custom Tailored (Measurements Provided)</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Budget</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">$750 - $1,200</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Deadline</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">November 25, 2026</td></tr></table>\n</td></tr></table>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Additional Notes</p>\n<p style=\"margin:0;font-size:13px;color:#4A2E1D;line-height:1.7;\">Looking for an asymmetrical zip with red quilted satin lining and reinforced elbow patches for riding.</p>\n</td></tr></table>\n          <p style=\"margin:0 0 16px;font-size:13px;color:#6F655B;\"><strong>Reference Images:</strong> 2 uploaded</p>\n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/admin/custom-jacket-inquiries\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">View In Dashboard</a>\n</td></tr></table></div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"08-custom-order-payment-link-customer","category":"Bespoke & Custom Jackets","role":"Customer","title":"Stripe Payment Link (Customer)","subject":"Complete Your Payment — Order #BPS-1049","from":"\"PAIRO Lifestyle\" <support@pairolifestyle.com>","to":"sophia.laurent@luxurymail.com","trigger":"Admin clicks 'Create & Send Payment Link' after quoting bespoke order","fileName":"08-custom-order-payment-link-customer.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Hi Sophia, Your Jacket Is Ready To Order!</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Complete your payment for order #BPS-1049.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Bespoke Jacket Service</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Hi Sophia, Your Jacket Is Ready To Order!</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">Your bespoke <strong>The Monarch Bespoke Leather Trench</strong> has been finalized. Please complete your payment below to confirm and begin production of order <strong>#BPS-1049</strong>.</p>\n    \n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 28px;\">\n            <tr><td style=\"padding:24px;text-align:center;\">\n              <p style=\"margin:0 0 6px;color:#6F655B;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Amount Due</p>\n              <p style=\"margin:0;color:#4A2E1D;font-size:34px;font-weight:800;\">USD 850</p>\n            </td></tr>\n          </table>\n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://buy.stripe.com/test_00g4hA4yB8nK3P2\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Pay Now</a>\n</td></tr></table></div>\n          <p style=\"margin:0;color:#9C9388;font-size:12px;line-height:1.6;\">If the button above doesn't work, copy and paste this link into your browser:<br/><a href=\"https://buy.stripe.com/test_00g4hA4yB8nK3P2\" style=\"color:#4A2E1D;word-break:break-all;\">https://buy.stripe.com/test_00g4hA4yB8nK3P2</a></p>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"09-customer-email-verification","category":"Customer Accounts","role":"Customer","title":"Verify Your Email (Customer)","subject":"Verify your email — PAIRO Lifestyle","from":"\"PAIRO Lifestyle\" <support@pairolifestyle.com>","to":"eleanor.vance@gmail.com","trigger":"New customer registers account or clicks 'Resend Verification'","fileName":"09-customer-email-verification.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Verify Your Email</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Verify your email to activate your account.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Lifestyle Collection</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Verify Your Email</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">Hi Eleanor, welcome to PAIRO Lifestyle. Please verify your email address to activate your account and start shopping.</p>\n    \n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/verify-email?token=9f8b4c2a1e7d0f3c8b5a\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Verify Email Address</a>\n</td></tr></table></div>\n          <p style=\"margin:0;color:#9C9388;font-size:12px;line-height:1.6;border-top:1px solid #E3DACB;padding-top:24px;\">\n            This link expires in <strong>24 hours</strong>. If you did not create an account at PAIRO Lifestyle, you can safely ignore this email.\n          </p>\n          <p style=\"margin:12px 0 0;color:#9C9388;font-size:11px;word-break:break-all;\">https://pairolifestyle.com/verify-email?token=9f8b4c2a1e7d0f3c8b5a</p>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"10-customer-password-reset","category":"Customer Accounts","role":"Customer","title":"Reset Your Password (Customer)","subject":"Reset your password — PAIRO Lifestyle","from":"\"PAIRO Lifestyle\" <support@pairolifestyle.com>","to":"eleanor.vance@gmail.com","trigger":"Customer requests password reset via /forgot-password","fileName":"10-customer-password-reset.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Reset Your Password</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Reset your PAIRO account password.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Lifestyle Collection</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Reset Your Password</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">Hi Eleanor, we received a request to reset the password for your PAIRO account. This link expires in <strong>1 hour</strong>.</p>\n    \n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/reset-password?token=e4c8b2d1f9a03b57e62c\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Reset Password</a>\n</td></tr></table></div>\n          <p style=\"margin:0;color:#9C9388;font-size:12px;line-height:1.6;border-top:1px solid #E3DACB;padding-top:24px;\">\n            If you did not request a password reset, you can safely ignore this email — your password will remain unchanged.\n          </p>\n          <p style=\"margin:12px 0 0;color:#9C9388;font-size:11px;word-break:break-all;\">https://pairolifestyle.com/reset-password?token=e4c8b2d1f9a03b57e62c</p>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"11-crm-submission-reply-customer","category":"Product Q&A & Support","role":"Customer","title":"Customer Support / Concierge Reply","subject":"Re: Inquiry regarding custom sleeve tailoring options","from":"\"PAIRO Support\" <support@pairolifestyle.com>","to":"david.miller@atelier.com","trigger":"Admin replies to customer ticket/message in CRM admin dashboard","fileName":"11-crm-submission-reply-customer.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>A Message From Our Team</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Thank you for contacting PAIRO Lifestyle Concierge.\n\nRegarding your question about sleeve alteration: yes, we can adjust</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Concierge</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">A Message From Our Team</h2>\n    \n    \n          <p style=\"margin:0 0 20px;color:#6F655B;font-size:14px;\">Dear David Miller,</p>\n          <div style=\"font-size:15px;color:#4A2E1D;line-height:1.8;white-space:pre-wrap;\">Thank you for contacting PAIRO Lifestyle Concierge.\n\nRegarding your question about sleeve alteration: yes, we can adjust sleeve length up to +&#x2F;- 2 inches at no additional charge during the initial tailoring phase. Simply specify your sleeve measurement from shoulder seam to wrist cuff when finalizing your bespoke order.\n\nPlease let us know if you need any assistance with taking measurements!</div>\n          <div style=\"margin-top:36px;padding-top:20px;border-top:1px solid #E3DACB;\">\n            <p style=\"margin:0;color:#6F655B;font-size:13px;\">Kind regards,</p>\n            <p style=\"margin:4px 0 0;color:#4A2E1D;font-size:14px;font-weight:700;\">The PAIRO Lifestyle Team</p>\n          </div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"12-affiliate-email-verification","category":"Affiliate Program","role":"Affiliate","title":"Affiliate Email Verification","subject":"Verify your email — PAIRO Affiliates","from":"\"PAIRO Affiliates\" <support@pairolifestyle.com>","to":"marcus.sterling@partners.io","trigger":"Affiliate partner registers application on /affiliate/register","fileName":"12-affiliate-email-verification.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Verify Your Email</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Verify your email to submit your affiliate application.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Affiliate Partners</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Verify Your Email</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">Hi Marcus, thank you for applying to the PAIRO Affiliate Program. Please verify your email address to submit your application for review.</p>\n    \n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/affiliate/verify-email?token=3a7b9c1d5e8f2046\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Verify Email Address</a>\n</td></tr></table></div>\n          <p style=\"margin:0;color:#9C9388;font-size:12px;line-height:1.6;border-top:1px solid #E3DACB;padding-top:24px;\">\n            This link expires in <strong>24 hours</strong>. If you did not apply for the Pairo Affiliate Program, you can safely ignore this email.\n          </p>\n          <p style=\"margin:12px 0 0;color:#9C9388;font-size:11px;word-break:break-all;\">https://pairolifestyle.com/affiliate/verify-email?token=3a7b9c1d5e8f2046</p>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"13-affiliate-application-received","category":"Affiliate Program","role":"Affiliate","title":"Affiliate Application Received","subject":"Affiliate Application Received — Pairo Lifestyle","from":"\"PAIRO Affiliates\" <support@pairolifestyle.com>","to":"marcus.sterling@partners.io","trigger":"Fired when affiliate confirms email address & application enters audit queue","fileName":"13-affiliate-application-received.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Application Received</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Affiliate Partners</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Application Received</h2>\n    \n    \n          <p style=\"margin:0 0 16px;color:#6F655B;font-size:14px;\">Hi Marcus Sterling,</p>\n          <p style=\"margin:0 0 14px;color:#4A2E1D;font-size:15px;line-height:1.7;\">Thank you for applying to the Pairo Affiliate Program. We have received your application and identity documents.</p>\n          <p style=\"margin:0;color:#4A2E1D;font-size:15px;line-height:1.7;\">Our review team is auditing your details. You will receive an email update with your login credentials as soon as your account is approved.</p>\n          <div style=\"margin-top:36px;padding-top:20px;border-top:1px solid #E3DACB;\">\n            <p style=\"margin:0;color:#6F655B;font-size:13px;\">Kind regards,</p>\n            <p style=\"margin:4px 0 0;color:#4A2E1D;font-size:14px;font-weight:700;\">The Pairo Team</p>\n          </div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"14-affiliate-application-approved","category":"Affiliate Program","role":"Affiliate","title":"Affiliate Application Approved","subject":"Affiliate Account Approved! — Pairo Lifestyle","from":"\"PAIRO Affiliates\" <support@pairolifestyle.com>","to":"marcus.sterling@partners.io","trigger":"Admin clicks 'Approve' on affiliate application in admin dashboard","fileName":"14-affiliate-application-approved.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Your Application Has Been Approved</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Affiliate Partners</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Your Application Has Been Approved</h2>\n    \n    \n          <p style=\"margin:0 0 16px;color:#6F655B;font-size:14px;\">Dear Marcus Sterling,</p>\n          <p style=\"margin:0 0 20px;color:#4A2E1D;font-size:15px;line-height:1.7;\">Congratulations! You can now log in to your dedicated Affiliate Portal to start generating links, tracking conversions, and viewing commissions.</p>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Your Account Details</p>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Portal Login URL</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\"><a href=\"https://pairolifestyle.com/affiliate-login\" style=\"color:#4A2E1D;\">https://pairolifestyle.com/affiliate-login</a></td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Login Email</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">marcus.sterling@partners.io</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Temporary Password</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\"><span style=\"font-family:monospace;background:#FFFFFF;border:1px solid #E3DACB;padding:3px 8px;border-radius:4px;\">Pairo-Partner-2026!</span></td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Referral Code</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">MARCUS15</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Commission Rate</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">10% on all delivered orders</td></tr></table>\n</td></tr></table>\n          <div style=\"padding-top:20px;border-top:1px solid #E3DACB;\">\n            <p style=\"margin:0;color:#6F655B;font-size:13px;\">Kind regards,</p>\n            <p style=\"margin:4px 0 0;color:#4A2E1D;font-size:14px;font-weight:700;\">The Pairo Team</p>\n          </div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"15-affiliate-application-rejected","category":"Affiliate Program","role":"Affiliate","title":"Affiliate Application Rejected","subject":"Affiliate Application Update — Pairo Lifestyle","from":"\"PAIRO Affiliates\" <support@pairolifestyle.com>","to":"liam.thorne@marketing.net","trigger":"Admin clicks 'Reject' on affiliate application in admin dashboard","fileName":"15-affiliate-application-rejected.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Application Update</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Affiliate Partners</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Application Update</h2>\n    \n    \n          <p style=\"margin:0 0 16px;color:#6F655B;font-size:14px;\">Dear Liam Thorne,</p>\n          <p style=\"margin:0 0 14px;color:#4A2E1D;font-size:15px;line-height:1.7;\">Thank you for your interest in the Pairo Affiliate Program.</p>\n          <p style=\"margin:0 0 20px;color:#4A2E1D;font-size:15px;line-height:1.7;\">After reviewing your application details and marketing channels, we regret to inform you that we are unable to accept your application at this time.</p>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;border-left:4px solid #9A3B3B;\">\n<tr><td style=\"padding:20px 22px;\">\n\n<p style=\"margin:0;color:#9A3B3B;font-size:14px;line-height:1.6;\"><strong>Review notes:</strong> Your social media channels do not currently meet our minimum luxury outerwear audience criteria. You are welcome to re-apply in 90 days.</p>\n</td></tr></table>\n          <div style=\"padding-top:20px;border-top:1px solid #E3DACB;\">\n            <p style=\"margin:0;color:#6F655B;font-size:13px;\">Kind regards,</p>\n            <p style=\"margin:4px 0 0;color:#4A2E1D;font-size:14px;font-weight:700;\">The Pairo Team</p>\n          </div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"16-affiliate-password-reset","category":"Affiliate Program","role":"Affiliate","title":"Affiliate Password Reset","subject":"Reset Your PAIRO Partner Password","from":"\"PAIRO Partners\" <support@pairolifestyle.com>","to":"marcus.sterling@partners.io","trigger":"Affiliate requests password reset on /affiliate/forgot-password","fileName":"16-affiliate-password-reset.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Reset Your Password</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;\">Reset your PAIRO Partner account password.</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Partner Portal</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Reset Your Password</h2>\n    <p style=\"margin:0 0 28px;color:#6F655B;font-size:14px;line-height:1.7;\">Hi Marcus, we received a request to reset the password for your PAIRO Partner account. This link expires in <strong>1 hour</strong>.</p>\n    \n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/affiliate/reset-password?token=7a9b0c2d3e4f5061\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Reset Password</a>\n</td></tr></table></div>\n          <p style=\"margin:0;color:#9C9388;font-size:12px;line-height:1.6;border-top:1px solid #E3DACB;padding-top:24px;\">\n            If you did not request a password reset, please ignore this email — your account is safe. For security, do not share this link with anyone.\n          </p>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"17-affiliate-payout-update","category":"Affiliate Program","role":"Affiliate","title":"Affiliate Payout Status Update","subject":"Affiliate Payout Update: $1420 — Pairo Lifestyle","from":"\"PAIRO Affiliates\" <support@pairolifestyle.com>","to":"marcus.sterling@partners.io","trigger":"Admin updates affiliate payout status (Paid / Approved / Processing)","fileName":"17-affiliate-payout-update.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Payout Update</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Affiliate Partners</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Payout Update</h2>\n    \n    \n          <p style=\"margin:0 0 16px;color:#6F655B;font-size:14px;\">Dear Marcus Sterling,</p>\n          <p style=\"margin:0 0 8px;color:#4A2E1D;font-size:15px;line-height:1.7;\">This is an update regarding your affiliate payout request of <strong>$1,420</strong>.</p>\n          <p style=\"margin:0 0 20px;color:#4A2E1D;font-size:15px;\">Status: <strong style=\"text-transform:uppercase;\">Approved &amp; Transferred</strong></p>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n\n<p style=\"margin:0;color:#4A2E1D;font-size:14px;line-height:1.6;\"><strong>Notes:</strong> International wire transfer sent to Chase account ending in 4920. Funds typically settle within 2 business days.</p>\n</td></tr></table>\n          <div style=\"padding-top:20px;border-top:1px solid #E3DACB;\">\n            <p style=\"margin:0;color:#6F655B;font-size:13px;\">Kind regards,</p>\n            <p style=\"margin:4px 0 0;color:#4A2E1D;font-size:14px;font-weight:700;\">The Pairo Team</p>\n          </div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"18-product-qa-confirmation-customer","category":"Product Q&A & Support","role":"Customer","title":"Product Question Confirmation (Customer)","subject":"We have received your question regarding The Aviator Shearling Leather Bomber","from":"\"PAIRO Store\" <support@pairolifestyle.com>","to":"claire.dupont@paris.fr","trigger":"Customer submits a question in the Product Q&A tab on product page","fileName":"18-product-qa-confirmation-customer.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>We’ve Received Your Question</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Customer Experience</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">We’ve Received Your Question</h2>\n    \n    \n          <p style=\"margin:0 0 16px;color:#6F655B;font-size:14px;\">Dear Claire Dupont,</p>\n          <p style=\"margin:0 0 10px;color:#4A2E1D;font-size:15px;line-height:1.7;\">Thank you for your question regarding <strong>The Aviator Shearling Leather Bomber</strong>.</p>\n          <p style=\"margin:0;color:#6F655B;font-size:14px;line-height:1.7;\">Our team will review it and get back to you shortly.</p>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"19-product-qa-notification-admin","category":"Product Q&A & Support","role":"Admin","title":"New Product Question (Admin)","subject":"New Q&A Question on The Aviator Shearling Leather Bomber by Claire Dupont","from":"\"PAIRO Store System\" <support@pairolifestyle.com>","to":"admin@pairolifestyle.com","trigger":"Fired when customer asks a question on any product page","fileName":"19-product-qa-notification-admin.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>New Product Question</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Admin Notification</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">New Product Question</h2>\n    \n    \n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Customer Name</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">Claire Dupont</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Customer Email</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">claire.dupont@paris.fr</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Product Name</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">The Aviator Shearling Leather Bomber</td></tr><tr><td style=\"padding:6px 0;color:#6F655B;font-size:13px;width:38%;vertical-align:top;\">Submitted Date</td><td style=\"padding:6px 0;color:#4A2E1D;font-size:13px;font-weight:600;\">10/14/2026, 3:45:00 PM</td></tr></table>\n</td></tr></table>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Submitted Question</p>\n<p style=\"margin:0;color:#4A2E1D;font-size:14px;line-height:1.6;font-style:italic;\">“Is the merino shearling collar detachable via hidden buttons or a zipper, and how water resistant is the antique nubuck finish in light rain?”</p>\n</td></tr></table>\n          <div style=\"text-align:center;margin:30px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:0 auto;\"><tr><td style=\"border-radius:999px;background:#4A2E1D;border:1px solid #4A2E1D;\">\n<a href=\"https://pairolifestyle.com/admin/products/questions\" style=\"display:inline-block;padding:15px 38px;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;\">Moderate Questions &amp; Answers</a>\n</td></tr></table></div>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"},{"id":"20-product-qa-reply-customer","category":"Product Q&A & Support","role":"Customer","title":"Product Question Answered (Customer)","subject":"Answered: Your question regarding The Aviator Shearling Leather Bomber","from":"\"PAIRO Support\" <support@pairolifestyle.com>","to":"claire.dupont@paris.fr","trigger":"Admin submits an answer to a customer question in the Q&A moderation panel","fileName":"20-product-qa-reply-customer.html","rawHtml":"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n<title>Your Question Has Been Answered</title>\n</head>\n<body style=\"margin:0;padding:0;background:#F3EFE7;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;\">\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F3EFE7;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E3DACB;\">\n  <tr><td style=\"background:#4A2E1D;padding:36px 40px;text-align:center;\">\n    <p style=\"margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">Customer Experience</p>\n    <h1 style=\"margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;\">PAIRO Lifestyle</h1>\n  </td></tr>\n  <tr><td style=\"padding:44px 40px 36px;\">\n    <h2 style=\"margin:0 0 14px;color:#4A2E1D;font-size:21px;font-weight:700;letter-spacing:-0.3px;\">Your Question Has Been Answered</h2>\n    \n    \n          <p style=\"margin:0 0 16px;color:#6F655B;font-size:14px;\">Dear Claire Dupont,</p>\n          <p style=\"margin:0 0 20px;color:#4A2E1D;font-size:15px;line-height:1.7;\">We've answered your question regarding <strong>The Aviator Shearling Leather Bomber</strong>.</p>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">Your Question</p>\n<p style=\"margin:0;font-size:14px;color:#6F655B;font-style:italic;\">“Is the merino shearling collar detachable via hidden buttons or a zipper, and how water resistant is the antique nubuck finish in light rain?”</p>\n</td></tr></table>\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#F6F2EA;border:1px solid #E3DACB;border-radius:10px;margin:0 0 24px;border-left:4px solid #4A2E1D;\">\n<tr><td style=\"padding:20px 22px;\">\n<p style=\"margin:0 0 12px;color:#4A2E1D;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;\">PAIRO Lifestyle Store Reply</p>\n<p style=\"margin:0;font-size:14px;color:#4A2E1D;font-weight:600;\">The Spanish merino shearling collar attaches securely with handcrafted horn buttons concealed beneath the storm flap, allowing you to easily remove it. The leather receives a natural beeswax water-repellent treatment during tanning that resists light rain and snow beautifully.</p>\n</td></tr></table>\n          <p style=\"margin:24px 0 0;font-size:14px;color:#4A2E1D;\">View this Q&amp;A on the product page: <a href=\"https://pairolifestyle.com/product/aviator-shearling-leather-bomber\" style=\"color:#4A2E1D;font-weight:700;text-decoration:underline;\">The Aviator Shearling Leather Bomber</a></p>\n        \n  </td></tr>\n  <tr><td style=\"background:#F6F2EA;border-top:1px solid #E3DACB;padding:26px 40px;text-align:center;\">\n    <p style=\"margin:0;color:#4A2E1D;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;\">PAIRO Lifestyle</p>\n    <p style=\"margin:8px 0 0;color:#9C9388;font-size:11px;\">&copy; 2026 PAIRO Lifestyle &middot; <a href=\"https://pairolifestyle.com\" style=\"color:#9C9388;text-decoration:underline;\">pairolifestyle.com</a></p>\n  </td></tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>"}];
+    let currentId = emailsData[0].id;
+    let isCodeMode = false;
+
+    function renderSidebar(filtered = emailsData) {
+      const container = document.getElementById('sidebar-list');
+      container.innerHTML = '';
+
+      const cats = Array.from(new Set(filtered.map(e => e.category)));
+
+      cats.forEach(cat => {
+        const catItems = filtered.filter(e => e.category === cat);
+        const group = document.createElement('div');
+        group.className = 'category-group';
+
+        const title = document.createElement('div');
+        title.className = 'cat-title';
+        title.innerHTML = '<span>' + cat + '</span><span>' + catItems.length + '</span>';
+        group.appendChild(title);
+
+        catItems.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'email-item' + (item.id === currentId ? ' active' : '');
+          div.onclick = () => selectEmail(item.id);
+          div.innerHTML = `
+            <div class="email-item-title">${item.title}</div>
+            <div class="email-item-meta">
+              <span class="role-badge role-${item.role}">${item.role}</span>
+              <span style="color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;">${item.subject}</span>
+            </div>
+          `;
+          group.appendChild(div);
+        });
+
+        container.appendChild(group);
+      });
+    }
+
+    function selectEmail(id) {
+      currentId = id;
+      const email = emailsData.find(e => e.id === id);
+      if (!email) return;
+
+      document.querySelectorAll('.email-item').forEach(el => el.classList.remove('active'));
+      renderSidebar(getFilteredList());
+
+      // Update Meta
+      document.getElementById('disp-subject').textContent = email.subject;
+      document.getElementById('disp-to').textContent = email.to;
+      document.getElementById('disp-from').textContent = email.from;
+      document.getElementById('disp-trigger').textContent = email.trigger;
+      document.getElementById('btn-open-tab').href = email.fileName;
+
+      // Update Frame
+      document.getElementById('preview-frame').src = email.fileName;
+      document.getElementById('code-view').textContent = email.rawHtml;
+
+      if (isCodeMode) {
+        document.getElementById('iframe-wrap').style.display = 'none';
+        document.getElementById('code-view').style.display = 'block';
+      } else {
+        document.getElementById('iframe-wrap').style.display = 'flex';
+        document.getElementById('code-view').style.display = 'none';
+      }
+    }
+
+    function setDevice(device) {
+      const wrap = document.getElementById('iframe-wrap');
+      wrap.className = 'iframe-wrapper ' + device;
+      document.querySelectorAll('.device-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + device).classList.add('active');
+    }
+
+    function toggleCodeView() {
+      isCodeMode = !isCodeMode;
+      const btn = document.getElementById('btn-toggle-code');
+      btn.textContent = isCodeMode ? 'View Visual' : 'View HTML';
+      btn.classList.toggle('primary', isCodeMode);
+
+      document.getElementById('iframe-wrap').style.display = isCodeMode ? 'none' : 'flex';
+      document.getElementById('code-view').style.display = isCodeMode ? 'block' : 'none';
+    }
+
+    function copyCurrentHtml() {
+      const email = emailsData.find(e => e.id === currentId);
+      if (!email) return;
+      navigator.clipboard.writeText(email.rawHtml).then(() => {
+        showToast('HTML copied to clipboard!');
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function getFilteredList() {
+      const q = document.getElementById('search').value.toLowerCase().trim();
+      if (!q) return emailsData;
+      return emailsData.filter(e => 
+        e.title.toLowerCase().includes(q) || 
+        e.subject.toLowerCase().includes(q) || 
+        e.category.toLowerCase().includes(q) || 
+        e.role.toLowerCase().includes(q) || 
+        e.to.toLowerCase().includes(q)
+      );
+    }
+
+    function filterEmails() {
+      renderSidebar(getFilteredList());
+    }
+
+    // Init
+    renderSidebar();
+    selectEmail(currentId);
+  </script>
+</body>
+</html>
