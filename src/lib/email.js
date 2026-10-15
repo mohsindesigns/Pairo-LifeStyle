@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import dbConnect from './db';
 import Staff from '@/models/Staff';
 import Role from '@/models/Role';
+import SiteConfig from '@/models/SiteConfig';
 import { escapeHtml } from './sanitize';
 
 function getSmtpPassword(secretKey, region) {
@@ -163,19 +164,23 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;c
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.pageBg};padding:40px 16px;">
 <tr><td align="center">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${BRAND.paper};border-radius:16px;overflow:hidden;border:1px solid ${BRAND.border};">
+  <!--HDR_START:${encodeURIComponent(eyebrow || storeName)}-->
   <tr><td style="background:${BRAND.ink};padding:36px 40px;text-align:center;">
     <p style="margin:0 0 8px;color:rgba(255,255,255,0.55);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">${escapeHtml(eyebrow || storeName)}</p>
     <h1 style="margin:0;color:#ffffff;font-size:21px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">${escapeHtml(storeName)}</h1>
   </td></tr>
+  <!--HDR_END-->
   <tr><td style="padding:44px 40px 36px;">
     ${heading ? `<h2 style="margin:0 0 14px;color:${BRAND.ink};font-size:21px;font-weight:700;letter-spacing:-0.3px;">${heading}</h2>` : ''}
     ${subheading ? `<p style="margin:0 0 28px;color:${BRAND.muted};font-size:14px;line-height:1.7;">${subheading}</p>` : ''}
     ${bodyHtml || ''}
   </td></tr>
+  <!--FTR_START-->
   <tr><td style="background:${BRAND.surface};border-top:1px solid ${BRAND.border};padding:26px 40px;text-align:center;">
     <p style="margin:0;color:${BRAND.ink};font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;">${escapeHtml(storeName)}</p>
     <p style="margin:8px 0 0;color:${BRAND.faint};font-size:11px;">&copy; ${new Date().getFullYear()} ${escapeHtml(storeName)} &middot; <a href="${storeUrl}" style="color:${BRAND.faint};text-decoration:underline;">${storeUrl.replace(/^https?:\/\//, '')}</a></p>
   </td></tr>
+  <!--FTR_END-->
 </table>
 </td></tr>
 </table>
@@ -245,6 +250,126 @@ async function resolveAdminEmail(label) {
  * same way everywhere. `critical: true` rethrows on failure, matching the
  * functions that previously threw so callers can react to a hard failure.
  */
+// ─── BRANDING (logo, contact details, footer) ──────────────────────────────────
+// Resolved at send time so the header logo follows whatever is set in the admin
+// (Site Config → header logo) and the footer carries real contact details.
+
+const BRANDING_TTL_MS = 10 * 60 * 1000;
+let brandingCache = { at: 0, data: null };
+
+function publicBaseUrl() {
+  return (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+}
+
+function toAbsoluteUrl(url) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  return url.startsWith('/') ? `${publicBaseUrl()}${url}` : url;
+}
+
+/** Many mail clients (notably Outlook) can't show WebP, so ask Cloudinary for a PNG. */
+function emailSafeImageUrl(url) {
+  const abs = toAbsoluteUrl(url);
+  if (/res\.cloudinary\.com/.test(abs) && abs.includes('/upload/') && !abs.includes('/upload/f_')) {
+    return abs.replace('/upload/', '/upload/f_png,w_480,c_limit/');
+  }
+  return abs;
+}
+
+async function getEmailBranding() {
+  if (brandingCache.data && Date.now() - brandingCache.at < BRANDING_TTL_MS) return brandingCache.data;
+
+  let logoUrl = (process.env.EMAIL_LOGO_URL || '').trim();
+  if (!logoUrl) {
+    try {
+      await dbConnect();
+      const cfg = await SiteConfig.findOne({ key: 'main' }).select('headerConfig.logoUrl').lean();
+      logoUrl = cfg?.headerConfig?.logoUrl || '';
+    } catch (e) {
+      console.warn('[Email] Could not load logo from site settings:', e.message);
+    }
+  }
+
+  const data = {
+    storeName: process.env.STORE_NAME || 'PAIRO Lifestyle',
+    storeUrl: publicBaseUrl(),
+    logoUrl: emailSafeImageUrl(logoUrl),
+    supportEmail: (process.env.STORE_EMAIL || process.env.ADMIN_EMAIL || '').trim(),
+    phone: (process.env.STORE_PHONE || '').trim(),
+    address: (process.env.STORE_ADDRESS || '').trim(),
+  };
+  brandingCache = { at: Date.now(), data };
+  return data;
+}
+
+function buildEmailHeader(b, eyebrow) {
+  return `<tr><td style="background:#ffffff;padding:30px 40px 24px;text-align:center;border-bottom:1px solid ${BRAND.border};">
+    <a href="${b.storeUrl}" style="text-decoration:none;"><img src="${escapeHtml(b.logoUrl)}" alt="${escapeHtml(b.storeName)}" width="170" style="display:inline-block;width:170px;max-width:60%;height:auto;border:0;outline:none;color:${BRAND.ink};font-size:20px;font-weight:700;letter-spacing:3px;" /></a>
+  </td></tr>
+  <tr><td style="background:${BRAND.ink};padding:13px 40px;text-align:center;">
+    <p style="margin:0;color:rgba(255,255,255,0.85);font-size:11px;font-weight:700;letter-spacing:3.5px;text-transform:uppercase;">${escapeHtml(eyebrow)}</p>
+  </td></tr>`;
+}
+
+function buildEmailFooter(b) {
+  const link = (href, label) => `<a href="${href}" style="color:${BRAND.ink};text-decoration:none;font-weight:600;">${label}</a>`;
+  const nav = [
+    link(`${b.storeUrl}/shop`, 'Shop'),
+    link(`${b.storeUrl}/track-order`, 'Track Order'),
+    link(`${b.storeUrl}/contact`, 'Contact'),
+  ].join(`<span style="color:${BRAND.border};padding:0 10px;">|</span>`);
+
+  const contactBits = [
+    b.supportEmail ? `<a href="mailto:${escapeHtml(b.supportEmail)}" style="color:${BRAND.muted};text-decoration:underline;">${escapeHtml(b.supportEmail)}</a>` : '',
+    b.phone ? escapeHtml(b.phone) : '',
+  ].filter(Boolean).join(' &nbsp;&middot;&nbsp; ');
+
+  return `<tr><td style="background:${BRAND.surface};border-top:1px solid ${BRAND.border};padding:28px 40px 30px;text-align:center;">
+    <p style="margin:0 0 14px;font-size:12px;letter-spacing:0.5px;">${nav}</p>
+    ${contactBits ? `<p style="margin:0 0 4px;color:${BRAND.muted};font-size:12px;line-height:1.7;">Questions? We&rsquo;re happy to help &mdash; ${contactBits}</p>` : ''}
+    <p style="margin:14px 0 0;color:${BRAND.faint};font-size:11px;line-height:1.7;">
+      This is an automated message from ${escapeHtml(b.storeName)}.<br/>
+      ${b.address ? `${escapeHtml(b.address)}<br/>` : ''}&copy; ${new Date().getFullYear()} ${escapeHtml(b.storeName)}. All rights reserved.
+    </p>
+  </td></tr>`;
+}
+
+/** Fills the header logo and footer placeholders left by emailShell(). */
+async function applyBranding(html) {
+  if (!html || !html.includes('<!--FTR_START-->')) return html;
+  const b = await getEmailBranding();
+  let out = html;
+  if (b.logoUrl) {
+    out = out.replace(/<!--HDR_START:([^>]*?)-->[\s\S]*?<!--HDR_END-->/, (_, enc) => buildEmailHeader(b, decodeURIComponent(enc)));
+  }
+  out = out.replace(/<!--FTR_START-->[\s\S]*?<!--FTR_END-->/, buildEmailFooter(b));
+  return out;
+}
+
+/** Plain-text alternative: improves spam scoring and works in text-only clients. */
+function htmlToText(html) {
+  return String(html || '')
+    .replace(/<head[\s\S]*?<\/head>/i, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<div style="display:none[\s\S]*?<\/div>/i, '')
+    .replace(/<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_, href, label) => {
+      const text = label.replace(/<[^>]+>/g, '').trim();
+      if (!text) return '';
+      return text === href || href.startsWith('mailto:') ? text : `${text} (${href})`;
+    })
+    .replace(/<img[^>]*alt="([^"]*)"[^>]*>/gi, '')
+    .replace(/<\/(p|h1|h2|h3|tr|table|div)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/t[dh]>/gi, '  ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&middot;/g, '·').replace(/&mdash;/g, '—').replace(/&rsquo;/g, '’')
+    .replace(/&copy;/g, '©').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&#x2F;/g, '/').replace(/&#x60;/g, '`')
+    .split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+
 async function dispatchEmail({ to, subject, html, from, label, critical = false, mailOptions = {} }) {
   if (!to) {
     console.warn(`[Email] ${label}: no recipient address — skipped.`);
@@ -255,7 +380,18 @@ async function dispatchEmail({ to, subject, html, from, label, critical = false,
     return null;
   }
   try {
-    const info = await transporter.sendMail({ from: from || getFromAddress(), to, subject, html, ...mailOptions });
+    const finalHtml = await applyBranding(html);
+    const branding = brandingCache.data;
+    const replyTo = mailOptions.replyTo || (branding?.supportEmail ? `"${branding.storeName}" <${branding.supportEmail}>` : undefined);
+    const info = await transporter.sendMail({
+      from: from || getFromAddress(),
+      to,
+      subject,
+      html: finalHtml,
+      text: htmlToText(finalHtml),
+      ...(replyTo ? { replyTo } : {}),
+      ...mailOptions,
+    });
     console.log(`[Email] ✅ ${label} sent to ${to} | MsgID: ${info.messageId}`);
     return info;
   } catch (err) {
@@ -393,29 +529,57 @@ export async function sendAffiliatePasswordReset(toEmail, name, resetUrl) {
  * Send Order Confirmation Email to Customer
  */
 export async function sendOrderConfirmation(order) {
-  const itemsRows = (order.items || []).map((item) => `
+  const money = (n) => `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fin = order.financials || {};
+
+  const itemsRows = (order.items || []).map((item) => {
+    const img = item.image ? emailSafeImageUrl(item.image) : '';
+    const thumb = img
+      ? `<img src="${escapeHtml(img)}" alt="" width="56" height="56" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid ${BRAND.border};" />`
+      : '';
+    return `
     <tr>
-      <td style="padding:12px 10px;border-bottom:1px solid ${BRAND.border};">
+      <td style="padding:14px 0 14px 10px;border-bottom:1px solid ${BRAND.border};width:56px;vertical-align:middle;">${thumb}</td>
+      <td style="padding:14px 10px;border-bottom:1px solid ${BRAND.border};vertical-align:middle;">
         <strong style="color:${BRAND.ink};">${escapeHtml(item.name || '')}</strong><br/>
         <span style="color:${BRAND.muted};font-size:12px;">${escapeHtml(item.selectedVariant?.title || '')}</span>
       </td>
-      <td style="padding:12px 10px;border-bottom:1px solid ${BRAND.border};text-align:center;color:${BRAND.ink};">${item.quantity}</td>
-      <td style="padding:12px 10px;border-bottom:1px solid ${BRAND.border};text-align:right;color:${BRAND.ink};font-weight:700;">$${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}</td>
-    </tr>`).join('');
+      <td style="padding:14px 10px;border-bottom:1px solid ${BRAND.border};text-align:center;color:${BRAND.ink};vertical-align:middle;">${item.quantity}</td>
+      <td style="padding:14px 10px;border-bottom:1px solid ${BRAND.border};text-align:right;color:${BRAND.ink};font-weight:700;vertical-align:middle;white-space:nowrap;">${money((item.priceAtPurchase || 0) * (item.quantity || 1))}</td>
+    </tr>`;
+  }).join('');
+
+  const sumRow = (label, value, { strong = false, topRule = false, color } = {}) => `
+    <tr>
+      <td colspan="3" style="padding:${strong ? '16px' : '6px'} 10px 6px;text-align:right;color:${color || (strong ? BRAND.ink : BRAND.muted)};font-size:${strong ? '15px' : '13px'};font-weight:${strong ? 800 : 400};${topRule ? `border-top:2px solid ${BRAND.ink};` : ''}">${label}</td>
+      <td style="padding:${strong ? '16px' : '6px'} 10px 6px;text-align:right;color:${color || BRAND.ink};font-size:${strong ? '15px' : '13px'};font-weight:${strong ? 800 : 600};white-space:nowrap;${topRule ? `border-top:2px solid ${BRAND.ink};` : ''}">${value}</td>
+    </tr>`;
+
+  const subtotal = fin.subtotal ?? (order.items || []).reduce((s, i) => s + (i.priceAtPurchase || 0) * (i.quantity || 1), 0);
+  const discount = (Number(fin.discountTotal) || 0) + (Number(fin.affiliateDiscountAmount) || 0);
+  const summaryRows =
+    sumRow('Subtotal', money(subtotal)) +
+    (discount > 0 ? sumRow('Discount', `&minus;${money(discount)}`, { color: '#2F7A4B' }) : '') +
+    sumRow('Shipping', Number(fin.shippingCost) > 0 ? money(fin.shippingCost) : 'Free') +
+    (Number(fin.tax) > 0 ? sumRow('Tax', money(fin.tax)) : '') +
+    sumRow('Total Paid', money(fin.total), { strong: true, topRule: true });
 
   const itemsTable = `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin-bottom:8px;">
       <thead><tr style="background:${BRAND.surface};">
-        <th style="text-align:left;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Product</th>
+        <th colspan="2" style="text-align:left;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Product</th>
         <th style="padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Qty</th>
         <th style="text-align:right;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Total</th>
       </tr></thead>
       <tbody>${itemsRows}</tbody>
-      <tfoot><tr>
-        <td colspan="2" style="padding:16px 10px;text-align:right;font-weight:700;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">Total Paid</td>
-        <td style="padding:16px 10px;text-align:right;font-weight:800;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">$${(order.financials?.total || 0).toLocaleString()}</td>
-      </tr></tfoot>
-    </table>`;
+      <tfoot>${summaryRows}</tfoot>
+    </table>
+    ${order.payment?.method ? `<p style="margin:6px 0 0;color:${BRAND.faint};font-size:12px;text-align:right;">Payment method: ${escapeHtml(order.payment.method)}</p>` : ''}`;
+
+  const trackUrl = order.customer?.isGuest === false || order.guestAccount?.created
+    ? `${publicBaseUrl()}/profile/orders`
+    : `${publicBaseUrl()}/track-order`;
+  const trackButton = buttonBlock(trackUrl, 'Track Your Order');
 
   const accountSectionHtml = order.guestAccount?.created && order.guestAccount?.temporaryPassword
     ? emailPanel(`
@@ -432,7 +596,7 @@ export async function sendOrderConfirmation(order) {
     <p style="margin:0;font-size:14px;line-height:1.8;color:${BRAND.ink};">
       ${escapeHtml(order.shippingAddress?.fullName || '')}<br/>
       ${escapeHtml(order.shippingAddress?.street || '')}<br/>
-      ${escapeHtml(order.shippingAddress?.city || '')}${order.shippingAddress?.zip ? `, ${escapeHtml(order.shippingAddress.zip)}` : ''}<br/>
+      ${escapeHtml(order.shippingAddress?.city || '')}${order.shippingAddress?.state ? `, ${escapeHtml(order.shippingAddress.state)}` : ''}${order.shippingAddress?.zip ? ` ${escapeHtml(order.shippingAddress.zip)}` : ''}<br/>
       ${escapeHtml(order.shippingAddress?.country || '')}
     </p>
   `, { title: 'Shipping To', accentColor: BRAND.ink });
@@ -441,7 +605,7 @@ export async function sendOrderConfirmation(order) {
     eyebrow: 'Order Confirmed',
     heading: 'Thank You For Your Order',
     subheading: `Hi ${escapeHtml(order.shippingAddress?.fullName?.split(' ')[0] || 'there')}, your order <strong>#${escapeHtml(order.orderNumber)}</strong> has been confirmed and is being prepared for dispatch.`,
-    bodyHtml: `${itemsTable}<div style="margin-top:28px;">${accountSectionHtml}${shippingHtml}</div>`,
+    bodyHtml: `${itemsTable}${trackButton}<div style="margin-top:8px;">${accountSectionHtml}${shippingHtml}</div>`,
     preheader: `Your order #${order.orderNumber} has been confirmed.`,
   });
 
@@ -1063,7 +1227,7 @@ export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, char
       ${chartBlock}
       ${emailPanel(`<p style="margin:0;color:${BRAND.ink};font-size:14px;line-height:1.7;">Please <strong>reply to this message</strong> with your confirmed size (e.g., Small, Medium, Large, etc.) or your measurements so we can move forward with processing and shipping your order right away.</p>`, { accentColor: BRAND.ink })}
       ${para('If you need any help figuring out your size, feel free to share your height and weight with us, and our team will gladly recommend the best fit for you!')}
-      <p style="margin:24px 0 0;color:${BRAND.ink};font-size:14px;line-height:1.7;">Warm regards,<br/><strong>Team ${escapeHtml(storeName)}</strong>${contactLine ? `<br/><span style="color:${BRAND.muted};">${escapeHtml(contactLine)}</span>` : ''}</p>
+      <p style="margin:24px 0 0;color:${BRAND.ink};font-size:14px;line-height:1.7;">Warm regards,<br/><strong>Team ${escapeHtml(storeName)}</strong></p>
     `,
     preheader: `Please reply with your size for Order #${orderNumber}.`,
   });
