@@ -56,7 +56,7 @@ function getDeliveryRange() {
       ? ` ${end.getFullYear()}`
       : "";
 
-  return `${startStr} â€“ ${endStr}${yearSuffix}`;
+  return `${startStr} – ${endStr}${yearSuffix}`;
 }
 
 export default function ProductMainSection({ product, topReview = null }) {
@@ -70,7 +70,7 @@ export default function ProductMainSection({ product, topReview = null }) {
 
   const handleVariantChange = (variant) => {
     if (variant.isPartial) {
-      // Always set â€” empty string resets gallery to product default
+      // Always set — empty string resets gallery to product default
       setSelectedVariantImage(variant.image ?? "");
       return;
     }

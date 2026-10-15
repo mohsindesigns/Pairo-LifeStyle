@@ -98,7 +98,7 @@ export default function ProductGallery({ images = [], variantImage, productName 
   return (
     <>
       <div className="flex flex-col gap-3 overflow-hidden w-full">
-        {/* Main image â€” Desktop: hover zoom | Mobile: tap to open lightbox */}
+        {/* Main image — Desktop: hover zoom | Mobile: tap to open lightbox */}
         <div
           ref={mainRef}
           className="relative w-full aspect-square bg-[#F4F4F4] rounded-2xl overflow-hidden shadow-sm"
@@ -131,7 +131,7 @@ export default function ProductGallery({ images = [], variantImage, productName 
           </div>
         </div>
 
-        {/* Thumbnails â€” row beneath the main image */}
+        {/* Thumbnails — row beneath the main image */}
         <div className="grid grid-flow-col auto-cols-[calc(25%-9px)] gap-3 overflow-x-auto scrollbar-hide max-w-full pb-1">
           {allImages.map((img, i) => {
             const isActive = displayImage === img;

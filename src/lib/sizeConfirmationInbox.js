@@ -118,8 +118,14 @@ async function runSync() {
           if (byMessageId.has(id)) { conf = byMessageId.get(id); break; }
         }
         if (!conf) {
+          // Fallback for clients that drop reply headers: same sender + order number in the
+          // subject, and only mail sent after the size email (1 min tolerance for clock skew).
+          const msgDate = msg.envelope?.date ? new Date(msg.envelope.date).getTime() : null;
           conf = candidates.find(
-            (c) => c.customerEmail === fromEmail && subject.includes(`Order #${c.orderNumber}`)
+            (c) =>
+              c.customerEmail === fromEmail &&
+              subject.includes(`Order #${c.orderNumber}`) &&
+              (msgDate === null || msgDate >= new Date(c.sentAt).getTime() - 60 * 1000)
           ) || null;
         }
         if (!conf) continue;
