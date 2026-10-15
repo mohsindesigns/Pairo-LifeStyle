@@ -15,7 +15,7 @@ import SelectOptionsPopup from "@/components/product/SelectOptionsPopup";
 
 import { recordOptionSelect } from "@/lib/siteAnalytics";
 
-export default function ClientProductActions({ product, onVariantChange }) {
+export default function ClientProductActions({ product, onVariantChange, unitPrice }) {
   const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
@@ -229,6 +229,11 @@ export default function ClientProductActions({ product, onVariantChange }) {
     router.push("/checkout");
   };
 
+  // Total shown inside the Add to cart button (unit price x quantity)
+  const actionTotal = Number.isFinite(Number(unitPrice))
+    ? (Number(unitPrice) * quantity).toFixed(2)
+    : null;
+
   const handleCloseMissingAttrsModal = () => {
     setMissingAttrsModal((prev) => ({ ...prev, isOpen: false }));
   };
@@ -257,13 +262,13 @@ export default function ClientProductActions({ product, onVariantChange }) {
               }`}
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <p className={`text-[11px] md:text-[12px] font-bold uppercase tracking-[0.25em] transition-colors duration-700 ${isHighlighted ? "text-red-600" : "text-black"}`}>
-                    {attr.name}
+                <div className="flex items-baseline gap-2">
+                  <p className={`text-[15px] md:text-[17px] font-bold transition-colors duration-700 ${isHighlighted ? "text-red-600" : "text-primary"}`}>
+                    {attr.name}:
                   </p>
                   {selectedOptions[attr.name] && (
-                    <span className="text-[12px] md:text-[13px] font-bold text-black uppercase tracking-wider">
-                      — {selectedOptions[attr.name]}
+                    <span className="text-[13px] md:text-[14px] font-medium text-primary/60">
+                      {selectedOptions[attr.name]}
                     </span>
                   )}
                 </div>
@@ -271,7 +276,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
                   <button
                     type="button"
                     onClick={() => setSizeGuideOpen(true)}
-                    className="text-[11px] font-bold text-black underline uppercase tracking-wider hover:text-black/80 transition-colors"
+                    className="text-[13px] font-medium text-primary underline underline-offset-2 hover:text-primary/70 transition-colors"
                   >
                     Size guide
                   </button>
@@ -279,7 +284,7 @@ export default function ClientProductActions({ product, onVariantChange }) {
               </div>
 
               {attr.name.toLowerCase() === "size" ? (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="inline-flex flex-wrap max-w-full rounded-[var(--radius,8px)] border border-primary/30 overflow-hidden divide-x divide-primary/20">
                   {(attr.values || []).map((option) => {
                     const isSelected = selectedOptions[attr.name] === option.label;
                     return (
@@ -287,9 +292,9 @@ export default function ClientProductActions({ product, onVariantChange }) {
                         key={option.label}
                         type="button"
                         onClick={() => handleOptionSelect(attr.name, option)}
-                        className={`w-full h-10 rounded-[var(--radius,0px)] text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-200 border ${isSelected
-                          ? "bg-black text-white border-black"
-                          : "bg-transparent text-black border-black/30 hover:border-black"
+                        className={`h-11 min-w-[3.25rem] px-4 text-[14px] font-semibold uppercase transition-colors duration-200 ${isSelected
+                          ? "bg-primary text-white"
+                          : "bg-white text-primary hover:bg-primary/5"
                           }`}
                       >
                         {option.label}
@@ -309,9 +314,9 @@ export default function ClientProductActions({ product, onVariantChange }) {
                           type="button"
                           onClick={() => handleOptionSelect(attr.name, option)}
                           title={option.label}
-                          className={`relative w-9 h-9 md:w-10 md:h-10 rounded-full transition-all duration-200 flex items-center justify-center ${isSelected
-                            ? "ring-1 ring-offset-2 ring-black scale-105"
-                            : "ring-1 ring-black/10 hover:ring-black/30 hover:scale-105"
+                          className={`relative w-10 h-10 md:w-11 md:h-11 rounded-full transition-all duration-200 flex items-center justify-center ${isSelected
+                            ? "ring-2 ring-offset-2 ring-primary"
+                            : "ring-1 ring-black/15 hover:ring-primary/50 hover:scale-105"
                             }`}
                           style={{
                             backgroundColor: option.hex || "#ddd",
@@ -322,16 +327,9 @@ export default function ClientProductActions({ product, onVariantChange }) {
                           }}
                         >
                           {isSelected && (
-                            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/10">
-                              <Check
-                                className={`w-3 h-3 ${option.hex === "#FFFFFF" ||
-                                  option.hex === "#ffffff"
-                                  ? "text-black"
-                                  : "text-white"
-                                  }`}
-                                strokeWidth={3}
-                              />
-                            </div>
+                            <span className="absolute -bottom-1 -right-1 w-[18px] h-[18px] rounded-full bg-primary border-2 border-white flex items-center justify-center">
+                              <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />
+                            </span>
                           )}
                         </button>
                       );
@@ -361,53 +359,69 @@ export default function ClientProductActions({ product, onVariantChange }) {
           <hr className="border-t border-black/10" />
         )}
 
-        <div className="space-y-2.5 pt-1">
-          <div className="flex gap-2 items-stretch">
-            <div className="flex items-center justify-center bg-transparent rounded-[var(--radius,0px)] border border-black/30 gap-2 h-11 min-w-[100px] shrink-0">
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center gap-3">
+            <p className="text-[15px] md:text-[17px] font-bold text-primary">Quantity:</p>
+            <div className="flex items-center justify-center rounded-[var(--radius,8px)] border border-primary/30 gap-2 h-10 min-w-[104px]">
               <button
+                type="button"
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="text-black hover:text-black/70 transition-colors p-1"
+                className="text-primary hover:text-primary/70 transition-colors p-1.5"
                 aria-label="Decrease quantity"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="font-bold text-[14px] w-6 text-center text-black select-none">{quantity}</span>
+              <span className="font-bold text-[14px] w-6 text-center text-primary select-none">{quantity}</span>
               <button
+                type="button"
                 onClick={() => setQuantity(quantity + 1)}
-                className="text-black hover:text-black/70 transition-colors p-1"
+                className="text-primary hover:text-primary/70 transition-colors p-1.5"
                 aria-label="Increase quantity"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
-
-            <button
-               onClick={handleAddToCart}
-               className="flex-1 h-11 rounded-[var(--radius,0px)] font-bold uppercase tracking-[0.2em] text-[11px] flex items-center justify-center transition-all duration-300 active:scale-[0.98] border bg-black text-white border-black hover:bg-black/90"
-             >
-              {addedFeedback ? "Added!" : "Add to Bag"}
-            </button>
-
-            <button
-              onClick={handleSecureCheckout}
-              className="flex-1 h-11 rounded-[var(--radius,0px)] border border-black/30 text-black font-bold uppercase tracking-[0.2em] text-[11px] hover:bg-black hover:text-white hover:border-black transition-all duration-200 active:scale-[0.98] flex items-center justify-center"
-            >
-              Checkout
-            </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          {/* Primary CTA — color follows the theme's primary color set in admin */}
+          <button
+            type="button"
+            onClick={() => handleAddToCart(true)}
+            className="w-full h-14 rounded-[var(--radius,12px)] bg-primary text-white font-bold uppercase tracking-wide text-[15px] md:text-[16px] flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:brightness-110 transition-all duration-200 active:scale-[0.99]"
+          >
+            {addedFeedback ? (
+              <>
+                <Check className="w-5 h-5" strokeWidth={3} /> Added to cart
+              </>
+            ) : (
+              <>
+                <ShoppingBag className="w-5 h-5" />
+                Add to cart{actionTotal !== null ? ` — $${actionTotal}` : ""}
+              </>
+            )}
+          </button>
+
+          {/* Secondary CTA — outlined in the same theme color */}
+          <button
+            type="button"
+            onClick={handleSecureCheckout}
+            className="w-full h-12 rounded-[var(--radius,12px)] border-2 border-primary bg-white text-primary font-bold uppercase tracking-wide text-[15px] hover:bg-primary hover:text-white transition-all duration-200 active:scale-[0.99] flex items-center justify-center"
+          >
+            Buy now
+          </button>
+
+          <div className="grid grid-cols-2 gap-2 pt-1">
             <button
               type="button"
               onClick={handleM2mClick}
-              className="w-full h-11 rounded-[var(--radius,0px)] border border-black/30 text-black font-bold uppercase tracking-[0.2em] text-[11px] hover:bg-black hover:text-white hover:border-black transition-all duration-200 active:scale-[0.98] flex items-center justify-center"
+              className="w-full h-10 rounded-[var(--radius,8px)] border border-primary/30 text-primary font-semibold text-[13px] hover:border-primary hover:bg-primary/5 transition-all duration-200 flex items-center justify-center"
             >
-              Measure (+$25)
+              Made to measure (+$25)
             </button>
             <button
               type="button"
               onClick={handleCustomizeClick}
-              className="w-full h-11 rounded-[var(--radius,0px)] border border-black/30 text-black font-bold uppercase tracking-[0.2em] text-[11px] hover:bg-black hover:text-white hover:border-black transition-all duration-200 active:scale-[0.98] flex items-center justify-center"
+              className="w-full h-10 rounded-[var(--radius,8px)] border border-primary/30 text-primary font-semibold text-[13px] hover:border-primary hover:bg-primary/5 transition-all duration-200 flex items-center justify-center"
             >
               Customize
             </button>

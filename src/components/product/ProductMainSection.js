@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
@@ -19,7 +19,8 @@ import {
   RefreshCw,
   Info,
   HelpCircle,
-  MessageSquare
+  MessageSquare,
+  Clock
 } from "lucide-react";
 
 const ICON_MAP = {
@@ -55,10 +56,10 @@ function getDeliveryRange() {
       ? ` ${end.getFullYear()}`
       : "";
 
-  return `${startStr} – ${endStr}${yearSuffix}`;
+  return `${startStr} â€“ ${endStr}${yearSuffix}`;
 }
 
-export default function ProductMainSection({ product }) {
+export default function ProductMainSection({ product, topReview = null }) {
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedVariantImage, setSelectedVariantImage] = useState("");
   const [deliveryRange, setDeliveryRange] = useState("");
@@ -69,7 +70,7 @@ export default function ProductMainSection({ product }) {
 
   const handleVariantChange = (variant) => {
     if (variant.isPartial) {
-      // Always set — empty string resets gallery to product default
+      // Always set â€” empty string resets gallery to product default
       setSelectedVariantImage(variant.image ?? "");
       return;
     }
@@ -105,13 +106,30 @@ export default function ProductMainSection({ product }) {
       : `$${affiliateDiscount.value} Referral Discount`
     : null;
 
-  const categoryName = product.categories?.[0]?.name || product.category || "Collection";
+  const unitPrice = hasAffiliateDiscount && affiliateDiscountedPrice !== null
+    ? Number(affiliateDiscountedPrice.toFixed(2))
+    : Number(displayPrice);
+
+  const hasSale = !hasAffiliateDiscount && displayCompareAtPrice > displayPrice;
+  const salePercent = hasSale
+    ? Math.round(((displayCompareAtPrice - displayPrice) / displayCompareAtPrice) * 100)
+    : 0;
+
+  const rating = Number(product.rating) || 0;
+  const reviewCount = Number(product.reviewCount) || 0;
+
+  // Urgency only when real stock is low (never fabricated)
+  const lowStockLimit = Math.max(Number(product.lowStockThreshold) || 0, 10);
+  const showLowStock =
+    product.manageStock !== false && displayStock > 0 && displayStock <= lowStockLimit;
+
+  const badgeLabel = product.isFeatured ? "Best Seller" : hasSale ? "On Sale" : null;
 
   return (
     <div className="">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-8 items-start">
-        {/* LEFT SIDE: STICKY GALLERY - 60% */}
-        <div className="lg:col-span-3 lg:sticky lg:top-28 self-start w-full min-w-0">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 items-start">
+        {/* LEFT SIDE: STICKY GALLERY */}
+        <div className="lg:sticky lg:top-28 self-start w-full min-w-0">
           <ProductGallery
             images={product.images && product.images.length > 0 ? product.images : (product.image ? [product.image] : [])}
             variantImage={selectedVariantImage}
@@ -119,14 +137,19 @@ export default function ProductMainSection({ product }) {
             imageAlts={product.imageAlts}
           />
         </div>
+        {/* RIGHT SIDE: PRODUCT INFO */}
+        <div className="space-y-4 min-w-0 lg:pt-1.5">
+          {badgeLabel && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500 text-white text-[12px] md:text-[13px] font-bold uppercase tracking-wide px-4 py-1.5">
+              {badgeLabel}
+            </span>
+          )}
 
-        {/* RIGHT SIDE: SCROLLABLE INFO - 40% */}
-        <div className="lg:col-span-2 space-y-4 min-w-0 overflow-hidden lg:pt-1.5">
-          <h1 className="text-[20px] md:text-[30px] font-medium heading-font tracking-tight leading-[1.2] text-primary">
+          <h1 className="text-[26px] md:text-[38px] font-extrabold heading-font tracking-tight leading-[1.1] text-primary">
             {product.name}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div>
             <button
               type="button"
               onClick={() => {
@@ -138,89 +161,116 @@ export default function ProductMainSection({ product }) {
                   }
                 }
               }}
-              className="flex items-center gap-2 text-[13px] md:text-[14px] font-semibold text-primary/80 hover:text-primary hover:underline transition-all cursor-pointer text-left group"
+              className="flex flex-col items-start gap-1 text-left cursor-pointer group"
               title="Click to view ratings & reviews"
             >
-              <Star className="w-3.5 h-3.5 fill-primary text-primary transition-transform group-hover:scale-110" />
-              <span>{(product.rating || 0).toFixed(1)}/5.0</span>
-              <span className="text-black/20">•</span>
-              <span className="underline-offset-2">({product.reviewCount || 0} Reviews)</span>
-            </button>
-
-            {deliveryRange && (
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-black/10 bg-white/80 text-[11px] font-semibold text-black tracking-wide shadow-sm"
-                style={{ backdropFilter: "blur(6px)" }}
-              >
-                <Truck className="w-3 h-3 text-black/50 shrink-0" />
-                Delivered between&nbsp;<span className="font-bold">{deliveryRange}</span>
+              <span className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Star
+                    key={n}
+                    className={`w-5 h-5 ${n <= Math.round(rating) ? "fill-amber-400 text-amber-400" : "fill-transparent text-black/20"}`}
+                  />
+                ))}
               </span>
-            )}
+              <span className="text-[14px] md:text-[15px] text-primary/70 group-hover:text-primary group-hover:underline underline-offset-2">
+                {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})
+              </span>
+            </button>
           </div>
 
-          <div className="flex items-center flex-wrap gap-3.5">
+          <div className="flex items-center flex-wrap gap-3">
+            <span className="text-[34px] md:text-[42px] font-extrabold tracking-tight leading-none text-primary">
+              ${unitPrice.toFixed(2)}
+            </span>
             {hasAffiliateDiscount && affiliateDiscountedPrice !== null ? (
               <>
-                <span className="text-2xl font-semibold tracking-tight text-primary">${affiliateDiscountedPrice.toFixed(2)}</span>
-                <span className="text-sm font-medium text-primary/40 line-through">${displayPrice}</span>
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary bg-primary/10 border border-primary/30 px-2.5 py-0.5 rounded-[var(--radius,0px)] select-none">
+                <span className="text-lg md:text-xl font-medium text-primary/40 line-through">${Number(displayPrice).toFixed(2)}</span>
+                <span className="text-[12px] md:text-[13px] font-bold uppercase tracking-wide text-white bg-red-600 px-3 py-1 rounded-md select-none">
                   {affiliateSavingsLabel}
                 </span>
               </>
             ) : (
-              <>
-                <span className="text-2xl font-semibold tracking-tight text-primary">${displayPrice}</span>
-                {displayCompareAtPrice > displayPrice && (
-                  <>
-                    <span className="text-sm font-medium text-primary/40 line-through">${displayCompareAtPrice}</span>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary bg-primary/10 border border-primary/30 px-2.5 py-0.5 rounded-[var(--radius,0px)] select-none">
-                      Save {Math.round(((displayCompareAtPrice - displayPrice) / displayCompareAtPrice) * 100)}%
-                    </span>
-                  </>
-                )}
-              </>
+              hasSale && (
+                <>
+                  <span className="text-lg md:text-xl font-medium text-primary/40 line-through">${Number(displayCompareAtPrice).toFixed(2)}</span>
+                  <span className="text-[13px] md:text-[14px] font-bold uppercase text-white bg-red-600 px-3 py-1 rounded-md select-none">
+                    {salePercent}% off
+                  </span>
+                </>
+              )
             )}
           </div>
 
-          <hr className="border-t border-black/10" />
-
-          {product.shortDescription && (
-            <div
-              className="short-description-prose text-black text-sm md:text-base leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(product.shortDescription) }}
-            />
+          {showLowStock && (
+            <p className="flex items-center gap-2 text-[14px] md:text-[15px] font-semibold text-red-600">
+              <Clock className="w-4 h-4 shrink-0" />
+              Limited stock left: only {displayStock} left
+            </p>
           )}
 
-          <hr className="border-t border-black/10" />
+          {deliveryRange && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-black/10 bg-white/80 text-[11px] font-semibold text-black tracking-wide shadow-sm">
+              <Truck className="w-3 h-3 text-black/50 shrink-0" />
+              Delivered between&nbsp;<span className="font-bold">{deliveryRange}</span>
+            </span>
+          )}
 
           {/* Variant Selector + Stock + ATC */}
           <ClientProductActions
             product={{ ...product, stock: displayStock }}
             onVariantChange={handleVariantChange}
+            unitPrice={unitPrice}
           />
 
-          {/* Stats Block - CMS Driven */}
+          {/* Trust strip - CMS Driven */}
           {product.stats && product.stats.length > 0 && (
-            <div className="grid grid-cols-2 gap-6 pt-2">
+            <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1">
               {product.stats.map((stat, i) => {
                 const Icon = ICON_MAP[stat.icon] || Info;
                 return (
-                  <div key={i} className="flex items-center gap-3 group">
-                    <div className="p-2.5 bg-white border border-border rounded-[var(--radius,0px)] transition-colors duration-300 group-hover:bg-primary group-hover:border-primary">
-                      <Icon className="w-3.5 h-3.5 text-primary/70 group-hover:text-white transition-colors" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[9px] font-normal uppercase tracking-[0.15em] text-primary/60">{stat.label}</p>
-                      <p className="text-[12px] font-normal text-black uppercase tracking-wider">{stat.value}</p>
-                    </div>
+                  <div key={i} className="flex items-center gap-1.5 text-[13px] text-primary">
+                    <Icon className="w-4 h-4 text-primary/70 shrink-0" />
+                    <span className="font-semibold">{stat.label}</span>
+                    {stat.value && <span className="text-primary/70">{stat.value}</span>}
                   </div>
                 );
               })}
             </div>
           )}
 
+          {product.shortDescription && (
+            <div className="rounded-xl bg-black/[0.04] p-4 md:p-5 space-y-2">
+              <h2 className="text-[17px] md:text-[19px] font-bold text-primary">Why You&apos;ll Love It</h2>
+              <div
+                className="short-description-prose text-primary/80 text-[14px] md:text-[15px] leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(product.shortDescription) }}
+              />
+            </div>
+          )}
+
+          {topReview && (
+            <div className="rounded-xl bg-black/[0.06] p-4 md:p-5 space-y-1.5">
+              <h2 className="text-[17px] md:text-[19px] font-bold text-primary">What Customers Are Saying</h2>
+              <p className="text-[14px] md:text-[15px] text-primary/80 leading-snug">
+                <span className="inline-flex align-middle gap-0.5 mr-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star
+                      key={n}
+                      className={`w-3.5 h-3.5 ${n <= topReview.rating ? "fill-amber-400 text-amber-400" : "fill-transparent text-black/20"}`}
+                    />
+                  ))}
+                </span>
+                &ldquo;{topReview.comment}&rdquo;
+              </p>
+              <p className="text-[13px] text-primary/60">
+                {topReview.customerName}
+                {topReview.verifiedPurchase ? ", Verified Buyer" : ""}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+

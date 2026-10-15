@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -97,49 +97,16 @@ export default function ProductGallery({ images = [], variantImage, productName 
 
   return (
     <>
-      <div className="flex flex-col md:flex-row gap-3 overflow-hidden w-full">
-        {/* Thumbnails */}
-        <div className="flex md:flex-col gap-2 md:w-[72px] order-2 md:order-1 overflow-x-auto md:overflow-y-auto scrollbar-hide shrink-0 max-w-full">
-          {allImages.map((img, i) => {
-            const isActive = displayImage === img;
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => handleThumbClick(img)}
-                className={`relative aspect-square w-[72px] md:w-full bg-[#F4F4F4] rounded-lg overflow-hidden cursor-pointer shrink-0 transition-all duration-200 outline-none border-2 ${
-                  isActive
-                    ? "border-black shadow-md"
-                    : "border-transparent opacity-50 hover:opacity-90 hover:border-black/20"
-                }`}
-                aria-label={`View image ${i + 1}`}
-              >
-                <img
-                  src={getOptimizedImage(img, "thumbnail")}
-                  alt={imageAlts[img] || `${productName} thumbnail ${i + 1}`}
-                  loading="lazy"
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
-                />
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Main image — Desktop: hover zoom | Mobile: tap to open lightbox */}
+      <div className="flex flex-col gap-3 overflow-hidden w-full">
+        {/* Main image â€” Desktop: hover zoom | Mobile: tap to open lightbox */}
         <div
           ref={mainRef}
-          className="relative flex-1 aspect-square bg-[#F4F4F4] rounded-2xl overflow-hidden order-1 md:order-2 shadow-sm"
+          className="relative w-full aspect-square bg-[#F4F4F4] rounded-2xl overflow-hidden shadow-sm"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           onMouseMove={handleMouseMove}
           onClick={openLightbox}
-          style={{ cursor: isZoomed ? "zoom-in" : "zoom-in" }}
+          style={{ cursor: "zoom-in" }}
         >
           <img
             key={displayImage}
@@ -158,16 +125,43 @@ export default function ProductGallery({ images = [], variantImage, productName 
               transition: 'transform 0.1s ease-out',
             }}
           />
-          {/* Zoom hint (shown only on non-zoomed hover) */}
-          {!isZoomed && (
-            <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur-sm rounded-full px-2.5 py-1 text-[11px] font-medium text-black/60 shadow-sm pointer-events-none select-none opacity-0 group-hover:opacity-100 md:flex hidden items-center gap-1">
-              🔍 Hover to zoom
-            </div>
-          )}
           {/* Mobile tap hint */}
           <div className="md:hidden absolute bottom-3 right-3 bg-white/80 backdrop-blur-sm rounded-full px-2.5 py-1 text-[11px] font-medium text-black/60 shadow-sm pointer-events-none select-none">
             Tap to view
           </div>
+        </div>
+
+        {/* Thumbnails â€” row beneath the main image */}
+        <div className="grid grid-flow-col auto-cols-[calc(25%-9px)] gap-3 overflow-x-auto scrollbar-hide max-w-full pb-1">
+          {allImages.map((img, i) => {
+            const isActive = displayImage === img;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => handleThumbClick(img)}
+                className={`relative aspect-square w-full bg-[#F4F4F4] rounded-xl overflow-hidden cursor-pointer transition-all duration-200 outline-none border-2 ${
+                  isActive
+                    ? "border-primary shadow-md"
+                    : "border-transparent opacity-70 hover:opacity-100 hover:border-primary/30"
+                }`}
+                aria-label={`View image ${i + 1}`}
+              >
+                <img
+                  src={getOptimizedImage(img, "thumbnail")}
+                  alt={imageAlts[img] || `${productName} thumbnail ${i + 1}`}
+                  loading="lazy"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                  }}
+                />
+              </button>
+            );
+          })}
         </div>
       </div>
 
