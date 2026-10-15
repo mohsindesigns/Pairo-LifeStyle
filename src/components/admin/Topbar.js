@@ -145,13 +145,38 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
   // Fetch Notifications
   const fetchNotifications = async () => {
     try {
-      const [ordersRes, affiliatesRes, productsRes] = await Promise.all([
+      const [ordersRes, affiliatesRes, productsRes, sizeRes] = await Promise.all([
         fetch("/api/admin/orders?status=Pending").then(r => r.json().catch(() => ({}))),
         fetch("/api/admin/affiliates/requests").then(r => r.json().catch(() => ({}))),
-        fetch("/api/admin/products").then(r => r.json().catch(() => ([])))
+        fetch("/api/admin/products").then(r => r.json().catch(() => ([]))),
+        // Check the support mailbox for new size-confirmation replies (server throttles this), then list unread threads
+        fetch("/api/admin/size-confirmations/sync", { method: "POST" })
+          .catch(() => null)
+          .then(() => fetch("/api/admin/size-confirmations?unread=1"))
+          .then(r => r.json().catch(() => ({})))
+          .catch(() => ({}))
       ]);
 
       let list = [];
+
+      if (sizeRes?.success && Array.isArray(sizeRes.confirmations)) {
+        sizeRes.confirmations.forEach(c => {
+          const last = c.replies?.[c.replies.length - 1];
+          const who = c.customerName || c.customerEmail;
+          const excerpt = (last?.text || "").replace(/\s+/g, " ").slice(0, 80);
+          list.push({
+            // Includes reply count so a new reply on a dismissed thread notifies again
+            id: `size-${c._id}-${c.replies?.length || 0}`,
+            type: "info",
+            label: "Size Reply",
+            text: `${who} replied about Order #${c.orderNumber}${excerpt ? `: "${excerpt}${(last?.text || "").length > 80 ? "…" : ""}"` : "."}`,
+            actions: [
+              { label: "View", href: `/admin/orders/${c.orderId}` },
+              { label: "Mark read", action: () => handleSizeReplyRead(c._id) }
+            ]
+          });
+        });
+      }
 
       if (ordersRes?.success && Array.isArray(ordersRes.orders)) {
         ordersRes.orders.forEach(order => {
@@ -222,6 +247,22 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
       } else {
         toast.error("Failed to update order.");
       }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleSizeReplyRead = async (confirmationId) => {
+    setUpdatingId(`size-${confirmationId}`);
+    try {
+      await fetch(`/api/admin/size-confirmations/${confirmationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "markRead" })
+      });
+      await fetchNotifications();
     } catch (err) {
       console.error(err);
     } finally {

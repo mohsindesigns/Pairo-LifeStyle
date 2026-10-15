@@ -28,6 +28,7 @@ import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
 import { usePopup } from "@/context/PopupContext";
 import { isPayableByLink } from "@/lib/customOrderConstants";
 import RequirePermission from "@/components/admin/RequirePermission";
+import SizeConfirmationPanel from "@/components/admin/SizeConfirmationPanel";
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -1030,6 +1031,11 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Size Confirmation email + customer replies */}
+            {can(session?.user, "orders.update") && (
+              <SizeConfirmationPanel orderId={id} customerEmail={order.customer?.email} />
             )}
 
             {/* Affiliate Attribution */}

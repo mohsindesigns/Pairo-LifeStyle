@@ -245,7 +245,7 @@ async function resolveAdminEmail(label) {
  * same way everywhere. `critical: true` rethrows on failure, matching the
  * functions that previously threw so callers can react to a hard failure.
  */
-async function dispatchEmail({ to, subject, html, from, label, critical = false }) {
+async function dispatchEmail({ to, subject, html, from, label, critical = false, mailOptions = {} }) {
   if (!to) {
     console.warn(`[Email] ${label}: no recipient address — skipped.`);
     return null;
@@ -255,7 +255,7 @@ async function dispatchEmail({ to, subject, html, from, label, critical = false 
     return null;
   }
   try {
-    const info = await transporter.sendMail({ from: from || getFromAddress(), to, subject, html });
+    const info = await transporter.sendMail({ from: from || getFromAddress(), to, subject, html, ...mailOptions });
     console.log(`[Email] ✅ ${label} sent to ${to} | MsgID: ${info.messageId}`);
     return info;
   } catch (err) {
@@ -979,4 +979,89 @@ export async function sendOrderInvoiceEmail(order) {
     label: `Invoice (#${order.orderNumber})`,
     critical: true,
   });
+}
+
+// ─── SIZE CONFIRMATION ─────────────────────────────────────────────────────────
+
+/** Address customers' replies should land in (the mailbox we poll over IMAP). */
+export function getSizeReplyToAddress() {
+  const imapUser = process.env.IMAP_USER || '';
+  if (process.env.SIZE_REPLY_TO) return process.env.SIZE_REPLY_TO.trim();
+  if (imapUser.includes('@')) return imapUser.trim();
+  return getFromAddress();
+}
+
+/** Subject line used for the size confirmation email (kept in sync with the reply matcher). */
+export function buildSizeConfirmationSubject(orderNumber) {
+  return `Action Required: Please confirm your jacket size for Order #${orderNumber} – Pairo Lifestyle`;
+}
+
+/**
+ * Sends the "Size Confirmation for Jacket Order" template to the customer.
+ * Returns { messageId, subject } so the caller can store them for reply matching.
+ * Throws if the email could not actually be sent.
+ */
+export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, messageId } = {}) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const clientName = order.shippingAddress?.fullName || order.customer?.name || 'there';
+  const orderNumber = order.orderNumber;
+  const subject = buildSizeConfirmationSubject(orderNumber);
+  const replyTo = getSizeReplyToAddress();
+  const supportEmail = (replyTo.match(/<([^>]+)>/)?.[1] || replyTo).trim();
+  const phone = (process.env.STORE_PHONE || '').trim();
+  const contactLine = [phone, supportEmail].filter(Boolean).join(' | ');
+
+  const para = (t) => `<p style="margin:0 0 18px;color:${BRAND.ink};font-size:14px;line-height:1.7;">${t}</p>`;
+  const chartBlock = sizeChartImageUrl
+    ? `<div style="margin:0 0 24px;text-align:center;"><img src="${escapeHtml(sizeChartImageUrl)}" alt="Size chart" style="max-width:100%;height:auto;border:1px solid ${BRAND.border};border-radius:10px;" /></div>`
+    : '';
+
+  const html = emailShell({
+    eyebrow: `Order #${orderNumber}`,
+    heading: 'Please Confirm Your Size',
+    bodyHtml: `
+      ${para(`Hi ${escapeHtml(clientName)},`)}
+      ${para(`Thank you so much for shopping with ${escapeHtml(storeName)}! We have successfully received your payment for your jacket order (Order #${escapeHtml(String(orderNumber))}).`)}
+      ${para('Because jacket fits and cuts can sometimes differ from standard clothing sizes, we want to make sure you receive the absolute best fit possible and avoid any sizing issues or hassle with returns later on.')}
+      ${para('Could you please take a quick look at the size chart attached below and confirm your correct size?')}
+      ${chartBlock}
+      ${emailPanel(`<p style="margin:0;color:${BRAND.ink};font-size:14px;line-height:1.7;">Please <strong>reply to this message</strong> with your confirmed size (e.g., Small, Medium, Large, etc.) or your measurements so we can move forward with processing and shipping your order right away.</p>`, { accentColor: BRAND.ink })}
+      ${para('If you need any help figuring out your size, feel free to share your height and weight with us, and our team will gladly recommend the best fit for you!')}
+      <p style="margin:24px 0 0;color:${BRAND.ink};font-size:14px;line-height:1.7;">Warm regards,<br/><strong>Team ${escapeHtml(storeName)}</strong>${contactLine ? `<br/><span style="color:${BRAND.muted};">${escapeHtml(contactLine)}</span>` : ''}</p>
+    `,
+    preheader: `Please reply with your size for Order #${orderNumber}.`,
+  });
+
+  const text = [
+    `Hi ${clientName},`,
+    '',
+    `Thank you so much for shopping with ${storeName}! We have successfully received your payment for your jacket order (Order #${orderNumber}).`,
+    '',
+    'Because jacket fits and cuts can sometimes differ from standard clothing sizes, we want to make sure you receive the absolute best fit possible and avoid any sizing issues or hassle with returns later on.',
+    '',
+    'Could you please take a quick look at the size chart attached below and confirm your correct size?',
+    sizeChartImageUrl ? `\nSize chart: ${sizeChartImageUrl}\n` : '',
+    'Please reply to this message with your confirmed size (e.g., Small, Medium, Large, etc.) or your measurements so we can move forward with processing and shipping your order right away.',
+    '',
+    'If you need any help figuring out your size, feel free to share your height and weight with us, and our team will gladly recommend the best fit for you!',
+    '',
+    'Warm regards,',
+    '',
+    `Team ${storeName}${contactLine ? ` ${contactLine}` : ''}`,
+  ].join('\n');
+
+  const info = await dispatchEmail({
+    to: order.customer?.email,
+    subject,
+    html,
+    from: getFromAddress(storeName),
+    label: `Size confirmation (#${orderNumber})`,
+    critical: true,
+    mailOptions: { text, replyTo, messageId },
+  });
+
+  if (!info) {
+    throw new Error('Email was not sent — SMTP is not configured (set EMAIL_SERVER / EMAIL_USER / EMAIL_PASS).');
+  }
+  return { messageId: info.messageId || messageId, subject };
 }
