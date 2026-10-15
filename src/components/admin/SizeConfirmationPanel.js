@@ -110,7 +110,7 @@ export default function SizeConfirmationPanel({ orderId, customerEmail }) {
 
       <div className="p-4 space-y-3">
         <div>
-          <label className="block text-[11px] font-semibold text-[#3c434a] mb-1">Size chart image URL (optional)</label>
+          <label className="block text-[11px] font-semibold text-[#3c434a] mb-1">Extra size chart image URL (optional — the products&apos; own size charts are included automatically)</label>
           <input
             type="url"
             value={chartUrl}
@@ -146,7 +146,8 @@ export default function SizeConfirmationPanel({ orderId, customerEmail }) {
             <div key={c._id} className="border border-[#dcdcde] rounded-[3px]">
               <div className="px-3 py-2 bg-[#f6f7f7] flex items-center justify-between gap-2">
                 <span className="text-[11px] text-[#50575e]">
-                  Sent {new Date(c.sentAt).toLocaleString()}
+                  {c.auto ? "Sent automatically" : "Sent"} {new Date(c.sentAt).toLocaleString()}
+                  {c.chartLabels?.length > 0 && <span className="block text-[10px] text-[#8c8f94]">Chart: {c.chartLabels.join(", ")}</span>}
                 </span>
                 <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-[2px] ${STATUS_STYLES[c.status] || ""}`}>
                   {c.status}

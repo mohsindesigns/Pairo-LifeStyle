@@ -2,6 +2,7 @@ import pairoEvents from '../events';
 import QueueService from '../queue';
 import { sendOrderConfirmation, sendAdminOrderNotification } from '../email';
 import { dispatchOrderToCRM } from '../crmWebhook';
+import { autoSendSizeConfirmation } from '../sizeConfirmationService';
 
 /**
  * Initialize Order Listeners
@@ -20,6 +21,10 @@ export function initOrderListeners() {
         }
         // Email Admin
         await sendAdminOrderNotification(order).catch(e => console.error("Email Admin Error:", e.message));
+
+        // Ask the customer to confirm their jacket size (includes each product's size chart).
+        // Only fires for paid orders that contain a product with a size chart; once per order.
+        await autoSendSizeConfirmation(order);
 
         // Push real-time event to CRM
         await dispatchOrderToCRM('ORDER_CREATED', order).catch(e => console.error("CRM Webhook Error:", e.message));

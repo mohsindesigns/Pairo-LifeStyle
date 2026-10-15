@@ -1001,7 +1001,42 @@ export function buildSizeConfirmationSubject(orderNumber) {
  * Returns { messageId, subject } so the caller can store them for reply matching.
  * Throws if the email could not actually be sent.
  */
-export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, messageId } = {}) {
+function renderSizeChartsHtml(charts = []) {
+  const th = `padding:8px 10px;border:1px solid ${BRAND.border};background:${BRAND.surface};color:${BRAND.ink};font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;text-align:left;white-space:nowrap;`;
+  const td = `padding:8px 10px;border:1px solid ${BRAND.border};color:${BRAND.ink};font-size:13px;`;
+  return charts.map((c) => {
+    const showName = (c.productNames || []).filter(Boolean).join(', ');
+    const table = c.columns?.length
+      ? `<div style="overflow-x:auto;"><table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">
+          <thead><tr>${c.columns.map((col) => `<th style="${th}">${escapeHtml(col)}</th>`).join('')}</tr></thead>
+          <tbody>${(c.rows || []).map((row) => `<tr>${c.columns.map((_, i) => `<td style="${td}${i === 0 ? 'font-weight:700;' : ''}">${escapeHtml(String(row[i] ?? '-'))}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table></div>`
+      : '';
+    const image = c.imageUrl
+      ? `<div style="margin:14px 0 0;text-align:center;"><img src="${escapeHtml(c.imageUrl)}" alt="Size chart" style="max-width:100%;height:auto;border:1px solid ${BRAND.border};border-radius:10px;" /></div>`
+      : '';
+    return `<div style="margin:0 0 24px;">
+      <p style="margin:0 0 4px;color:${BRAND.ink};font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">${escapeHtml(c.heading || 'Size Chart')}</p>
+      ${showName ? `<p style="margin:0 0 10px;color:${BRAND.muted};font-size:12px;">For: ${escapeHtml(showName)}</p>` : ''}
+      ${c.description ? `<p style="margin:0 0 10px;color:${BRAND.muted};font-size:12px;line-height:1.6;">${escapeHtml(c.description)}</p>` : ''}
+      ${table}${image}
+    </div>`;
+  }).join('');
+}
+
+function renderSizeChartsText(charts = []) {
+  return charts.map((c) => {
+    const lines = [`${c.heading || 'Size Chart'}${c.productNames?.length ? ` (for: ${c.productNames.join(', ')})` : ''}`];
+    if (c.columns?.length) {
+      lines.push(c.columns.join(' | '));
+      (c.rows || []).forEach((row) => lines.push(c.columns.map((_, i) => row[i] ?? '-').join(' | ')));
+    }
+    if (c.imageUrl) lines.push(`Size chart image: ${c.imageUrl}`);
+    return lines.join('\n');
+  }).join('\n\n');
+}
+
+export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, charts = [], messageId } = {}) {
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const clientName = order.shippingAddress?.fullName || order.customer?.name || 'there';
   const orderNumber = order.orderNumber;
@@ -1012,9 +1047,10 @@ export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, mess
   const contactLine = [phone, supportEmail].filter(Boolean).join(' | ');
 
   const para = (t) => `<p style="margin:0 0 18px;color:${BRAND.ink};font-size:14px;line-height:1.7;">${t}</p>`;
-  const chartBlock = sizeChartImageUrl
+  const extraImage = sizeChartImageUrl
     ? `<div style="margin:0 0 24px;text-align:center;"><img src="${escapeHtml(sizeChartImageUrl)}" alt="Size chart" style="max-width:100%;height:auto;border:1px solid ${BRAND.border};border-radius:10px;" /></div>`
     : '';
+  const chartBlock = `${renderSizeChartsHtml(charts)}${extraImage}`;
 
   const html = emailShell({
     eyebrow: `Order #${orderNumber}`,
@@ -1040,6 +1076,7 @@ export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, mess
     'Because jacket fits and cuts can sometimes differ from standard clothing sizes, we want to make sure you receive the absolute best fit possible and avoid any sizing issues or hassle with returns later on.',
     '',
     'Could you please take a quick look at the size chart attached below and confirm your correct size?',
+    charts.length ? `\n${renderSizeChartsText(charts)}\n` : '',
     sizeChartImageUrl ? `\nSize chart: ${sizeChartImageUrl}\n` : '',
     'Please reply to this message with your confirmed size (e.g., Small, Medium, Large, etc.) or your measurements so we can move forward with processing and shipping your order right away.',
     '',

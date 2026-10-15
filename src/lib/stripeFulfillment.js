@@ -4,6 +4,7 @@ import Promotion from "@/models/Promotion";
 import PromotionCustomerUsage from "@/models/PromotionCustomerUsage";
 import stripe from "@/lib/stripe";
 import { createOrderFromCheckoutPayload } from "@/lib/checkoutFulfillment";
+import { autoSendSizeConfirmation } from "@/lib/sizeConfirmationService";
 
 /**
  * Fulfills a succeeded Stripe PaymentIntent into an Order, if it hasn't been already.
@@ -270,6 +271,9 @@ export async function fulfillPaymentLinkSession(session, log) {
 
   await order.save();
   log?.info?.({ orderId, orderNumber: order.orderNumber, sessionId: session.id }, "Custom order marked Paid from Payment Link checkout");
+
+  // Payment just landed for this order — ask the customer to confirm their size (no-op if not applicable / already sent).
+  autoSendSizeConfirmation(order).catch(() => {});
   return order;
 }
 

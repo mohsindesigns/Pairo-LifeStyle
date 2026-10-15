@@ -24,6 +24,8 @@ const SizeConfirmationSchema = new mongoose.Schema({
   messageId: { type: String, required: true, unique: true },
   sizeChartImageUrl: { type: String },
   sentBy: { type: String },
+  auto: { type: Boolean, default: false }, // sent automatically when the order was received
+  chartLabels: [{ type: String }], // size charts included in the email
   sentAt: { type: Date, default: Date.now },
 
   status: { type: String, enum: ['Awaiting Reply', 'Replied', 'Confirmed'], default: 'Awaiting Reply', index: true },
