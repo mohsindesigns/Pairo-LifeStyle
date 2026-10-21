@@ -11,6 +11,20 @@ import ProductSelector from "@/components/admin/discounts/ProductSelector";
 import CategorySelector from "@/components/admin/discounts/CategorySelector";
 import CouponViewModal from "@/components/admin/discounts/CouponViewModal";
 
+// Prefers the real specificCustomerEmails field; falls back to deriving from populated
+// specificCustomers (ObjectId refs with .email) for any coupon saved before that field
+// existed. Used everywhere a discount's customer-restriction list needs to become the
+// comma-separated string the form/duplicate payloads work with.
+function deriveCustomerEmailsString(discount) {
+  if (discount.specificCustomerEmails && discount.specificCustomerEmails.length > 0) {
+    return discount.specificCustomerEmails.join(", ");
+  }
+  if (discount.specificCustomers && discount.specificCustomers.length > 0) {
+    return discount.specificCustomers.map(c => typeof c === 'object' ? c.email : c).join(", ");
+  }
+  return "";
+}
+
 const EMPTY_FORM = {
   code: "",
   type: "percentage",
@@ -143,7 +157,7 @@ function CouponsContent() {
       maxDiscountAmount: discount.maxDiscountAmount !== undefined && discount.maxDiscountAmount !== null ? discount.maxDiscountAmount.toString() : "",
       minQuantity: discount.minQuantity || "",
       excludeSaleItems: !!discount.excludeSaleItems,
-      specificCustomerEmails: discount.specificCustomers ? discount.specificCustomers.map(c => typeof c === 'object' ? c.email : c).join(", ") : "",
+      specificCustomerEmails: deriveCustomerEmailsString(discount),
       oneRedemptionPerDevice: !!discount.oneRedemptionPerDevice
     });
 
@@ -302,13 +316,15 @@ function CouponsContent() {
     setErrorNotice("");
     setSuccessNotice("");
     try {
-      const { _id, usageCount, createdAt, updatedAt, specificCustomers, redeemedFingerprints, ...rest } = discount;
+      const { _id, usageCount, createdAt, updatedAt, specificCustomers, specificCustomerEmails, notifiedCustomerEmails, redeemedFingerprints, ...rest } = discount;
       const copy = {
         ...rest,
         code: `${discount.code}_COPY_${Math.floor(Math.random() * 1000)}`,
         specificProducts: Array.isArray(discount.specificProducts) ? discount.specificProducts.map(p => typeof p === 'object' && p?._id ? String(p._id) : String(p)) : [],
         specificCategories: Array.isArray(discount.specificCategories) ? discount.specificCategories.map(c => typeof c === 'object' && c?._id ? String(c._id) : String(c)) : [],
-        specificCustomerEmails: specificCustomers ? specificCustomers.map(c => typeof c === 'object' ? c.email : c).join(", ") : ""
+        // A duplicate is a brand new coupon — carries over who it's restricted to, but not
+        // who's already been notified (notifiedCustomerEmails deliberately left out of `rest`).
+        specificCustomerEmails: deriveCustomerEmailsString({ specificCustomerEmails, specificCustomers })
       };
       const res = await fetch("/api/admin/discounts", {
         method: "POST",
@@ -422,13 +438,13 @@ function CouponsContent() {
             } else if (bulkAction === "Duplicate") {
               const d = discounts.find(x => x._id === id);
               if (d) {
-                const { _id, usageCount, createdAt, updatedAt, specificCustomers, redeemedFingerprints, ...rest } = d;
+                const { _id, usageCount, createdAt, updatedAt, specificCustomers, specificCustomerEmails, notifiedCustomerEmails, redeemedFingerprints, ...rest } = d;
                 const copy = {
                   ...rest,
                   code: `${d.code}_COPY_${Math.floor(Math.random() * 1000)}`,
                   specificProducts: Array.isArray(d.specificProducts) ? d.specificProducts.map(p => typeof p === 'object' && p?._id ? String(p._id) : String(p)) : [],
                   specificCategories: Array.isArray(d.specificCategories) ? d.specificCategories.map(c => typeof c === 'object' && c?._id ? String(c._id) : String(c)) : [],
-                  specificCustomerEmails: specificCustomers ? specificCustomers.map(c => typeof c === 'object' ? c.email : c).join(", ") : ""
+                  specificCustomerEmails: deriveCustomerEmailsString({ specificCustomerEmails, specificCustomers })
                 };
                 const res = await fetch("/api/admin/discounts", {
                   method: "POST",
@@ -496,7 +512,7 @@ function CouponsContent() {
       maxDiscountAmount: discount.maxDiscountAmount !== undefined && discount.maxDiscountAmount !== null ? discount.maxDiscountAmount.toString() : "",
       minQuantity: discount.minQuantity || "",
       excludeSaleItems: !!discount.excludeSaleItems,
-      specificCustomerEmails: discount.specificCustomers ? discount.specificCustomers.map(c => typeof c === 'object' ? c.email : c).join(", ") : "",
+      specificCustomerEmails: deriveCustomerEmailsString(discount),
       oneRedemptionPerDevice: !!discount.oneRedemptionPerDevice
     });
   };
@@ -883,7 +899,7 @@ function CouponsContent() {
                   value={formData.specificCustomerEmails}
                   onChange={(e) => setFormData({...formData, specificCustomerEmails: e.target.value})}
                 />
-                <p className="text-[11px] text-[#646970] italic">Restricts coupon to specific customer accounts.</p>
+                <p className="text-[11px] text-[#646970] italic">Restricts the coupon to these emails only — no account required. Each one gets an automatic email with the code once this coupon is active.</p>
               </div>
             </div>
 

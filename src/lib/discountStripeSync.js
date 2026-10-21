@@ -17,6 +17,7 @@ function getStripeDiscountSpec(discount) {
   if (Array.isArray(discount.specificProducts) && discount.specificProducts.length > 0) return null;
   if (Array.isArray(discount.specificCategories) && discount.specificCategories.length > 0) return null;
   if (Array.isArray(discount.specificCustomers) && discount.specificCustomers.length > 0) return null;
+  if (Array.isArray(discount.specificCustomerEmails) && discount.specificCustomerEmails.length > 0) return null;
   if (discount.userRegistrationRequired) return null;
   if (discount.newsletterSubscribedOnly) return null;
   if (discount.usagePerUserLimit && Number(discount.usagePerUserLimit) !== 1) return null;

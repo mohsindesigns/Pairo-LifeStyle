@@ -111,6 +111,54 @@ const SIZE_ALIASES = {
   xxxxl: "4xl",
 };
 
+// Mirrors src/components/product/MadeToMeasureModal.js's field keys/labels/order exactly, so a
+// custom (Made to Measure) order's measurements print with the same readable labels and grouping
+// the customer actually filled in, not raw object keys in whatever order they happen to iterate.
+const MEASUREMENT_FIELD_LABELS = [
+  ["chest", "Chest"],
+  ["neck", "Neck"],
+  ["shoulder", "Shoulder"],
+  ["sleeveLength", "Sleeve Length"],
+  ["bicep", "Bicep"],
+  ["wrist", "Wrist"],
+  ["waist", "Waist"],
+  ["lowerWaist", "Lower Waist"],
+  ["hips", "Hips"],
+  ["jacketLength", "Jacket Length"],
+  ["height", "Height"],
+  ["weight", "Weight"],
+];
+
+/** Humanizes an unrecognized measurement key (e.g. "customNote" -> "Custom Note") as a fallback. */
+function humanizeKey(key) {
+  return String(key)
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+/**
+ * Builds the same {columns, rows} shape buildChartForProduct() produces for a reusable/per-product
+ * size chart, but from a single Made to Measure order's own measurements — so it can be drawn with
+ * the exact same renderSizeTable() the standard size chart uses, instead of a plain text line.
+ */
+function buildMeasurementTable(measurements, unit) {
+  const entries = [];
+  const seen = new Set();
+  for (const [key, label] of MEASUREMENT_FIELD_LABELS) {
+    const v = measurements?.[key];
+    if (v !== undefined && v !== null && v !== "") {
+      entries.push([label, String(v)]);
+    }
+    seen.add(key);
+  }
+  for (const [key, v] of Object.entries(measurements || {})) {
+    if (seen.has(key) || v === undefined || v === null || v === "") continue;
+    entries.push([humanizeKey(key), String(v)]);
+  }
+  if (!entries.length) return null;
+  return { columns: ["Measurement", `Value (${unit})`], rows: entries };
+}
+
 function normalizeSize(s) {
   if (!s) return "";
   const t = String(s).trim().toLowerCase().replace(/[\s\-_.]/g, "");
@@ -327,15 +375,21 @@ export async function GET(req, { params }) {
       let y = Math.max(blockTop + IMAGE_SIZE, rightBottom) + 10;
 
       if (item.madeToMeasure?.enabled) {
-        const m = item.madeToMeasure.measurements || {};
         const unit = item.madeToMeasure.unit || "inches";
-        const entries = Object.entries(m).filter(([, v]) => v !== undefined && v !== null && v !== "");
-        if (entries.length) {
-          doc.fontSize(8).font("Helvetica-Bold").fillColor(COLOR_PRIMARY).text(`Custom Measurements (${unit}):`, PAGE_LEFT, y, { width: PAGE_WIDTH });
-          y = doc.y + 2;
-          const line = entries.map(([k, v]) => `${k}: ${v}`).join("   |   ");
-          doc.fontSize(8).font("Helvetica").fillColor(COLOR_TEXT).text(line, PAGE_LEFT, y, { width: PAGE_WIDTH });
+        const table = buildMeasurementTable(item.madeToMeasure.measurements, unit);
+        if (table) {
+          doc.fontSize(8.5).font("Helvetica-Bold").fillColor(COLOR_PRIMARY).text("Custom Measurements", PAGE_LEFT, y, { width: PAGE_WIDTH });
+          y = doc.y + 4;
+          y = renderSizeTable(doc, PAGE_LEFT, y, 220, table.columns, table.rows, -1);
+        } else {
+          doc.fontSize(8).font("Helvetica-Oblique").fillColor(COLOR_TEXT_MUTED).text("No measurements were provided for this item.", PAGE_LEFT, y, { width: PAGE_WIDTH });
           y = doc.y + 10;
+        }
+        if (item.madeToMeasure.notes) {
+          doc.fontSize(7.5).font("Helvetica-Bold").fillColor(COLOR_PRIMARY).text("Fitting Notes:", PAGE_LEFT, y, { width: PAGE_WIDTH });
+          y = doc.y + 1;
+          doc.fontSize(7.5).font("Helvetica-Oblique").fillColor(COLOR_TEXT).text(item.madeToMeasure.notes, PAGE_LEFT, y, { width: PAGE_WIDTH });
+          y = doc.y + 8;
         }
       } else if (item.corporateGifting?.enabled) {
         const selections = item.corporateGifting.selections || [];

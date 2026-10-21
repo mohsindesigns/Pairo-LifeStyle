@@ -1166,3 +1166,51 @@ export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, {
     label: `Abandoned cart recovery (${email})`,
   });
 }
+
+// ─── CUSTOMER-SPECIFIC COUPON EMAILS ────────────────────────────────────────────
+
+/**
+ * Notifies a customer they've been personally given a discount code, sent
+ * automatically when an admin adds their email to a coupon's "specific
+ * customers" list and the coupon is active (see src/app/api/admin/discounts/route.js).
+ * Never throws — best-effort, mirrors sendAbandonedCartEmail's resilience.
+ */
+export async function sendCouponAssignedEmail(email, discount) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+
+  const valueText = discount.type === 'percentage'
+    ? `${Number(discount.value)}% off`
+    : `$${Number(discount.value).toLocaleString()} off`;
+
+  const conditions = [
+    discount.minPurchase > 0 && `Minimum purchase of $${Number(discount.minPurchase).toLocaleString()}`,
+    discount.maxDiscountAmount && `Capped at $${Number(discount.maxDiscountAmount).toLocaleString()} off`,
+    discount.endDate && `Valid until ${new Date(discount.endDate).toLocaleDateString()}`,
+  ].filter(Boolean).join(' · ');
+
+  const voucherHtml = emailPanel(`
+    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">You've been personally given <strong>${escapeHtml(valueText)}</strong> at ${escapeHtml(storeName)}. Use this code at checkout:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
+      <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(discount.code)}</span>
+    </td></tr></table>
+    ${conditions ? `<p style="margin:0 0 16px;color:${BRAND.muted};font-size:12px;">${escapeHtml(conditions)}</p>` : ''}
+    ${emailButton(`${storeUrl}/shop`, 'Start Shopping', { align: 'left' })}
+  `, { title: 'A Gift For You', accentColor: BRAND.ink });
+
+  const html = emailShell({
+    eyebrow: 'Just For You',
+    heading: 'You’ve Got A Discount Code',
+    subheading: `Hi there, we've set aside a special discount code just for you at ${escapeHtml(storeName)}.`,
+    bodyHtml: voucherHtml,
+    preheader: `You've been given ${valueText} at ${storeName}.`,
+  });
+
+  return dispatchEmail({
+    to: email,
+    subject: `A discount code just for you — ${valueText}`,
+    html,
+    from: getFromAddress(storeName),
+    label: `Customer-specific coupon assigned (${email})`,
+  });
+}

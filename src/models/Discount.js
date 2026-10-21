@@ -26,8 +26,15 @@ const DiscountSchema = new mongoose.Schema({
   minQuantity: { type: Number, default: 0 },
   // Only discounts items that are NOT already marked down (price < compareAtPrice)
   excludeSaleItems: { type: Boolean, default: false },
-  // Restricts the coupon to a hand-picked list of customers
+  // Restricts the coupon to a hand-picked list of customers. `specificCustomers` links the
+  // ones that happen to have a registered account (used for fast ID-based matching at
+  // checkout); `specificCustomerEmails` is the real source of truth — every targeted email,
+  // whether or not it has an account yet, since an admin can target someone who's never
+  // signed up. `notifiedCustomerEmails` tracks who's already received the auto-notification
+  // email so re-saving the coupon (or re-activating it) never spams a repeat email.
   specificCustomers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Customer' }],
+  specificCustomerEmails: [{ type: String }],
+  notifiedCustomerEmails: [{ type: String }],
   // Anti-abuse: caps redemption to one per device/IP, tracked via hashed IP fingerprints
   oneRedemptionPerDevice: { type: Boolean, default: false },
   redeemedFingerprints: [{ type: String }],

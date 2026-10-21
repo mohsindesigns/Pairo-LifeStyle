@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 
 import { can } from "@/lib/rbac";
 import { syncDiscountToStripe, deactivateDiscountStripeCode } from "@/lib/discountStripeSync";
+import { sendCouponAssignedEmail } from "@/lib/email";
 
 // Verify session is staff AND (when a permission is given) holds that permission.
 // Coupons live under the "promotions" permission module — previously any staff role
@@ -24,20 +25,53 @@ async function checkAuth(permission = null) {
   return session;
 }
 
-// Resolves a comma/newline-separated list of customer emails (the admin-facing
-// input format) into Customer ObjectIds for storage on Discount.specificCustomers.
-async function resolveCustomerIds(emailsInput) {
+// Parses the admin-facing comma/newline-separated email input into a clean,
+// deduped, lowercased list — this is the full target audience for a coupon
+// restricted to specific customers, regardless of whether any of them have
+// a registered account yet.
+function parseEmailList(emailsInput) {
   if (!emailsInput || typeof emailsInput !== "string") return [];
   const emails = emailsInput.split(/[,\n]/).map(e => e.trim().toLowerCase()).filter(Boolean);
-  if (emails.length === 0) return [];
+  return [...new Set(emails)];
+}
 
-  const customers = await Customer.find({ email: { $in: emails } }).select("_id email");
-  const foundEmails = new Set(customers.map(c => c.email.toLowerCase()));
-  const notFound = emails.filter(e => !foundEmails.has(e));
-  if (notFound.length > 0) {
-    throw new Error(`No customer account found for: ${notFound.join(", ")}`);
-  }
+// Resolves whichever of those emails already have a registered Customer account into
+// ObjectIds, for Discount.specificCustomers (used for fast ID-based matching when that
+// customer is logged in at checkout — see couponValidator.js). An email with no account
+// yet is NOT an error: it still gets stored on Discount.specificCustomerEmails and is
+// still matched at checkout by email, and still gets the notification email below — an
+// admin can legitimately target someone who's never signed up.
+async function resolveCustomerIds(emails) {
+  if (!emails.length) return [];
+  const customers = await Customer.find({ email: { $in: emails } }).select("_id");
   return customers.map(c => c._id);
+}
+
+// Emails everyone in `targetEmails` who hasn't already been notified for this coupon,
+// but only when the coupon is actually active — an admin building out a draft coupon
+// with a customer list shouldn't trigger emails until they flip it on. Returns the
+// updated notified-list; best-effort (a failed send is logged, not thrown) so one bad
+// address never blocks saving the coupon.
+async function notifyNewCouponRecipients(discount, targetEmails, alreadyNotified) {
+  // Mirrors discountStripeSync.js's hasStarted check — a coupon with isActive:true but a
+  // future startDate isn't actually usable yet, so don't email a code that would fail at
+  // checkout. Left un-notified (not added to notifiedCustomerEmails) so a later save of
+  // this coupon, once startDate has passed, still catches and sends it then.
+  const hasStarted = !discount.startDate || new Date(discount.startDate) <= new Date();
+  if (!discount.isActive || !hasStarted || targetEmails.length === 0) return alreadyNotified;
+  const notifiedSet = new Set(alreadyNotified);
+  const toNotify = targetEmails.filter(e => !notifiedSet.has(e));
+  if (toNotify.length === 0) return alreadyNotified;
+
+  await Promise.all(toNotify.map(async (email) => {
+    try {
+      await sendCouponAssignedEmail(email, discount);
+      notifiedSet.add(email);
+    } catch (err) {
+      console.error(`[Discounts] Failed to notify ${email} of coupon ${discount.code}:`, err.message);
+    }
+  }));
+  return [...notifiedSet];
 }
 
 export async function GET(req) {
@@ -195,12 +229,8 @@ export async function POST(req) {
       }
     }
 
-    let specificCustomers;
-    try {
-      specificCustomers = await resolveCustomerIds(body.specificCustomerEmails);
-    } catch (err) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
+    const specificCustomerEmails = parseEmailList(body.specificCustomerEmails);
+    const specificCustomers = await resolveCustomerIds(specificCustomerEmails);
 
     // Sanitize values to prevent CastErrors
     const data = {
@@ -223,6 +253,7 @@ export async function POST(req) {
       minQuantity: (body.minQuantity !== undefined && body.minQuantity !== "" && body.minQuantity !== null) ? Number(body.minQuantity) : 0,
       excludeSaleItems: body.excludeSaleItems !== undefined ? !!body.excludeSaleItems : false,
       specificCustomers,
+      specificCustomerEmails,
       oneRedemptionPerDevice: body.oneRedemptionPerDevice !== undefined ? !!body.oneRedemptionPerDevice : false
     };
 
@@ -256,6 +287,7 @@ export async function POST(req) {
 
     const stripeState = await syncDiscountToStripe(discount);
     Object.assign(discount, stripeState);
+    discount.notifiedCustomerEmails = await notifyNewCouponRecipients(discount, specificCustomerEmails, []);
     await discount.save();
 
     return NextResponse.json(discount, { status: 201 });
@@ -414,20 +446,44 @@ export async function PUT(req) {
     if (body.excludeSaleItems !== undefined) discount.excludeSaleItems = !!body.excludeSaleItems;
     if (body.oneRedemptionPerDevice !== undefined) discount.oneRedemptionPerDevice = !!body.oneRedemptionPerDevice;
 
+    // The admin form always re-submits the full current email list on every save (even one
+    // touching an unrelated field like minPurchase), so "body.specificCustomerEmails is
+    // present" can't be the notify trigger — that would mass-resend the assigned-coupon
+    // email to an existing coupon's entire customer list on its very next unrelated edit.
+    // Instead: diff against what was actually stored before this request, and only notify
+    // emails that are genuinely new to the list in this edit, or the whole current list when
+    // this request is the one actually flipping the coupon on.
+    const previousEmails = new Set(discount.specificCustomerEmails || []);
+    const wasActive = discount.isActive;
+    let newlyAddedEmails = [];
+
     if (body.specificCustomerEmails !== undefined) {
-      try {
-        discount.specificCustomers = await resolveCustomerIds(body.specificCustomerEmails);
-      } catch (err) {
-        return NextResponse.json({ error: err.message }, { status: 400 });
+      const emails = parseEmailList(body.specificCustomerEmails);
+      const invalidEmail = emails.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+      if (invalidEmail) {
+        return NextResponse.json({ error: `"${invalidEmail}" doesn't look like a valid email address.` }, { status: 400 });
       }
+      newlyAddedEmails = emails.filter((e) => !previousEmails.has(e));
+      discount.specificCustomerEmails = emails;
+      discount.specificCustomers = await resolveCustomerIds(emails);
     }
 
     if (body.isActive !== undefined) {
       discount.isActive = body.isActive;
     }
+    const isBeingActivatedNow = !wasActive && discount.isActive === true;
 
     const stripeState = await syncDiscountToStripe(discount);
     Object.assign(discount, stripeState);
+
+    const audienceToNotify = isBeingActivatedNow
+      ? (discount.specificCustomerEmails || [])
+      : newlyAddedEmails;
+    discount.notifiedCustomerEmails = await notifyNewCouponRecipients(
+      discount,
+      audienceToNotify,
+      discount.notifiedCustomerEmails || []
+    );
     await discount.save();
     return NextResponse.json(discount);
   } catch (error) {

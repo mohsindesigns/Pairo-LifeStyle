@@ -105,13 +105,23 @@ export async function validateLegacyDiscount(discount, { cartSubtotal, items = [
     return { valid: false, error: "You must register or log in to use this coupon." };
   }
 
-  // 7. Specific Customers Check
-  if (discount.specificCustomers && discount.specificCustomers.length > 0) {
-    const allowedIds = discount.specificCustomers.map(c => c.toString());
-    let matched = userId && allowedIds.includes(userId.toString());
+  // 7. Specific Customers Check — specificCustomers (linked accounts) OR
+  // specificCustomerEmails (any targeted email, account or not; an admin can target
+  // someone who's never registered).
+  const hasCustomerRestriction = (discount.specificCustomers && discount.specificCustomers.length > 0)
+    || (discount.specificCustomerEmails && discount.specificCustomerEmails.length > 0);
+  if (hasCustomerRestriction) {
+    const allowedIds = (discount.specificCustomers || []).map(c => c.toString());
+    const allowedEmails = (discount.specificCustomerEmails || []).map(e => e.toLowerCase().trim());
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
 
-    if (!matched && email) {
-      const customer = await Customer.findOne({ email: email.toLowerCase().trim() }).select("_id");
+    let matched = userId && allowedIds.includes(userId.toString());
+    if (!matched && normalizedEmail && allowedEmails.includes(normalizedEmail)) {
+      matched = true;
+    }
+
+    if (!matched && normalizedEmail) {
+      const customer = await Customer.findOne({ email: normalizedEmail }).select("_id");
       if (customer && allowedIds.includes(customer._id.toString())) {
         matched = true;
       }

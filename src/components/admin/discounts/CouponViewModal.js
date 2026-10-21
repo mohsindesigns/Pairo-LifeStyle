@@ -307,12 +307,17 @@ export default function CouponViewModal({
               )}
             </div>
 
-            {discount.specificCustomers && discount.specificCustomers.length > 0 && (
+            {((discount.specificCustomerEmails && discount.specificCustomerEmails.length > 0) || (discount.specificCustomers && discount.specificCustomers.length > 0)) && (
               <div className="p-2.5 bg-[#f6f7f7] border border-gray-200 rounded-[3px] text-xs space-y-1 mt-2">
-                <span className="font-bold text-[#1d2327] block">Restricted Customer Accounts:</span>
+                <span className="font-bold text-[#1d2327] block">Restricted To Specific Customers:</span>
                 <p className="text-[#646970] font-mono text-[11px]">
-                  {discount.specificCustomers.map(c => typeof c === 'object' ? c.email : c).join(", ")}
+                  {discount.specificCustomerEmails && discount.specificCustomerEmails.length > 0
+                    ? discount.specificCustomerEmails.join(", ")
+                    : discount.specificCustomers.map(c => typeof c === 'object' ? c.email : c).join(", ")}
                 </p>
+                {discount.notifiedCustomerEmails && discount.notifiedCustomerEmails.length > 0 && (
+                  <p className="text-emerald-700 text-[10px]">✓ Notified: {discount.notifiedCustomerEmails.join(", ")}</p>
+                )}
               </div>
             )}
           </div>
