@@ -315,9 +315,9 @@ export default function CorporateGiftingForm(props) {
           <p className="text-foreground/60 max-w-xl mx-auto text-base leading-relaxed">{formSubtitle}</p>
         </motion.div>
 
-        <form onSubmit={submit} noValidate className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          {/* LEFT: company + pack */}
-          <div className="space-y-8">
+        <form onSubmit={submit} noValidate className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+          {/* LEFT: company, pack details, notes */}
+          <div className="flex flex-col gap-8">
             <div className={card}>
               <CardTitle n="1">{companyTitle}</CardTitle>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -345,7 +345,7 @@ export default function CorporateGiftingForm(props) {
               </div>
             </div>
 
-            <div className={card}>
+            <div className={`${card} flex flex-col flex-1`}>
               <CardTitle n="2">{packTitle}</CardTitle>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <Field label="Occasion" required error={errors.occasion}>
@@ -407,8 +407,8 @@ export default function CorporateGiftingForm(props) {
             </div>
           </div>
 
-          {/* RIGHT: branding + uploads + notes + submit */}
-          <div className="space-y-8">
+          {/* RIGHT: branding + logo, reference images */}
+          <div className="flex flex-col gap-8">
             <div className={card}>
               <CardTitle n="3">{brandingTitle}</CardTitle>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -458,7 +458,8 @@ export default function CorporateGiftingForm(props) {
               />
             </div>
 
-            <div className={card}>
+
+            <div className={`${card} flex flex-col flex-1`}>
               <CardTitle n="4" hint="(optional)">{referenceTitle}</CardTitle>
               <p className="text-foreground/50 text-[13px] -mt-3 mb-4 leading-relaxed">{referenceDescription}</p>
               {referenceTags.length > 0 && (
@@ -479,9 +480,14 @@ export default function CorporateGiftingForm(props) {
                 help={`JPG, PNG, WebP — up to 8MB each, max ${Number(maxReferenceImages) || 10} images`}
               />
             </div>
+          </div>
 
-            <div className={card}>
-              <CardTitle n="5">{notesTitle}</CardTitle>
+
+          {/* Notes + submit, full width row */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-[32px] shadow-xl border border-border p-8 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-end">
+              <div>
+                <CardTitle n="5">{notesTitle}</CardTitle>
               <Field label="Anything else we should know?" error={errors.notes}>
                 <textarea
                   name="notes"
@@ -494,8 +500,8 @@ export default function CorporateGiftingForm(props) {
                 />
               </Field>
               <p className="text-[11px] text-foreground/30 mt-1.5 text-right">{form.notes.length}/2000</p>
-
-              <div className="border-t border-border pt-6 mt-4">
+              </div>
+              <div>
                 <TurnstileWidget
                   ref={turnstileRef}
                   onVerify={(t) => setTurnstileToken(t)}
