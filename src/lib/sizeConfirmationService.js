@@ -72,7 +72,17 @@ export async function autoSendSizeConfirmation(orderLike) {
       const order = await Order.findById(orderLike._id);
       if (!order) return { sent: false, reason: 'no-order' };
       if (!order.customer?.email) return { sent: false, reason: 'no-email' };
-      if (order.payment?.status !== 'Paid') return { sent: false, reason: 'not-paid' };
+      // Fire on order creation regardless of payment status for real customer-facing payment
+      // methods (COD orders are created with payment.status 'Pending' and otherwise never got
+      // this email automatically) — but skip a payment that's already known to have failed
+      // outright, and skip an admin-created Manual/Gift order still awaiting payment, since
+      // asking a customer to confirm their size before the admin has even confirmed the order
+      // will actually be fulfilled is premature (COD doesn't have this ambiguity — the order is
+      // already committed to shipping regardless of payment status).
+      if (order.payment?.status === 'Failed') return { sent: false, reason: 'payment-failed' };
+      if (order.payment?.method === 'Manual/Gift' && order.payment?.status === 'Pending') {
+        return { sent: false, reason: 'manual-order-pending-payment' };
+      }
       if (['Cancelled', 'Refunded'].includes(order.status)) return { sent: false, reason: 'cancelled' };
       if (await SizeConfirmation.exists({ orderId: order._id })) return { sent: false, reason: 'already-sent' };
 

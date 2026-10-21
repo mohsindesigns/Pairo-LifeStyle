@@ -43,6 +43,15 @@ const AbandonedCartSchema = new mongoose.Schema({
   // cheaper and more reliable than a background job guessing who "gave up".
   status: { type: String, enum: ['active', 'recovered'], default: 'active', index: true },
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+
+  // Tracks the automatic win-back voucher email (src/lib/abandonedCartService.js), sent once
+  // per cart snapshot by the /api/cron/abandoned-carts route once the cart has gone quiet long
+  // enough to count as abandoned.
+  recoveryEmail: {
+    sent: { type: Boolean, default: false },
+    sentAt: { type: Date, default: null },
+    voucherCode: { type: String, default: null },
+  },
 }, { timestamps: true });
 
 AbandonedCartSchema.index({ status: 1, updatedAt: -1 });

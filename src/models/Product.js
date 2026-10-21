@@ -146,7 +146,20 @@ const ProductSchema = new mongoose.Schema({
     }]
   },
   sizeChartSource: { type: String, enum: ['category_default', 'custom', 'none'], default: 'category_default' },
-  sizeChart: { type: mongoose.Schema.Types.ObjectId, ref: 'SizeChart', default: null }
+  sizeChart: { type: mongoose.Schema.Types.ObjectId, ref: 'SizeChart', default: null },
+
+  // Corporate Gifting — multi-select customizable add-on items (e.g. belt, bottle, bag),
+  // each with its own price delta and a per-item logo/artwork upload on the storefront.
+  corporateGifting: {
+    enabled: { type: Boolean, default: false },
+    minSelections: { type: Number, default: 3 },
+    items: [{
+      name: { type: String },
+      image: { type: String },
+      priceDelta: { type: Number, default: 0 },
+      active: { type: Boolean, default: true }
+    }]
+  }
 }, { timestamps: true });
 
 // Ensure unique slugs

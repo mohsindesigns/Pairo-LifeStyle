@@ -12,6 +12,7 @@ import MadeToMeasureModal from "@/components/product/MadeToMeasureModal";
 import CustomizeProductModal from "@/components/product/CustomizeProductModal";
 import SizeGuideModal from "@/components/product/SizeGuideModal";
 import SelectOptionsPopup from "@/components/product/SelectOptionsPopup";
+import CorporateGiftingActions from "@/components/product/CorporateGiftingActions";
 
 import { recordOptionSelect } from "@/lib/siteAnalytics";
 
@@ -243,6 +244,10 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
     setMissingAttrsModal({ isOpen: false, missing: [] });
     focusMissingAttributes(missing);
   };
+
+  if (product.corporateGifting?.enabled) {
+    return <CorporateGiftingActions product={product} unitPrice={unitPrice} />;
+  }
 
   return (
     <>

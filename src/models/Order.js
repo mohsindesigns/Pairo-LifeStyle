@@ -56,6 +56,19 @@ const OrderSchema = new mongoose.Schema({
         back:       { url: String, name: String },
         other:      { url: String, name: String, note: String }
       }
+    },
+    // Corporate Gifting selection data — which configurable items the shopper picked
+    // for this line, with a snapshot of each item's name/price and the uploaded logo/artwork.
+    corporateGifting: {
+      enabled: { type: Boolean, default: false },
+      minSelections: { type: Number, default: 3 },
+      selections: [{
+        itemId: { type: mongoose.Schema.Types.ObjectId },
+        name: { type: String },
+        image: { type: String },
+        priceDelta: { type: Number, default: 0 },
+        artwork: { url: String, name: String }
+      }]
     }
   }],
 

@@ -119,6 +119,7 @@ export default function AdminSidebar({ open = false, onClose }) {
     staffCreate: can(user, "staff.create"),
     staffManageRoles: can(user, "staff.manage_roles"),
     scriptsView: can(user, "scripts.view"),
+    corporateGiftingView: can(user, "corporate_gifting.view"),
   };
   const canSeeCommerce = perms.ordersView || perms.submissionsView || perms.customersView || perms.promotionsView;
   const canSeeTools = perms.submissionsView || perms.settingsView || perms.scriptsView || perms.productsView;
@@ -142,7 +143,7 @@ export default function AdminSidebar({ open = false, onClose }) {
 
   // Determine initial open accordion based on path
   useEffect(() => {
-    if (pathname.startsWith("/admin/products") || pathname.startsWith("/admin/categories") || pathname.startsWith("/admin/product-process") || pathname.startsWith("/admin/product-questions")) setOpenAccordion("products");
+    if (pathname.startsWith("/admin/products") || pathname.startsWith("/admin/categories") || pathname.startsWith("/admin/product-process") || pathname.startsWith("/admin/product-questions") || pathname.startsWith("/admin/corporate-gifting")) setOpenAccordion("products");
     else if (pathname.startsWith("/admin/affiliates")) setOpenAccordion("affiliates");
     else if (pathname.startsWith("/admin/orders") || pathname.startsWith("/admin/custom-jacket-orders") || pathname.startsWith("/admin/size-confirmations") || pathname.startsWith("/admin/custom-jacket-inquiries") || pathname.startsWith("/admin/customers") || pathname.startsWith("/admin/discounts")) setOpenAccordion("commerce");
     else if (pathname.startsWith("/admin/blogs")) setOpenAccordion("posts");
@@ -297,6 +298,7 @@ export default function AdminSidebar({ open = false, onClose }) {
               <NavLink href="/admin/categories" exact isSubmenu>Categories</NavLink>
               <NavLink href="/admin/product-process" exact isSubmenu>Product Process</NavLink>
               <NavLink href="/admin/product-questions" exact isSubmenu>Product Questions</NavLink>
+              {perms.corporateGiftingView && <NavLink href="/admin/corporate-gifting" isSubmenu>Corporate Gifting</NavLink>}
             </AccordionMenu>
           )}
 

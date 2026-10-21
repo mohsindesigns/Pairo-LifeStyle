@@ -19,7 +19,7 @@ const withSession = (query, mongoSession) => mongoSession ? query.session(mongoS
 // base product price) since a variant can legitimately cost more or less.
 async function resolveAuthoritativeSubtotal({ items, mongoSession }) {
   const productIds = items.map(item => item.id || item._id).filter(Boolean);
-  const dbProducts = await withSession(Product.find({ _id: { $in: productIds } }).select("price variantCombinations attributes"), mongoSession);
+  const dbProducts = await withSession(Product.find({ _id: { $in: productIds } }).select("price variantCombinations attributes corporateGifting"), mongoSession);
   const productById = new Map(dbProducts.map(p => [p._id.toString(), p]));
 
   return items.reduce((sum, item) => {

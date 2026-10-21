@@ -10,6 +10,7 @@ import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restricte
 import pairoEvents from "@/lib/events";
 import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
+import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { sendPinterestPurchaseEvent } from "@/lib/pinterestCapi";
 import {
@@ -130,7 +131,12 @@ export async function createOrderFromCheckoutPayload(payload, {
         const product = await Product.findOne({ _id: item.id || item._id }).session(mongoSession);
         if (!product) throw new Error(`Product ${item.id} not found.`);
 
-        if (product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
+        // Corporate Gifting replaces the standard variant/attribute picker with its own
+        // item-selection UI entirely, so a line with corporateGifting selections never carries
+        // selectedOptions by design — the required-attribute gate below doesn't apply to it,
+        // same as made-to-measure replacing the Size attribute with custom measurements.
+        const isCorporateGifting = !!item.corporateGifting?.enabled;
+        if (!isCorporateGifting && product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
           const isMadeToMeasure = !!item.madeToMeasure?.enabled;
           const missingAttrs = product.attributes.filter((attr) => {
             // Made-to-measure orders replace the standard Size selection with custom measurements.
@@ -159,6 +165,14 @@ export async function createOrderFromCheckoutPayload(payload, {
             || Object.values(selectedOptions).join(" / ")
           : null;
 
+        // Corporate Gifting — re-validate the minimum-selection gate and re-resolve each
+        // selected item against the product's own catalog server-side (never trusting the
+        // client's name/priceDelta), the same way variant stock/attrs are re-checked above.
+        // Shared with create-payment-intent's pre-charge check so the two can never disagree.
+        const corporateGiftingResult = validateCorporateGiftingSelections(item, product);
+        if (!corporateGiftingResult.valid) throw new Error(corporateGiftingResult.error);
+        const corporateGiftingData = corporateGiftingResult.data;
+
         orderItems.push({
           productId: product._id,
           name: product.name,
@@ -168,7 +182,8 @@ export async function createOrderFromCheckoutPayload(payload, {
           quantity: item.quantity,
           ...(variantTitle ? { selectedVariant: { title: variantTitle, options: selectedOptions } } : {}),
           ...(item.madeToMeasure?.enabled ? { madeToMeasure: item.madeToMeasure } : {}),
-          ...(item.customization?.enabled ? { customization: item.customization } : {})
+          ...(item.customization?.enabled ? { customization: item.customization } : {}),
+          ...(corporateGiftingData ? { corporateGifting: corporateGiftingData } : {})
         });
       }
 

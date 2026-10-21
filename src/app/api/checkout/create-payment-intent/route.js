@@ -6,6 +6,7 @@ import Order from "@/models/Order";
 import Product from "@/models/Product";
 import stripe from "@/lib/stripe";
 import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { getContextLogger, LogCategory } from "@/lib/logger";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 import { getClientIp } from "@/lib/rateLimit";
@@ -65,6 +66,14 @@ export async function POST(req) {
       }
       if (product.manageStock && product.stock < item.quantity) {
         return NextResponse.json({ error: `Insufficient stock for ${product.name}.` }, { status: 400 });
+      }
+      // Corporate Gifting — same check checkoutFulfillment.js performs at order-creation time
+      // (shared helper, so the two can never disagree), run here too so a stale cart (feature
+      // disabled, item deactivated, or no longer meeting the minimum-selection count) fails
+      // before the card is charged instead of charging then failing at webhook fulfillment.
+      const corporateGiftingCheck = validateCorporateGiftingSelections(item, product);
+      if (!corporateGiftingCheck.valid) {
+        return NextResponse.json({ error: corporateGiftingCheck.error }, { status: 400 });
       }
     }
 

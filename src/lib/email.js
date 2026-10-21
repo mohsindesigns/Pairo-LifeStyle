@@ -1102,3 +1102,67 @@ export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, char
   }
   return { messageId: info.messageId || messageId, subject };
 }
+
+// ─── ABANDONED CART EMAILS ──────────────────────────────────────────────────────
+
+/**
+ * Sends the automatic "come back" win-back email for an abandoned checkout
+ * (see src/lib/abandonedCartService.js). `cartSnapshot` is an AbandonedCart
+ * doc (or plain object with the same shape: items, cartSubtotal, cartTotal,
+ * contact, shippingAddress). `voucherCode` is the sitewide percentage-discount
+ * Promotion code to feature. Never throws — best-effort, called from a cron route.
+ */
+export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, { discountPercent = 15 } = {}) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+  const firstName = (cartSnapshot?.shippingAddress?.fullName || cartSnapshot?.contact?.firstName || '').split(' ')[0] || 'there';
+
+  const items = Array.isArray(cartSnapshot?.items) ? cartSnapshot.items : [];
+  const itemsRows = items.map((item) => `
+    <tr>
+      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};">
+        ${item.image ? `<img src="${escapeHtml(item.image)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid ${BRAND.border};vertical-align:middle;margin-right:10px;" />` : ''}
+        <strong style="color:${BRAND.ink};">${escapeHtml(item.name || 'Item')}</strong>
+      </td>
+      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};text-align:center;color:${BRAND.ink};">${item.quantity || 1}</td>
+      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};text-align:right;color:${BRAND.ink};font-weight:700;">$${(((item.price || 0) * (item.quantity || 1))).toLocaleString()}</td>
+    </tr>`).join('');
+
+  const itemsTable = items.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin-bottom:8px;">
+        <thead><tr style="background:${BRAND.surface};">
+          <th style="text-align:left;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Item</th>
+          <th style="padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Qty</th>
+          <th style="text-align:right;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Price</th>
+        </tr></thead>
+        <tbody>${itemsRows}</tbody>
+      </table>`
+    : '';
+
+  const voucherHtml = emailPanel(`
+    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here's <strong>${discountPercent}% off</strong> your order — on us. Use this code at checkout:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
+      <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(voucherCode)}</span>
+    </td></tr></table>
+    ${emailButton(`${storeUrl}/cart`, 'Complete My Order', { align: 'left' })}
+  `, { title: 'A Little Something For You', accentColor: BRAND.ink });
+
+  const html = emailShell({
+    eyebrow: 'We Saved Your Cart',
+    heading: 'Still Thinking It Over?',
+    subheading: `Hi ${escapeHtml(firstName)}, we noticed you left some items in your cart at ${escapeHtml(storeName)}. They're still waiting for you — and we've added a little incentive to help you decide.`,
+    bodyHtml: `${itemsTable}<div style="margin-top:24px;">${voucherHtml}</div>
+      <p style="margin:24px 0 0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:20px;">
+        This code is valid sitewide for a limited time. If you've already completed your order, you can safely ignore this email.
+      </p>`,
+    preheader: `We saved your cart — here's ${discountPercent}% off to come back.`,
+  });
+
+  return dispatchEmail({
+    to: email,
+    subject: `You left something behind — here's ${discountPercent}% off`,
+    html,
+    from: getFromAddress(storeName),
+    label: `Abandoned cart recovery (${email})`,
+  });
+}

@@ -715,7 +715,25 @@ export default function TiptapEditor({ content, onChange }) {
       },
       transformPastedHTML(html) {
         if (!html) return html;
-        // Clean out pasted Google Docs & Word inline font-size, font-family, and normal font-weights that break editor heading formatting
+        // Clean out pasted Google Docs & Word inline font-size, font-family, and
+        // line-height that break editor heading formatting.
+        //
+        // IMPORTANT: do NOT strip `font-weight: normal` / `font-weight: 400`
+        // here. Google Docs wraps its entire copied fragment in something like
+        // <b id="docs-internal-guid-xxxx" style="font-weight:normal;"> and marks
+        // genuinely non-bold runs with <span style="font-weight:400;...">.
+        // Tiptap's Bold extension (@tiptap/extension-bold) specifically relies on
+        // those inline styles to avoid the extremely common "paste from Google
+        // Docs makes everything bold" bug: its parse rule for <b> only applies
+        // the bold mark when the tag's OWN style isn't "font-weight:normal", and
+        // it has a dedicated `style: 'font-weight=400'` rule that explicitly
+        // clears any inherited bold mark. Stripping those declarations (as this
+        // function previously did) destroys the exact signal those rules need,
+        // so the bare <b> wrapper then matches the generic bold rule and the
+        // whole paste turns bold. Leaving font-weight alone lets Tiptap's
+        // built-in handling do the right thing, while real bold text (explicit
+        // <strong>/<b> without a "normal" override, or font-weight >= 500) is
+        // untouched and still renders bold.
         return html.replace(/style="([^"]*)"/gi, (match, styles) => {
           const cleaned = styles
             .split(';')
@@ -726,7 +744,6 @@ export default function TiptapEditor({ content, onChange }) {
               if (lower.startsWith('font-size:')) return false;
               if (lower.startsWith('font-family:')) return false;
               if (lower.startsWith('line-height:')) return false;
-              if (lower.replace(/\s+/g, '').includes('font-weight:400') || lower.replace(/\s+/g, '').includes('font-weight:normal')) return false;
               return true;
             })
             .join('; ');

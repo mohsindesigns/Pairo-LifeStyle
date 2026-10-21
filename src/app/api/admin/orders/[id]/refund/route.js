@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
-import Order from "@/models/Order";
 import stripe from "@/lib/stripe";
+import { orderLookupQuery } from "@/lib/orderLookup";
 import { can } from "@/lib/rbac";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { reconcilePromotionUsage, isUsageReleasingTransition } from "@/lib/promotionUsageReconciliation";
@@ -25,7 +25,7 @@ export async function POST(req, { params }) {
     const body = await req.json().catch(() => ({}));
     const requestedAmount = body?.amount;
 
-    const order = await Order.findById(id);
+    const order = await orderLookupQuery(id);
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     if (order.payment?.provider !== 'stripe' || !order.payment?.stripePaymentIntentId) {

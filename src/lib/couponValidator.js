@@ -45,7 +45,7 @@ async function loadDbProductMap(items = []) {
 
   let productsInDb = [];
   if (queryOr.length > 0) {
-    productsInDb = await Product.find({ $or: queryOr }).select("_id id categories price compareAtPrice variantCombinations attributes");
+    productsInDb = await Product.find({ $or: queryOr }).select("_id id categories price compareAtPrice variantCombinations attributes corporateGifting");
   }
 
   const map = {}; // keyed by both the Mongo _id string AND the legacy numeric id string

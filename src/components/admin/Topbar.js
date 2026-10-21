@@ -324,7 +324,10 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
 
   const resetAllRead = () => {
     saveDismissedIds([]);
-    toast.success("Notification read history cleared");
+    // This un-reads everything currently marked read (so they show as unread/new
+    // again) — it does not delete any notification. Wording matches that, rather
+    // than the previous "history cleared" copy which implied items were removed.
+    toast.success("All read notifications marked as unread again");
   };
 
   const unreadNotices = useMemo(() => {

@@ -15,6 +15,7 @@ import {
   FileText,
   Sparkles,
   Globe,
+  Printer,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -50,6 +51,7 @@ export default function OrderDetailPage() {
   const [amountInput, setAmountInput] = useState("");
   const [savingAmount, setSavingAmount] = useState(false);
   const [convertingToCard, setConvertingToCard] = useState(false);
+  const [exportingVendorPdf, setExportingVendorPdf] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -280,6 +282,30 @@ export default function OrderDetailPage() {
       toast.error(error.message || "Failed to send invoice");
     } finally {
       setSendingInvoice(false);
+    }
+  };
+
+  const exportVendorPdf = async () => {
+    setExportingVendorPdf(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/vendor-pdf`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to generate PDF");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `order-${order?.orderNumber || id}-vendor.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error.message || "Failed to generate vendor PDF");
+    } finally {
+      setExportingVendorPdf(false);
     }
   };
 
@@ -803,6 +829,32 @@ export default function OrderDetailPage() {
                                 </div>
                               </div>
                             )}
+                            {/* Corporate Gifting selections */}
+                            {item.corporateGifting?.enabled && (
+                              <div className="mt-3 pt-2 border-t border-neutral-100">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-wide">
+                                  ✦ Corporate Gifting — {(item.corporateGifting.selections || []).length} items
+                                </span>
+                                <div className="mt-2 space-y-2 text-[11px] text-[#1d2327]">
+                                  {(item.corporateGifting.selections || []).map((sel, selIdx) => (
+                                    <div key={sel.itemId || selIdx} className="flex items-center gap-2">
+                                      {sel.image && (
+                                        <img src={sel.image} alt={sel.name} className="w-6 h-6 rounded object-cover border border-[#ccd0d4] shrink-0" />
+                                      )}
+                                      <span className="font-semibold text-[#2c3338]">{sel.name}</span>
+                                      {sel.priceDelta > 0 && <span className="text-[#646970]">+${Number(sel.priceDelta).toLocaleString()}</span>}
+                                      {sel.artwork?.url ? (
+                                        <a href={sel.artwork.url} target="_blank" rel="noopener noreferrer" className="text-[#2271b1] hover:underline truncate max-w-[160px]">
+                                          {sel.artwork.name || "View logo"}
+                                        </a>
+                                      ) : (
+                                        <span className="text-neutral-400 italic">No logo uploaded</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4">
@@ -1029,6 +1081,29 @@ export default function OrderDetailPage() {
                       </p>
                     ) : null}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Vendor-facing production PDF (product image + name + size chart with ordered size highlighted) */}
+            {can(session?.user, "orders.view") && (
+              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
+                <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
+                  <Printer className="w-3.5 h-3.5 text-[#2271b1]" />
+                  <h2 className="text-[14px] font-bold text-[#1d2327]">Vendor Export</h2>
+                </div>
+                <div className="p-4 space-y-2">
+                  <button
+                    type="button"
+                    onClick={exportVendorPdf}
+                    disabled={exportingVendorPdf}
+                    className="w-full flex items-center justify-center gap-1.5 bg-[#1a1a1a] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-black transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> {exportingVendorPdf ? "Generating..." : "Print PDF for Vendor"}
+                  </button>
+                  <p className="text-[11px] text-[#646970] text-center">
+                    Product photos, names and the ordered size highlighted on each item&apos;s size chart — ready to send to your manufacturing vendor.
+                  </p>
                 </div>
               </div>
             )}

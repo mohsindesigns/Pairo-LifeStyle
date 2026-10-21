@@ -11,6 +11,7 @@ import { reconcilePaymentLinkOrder } from "@/lib/stripeFulfillment";
 import { reconcilePromotionUsage, isUsageReleasingTransition, isUsageRestoringTransition } from "@/lib/promotionUsageReconciliation";
 import pairoEvents from "@/lib/events";
 import { resolveIpLocation } from "@/lib/geoIp";
+import { orderLookupQuery } from "@/lib/orderLookup";
 
 export async function GET(req, { params }) {
   try {
@@ -26,7 +27,7 @@ export async function GET(req, { params }) {
     }
 
     const { id } = await params;
-    let order = await Order.findById(id).populate("affiliateId", "name email affiliateId referralCode");
+    let order = await orderLookupQuery(id).populate("affiliateId", "name email affiliateId referralCode");
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     // Self-heal: if this is a Custom Order with an unpaid Stripe payment link,
@@ -69,7 +70,7 @@ export async function PATCH(req, { params }) {
 
     const { id } = await params;
     const { status, adminNotes, timelineMessage } = await req.json();
-    const order = await Order.findById(id);
+    const order = await orderLookupQuery(id);
 
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 

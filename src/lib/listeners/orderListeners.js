@@ -14,20 +14,23 @@ export function initOrderListeners() {
         const order = payload?.order || payload;
         if (!order) return;
         console.log(`[Event Received] ORDER_CREATED: ${order.orderNumber}`);
-        // Email Customer
+        // Email Customer — must complete (and the temp password must still be present) before
+        // the password is stripped below, so this one stays sequential and first.
         await sendOrderConfirmation(order).catch(e => console.error("Email Cust Error:", e.message));
         if (order?.guestAccount?.temporaryPassword) {
           delete order.guestAccount.temporaryPassword;
         }
-        // Email Admin
-        await sendAdminOrderNotification(order).catch(e => console.error("Email Admin Error:", e.message));
 
-        // Ask the customer to confirm their jacket size (includes each product's size chart).
-        // Only fires for paid orders that contain a product with a size chart; once per order.
-        await autoSendSizeConfirmation(order);
-
-        // Push real-time event to CRM
-        await dispatchOrderToCRM('ORDER_CREATED', order).catch(e => console.error("CRM Webhook Error:", e.message));
+        // None of these three depend on each other (or on the temp password, now stripped),
+        // so they run concurrently instead of stacking each call's latency on top of the last.
+        await Promise.allSettled([
+          sendAdminOrderNotification(order).catch(e => console.error("Email Admin Error:", e.message)),
+          // Ask the customer to confirm their jacket size (includes each product's size chart).
+          // Fires for any new order (COD/Pending included) that contains a product with a size
+          // chart, once per order — skipped only if the payment already failed outright.
+          autoSendSizeConfirmation(order),
+          dispatchOrderToCRM('ORDER_CREATED', order).catch(e => console.error("CRM Webhook Error:", e.message)),
+        ]);
     } catch (err) {
         console.error("Order created listener error:", err);
     }

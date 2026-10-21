@@ -31,10 +31,28 @@ export function resolveVariantForItem(product, item) {
 // amount, so a forged surcharge value can't be used to discount the item.
 export const MADE_TO_MEASURE_SURCHARGE = 25;
 
+// Sums the price delta of this item's Corporate Gifting selections, resolved against the
+// product's own catalog of configurable items — never trusting a client-supplied priceDelta —
+// so a forged request can't under/over-price a selection. Deactivated or unknown items are
+// silently ignored here (checkoutFulfillment performs the hard validation/rejection).
+export function resolveCorporateGiftingSurcharge(product, item) {
+  if (!product?.corporateGifting?.enabled) return 0;
+  const selections = item?.corporateGifting?.enabled ? (item.corporateGifting.selections || []) : [];
+  if (!selections.length || !product?.corporateGifting?.items?.length) return 0;
+
+  const selectedIds = new Set(selections.map((s) => String(s.itemId)));
+  return product.corporateGifting.items.reduce((sum, giftItem) => {
+    if (giftItem.active === false) return sum;
+    if (!selectedIds.has(String(giftItem._id))) return sum;
+    return sum + (Number(giftItem.priceDelta) || 0);
+  }, 0);
+}
+
 export function resolveAuthoritativePrice(product, item) {
   const variant = resolveVariantForItem(product, item);
   const basePrice = (variant?.price !== undefined && variant?.price !== null) ? variant.price : product.price;
-  return item?.madeToMeasure?.enabled ? basePrice + MADE_TO_MEASURE_SURCHARGE : basePrice;
+  const m2mPrice = item?.madeToMeasure?.enabled ? basePrice + MADE_TO_MEASURE_SURCHARGE : basePrice;
+  return m2mPrice + resolveCorporateGiftingSurcharge(product, item);
 }
 
 export function resolveAuthoritativeCompareAtPrice(product, item) {

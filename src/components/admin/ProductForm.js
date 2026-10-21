@@ -331,8 +331,12 @@ export default function ProductForm({ productId = null }) {
           }));
        }
 
-      const normalizedData = { 
-         ...formData, 
+      // corporateGifting is intentionally excluded below — this form has no UI for it and only
+      // round-trips whatever it fetched, so sending it back would silently overwrite config an
+      // admin just saved via the dedicated /admin/corporate-gifting editor in another tab.
+      const { corporateGifting: _omitCorporateGifting, ...formDataWithoutCorporateGifting } = formData;
+      const normalizedData = {
+         ...formDataWithoutCorporateGifting,
          slug: finalSlug,
          slugManuallyEdited,
          variantCombinations: updatedCombinations,
