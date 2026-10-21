@@ -9,44 +9,7 @@ import { ARTWORK_ACCEPTED_FORMATS } from "@/lib/customizationOptions";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB — matches /api/uploads/artwork server limit
 
-function GiftItemCard({ item, selected, onToggle, artwork, onArtworkChange }) {
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
-  const inputRef = useRef(null);
-
-  const handleFile = async (file) => {
-    if (!file) return;
-    setUploadError(null);
-
-    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    const allowed = ARTWORK_ACCEPTED_FORMATS.split(",");
-    if (!allowed.includes(ext)) {
-      setUploadError("Unsupported file format.");
-      return;
-    }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError("File exceeds the 10MB limit.");
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/uploads/artwork", { method: "POST", body: fd });
-      const data = await res.json();
-      if (res.ok && data.url) {
-        onArtworkChange({ url: data.url, name: file.name });
-      } else {
-        setUploadError(data.error || "Upload failed. Please try again.");
-      }
-    } catch {
-      setUploadError("Network error. Please try again.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
+function GiftItemCard({ item, selected, onToggle }) {
   return (
     <div
       className={`relative rounded-[var(--radius,10px)] border-2 transition-colors duration-200 overflow-hidden bg-white ${
@@ -82,44 +45,74 @@ function GiftItemCard({ item, selected, onToggle, artwork, onArtworkChange }) {
           )}
         </div>
       </button>
+    </div>
+  );
+}
 
-      {/* Logo upload sits over the image, so selecting never changes the card height */}
-      {selected && (
-        <div className="absolute left-1.5 right-8 top-1.5">
-          {artwork?.url ? (
-            <div className="flex items-center gap-1 bg-white/95 rounded-md px-1.5 py-1 shadow-sm border border-black/10">
-              <span className="text-[10px] font-semibold text-primary truncate flex-1">{artwork.name}</span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onArtworkChange(null); setUploadError(null); }}
-                className="text-primary/50 hover:text-red-600 transition-colors shrink-0"
-                aria-label="Remove logo"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
-              disabled={uploading}
-              className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary bg-white/95 border border-dashed border-primary/50 hover:border-primary rounded-md px-1.5 py-1 shadow-sm disabled:opacity-50"
-            >
-              {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-              {uploading ? "Uploading..." : "Add logo"}
-            </button>
-          )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ARTWORK_ACCEPTED_FORMATS}
-            className="hidden"
-            onChange={(e) => handleFile(e.target.files?.[0])}
-          />
-          {uploadError && (
-            <p className="text-[9px] text-red-600 font-semibold mt-0.5 bg-white/95 rounded px-1 leading-tight">{uploadError}</p>
-          )}
+/** One logo for the whole order: applied to every selected item. */
+function LogoUpload({ logo, onChange }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+  const inputRef = useRef(null);
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setError(null);
+    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    if (!ARTWORK_ACCEPTED_FORMATS.split(",").includes(ext)) return setError("Unsupported file format.");
+    if (file.size > MAX_UPLOAD_BYTES) return setError("File exceeds the 10MB limit.");
+
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/uploads/artwork", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok && data.url) onChange({ url: data.url, name: file.name });
+      else setError(data.error || "Upload failed. Please try again.");
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[13px] font-bold text-primary">
+        Your logo <span className="text-primary/50 font-medium">(applied to all selected items)</span>
+      </p>
+      {logo?.url ? (
+        <div className="flex items-center gap-2.5 bg-black/[0.03] rounded-[var(--radius,8px)] px-3 py-2">
+          <div className="w-9 h-9 rounded-md border border-black/10 overflow-hidden shrink-0 bg-white">
+            {/\.(png|jpg|jpeg|svg|webp)$/i.test(logo.url) ? (
+              <img src={logo.url} alt={logo.name} className="w-full h-full object-contain" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-primary/60">FILE</div>
+            )}
+          </div>
+          <span className="text-[12px] font-semibold text-primary truncate flex-1">{logo.name}</span>
+          <button type="button" onClick={() => { onChange(null); setError(null); }} className="text-primary/50 hover:text-red-600 transition-colors shrink-0" aria-label="Remove logo">
+            <X className="w-4 h-4" />
+          </button>
         </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="w-full flex items-center justify-center gap-2 text-[12px] font-bold uppercase tracking-wide text-primary border border-dashed border-primary/40 hover:border-primary rounded-[var(--radius,8px)] px-3 py-3 transition-all disabled:opacity-50"
+        >
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {uploading ? "Uploading..." : "Upload your logo"}
+        </button>
+      )}
+      <input ref={inputRef} type="file" accept={ARTWORK_ACCEPTED_FORMATS} className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+      {error && (
+        <p className="flex items-center gap-1 text-[11px] text-red-600 font-semibold">
+          <AlertCircle className="w-3 h-3 shrink-0" /> {error}
+        </p>
       )}
     </div>
   );
@@ -135,7 +128,8 @@ export default function CorporateGiftingActions({ product, unitPrice, onExtraCha
   );
   const minSelections = product.corporateGifting?.minSelections || 3;
 
-  const [selections, setSelections] = useState({}); // { [itemId]: { artwork } }
+  const [selections, setSelections] = useState({}); // { [itemId]: true }
+  const [logo, setLogo] = useState(null); // one logo for the whole order
   const [quantity, setQuantity] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
   const [showGateMessage, setShowGateMessage] = useState(false);
@@ -165,17 +159,10 @@ export default function CorporateGiftingActions({ product, unitPrice, onExtraCha
       if (next[item._id]) {
         delete next[item._id];
       } else {
-        next[item._id] = { artwork: null };
+        next[item._id] = true;
       }
       return next;
     });
-  };
-
-  const setArtwork = (itemId, artwork) => {
-    setSelections((prev) => ({
-      ...prev,
-      [itemId]: { ...(prev[itemId] || {}), artwork },
-    }));
   };
 
   const buildCartItem = () => ({
@@ -193,7 +180,7 @@ export default function CorporateGiftingActions({ product, unitPrice, onExtraCha
           name: item.name,
           image: item.image,
           priceDelta: item.priceDelta || 0,
-          artwork: selections[item._id]?.artwork || null,
+          artwork: logo || null,
         })),
     },
   });
@@ -243,11 +230,11 @@ export default function CorporateGiftingActions({ product, unitPrice, onExtraCha
             item={item}
             selected={!!selections[item._id]}
             onToggle={() => toggleItem(item)}
-            artwork={selections[item._id]?.artwork}
-            onArtworkChange={(art) => setArtwork(item._id, art)}
           />
         ))}
       </div>
+
+      <LogoUpload logo={logo} onChange={setLogo} />
 
       {!meetsMinimum && showGateMessage && (
         <p className="flex items-center gap-2 text-[13px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded-[var(--radius,8px)] px-3 py-2.5">
