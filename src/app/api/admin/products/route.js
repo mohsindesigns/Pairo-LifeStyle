@@ -50,8 +50,9 @@ export async function POST(req) {
 
     // Strip empty-string ObjectId fields — Mongoose cannot cast "" to ObjectId
     if (!productData.primaryCategory) delete productData.primaryCategory;
-    if (Array.isArray(productData.categories)) {
-      productData.categories = productData.categories.filter(Boolean);
+    if (!productData.sizeChart) delete productData.sizeChart;
+    for (const key of ["categories", "collections", "relatedProducts", "upsellProducts"]) {
+      if (Array.isArray(productData[key])) productData[key] = productData[key].filter(Boolean);
     }
 
     // Generate slug cleanly
@@ -123,10 +124,13 @@ export async function PUT(req) {
 
     // Strip empty-string ObjectId fields — Mongoose cannot cast "" to ObjectId
     if (!data.primaryCategory) delete data.primaryCategory;
-    if (Array.isArray(data.categories)) {
-      data.categories = data.categories.filter(Boolean);
+    // An empty size chart means "none": clear it, but only when the field was actually sent
+    // (a partial update that omits it must leave the product's chart alone).
+    if ("sizeChart" in data && !data.sizeChart) data.sizeChart = null;
+    for (const key of ["categories", "collections", "relatedProducts", "upsellProducts"]) {
+      if (Array.isArray(data[key])) data[key] = data[key].filter(Boolean);
     }
-    
+
     const oldProduct = await Product.findById(id);
     if (!oldProduct) {
       console.error("[Products PUT] Product not found:", id);
