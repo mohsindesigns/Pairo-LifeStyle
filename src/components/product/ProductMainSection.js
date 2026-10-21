@@ -78,8 +78,11 @@ export default function ProductMainSection({ product, topReview = null }) {
     if (variant.image) setSelectedVariantImage(variant.image);
   };
 
-  const displayPrice = selectedVariant?.price || product.price;
-  const displayCompareAtPrice = selectedVariant ? (selectedVariant.compareAtPrice !== undefined && selectedVariant.compareAtPrice !== null ? selectedVariant.compareAtPrice : null) : product.compareAtPrice;
+  // Gifting: the chosen items' price increases are folded into the one main price.
+  const [giftingExtra, setGiftingExtra] = useState(0);
+  const displayPrice = Number(selectedVariant?.price || product.price) + giftingExtra;
+  const baseCompareAt = selectedVariant ? (selectedVariant.compareAtPrice !== undefined && selectedVariant.compareAtPrice !== null ? selectedVariant.compareAtPrice : null) : product.compareAtPrice;
+  const displayCompareAtPrice = baseCompareAt ? Number(baseCompareAt) + giftingExtra : baseCompareAt;
   const displaySku = selectedVariant?.sku || product.sku;
   let displayStock = product.stock;
   if (selectedVariant?.stock !== undefined) {
@@ -220,6 +223,7 @@ export default function ProductMainSection({ product, topReview = null }) {
             product={{ ...product, stock: displayStock }}
             onVariantChange={handleVariantChange}
             unitPrice={unitPrice}
+            onGiftingExtraChange={setGiftingExtra}
           />
 
           {/* Trust strip - CMS Driven */}

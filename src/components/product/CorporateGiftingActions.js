@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Upload, X, Loader2, AlertCircle, ShoppingBag, Gift, Minus, Plus } from "lucide-react";
 
@@ -49,62 +49,53 @@ function GiftItemCard({ item, selected, onToggle, artwork, onArtworkChange }) {
 
   return (
     <div
-      className={`relative rounded-[var(--radius,12px)] border-2 transition-all duration-200 overflow-hidden bg-white ${
-        selected ? "border-primary shadow-md" : "border-black/10 hover:border-primary/40"
+      className={`relative rounded-[var(--radius,10px)] border-2 transition-colors duration-200 overflow-hidden bg-white ${
+        selected ? "border-primary shadow-sm" : "border-black/10 hover:border-primary/40"
       }`}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full text-left"
-      >
-        <div className="relative aspect-square bg-black/[0.03]">
+      <button type="button" onClick={onToggle} className="w-full text-left block">
+        <div className="relative aspect-[4/3] bg-black/[0.03]">
           {item.image ? (
             <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-primary/30">
-              <Gift className="w-8 h-8" />
+              <Gift className="w-6 h-6" />
             </div>
           )}
           <span
-            className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+            className={`absolute top-1.5 right-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
               selected ? "bg-primary border-primary" : "bg-white/90 border-black/20"
             }`}
           >
-            {selected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+            {selected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
           </span>
         </div>
-        <div className="px-3 py-2.5 space-y-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] md:text-[14px] font-bold text-primary truncate">{item.name}</span>
-            <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-primary/70 bg-primary/10 rounded-full px-2 py-0.5">
+        <div className="px-2 py-1.5">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[12px] font-bold text-primary truncate">{item.name}</span>
+            <span className="shrink-0 text-[10px] font-bold text-primary/70 bg-primary/10 rounded-full px-1.5 py-0.5">
               +${Number(item.priceDelta || 0).toFixed(2)}
             </span>
           </div>
           {item.description && (
-            <p className="text-[11px] md:text-[12px] text-primary/60 leading-snug line-clamp-2">{item.description}</p>
+            <p className="text-[10px] text-primary/60 leading-snug line-clamp-1 mt-0.5">{item.description}</p>
           )}
         </div>
       </button>
 
+      {/* Logo upload sits over the image, so selecting never changes the card height */}
       {selected && (
-        <div className="px-3 pb-3 pt-1 border-t border-black/5">
+        <div className="absolute left-1.5 right-8 top-1.5">
           {artwork?.url ? (
-            <div className="flex items-center gap-2 bg-black/[0.03] rounded-[var(--radius,8px)] px-2.5 py-2">
-              <div className="w-8 h-8 rounded-[var(--radius,6px)] border border-black/10 overflow-hidden shrink-0 bg-white">
-                {artwork.url.match(/\.(png|jpg|jpeg|svg|webp)$/i) ? (
-                  <img src={artwork.url} alt={artwork.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-primary/60">FILE</div>
-                )}
-              </div>
-              <span className="text-[11px] font-semibold text-primary truncate flex-1">{artwork.name}</span>
+            <div className="flex items-center gap-1 bg-white/95 rounded-md px-1.5 py-1 shadow-sm border border-black/10">
+              <span className="text-[10px] font-semibold text-primary truncate flex-1">{artwork.name}</span>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onArtworkChange(null); setUploadError(null); }}
                 className="text-primary/50 hover:text-red-600 transition-colors shrink-0"
+                aria-label="Remove logo"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" />
               </button>
             </div>
           ) : (
@@ -112,10 +103,10 @@ function GiftItemCard({ item, selected, onToggle, artwork, onArtworkChange }) {
               type="button"
               onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
               disabled={uploading}
-              className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-primary border border-dashed border-primary/40 hover:border-primary rounded-[var(--radius,8px)] px-3 py-2 transition-all disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary bg-white/95 border border-dashed border-primary/50 hover:border-primary rounded-md px-1.5 py-1 shadow-sm disabled:opacity-50"
             >
-              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-              {uploading ? "Uploading..." : "Upload your logo"}
+              {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+              {uploading ? "Uploading..." : "Add logo"}
             </button>
           )}
           <input
@@ -126,9 +117,7 @@ function GiftItemCard({ item, selected, onToggle, artwork, onArtworkChange }) {
             onChange={(e) => handleFile(e.target.files?.[0])}
           />
           {uploadError && (
-            <p className="flex items-center gap-1 text-[10px] text-red-600 font-semibold mt-1.5">
-              <AlertCircle className="w-3 h-3 shrink-0" /> {uploadError}
-            </p>
+            <p className="text-[9px] text-red-600 font-semibold mt-0.5 bg-white/95 rounded px-1 leading-tight">{uploadError}</p>
           )}
         </div>
       )}
@@ -136,7 +125,7 @@ function GiftItemCard({ item, selected, onToggle, artwork, onArtworkChange }) {
   );
 }
 
-export default function CorporateGiftingActions({ product, unitPrice }) {
+export default function CorporateGiftingActions({ product, unitPrice, onExtraChange }) {
   const { addToCart } = useCart();
   const router = useRouter();
 
@@ -160,9 +149,15 @@ export default function CorporateGiftingActions({ product, unitPrice }) {
     return sum;
   }, 0);
 
-  const basePrice = Number(unitPrice ?? product.price) || 0;
-  const lineUnitPrice = basePrice + deltaTotal;
-  const runningTotal = lineUnitPrice * quantity;
+  // Report the extra to the page so the existing main price updates (no separate total box).
+  useEffect(() => {
+    onExtraChange?.(deltaTotal);
+    return () => onExtraChange?.(0);
+  }, [deltaTotal, onExtraChange]);
+
+  // unitPrice already includes the extra (the page folds it into its main price).
+  const lineUnitPrice = Number(product.price) + deltaTotal;
+  const runningTotal = (Number(unitPrice ?? lineUnitPrice) || 0) * quantity;
 
   const toggleItem = (item) => {
     setSelections((prev) => {
@@ -241,7 +236,7 @@ export default function CorporateGiftingActions({ product, unitPrice }) {
         </span>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {giftItems.map((item) => (
           <GiftItemCard
             key={item._id}
@@ -260,11 +255,6 @@ export default function CorporateGiftingActions({ product, unitPrice }) {
           Please select at least {minSelections} items ({selectedCount} selected) before adding to cart.
         </p>
       )}
-
-      <div className="flex items-center justify-between rounded-[var(--radius,12px)] bg-black/[0.04] px-4 py-3">
-        <span className="text-[13px] font-semibold text-primary/70">Running total</span>
-        <span className="text-[20px] font-extrabold text-primary">${runningTotal.toFixed(2)}</span>
-      </div>
 
       <div className="space-y-3 pt-1">
         <div className="flex items-center gap-3">

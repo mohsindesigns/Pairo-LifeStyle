@@ -16,7 +16,7 @@ import CorporateGiftingActions from "@/components/product/CorporateGiftingAction
 
 import { recordOptionSelect } from "@/lib/siteAnalytics";
 
-export default function ClientProductActions({ product, onVariantChange, unitPrice }) {
+export default function ClientProductActions({ product, onVariantChange, unitPrice, onGiftingExtraChange }) {
   const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
@@ -249,7 +249,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
   // "Made to measure" / "Customize" buttons below. Keyed on the product type as well as the
   // derived flag so a gifting product can't fall through to the jacket UI.
   if (product.productType === "gifting" || product.corporateGifting?.enabled) {
-    return <CorporateGiftingActions product={product} unitPrice={unitPrice} />;
+    return <CorporateGiftingActions product={product} unitPrice={unitPrice} onExtraChange={onGiftingExtraChange} />;
   }
 
   return (
