@@ -23,6 +23,10 @@ export const SECTION_REGISTRY = {
   custom_jacket_hero: dynamic(() => import("@/components/sections/CustomJacketHero")),
   custom_jacket_process: dynamic(() => import("@/components/sections/CustomJacketProcess")),
   custom_jacket_form: dynamic(() => import("@/components/sections/CustomJacketForm")),
+  // Corporate Gifting Page
+  corporate_gifting_hero: dynamic(() => import("@/components/sections/CorporateGiftingHero")),
+  corporate_gifting_process: dynamic(() => import("@/components/sections/CorporateGiftingProcess")),
+  corporate_gifting_form: dynamic(() => import("@/components/sections/CorporateGiftingForm")),
   // Gallery Page
   gallery_hero: dynamic(() => import("@/components/sections/GalleryHero")),
   gallery_grid: dynamic(() => import("@/components/sections/GalleryGrid")),

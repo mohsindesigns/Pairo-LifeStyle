@@ -51,7 +51,7 @@ const PageSchema = new mongoose.Schema({
   },
   template: {
     type: String,
-    enum: ["home", "about", "contact", "default", "custom-jacket", "gallery", "size-chart"],
+    enum: ["home", "about", "contact", "default", "custom-jacket", "corporate-gifting", "gallery", "size-chart"],
     default: "default",
     required: true
   },

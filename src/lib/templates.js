@@ -3,6 +3,7 @@ import AboutTemplate from "@/templates/AboutTemplate";
 import ContactTemplate from "@/templates/ContactTemplate";
 import DefaultTemplate from "@/templates/DefaultTemplate";
 import CustomJacketTemplate from "@/templates/CustomJacketTemplate";
+import CorporateGiftingTemplate from "@/templates/CorporateGiftingTemplate";
 import GalleryTemplate from "@/templates/GalleryTemplate";
 import SizeChartTemplate from "@/templates/SizeChartTemplate";
 
@@ -90,6 +91,40 @@ export const TEMPLATE_REGISTRY = {
       { type: "custom_jacket_hero", config: {} },
       { type: "custom_jacket_process", config: {} },
       { type: "custom_jacket_form", config: {} }
+    ]
+  },
+  "corporate-gifting": {
+    name: "Corporate Gifting Page",
+    component: CorporateGiftingTemplate,
+    allowedSections: [
+      "corporate_gifting_hero",
+      "feature_marquee",
+      "corporate_gifting_process",
+      "corporate_gifting_form",
+      "trust_badges",
+      "testimonials",
+      "rich_text"
+    ],
+    defaultSections: [
+      { type: "corporate_gifting_hero", config: {} },
+      { type: "feature_marquee", config: {
+        items: [
+          { text: "Free shipping worldwide", icon: "Truck" },
+          { text: "Made to order", icon: "Scissors" },
+          { text: "Logo embossing", icon: "Stamp" },
+          { text: "Bulk pricing", icon: "Tag" },
+          { text: "Premium gift boxes", icon: "Gift" }
+        ]
+      } },
+      { type: "corporate_gifting_process", config: {} },
+      { type: "corporate_gifting_form", config: {} },
+      { type: "trust_badges", config: {
+        items: [
+          { title: "Free worldwide", description: "Shipping", icon: "Globe" },
+          { title: "100% secure", description: "Checkout", icon: "Lock" },
+          { title: "32-day", description: "Return policy", icon: "RefreshCw" }
+        ]
+      } }
     ]
   },
   gallery: {

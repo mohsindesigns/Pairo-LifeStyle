@@ -144,7 +144,7 @@ export default function AdminSidebar({ open = false, onClose }) {
   useEffect(() => {
     if (pathname.startsWith("/admin/products") || pathname.startsWith("/admin/categories") || pathname.startsWith("/admin/product-process") || pathname.startsWith("/admin/product-questions")) setOpenAccordion("products");
     else if (pathname.startsWith("/admin/affiliates")) setOpenAccordion("affiliates");
-    else if (pathname.startsWith("/admin/orders") || pathname.startsWith("/admin/custom-jacket-orders") || pathname.startsWith("/admin/size-confirmations") || pathname.startsWith("/admin/custom-jacket-inquiries") || pathname.startsWith("/admin/customers") || pathname.startsWith("/admin/discounts")) setOpenAccordion("commerce");
+    else if (pathname.startsWith("/admin/orders") || pathname.startsWith("/admin/custom-jacket-orders") || pathname.startsWith("/admin/size-confirmations") || pathname.startsWith("/admin/custom-jacket-inquiries") || pathname.startsWith("/admin/corporate-gifting-inquiries") || pathname.startsWith("/admin/customers") || pathname.startsWith("/admin/discounts")) setOpenAccordion("commerce");
     else if (pathname.startsWith("/admin/blogs")) setOpenAccordion("posts");
     else if (pathname.startsWith("/admin/pages") || pathname.startsWith("/admin/gallery-items")) setOpenAccordion("pages");
     else if (pathname.startsWith("/admin/settings/team") || pathname.startsWith("/admin/settings/roles")) setOpenAccordion("users");
@@ -239,6 +239,7 @@ export default function AdminSidebar({ open = false, onClose }) {
               {perms.ordersView && <NavLink href="/admin/custom-jacket-orders" exact isSubmenu>Custom Orders</NavLink>}
               {perms.ordersView && <NavLink href="/admin/size-confirmations" exact isSubmenu>Size Confirmations</NavLink>}
               {perms.submissionsView && <NavLink href="/admin/custom-jacket-inquiries" exact isSubmenu>Custom Inquiries</NavLink>}
+              {perms.submissionsView && <NavLink href="/admin/corporate-gifting-inquiries" exact isSubmenu>Gifting Inquiries</NavLink>}
               {perms.customersView && <NavLink href="/admin/customers" exact isSubmenu>Customers</NavLink>}
               {perms.promotionsView && <NavLink href="/admin/discounts" exact isSubmenu>Coupons</NavLink>}
               {perms.promotionsView && <NavLink href="/admin/promotions" exact isSubmenu>Promotions & BOGO</NavLink>}

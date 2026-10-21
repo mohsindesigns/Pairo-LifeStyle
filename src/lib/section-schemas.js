@@ -389,6 +389,89 @@ export const SECTION_SCHEMAS = {
     ]
   },
 
+  // ─── CORPORATE GIFTING SECTIONS ────────────────────────────
+  corporate_gifting_hero: {
+    name: "Corporate Gifting Hero",
+    icon: "Gift",
+    fields: [
+      { name: "label", label: "Badge Label", type: "text" },
+      { name: "title", label: "Hero Title", type: "text" },
+      { name: "subtitle", label: "Hero Subtitle", type: "textarea" },
+      { name: "image", label: "Background Image (optional)", type: "image" },
+      { name: "primaryButtonText", label: "Primary Button Text", type: "text" },
+      { name: "primaryButtonLink", label: "Primary Button Link", type: "text" },
+      { name: "secondaryButtonText", label: "Secondary Button Text", type: "text" },
+      { name: "secondaryButtonLink", label: "Secondary Button Link", type: "text" },
+      { name: "breadcrumb", label: "Breadcrumb Label", type: "text" }
+    ]
+  },
+  corporate_gifting_process: {
+    name: "Corporate Gifting Process Steps",
+    icon: "Layers",
+    fields: [
+      { name: "sectionLabel", label: "Section Label", type: "text" },
+      { name: "sectionTitle", label: "Section Title", type: "text" },
+      { name: "sectionDescription", label: "Section Description", type: "textarea" },
+      { name: "steps", label: "Steps (leave empty for defaults)", type: "repeater", fields: [
+        { name: "title", label: "Step Title", type: "text" },
+        { name: "description", label: "Step Description", type: "textarea" },
+        { name: "image", label: "Step Image", type: "image" }
+      ]}
+    ]
+  },
+  corporate_gifting_form: {
+    name: "Corporate Gifting Inquiry Form",
+    icon: "Mail",
+    fields: [
+      { name: "eyebrow", label: "Small Label Above Title", type: "text" },
+      { name: "formTitle", label: "Form Title", type: "text" },
+      { name: "formSubtitle", label: "Form Subtitle", type: "textarea" },
+      { name: "companyTitle", label: "Step 1 Title (Company)", type: "text" },
+      { name: "packTitle", label: "Step 2 Title (Pack details)", type: "text" },
+      { name: "packItemsLabel", label: "Pack Items Question", type: "text" },
+      { name: "brandingTitle", label: "Step 3 Title (Branding)", type: "text" },
+      { name: "logoLabel", label: "Logo Upload Label", type: "text" },
+      { name: "referenceTitle", label: "Step 4 Title (Reference images)", type: "text" },
+      { name: "referenceDescription", label: "Reference Images Description", type: "textarea" },
+      { name: "notesTitle", label: "Step 5 Title (Notes)", type: "text" },
+      { name: "notesPlaceholder", label: "Notes Placeholder", type: "text" },
+      { name: "submitText", label: "Submit Button Text", type: "text" },
+      { name: "disclaimer", label: "Text Under Submit Button", type: "textarea" },
+      { name: "successTitle", label: "Success Title", type: "text" },
+      { name: "successMessage", label: "Success Message", type: "textarea" },
+      { name: "maxLogos", label: "Max Logo Files", type: "number", default: 3 },
+      { name: "maxReferenceImages", label: "Max Reference Images", type: "number", default: 10 },
+      { name: "packItems", label: "Pack Items (tiles customers pick from)", type: "repeater", fields: [
+        { name: "label", label: "Item Name", type: "text" },
+        { name: "icon", label: "Icon", type: "icon" }
+      ]},
+      { name: "occasions", label: "Occasion Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "quantities", label: "Number-of-Packs Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "budgets", label: "Budget Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "brandingStyles", label: "Branding Style Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "packagingOptions", label: "Packaging Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "leatherTypes", label: "Leather Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "countries", label: "Country Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "referenceTags", label: "Reference Image Hint Tags", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+    ]
+  },
+
   // ─── GALLERY SECTIONS ──────────────────────────────────────
   gallery_hero: {
     name: "Gallery Hero",

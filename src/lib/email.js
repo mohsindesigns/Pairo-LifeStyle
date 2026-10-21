@@ -1214,3 +1214,92 @@ export async function sendCouponAssignedEmail(email, discount) {
     label: `Customer-specific coupon assigned (${email})`,
   });
 }
+
+/**
+ * Confirmation to the company that submitted a Corporate Gifting quote request.
+ */
+export async function sendCorporateGiftingConfirmation(toEmail, contactName, inquiry) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pairolifestyle.com';
+
+  const rows = [
+    inquiry.company && fieldRow('Company', escapeHtml(inquiry.company)),
+    inquiry.occasion && fieldRow('Occasion', escapeHtml(inquiry.occasion)),
+    inquiry.quantity && fieldRow('Packs', escapeHtml(inquiry.quantity)),
+    inquiry.items?.length > 0 && fieldRow('Items', escapeHtml(inquiry.items.join(', '))),
+    inquiry.budget && fieldRow('Budget / pack', escapeHtml(inquiry.budget)),
+    inquiry.deliveryDate && fieldRow('Needed by', escapeHtml(inquiry.deliveryDate)),
+  ].filter(Boolean).join('');
+
+  const html = emailShell({
+    eyebrow: 'Corporate Gifting',
+    heading: `Thank You, ${escapeHtml(contactName)}!`,
+    subheading: `We've received your corporate gifting request. Our team will review it and send you a quote within <strong>24 hours</strong>.`,
+    bodyHtml: `
+      ${emailPanel(fieldTable(rows), { title: 'Your Request Summary' })}
+      <p style="margin:0 0 24px;color:${BRAND.muted};font-size:14px;line-height:1.7;">No payment is required at this stage.</p>
+      ${buttonBlock(`${storeUrl}/shop`, 'Explore Collection')}
+    `,
+    preheader: 'We’ve received your corporate gifting request.',
+  });
+
+  await dispatchEmail({
+    to: toEmail,
+    subject: `Your Corporate Gifting Request — We'll Be In Touch!`,
+    html,
+    from: getFromAddress(storeName),
+    label: 'Corporate gifting confirmation',
+    critical: true,
+  });
+}
+
+/**
+ * Notify admin of a new Corporate Gifting quote request.
+ */
+export async function sendCorporateGiftingAdminNotification(inquiry) {
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.STORE_EMAIL || 'support@pairolifestyle.com';
+  const storeUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pairolifestyle.com';
+
+  const contactRows = [
+    fieldRow('Company', escapeHtml(inquiry.company)),
+    fieldRow('Contact', escapeHtml(inquiry.contactName)),
+    fieldRow('Email', escapeHtml(inquiry.email)),
+    inquiry.phone && fieldRow('Phone', escapeHtml(inquiry.phone)),
+    inquiry.country && fieldRow('Location', `${inquiry.city ? escapeHtml(inquiry.city) + ', ' : ''}${escapeHtml(inquiry.country)}`),
+  ].filter(Boolean).join('');
+
+  const packRows = [
+    inquiry.occasion && fieldRow('Occasion', escapeHtml(inquiry.occasion)),
+    inquiry.quantity && fieldRow('Packs', escapeHtml(inquiry.quantity)),
+    inquiry.budget && fieldRow('Budget / pack', escapeHtml(inquiry.budget)),
+    inquiry.deliveryDate && fieldRow('Needed by', escapeHtml(inquiry.deliveryDate)),
+    inquiry.items?.length > 0 && fieldRow('Items', escapeHtml(inquiry.items.join(', '))),
+    inquiry.branding && fieldRow('Branding', escapeHtml(inquiry.branding)),
+    inquiry.packaging && fieldRow('Packaging', escapeHtml(inquiry.packaging)),
+    inquiry.leather && fieldRow('Leather', escapeHtml(inquiry.leather)),
+    inquiry.brandColors && fieldRow('Brand colors', escapeHtml(inquiry.brandColors)),
+    inquiry.greetingCard && fieldRow('Greeting card', 'Yes'),
+  ].filter(Boolean).join('');
+
+  const html = emailShell({
+    eyebrow: 'Admin Notification',
+    heading: 'New Corporate Gifting Request',
+    bodyHtml: `
+      ${emailPanel(fieldTable(contactRows), { title: 'Company' })}
+      ${emailPanel(fieldTable(packRows), { title: 'Pack Details' })}
+      ${inquiry.notes ? emailPanel(`<p style="margin:0;font-size:13px;color:${BRAND.ink};line-height:1.7;">${escapeHtml(inquiry.notes)}</p>`, { title: 'Notes' }) : ''}
+      <p style="margin:0 0 16px;font-size:13px;color:${BRAND.muted};"><strong>Uploads:</strong> ${inquiry.logos?.length || 0} logo file(s), ${inquiry.referenceImages?.length || 0} reference image(s)</p>
+      ${buttonBlock(`${storeUrl}/admin/corporate-gifting-inquiries`, 'View In Dashboard')}
+    `,
+    preheader: `New corporate gifting request from ${inquiry.company}.`,
+  });
+
+  await dispatchEmail({
+    to: adminEmail,
+    subject: `New Corporate Gifting Request — ${inquiry.company}`,
+    html,
+    from: getFromAddress('PAIRO System'),
+    label: 'Corporate gifting admin notification',
+    critical: true,
+  });
+}
