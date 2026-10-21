@@ -108,7 +108,7 @@ const ProductSchema = new mongoose.Schema({
   upsellProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
 
   // Meta
-  productType: { type: String, enum: ['simple', 'variable'], default: 'simple' },
+  productType: { type: String, enum: ['simple', 'variable', 'gifting'], default: 'simple' },
   isDeleted: { type: Boolean, default: false },
   rating: { type: Number, default: 0 },
   reviewCount: { type: Number, default: 0 },
@@ -155,6 +155,7 @@ const ProductSchema = new mongoose.Schema({
     minSelections: { type: Number, default: 3 },
     items: [{
       name: { type: String },
+      description: { type: String, default: '' },
       image: { type: String },
       priceDelta: { type: Number, default: 0 },
       active: { type: Boolean, default: true }

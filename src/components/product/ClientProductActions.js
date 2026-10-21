@@ -245,7 +245,10 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
     focusMissingAttributes(missing);
   };
 
-  if (product.corporateGifting?.enabled) {
+  // Gifting products get their own item-picker UI — never the variant picker or the jacket-only
+  // "Made to measure" / "Customize" buttons below. Keyed on the product type as well as the
+  // derived flag so a gifting product can't fall through to the jacket UI.
+  if (product.productType === "gifting" || product.corporateGifting?.enabled) {
     return <CorporateGiftingActions product={product} unitPrice={unitPrice} />;
   }
 

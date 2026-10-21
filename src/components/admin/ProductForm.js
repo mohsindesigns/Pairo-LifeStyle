@@ -24,7 +24,8 @@ import {
    Lock,
    Unlock,
    Loader2,
-   Ruler
+   Ruler,
+   Gift
 } from "lucide-react";
 
 const DEFAULT_SIZES_CM = [
@@ -149,6 +150,7 @@ export default function ProductForm({ productId = null }) {
       gender: "unisex",
       ageGroup: "adult",
       images: [],
+      corporateGifting: { minSelections: 3, items: [] },
       seo: {
          title: "",
          description: "",
@@ -214,6 +216,10 @@ export default function ProductForm({ productId = null }) {
                         ...prodData,
                         productType: prodData.productType || "simple",
                         images: Array.isArray(prodData.images) ? prodData.images : [],
+                        corporateGifting: {
+                           minSelections: prodData.corporateGifting?.minSelections || 3,
+                           items: Array.isArray(prodData.corporateGifting?.items) ? prodData.corporateGifting.items : [],
+                        },
                         categories: Array.isArray(prodData.categories) ? prodData.categories : [],
                         primaryCategory: prodData.primaryCategory || "",
                         sizeChartSource: prodData.sizeChartSource || "category_default",
@@ -331,12 +337,29 @@ export default function ProductForm({ productId = null }) {
           }));
        }
 
-      // corporateGifting is intentionally excluded below — this form has no UI for it and only
-      // round-trips whatever it fetched, so sending it back would silently overwrite config an
-      // admin just saved via the dedicated /admin/corporate-gifting editor in another tab.
-      const { corporateGifting: _omitCorporateGifting, ...formDataWithoutCorporateGifting } = formData;
+      // Gifting products carry their selectable items on corporateGifting; `enabled` is derived
+      // from the product type so the checkout/pricing/order pipeline (which keys off it) stays in
+      // sync without a separate toggle. Non-gifting products save it disabled with no items.
+      const isGifting = formData.productType === "gifting";
+      const corporateGifting = {
+         enabled: isGifting,
+         minSelections: isGifting ? Math.max(1, Number(formData.corporateGifting?.minSelections) || 3) : 3,
+         items: isGifting
+            ? (formData.corporateGifting?.items || [])
+               .filter((it) => String(it.name || "").trim())
+               .map(({ _localKey, ...it }) => ({
+                  ...(it._id ? { _id: it._id } : {}),
+                  name: String(it.name).trim(),
+                  description: String(it.description || "").trim(),
+                  image: it.image || "",
+                  priceDelta: Number(it.priceDelta) || 0,
+                  active: it.active !== false,
+               }))
+            : [],
+      };
       const normalizedData = {
-         ...formDataWithoutCorporateGifting,
+         ...formData,
+         corporateGifting,
          slug: finalSlug,
          slugManuallyEdited,
          variantCombinations: updatedCombinations,
@@ -672,10 +695,12 @@ export default function ProductForm({ productId = null }) {
                                        const val = e.target.value;
                                        setFormData({ ...formData, productType: val });
                                        if (val === "variable") setActiveTab("variants");
+                                       if (val === "gifting") setActiveTab("gifting");
                                     }}
                                  >
                                     <option value="simple">Simple product</option>
                                     <option value="variable">Variable product</option>
+                                    <option value="gifting">Gifting product</option>
                                  </select>
                                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                               </div>
@@ -688,6 +713,7 @@ export default function ProductForm({ productId = null }) {
                                  { id: "general", label: "General", icon: Zap },
                                  { id: "inventory", label: "Inventory", icon: Package },
                                  formData.productType === "variable" && { id: "variants", label: "Variants Engine", icon: Layers },
+                                 formData.productType === "gifting" && { id: "gifting", label: "Gifting Items", icon: Gift },
                                  { id: "stats", label: "Product Stats", icon: Activity },
                                  { id: "faqs", label: "FAQs", icon: HelpCircle },
                                  { id: "sizeguide", label: "Size Guide", icon: Ruler }
@@ -1031,6 +1057,116 @@ export default function ProductForm({ productId = null }) {
                                           </div>
                                        )}
                                     </div>
+                                 </div>
+                              )}
+
+                              {activeTab === "gifting" && (
+                                 <div className="space-y-4">
+                                    <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2">
+                                       <div>
+                                          <p className="text-[13px] font-bold text-gray-700">Gifting Items</p>
+                                          <p className="text-[11px] text-gray-500">Customers pick from these. Each selected item adds its price to the product price and asks for a logo upload.</p>
+                                       </div>
+                                       <button
+                                          type="button"
+                                          onClick={() => setFormData({
+                                             ...formData,
+                                             corporateGifting: {
+                                                ...(formData.corporateGifting || {}),
+                                                items: [...(formData.corporateGifting?.items || []), { name: "", description: "", image: "", priceDelta: "", active: true, _localKey: Date.now() + Math.random() }],
+                                             },
+                                          })}
+                                          className="text-[11px] font-bold border border-[#2271b1] text-[#2271b1] px-3 py-1.5 bg-white hover:bg-blue-50 rounded flex items-center gap-1"
+                                       >
+                                          <Plus className="w-3 h-3" /> Add Item
+                                       </button>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                       <label className="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Minimum items a customer must select</label>
+                                       <input
+                                          type="number"
+                                          min="1"
+                                          className="w-20 border border-gray-200 bg-gray-50/50 p-1.5 text-[13px] outline-none rounded-sm focus:border-[#2271b1]"
+                                          value={formData.corporateGifting?.minSelections ?? 3}
+                                          onChange={(e) => setFormData({ ...formData, corporateGifting: { ...(formData.corporateGifting || {}), minSelections: e.target.value } })}
+                                       />
+                                    </div>
+
+                                    {(formData.corporateGifting?.items || []).length === 0 ? (
+                                       <p className="text-[12px] text-gray-400 italic py-6 text-center border border-dashed border-gray-200 rounded">No items yet — add at least {Number(formData.corporateGifting?.minSelections) || 3} so customers can meet the minimum.</p>
+                                    ) : (
+                                       <div className="space-y-2">
+                                          {(formData.corporateGifting?.items || []).length < (Number(formData.corporateGifting?.minSelections) || 3) && (
+                                             <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 font-semibold">Only {(formData.corporateGifting?.items || []).length} item(s) but the minimum is {Number(formData.corporateGifting?.minSelections) || 3} — customers won't be able to order until there are enough items.</p>
+                                          )}
+                                          {(formData.corporateGifting?.items || []).map((item, idx) => {
+                                             const updateItem = (patch) => setFormData({
+                                                ...formData,
+                                                corporateGifting: {
+                                                   ...(formData.corporateGifting || {}),
+                                                   items: (formData.corporateGifting?.items || []).map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+                                                },
+                                             });
+                                             return (
+                                                <div key={item._id || item._localKey || idx} className="border border-gray-200 rounded p-3 bg-white flex flex-col sm:flex-row gap-3">
+                                                   <div className="shrink-0 flex sm:flex-col items-center gap-2">
+                                                      <div className="w-16 h-16 rounded border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+                                                         {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5 text-gray-300" />}
+                                                      </div>
+                                                      <InlinePick value={item.image} onChange={(url) => updateItem({ image: url })} label="+ Picture" doneLabel="✓ Change" title="Pick item picture" />
+                                                   </div>
+                                                   <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+                                                      <input
+                                                         placeholder="Item name (e.g. Belt)"
+                                                         className="border border-gray-200 bg-gray-50/50 p-2 text-[13px] outline-none rounded-sm focus:border-[#2271b1]"
+                                                         value={item.name || ""}
+                                                         onChange={(e) => updateItem({ name: e.target.value })}
+                                                      />
+                                                      <div className="flex items-center border border-gray-200 bg-gray-50/50 rounded-sm focus-within:border-[#2271b1]">
+                                                         <span className="pl-2 text-[12px] text-gray-500 font-semibold">+ $</span>
+                                                         <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            placeholder="Price increase"
+                                                            className="w-full bg-transparent p-2 text-[13px] outline-none"
+                                                            value={item.priceDelta ?? ""}
+                                                            onChange={(e) => updateItem({ priceDelta: e.target.value })}
+                                                         />
+                                                      </div>
+                                                      <input
+                                                         placeholder="Short description shown to the customer"
+                                                         className="sm:col-span-2 border border-gray-200 bg-gray-50/50 p-2 text-[13px] outline-none rounded-sm focus:border-[#2271b1]"
+                                                         value={item.description || ""}
+                                                         onChange={(e) => updateItem({ description: e.target.value })}
+                                                      />
+                                                   </div>
+                                                   <div className="shrink-0 flex sm:flex-col items-center justify-between gap-2">
+                                                      <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-600 cursor-pointer select-none">
+                                                         <input type="checkbox" checked={item.active !== false} onChange={(e) => updateItem({ active: e.target.checked })} />
+                                                         Active
+                                                      </label>
+                                                      <button
+                                                         type="button"
+                                                         onClick={() => setFormData({
+                                                            ...formData,
+                                                            corporateGifting: {
+                                                               ...(formData.corporateGifting || {}),
+                                                               items: (formData.corporateGifting?.items || []).filter((_, i) => i !== idx),
+                                                            },
+                                                         })}
+                                                         className="text-gray-400 hover:text-red-600 transition-colors"
+                                                         aria-label="Remove item"
+                                                      >
+                                                         <X className="w-4 h-4" />
+                                                      </button>
+                                                   </div>
+                                                </div>
+                                             );
+                                          })}
+                                       </div>
+                                    )}
                                  </div>
                               )}
 

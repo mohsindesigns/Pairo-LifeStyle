@@ -276,9 +276,10 @@ export default function AdminProducts() {
               value={selectedType} 
               onChange={(e) => setSelectedType(e.target.value)}
             >
-              <option>All types</option>
-              <option>Simple product</option>
-              <option>Variable product</option>
+              <option value="All types">All types</option>
+              <option value="simple">Simple product</option>
+              <option value="variable">Variable product</option>
+              <option value="gifting">Gifting product</option>
             </select>
 
             <button 

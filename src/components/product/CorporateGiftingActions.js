@@ -74,11 +74,16 @@ function GiftItemCard({ item, selected, onToggle, artwork, onArtworkChange }) {
             {selected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
           </span>
         </div>
-        <div className="px-3 py-2.5 flex items-center justify-between gap-2">
-          <span className="text-[13px] md:text-[14px] font-bold text-primary truncate">{item.name}</span>
-          <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-primary/70 bg-primary/10 rounded-full px-2 py-0.5">
-            +${Number(item.priceDelta || 0).toFixed(2)}
-          </span>
+        <div className="px-3 py-2.5 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[13px] md:text-[14px] font-bold text-primary truncate">{item.name}</span>
+            <span className="shrink-0 text-[11px] font-bold uppercase tracking-wide text-primary/70 bg-primary/10 rounded-full px-2 py-0.5">
+              +${Number(item.priceDelta || 0).toFixed(2)}
+            </span>
+          </div>
+          {item.description && (
+            <p className="text-[11px] md:text-[12px] text-primary/60 leading-snug line-clamp-2">{item.description}</p>
+          )}
         </div>
       </button>
 

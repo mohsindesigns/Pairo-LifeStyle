@@ -4,7 +4,17 @@
 // time, where the resolved snapshot is actually persisted). Keeping this logic in one place means
 // the two call sites can never drift into a "charge approved here, rejected there" split-brain.
 export function validateCorporateGiftingSelections(item, product) {
-  if (!item?.corporateGifting?.enabled) return { valid: true, data: null };
+  if (!item?.corporateGifting?.enabled) {
+    // A gifting product can't be bought bare (e.g. via a quick-add or a forged request) —
+    // that would skip the minimum-selection rule and the surcharge entirely.
+    if (product?.corporateGifting?.enabled) {
+      return {
+        valid: false,
+        error: `Please choose your items for "${product.name}" on its product page before checkout.`,
+      };
+    }
+    return { valid: true, data: null };
+  }
 
   if (!product?.corporateGifting?.enabled) {
     return {
