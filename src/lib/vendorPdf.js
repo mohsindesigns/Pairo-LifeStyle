@@ -344,8 +344,43 @@ function drawChartTable(doc, F, columns, rows, highlightCol, topPx, maxHeightPx)
   return topPx + tableH;
 }
 
+/** Word-wraps `text` between x0Px and x1Px starting at firstBaselinePx; ends with "…" if it runs past bottomPx. */
+function drawParagraph(doc, font, size, text, x0Px, x1Px, firstBaselinePx, bottomPx) {
+  doc.font(font).fontSize(size);
+  const maxW = p(x1Px - x0Px);
+  const lines = [];
+  let line = "";
+  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+    const next = line ? line + " " + word : word;
+    if (line && doc.widthOfString(next) > maxW) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+
+  const pitch = 33;
+  const maxLines = Math.max(1, Math.floor((bottomPx - firstBaselinePx) / pitch) + 1);
+  const shown = lines.slice(0, maxLines);
+  if (lines.length > maxLines) {
+    let last = shown[maxLines - 1];
+    while (last.length > 1 && doc.widthOfString(last + "…") > maxW) last = last.slice(0, -1).trimEnd();
+    shown[maxLines - 1] = last + "…";
+  }
+  shown.forEach((l, i) => drawText(doc, font, size, l, x0Px, firstBaselinePx + i * pitch, INK));
+}
+
 /** "Product Specification:" heading plus its bullet list, flowing down from `topPx`. */
-function drawSpecification(doc, F, SZ, bullets, headingBaselinePx) {
+function drawSpecification(doc, F, SZ, bullets, headingBaselinePx, description = "") {
+  // No specification list: show the product's short description instead of leaving the space empty.
+  if (!bullets.length && description) {
+    drawText(doc, F.bold, SZ.spec, "Product Description:", COL_X, headingBaselinePx, INK);
+    drawParagraph(doc, F.regular, SZ.bullet, description, 713, 1255, headingBaselinePx + 36, COL_BOTTOM);
+    return;
+  }
+
   drawText(doc, F.bold, SZ.spec, "Product Specification:", COL_X, headingBaselinePx, INK);
 
   if (!bullets.length) {
@@ -436,7 +471,7 @@ export function buildVendorPdf({ order, lines }) {
       return;
     }
 
-    const { item, imageBuf, artworkBufs, chart, specs } = line;
+    const { item, imageBuf, artworkBufs, chart, specs, description } = line;
     const name = String(item.name || "Item");
     const subtitle = shrinkToFit(doc, F.regular, SZ.subtitle, name, 1000);
     drawText(doc, F.regular, subtitle, name, MOCK_W / 2, 141, INK, "center");
@@ -473,7 +508,8 @@ export function buildVendorPdf({ order, lines }) {
 
     // A tall chart (e.g. 10 measurements) gets more room, paid for by tightening the bullet
     // spacing: budget = column height minus what the specification list needs at ~27px pitch.
-    const specNeeds = 52 + 32 + Math.max(bullets.length - 1, 0) * 27 + 15;
+    const descLines = !bullets.length && description ? Math.min(4, Math.ceil(stripHtml(description).length / 55)) : 0;
+    const specNeeds = 52 + 32 + Math.max(bullets.length - 1, descLines - 1, 0) * 27 + 15;
     const chartMaxHeight = Math.max(215, Math.min(320, COL_BOTTOM - 240 - specNeeds - 12));
 
     let bottom = 255;
@@ -504,7 +540,7 @@ export function buildVendorPdf({ order, lines }) {
       }
     }
 
-    drawSpecification(doc, F, SZ, bullets, bottom + 52);
+    drawSpecification(doc, F, SZ, bullets, bottom + 52, stripHtml(description));
   });
 
   return new Promise((resolve, reject) => {

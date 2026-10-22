@@ -90,6 +90,8 @@ export async function GET(req, { params }) {
           artworkBufs,
           chart: sized && product ? buildChartForProduct(product) : null,
           specs: product?.specifications || [],
+          // Shown in place of the (empty) specification list; falls back to the long description.
+          description: product?.shortDescription || product?.description || "",
         };
       })
     );
