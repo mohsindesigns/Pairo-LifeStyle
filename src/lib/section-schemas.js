@@ -439,6 +439,7 @@ export const SECTION_SCHEMAS = {
       { name: "disclaimer", label: "Text Under Submit Button", type: "textarea" },
       { name: "successTitle", label: "Success Title", type: "text" },
       { name: "successMessage", label: "Success Message", type: "textarea" },
+      { name: "minQuantity", label: "Minimum Number of Packs", type: "number", default: 10 },
       { name: "maxLogos", label: "Max Logo Files", type: "number", default: 3 },
       { name: "maxReferenceImages", label: "Max Reference Images", type: "number", default: 10 },
       { name: "packItems", label: "Pack Items (tiles customers pick from)", type: "repeater", fields: [
@@ -446,9 +447,6 @@ export const SECTION_SCHEMAS = {
         { name: "icon", label: "Icon", type: "icon" }
       ]},
       { name: "occasions", label: "Occasion Options", type: "repeater", fields: [
-        { name: "label", label: "Option", type: "text" }
-      ]},
-      { name: "quantities", label: "Number-of-Packs Options", type: "repeater", fields: [
         { name: "label", label: "Option", type: "text" }
       ]},
       { name: "budgets", label: "Budget Options", type: "repeater", fields: [

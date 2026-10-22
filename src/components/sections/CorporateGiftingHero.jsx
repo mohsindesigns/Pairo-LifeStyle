@@ -5,19 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, ChevronRight } from "lucide-react";
+import { withSectionDefaults } from "@/lib/section-defaults";
 
-export default function CorporateGiftingHero({
-  label = "CORPORATE COLLECTION • MADE TO ORDER",
-  title = "CUSTOMIZE CORPORATE GIFTING",
-  subtitle = "Handcrafted leather gift packs for your team and clients, finished with your logo and wrapped to impress.",
-  image = "",
-  primaryButtonText = "Build your pack",
-  primaryButtonLink = "#gifting-inquiry",
-  secondaryButtonText = "See how it works",
-  secondaryButtonLink = "#gifting-process",
-  breadcrumb = "Corporate Gifting",
-  headingLevel = "h1",
-}) {
+export default function CorporateGiftingHero(props) {
+  const {
+    label, title, subtitle, image,
+    primaryButtonText, primaryButtonLink, secondaryButtonText, secondaryButtonLink,
+    breadcrumb, headingLevel = "h1",
+  } = withSectionDefaults("corporate_gifting_hero", props);
   const Heading = headingLevel;
 
   return (
@@ -44,7 +39,7 @@ export default function CorporateGiftingHero({
               </motion.div>
             )}
             {breadcrumb && (
-              <nav className="hidden md:flex items-center gap-1.5 text-white/60 text-[12px]" aria-label="Breadcrumb">
+              <nav className="hidden md:flex items-center gap-1.5 text-white/80 text-[12px]" aria-label="Breadcrumb">
                 <Link href="/" className="hover:text-white transition-colors">Home</Link>
                 <ChevronRight className="w-3.5 h-3.5" />
                 <span className="text-white font-medium">{breadcrumb}</span>
@@ -61,7 +56,7 @@ export default function CorporateGiftingHero({
             <Heading className="font-heading text-white text-4xl md:text-5xl lg:text-6xl font-black leading-[1.05] tracking-tight mb-5">
               {title}
             </Heading>
-            <p className="text-white/80 text-base md:text-lg leading-relaxed mb-8 max-w-lg">{subtitle}</p>
+            <p className="text-white/90 text-base md:text-lg leading-relaxed mb-8 max-w-lg">{subtitle}</p>
             <div className="flex flex-wrap gap-3">
               {primaryButtonText && (
                 <a
@@ -85,7 +80,7 @@ export default function CorporateGiftingHero({
 
           <div className="flex items-center gap-4">
             <div className="h-px flex-1 bg-white/20" />
-            <span className="text-white/40 text-[10px] uppercase tracking-[4px] font-medium">Pairo Corporate</span>
+            <span className="text-white/60 text-[10px] uppercase tracking-[4px] font-medium">Pairo Corporate</span>
             <div className="h-px flex-1 bg-white/20" />
           </div>
         </div>

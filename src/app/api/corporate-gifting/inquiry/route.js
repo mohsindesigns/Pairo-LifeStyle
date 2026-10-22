@@ -49,7 +49,9 @@ export async function POST(req) {
     }
     if (!phone) return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
     if (!occasion) return NextResponse.json({ error: "Occasion is required" }, { status: 400 });
-    if (!quantity) return NextResponse.json({ error: "Number of packs is required" }, { status: 400 });
+    if (!/^\d{1,6}$/.test(quantity) || Number(quantity) < 1) {
+      return NextResponse.json({ error: "Enter a valid number of packs" }, { status: 400 });
+    }
     if (items.length === 0) return NextResponse.json({ error: "Select at least one item for the pack" }, { status: 400 });
 
     await dbConnect();

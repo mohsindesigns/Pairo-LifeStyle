@@ -3,25 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-
-const DEFAULT_STEPS = [
-  {
-    title: "Share your requirements",
-    description: "Tell us the occasion, how many packs you need, your budget, and your deadline. One short form is all it takes.",
-  },
-  {
-    title: "Pick your items",
-    description: "Mix and match wallets, card holders, keychains, laptop sleeves, or jackets. We'll suggest combinations that fit your budget.",
-  },
-  {
-    title: "Approve your branded sample",
-    description: "You get a digital mockup with your logo on every item, plus a physical sample on request. Production starts only after your approval.",
-  },
-  {
-    title: "Crafted, packed, and delivered",
-    description: "Each piece is handcrafted, quality checked, and packed in premium gift boxes, then shipped to one office or many.",
-  },
-];
+import { withSectionDefaults } from "@/lib/section-defaults";
 
 function Step({ step, index }) {
   const isEven = index % 2 === 0;
@@ -62,7 +44,7 @@ function Step({ step, index }) {
         <h3 className="font-heading text-3xl md:text-4xl font-black text-foreground leading-tight tracking-tight">
           {step.title}
         </h3>
-        <p className="text-foreground/65 text-base md:text-lg leading-relaxed">{step.description}</p>
+        <p className="text-foreground/80 text-base md:text-lg leading-relaxed">{step.description}</p>
         <div className="flex items-center gap-3 pt-2">
           <div className="w-8 h-0.5 bg-primary" />
           <div className="w-3 h-0.5 bg-primary/40" />
@@ -72,15 +54,11 @@ function Step({ step, index }) {
   );
 }
 
-export default function CorporateGiftingProcess({
-  sectionLabel = "THE PROCESS",
-  sectionTitle = "FROM IDEA TO GIFT BOX IN FOUR STEPS",
-  sectionDescription = "",
-  steps = [],
-  headingLevel = "h2",
-}) {
+export default function CorporateGiftingProcess(props) {
+  const { sectionLabel, sectionTitle, sectionDescription, steps, headingLevel = "h2" } =
+    withSectionDefaults("corporate_gifting_process", props);
   const Heading = headingLevel;
-  const list = Array.isArray(steps) && steps.length > 0 ? steps : DEFAULT_STEPS;
+  const list = Array.isArray(steps) ? steps : [];
 
   return (
     <section id="gifting-process" className="container mx-auto px-4 md:px-8 py-10 md:py-16 scroll-mt-24">
@@ -92,7 +70,7 @@ export default function CorporateGiftingProcess({
         className="text-center mb-16 md:mb-20"
       >
         {sectionLabel && (
-          <span className="inline-block text-[11px] font-bold uppercase tracking-[4px] text-primary/60 mb-4">
+          <span className="inline-block text-[11px] font-bold uppercase tracking-[4px] text-primary/80 mb-4">
             {sectionLabel}
           </span>
         )}
@@ -100,7 +78,7 @@ export default function CorporateGiftingProcess({
           {sectionTitle}
         </Heading>
         {sectionDescription && (
-          <p className="text-foreground/60 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">{sectionDescription}</p>
+          <p className="text-foreground/80 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">{sectionDescription}</p>
         )}
       </motion.div>
 

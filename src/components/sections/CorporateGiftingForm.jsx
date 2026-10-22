@@ -6,47 +6,23 @@ import { toast } from "react-hot-toast";
 import * as LucideIcons from "lucide-react";
 import { Upload, X, Check, AlertCircle, ArrowRight, Loader2, FileText, Gift } from "lucide-react";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
-
-/* ───────── Defaults (every list is editable from the page builder) ───────── */
-const D = {
-  occasions: ["Employee appreciation", "Client gifts", "Eid / festive", "Christmas / new year", "New joiner kit", "Event / conference", "Other"],
-  quantities: ["10 to 25", "26 to 50", "51 to 100", "101 to 250", "250+"],
-  budgets: ["Under $50", "$50 to $100", "$100 to $200", "$200+", "Flexible"],
-  brandings: ["Logo embossing", "Logo debossing", "Laser engraving", "Individual name engraving", "No branding"],
-  packagings: ["Premium rigid gift box", "Branded box with your logo", "Eco kraft box", "Wooden box"],
-  leathers: ["Full-grain cowhide", "Top-grain lambskin", "Genuine suede", "Nappa leather", "Vegan leather"],
-  countries: ["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "UAE", "Saudi Arabia", "Pakistan", "India", "Other"],
-  packItems: [
-    { label: "Leather jacket", icon: "Shirt" },
-    { label: "Wallet", icon: "Wallet" },
-    { label: "Card holder", icon: "CreditCard" },
-    { label: "Keychain", icon: "Key" },
-    { label: "Laptop sleeve", icon: "Briefcase" },
-    { label: "Journal cover", icon: "Notebook" },
-    { label: "Belt", icon: "Minus" },
-    { label: "Something else", icon: "Plus" },
-  ],
-  referenceTags: ["Gift box style", "Item design", "Color and finish", "Logo placement", "Inspiration"],
-};
+import { withSectionDefaults } from "@/lib/section-defaults";
 
 // Builder repeaters store [{ label }]; accept plain strings too.
-const toList = (value, fallback) => {
-  if (!Array.isArray(value) || value.length === 0) return fallback;
-  const out = value.map((v) => (typeof v === "string" ? v : v?.label)).filter(Boolean);
-  return out.length ? out : fallback;
-};
+const toList = (value) =>
+  (Array.isArray(value) ? value : []).map((v) => (typeof v === "string" ? v : v?.label)).filter(Boolean);
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const LOGO_EXT = ["png", "svg", "ai", "pdf", "jpg", "jpeg", "eps", "webp"];
 const IMAGE_EXT = ["jpg", "jpeg", "png", "webp"];
 
 const inputClass =
-  "w-full bg-white border border-border rounded-lg px-4 py-3 text-[14px] text-foreground placeholder:text-foreground/30 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200";
+  "w-full bg-white border border-border rounded-lg px-4 py-3 text-[14px] text-foreground placeholder:text-foreground/50 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200";
 const selectClass = `${inputClass} cursor-pointer`;
 
 const Field = ({ label, required, error, children }) => (
   <div className="space-y-1.5">
-    <label className="block text-[12px] font-bold uppercase tracking-wider text-foreground/50">
+    <label className="block text-[12px] font-bold uppercase tracking-wider text-foreground/70">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     {children}
@@ -62,7 +38,7 @@ const CardTitle = ({ n, children, hint }) => (
   <h3 className="font-heading text-lg font-black text-foreground mb-6 flex items-center gap-3">
     <span className="w-7 h-7 rounded-full bg-primary text-white text-[12px] font-bold flex items-center justify-center shrink-0">{n}</span>
     {children}
-    {hint && <span className="text-[12px] font-normal text-foreground/40">{hint}</span>}
+    {hint && <span className="text-[12px] font-normal text-foreground/60">{hint}</span>}
   </h3>
 );
 
@@ -128,7 +104,7 @@ function UploadZone({ files, setFiles, max, extensions, accept, icon: Icon, prom
               <Icon className="w-5 h-5 text-primary" />
             </div>
             <p className="font-bold text-foreground text-sm">{prompt}</p>
-            <p className="text-foreground/40 text-xs">{help}</p>
+            <p className="text-foreground/60 text-xs">{help}</p>
           </div>
         )}
       </div>
@@ -142,7 +118,7 @@ function UploadZone({ files, setFiles, max, extensions, accept, icon: Icon, prom
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
                   <FileText className="w-6 h-6 text-primary" />
-                  <span className="text-[10px] text-foreground/50 mt-1 break-all line-clamp-2">{f.name}</span>
+                  <span className="text-[10px] text-foreground/70 mt-1 break-all line-clamp-2">{f.name}</span>
                 </div>
               )}
               <button
@@ -162,41 +138,23 @@ function UploadZone({ files, setFiles, max, extensions, accept, icon: Icon, prom
 }
 
 export default function CorporateGiftingForm(props) {
+  const cfg = withSectionDefaults("corporate_gifting_form", props);
   const {
-    eyebrow = "BULK INQUIRY",
-    formTitle = "BUILD YOUR GIFT PACK",
-    formSubtitle = "Complete the form below and our corporate team will send you a quote within 24 hours.",
-    companyTitle = "Company information",
-    packTitle = "Pack details",
-    packItemsLabel = "What goes in the pack?",
-    brandingTitle = "Branding and packaging",
-    logoLabel = "Company logo",
-    notesTitle = "Additional notes",
-    notesPlaceholder = "Separate packs for management and staff, or ship to 3 office locations",
-    referenceTitle = "Design reference images",
-    referenceDescription = "Show us the look you have in mind: gift box styles, item designs, colors, or packs you've seen elsewhere.",
-    submitText = "Request a quote",
-    disclaimer = "By submitting, you agree that we may contact you regarding your inquiry. No payment is required at this stage.",
-    successTitle = "Inquiry Received!",
-    successMessage = "Thank you for your interest in Pairo corporate gifting. Our team will review your request and contact you within 24 hours with a quote.",
-    maxLogos = 3,
-    maxReferenceImages = 10,
-    headingLevel = "h2",
-  } = props;
+    eyebrow, formTitle, formSubtitle, companyTitle, packTitle, packItemsLabel, brandingTitle, logoLabel,
+    notesTitle, notesPlaceholder, referenceTitle, referenceDescription, submitText, disclaimer,
+    successTitle, successMessage, maxLogos, maxReferenceImages, headingLevel = "h2",
+  } = cfg;
   const Heading = headingLevel;
+  const minQuantity = Math.max(1, Math.floor(Number(cfg.minQuantity)) || 10);
 
-  const occasions = toList(props.occasions, D.occasions);
-  const quantities = toList(props.quantities, D.quantities);
-  const budgets = toList(props.budgets, D.budgets);
-  const brandings = toList(props.brandingStyles, D.brandings);
-  const packagings = toList(props.packagingOptions, D.packagings);
-  const leathers = toList(props.leatherTypes, D.leathers);
-  const countries = toList(props.countries, D.countries);
-  const referenceTags = toList(props.referenceTags, D.referenceTags);
-  const packItems =
-    Array.isArray(props.packItems) && props.packItems.filter((i) => i?.label).length > 0
-      ? props.packItems.filter((i) => i?.label)
-      : D.packItems;
+  const occasions = toList(cfg.occasions);
+  const budgets = toList(cfg.budgets);
+  const brandings = toList(cfg.brandingStyles);
+  const packagings = toList(cfg.packagingOptions);
+  const leathers = toList(cfg.leatherTypes);
+  const countries = toList(cfg.countries);
+  const referenceTags = toList(cfg.referenceTags);
+  const packItems = (Array.isArray(cfg.packItems) ? cfg.packItems : []).filter((i) => i?.label);
 
   const initial = {
     company: "", contactName: "", email: "", phone: "", country: "", city: "",
@@ -220,6 +178,15 @@ export default function CorporateGiftingForm(props) {
     if (errors[name]) setErrors((p) => ({ ...p, [name]: undefined }));
   };
 
+  const changeQuantity = (e) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
+    setForm((p) => ({ ...p, quantity: digits }));
+    if (errors.quantity) setErrors((p) => ({ ...p, quantity: undefined }));
+  };
+  const blurQuantity = () => {
+    setForm((p) => (p.quantity !== "" && Number(p.quantity) < minQuantity ? { ...p, quantity: String(minQuantity) } : p));
+  };
+
   const toggleItem = (label) => {
     setItems((prev) => (prev.includes(label) ? prev.filter((i) => i !== label) : [...prev, label]));
     if (errors.items) setErrors((p) => ({ ...p, items: undefined }));
@@ -232,7 +199,8 @@ export default function CorporateGiftingForm(props) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter a valid work email";
     if (!/^[+\d\s\-()]{7,20}$/.test(form.phone)) e.phone = "Enter a valid phone number";
     if (!form.occasion) e.occasion = "Select an occasion";
-    if (!form.quantity) e.quantity = "Select the number of packs";
+    if (!form.quantity) e.quantity = "Enter the number of packs";
+    else if (Number(form.quantity) < minQuantity) e.quantity = `Minimum order is ${minQuantity} packs`;
     if (items.length === 0) e.items = "Select at least one item for the pack";
     if (form.notes.length > 2000) e.notes = "Notes must be under 2000 characters";
     return e;
@@ -289,8 +257,8 @@ export default function CorporateGiftingForm(props) {
             <Check className="w-10 h-10 text-white" />
           </div>
           <h3 className="font-heading text-3xl font-black text-foreground mb-4">{successTitle}</h3>
-          <p className="text-foreground/60 text-base leading-relaxed mb-6">{successMessage}</p>
-          <p className="text-[12px] text-foreground/40 uppercase tracking-widest">Check your inbox for a confirmation email</p>
+          <p className="text-foreground/80 text-base leading-relaxed mb-6">{successMessage}</p>
+          <p className="text-[12px] text-foreground/60 uppercase tracking-widest">Check your inbox for a confirmation email</p>
         </motion.div>
       </section>
     );
@@ -309,10 +277,10 @@ export default function CorporateGiftingForm(props) {
           className="text-center mb-14"
         >
           {eyebrow && (
-            <span className="inline-block text-[11px] font-bold uppercase tracking-[4px] text-primary/60 mb-4">{eyebrow}</span>
+            <span className="inline-block text-[11px] font-bold uppercase tracking-[4px] text-primary/80 mb-4">{eyebrow}</span>
           )}
           <Heading className="font-heading text-4xl md:text-5xl font-black text-foreground tracking-tight mb-4">{formTitle}</Heading>
-          <p className="text-foreground/60 max-w-xl mx-auto text-base leading-relaxed">{formSubtitle}</p>
+          <p className="text-foreground/80 max-w-xl mx-auto text-base leading-relaxed">{formSubtitle}</p>
         </motion.div>
 
         <form onSubmit={submit} noValidate className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
@@ -355,10 +323,17 @@ export default function CorporateGiftingForm(props) {
                   </select>
                 </Field>
                 <Field label="Number of packs" required error={errors.quantity}>
-                  <select name="quantity" value={form.quantity} onChange={change} className={selectClass}>
-                    <option value="">Select quantity...</option>
-                    {quantities.map((q) => <option key={q} value={q}>{q}</option>)}
-                  </select>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    name="quantity"
+                    value={form.quantity}
+                    onChange={changeQuantity}
+                    onBlur={blurQuantity}
+                    placeholder={`Minimum ${minQuantity}`}
+                    className={inputClass}
+                  />
                 </Field>
                 <Field label="Budget per pack">
                   <select name="budget" value={form.budget} onChange={change} className={selectClass}>
@@ -373,7 +348,7 @@ export default function CorporateGiftingForm(props) {
 
               <div className="mt-7">
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[12px] font-bold uppercase tracking-wider text-foreground/50">
+                  <p className="text-[12px] font-bold uppercase tracking-wider text-foreground/70">
                     {packItemsLabel} <span className="text-red-500">*</span>
                   </p>
                   <span className="text-[12px] font-semibold text-primary">{items.length} selected</span>
@@ -389,7 +364,7 @@ export default function CorporateGiftingForm(props) {
                         onClick={() => toggleItem(it.label)}
                         aria-pressed={on}
                         className={`flex flex-col items-center gap-1.5 px-2 py-4 rounded-xl border-2 text-center text-[12px] font-semibold transition-all ${
-                          on ? "border-primary bg-primary/5 text-primary" : "border-border text-foreground/70 hover:border-primary/40"
+                          on ? "border-primary bg-primary/5 text-primary" : "border-border text-foreground/85 hover:border-primary/40"
                         }`}
                       >
                         <Icon className="w-5 h-5" />
@@ -445,7 +420,7 @@ export default function CorporateGiftingForm(props) {
                 Include a personalized greeting card in each pack
               </label>
 
-              <p className="text-[12px] font-bold uppercase tracking-wider text-foreground/50 mt-7 mb-3">{logoLabel}</p>
+              <p className="text-[12px] font-bold uppercase tracking-wider text-foreground/70 mt-7 mb-3">{logoLabel}</p>
               <UploadZone
                 files={logos}
                 setFiles={setLogos}
@@ -461,11 +436,11 @@ export default function CorporateGiftingForm(props) {
 
             <div className={`${card} flex flex-col flex-1`}>
               <CardTitle n="4" hint="(optional)">{referenceTitle}</CardTitle>
-              <p className="text-foreground/50 text-[13px] -mt-3 mb-4 leading-relaxed">{referenceDescription}</p>
+              <p className="text-foreground/70 text-[13px] -mt-3 mb-4 leading-relaxed">{referenceDescription}</p>
               {referenceTags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-4">
                   {referenceTags.map((t) => (
-                    <span key={t} className="text-[11px] px-3 py-1 rounded-full border border-border text-foreground/50">{t}</span>
+                    <span key={t} className="text-[11px] px-3 py-1 rounded-full border border-border text-foreground/70">{t}</span>
                   ))}
                 </div>
               )}
@@ -499,7 +474,7 @@ export default function CorporateGiftingForm(props) {
                   className={`${inputClass} resize-none`}
                 />
               </Field>
-              <p className="text-[11px] text-foreground/30 mt-1.5 text-right">{form.notes.length}/2000</p>
+              <p className="text-[11px] text-foreground/50 mt-1.5 text-right">{form.notes.length}/2000</p>
               </div>
               <div>
                 <TurnstileWidget
@@ -518,7 +493,7 @@ export default function CorporateGiftingForm(props) {
                     <>{submitText}<ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
                   )}
                 </button>
-                {disclaimer && <p className="text-[11px] text-foreground/45 mt-3 leading-relaxed">{disclaimer}</p>}
+                {disclaimer && <p className="text-[11px] text-foreground/65 mt-3 leading-relaxed">{disclaimer}</p>}
               </div>
             </div>
           </div>

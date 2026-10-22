@@ -51,7 +51,7 @@ function ProcessStep({ item, index }) {
         <h3 className="font-heading text-3xl md:text-4xl font-black text-foreground leading-tight tracking-tight">
           {headingText}
         </h3>
-        <p className="text-foreground/65 text-base md:text-lg leading-relaxed">
+        <p className="text-foreground/80 text-base md:text-lg leading-relaxed">
           {item.description || ""}
         </p>
 
@@ -65,12 +65,15 @@ function ProcessStep({ item, index }) {
   );
 }
 
+// Stable reference: a fresh [] default on every render would re-trigger the effect below forever.
+const NO_STEPS = [];
+
 export default function CustomJacketProcess({
   sectionTitle = "HOW IT WORKS",
   sectionLabel = "THE PROCESS",
   sectionDescription = "We've streamlined the bespoke jacket experience into four elegant steps — from your first idea to your finished masterpiece.",
   headingLevel = "h2",
-  customSteps = []
+  customSteps = NO_STEPS
 }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -131,13 +134,13 @@ export default function CustomJacketProcess({
         transition={{ duration: 0.6 }}
         className="text-center mb-16 md:mb-20"
       >
-        <span className="inline-block text-[11px] font-bold uppercase tracking-[4px] text-primary/60 mb-4">
+        <span className="inline-block text-[11px] font-bold uppercase tracking-[4px] text-primary/80 mb-4">
           {sectionLabel}
         </span>
         <Heading className="font-heading text-4xl md:text-5xl font-black text-foreground tracking-tight mb-5">
           {sectionTitle}
         </Heading>
-        <p className="text-foreground/60 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+        <p className="text-foreground/80 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
           {sectionDescription}
         </p>
       </motion.div>

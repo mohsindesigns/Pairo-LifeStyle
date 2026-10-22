@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { SECTION_SCHEMAS } from "@/lib/section-schemas";
+import { hydratePageDefaults } from "@/lib/section-defaults";
 import { TEMPLATE_REGISTRY } from "@/lib/templates";
 import Link from "next/link";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
@@ -211,7 +212,9 @@ const SortableSection = ({
 };
 
 export default function PageBuilder({ initialPage }) {
-  const [page, setPage] = useState(initialPage);
+  // Fill fields the page never stored with the section's built-in content so the admin can see and edit it.
+  const [hydratedInitial] = useState(() => hydratePageDefaults(initialPage));
+  const [page, setPage] = useState(hydratedInitial);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(new Date());
   const [activeTab, setActiveTab] = useState("content");
@@ -221,7 +224,7 @@ export default function PageBuilder({ initialPage }) {
   const [dynamicOptions, setDynamicOptions] = useState({ categories: [], products: [], blogs: [] });
   
   // PRODUCTION TRACKING: Avoid redundant autosaves
-  const lastSavedRef = useRef(JSON.stringify(initialPage));
+  const lastSavedRef = useRef(JSON.stringify(hydratedInitial));
 
   useEffect(() => {
     const fetchData = async () => {

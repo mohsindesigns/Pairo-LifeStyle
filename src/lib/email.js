@@ -1112,7 +1112,8 @@ export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, char
  * contact, shippingAddress). `voucherCode` is the sitewide percentage-discount
  * Promotion code to feature. Never throws — best-effort, called from a cron route.
  */
-export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, { discountPercent = 15 } = {}) {
+export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, { discountPercent = 15, discountLabel = null, oneTime = false } = {}) {
+  const offerText = discountLabel || `${discountPercent}% off`;
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
   const firstName = (cartSnapshot?.shippingAddress?.fullName || cartSnapshot?.contact?.firstName || '').split(' ')[0] || 'there';
@@ -1140,7 +1141,7 @@ export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, {
     : '';
 
   const voucherHtml = emailPanel(`
-    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here's <strong>${discountPercent}% off</strong> your order — on us. Use this code at checkout:</p>
+    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here's <strong>${offerText}</strong> your order — on us. Use this code at checkout:</p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
       <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(voucherCode)}</span>
     </td></tr></table>
@@ -1153,14 +1154,14 @@ export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, {
     subheading: `Hi ${escapeHtml(firstName)}, we noticed you left some items in your cart at ${escapeHtml(storeName)}. They're still waiting for you — and we've added a little incentive to help you decide.`,
     bodyHtml: `${itemsTable}<div style="margin-top:24px;">${voucherHtml}</div>
       <p style="margin:24px 0 0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:20px;">
-        This code is valid sitewide for a limited time. If you've already completed your order, you can safely ignore this email.
+        ${oneTime ? 'This code was created just for you and can be used once.' : 'This code is valid sitewide for a limited time.'} If you've already completed your order, you can safely ignore this email.
       </p>`,
-    preheader: `We saved your cart — here's ${discountPercent}% off to come back.`,
+    preheader: `We saved your cart — here's ${offerText} to come back.`,
   });
 
   return dispatchEmail({
     to: email,
-    subject: `You left something behind — here's ${discountPercent}% off`,
+    subject: `You left something behind — here's ${offerText}`,
     html,
     from: getFromAddress(storeName),
     label: `Abandoned cart recovery (${email})`,

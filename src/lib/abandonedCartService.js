@@ -2,89 +2,125 @@ import dbConnect from './db';
 import AbandonedCart from '@/models/AbandonedCart';
 import Order from '@/models/Order';
 import Promotion from '@/models/Promotion';
+import Discount from '@/models/Discount';
 import { sendAbandonedCartEmail } from './email';
 
-// Recognizable marker so we reuse the same auto-generated voucher every time instead of
-// minting a new code on every cron run. Checked against `code` first (fast, indexed) and
-// `description` as a fallback in case an admin renamed the code but kept the marker text.
-const AUTO_VOUCHER_CODE = 'COMEBACK15';
-const AUTO_VOUCHER_MARKER = 'auto-abandoned-cart-voucher';
-const AUTO_VOUCHER_DISCOUNT_PERCENT = 15;
+// Personalized one-time win-back codes are tagged so they are identifiable (and reusable if the
+// same person abandons again before using their code).
+const PERSONAL_VOUCHER_SOURCE = 'abandoned-cart';
+const PERSONAL_VOUCHER_PERCENT = 15;
+
+const activeWindow = (now) => ({
+  $and: [
+    { $or: [{ startDate: { $exists: false } }, { startDate: null }, { startDate: { $lte: now } }] },
+    { $or: [{ endDate: { $exists: false } }, { endDate: null }, { endDate: { $gte: now } }] },
+  ],
+});
 
 /**
- * Finds a reusable active sitewide percentage-discount coupon code to feature in abandoned-cart
- * emails, preferring our own auto-generated voucher (tagged with AUTO_VOUCHER_MARKER) over any
- * other active sitewide percentage-discount code so that we never spam new codes. Creates the
- * auto voucher once, the first time none exists, then reuses it forever after (until an admin
- * pauses/archives it, at which point a fresh one is created).
+ * Finds an ONGOING campaign code to feature in abandoned-cart emails: an active, currently-running,
+ * sitewide (no product/category/customer/minimum-spend restriction), publicly shareable code.
+ * Looks at the promotion engine first, then the simple Coupons list. Returns
+ * { code, label } (label like "10% off" / "$5 off") or null when no campaign is running.
+ * Never returns a restricted code: it could reach a customer it silently will not apply to.
  */
-export async function getOrCreateAbandonedCartVoucher() {
+export async function findOngoingCampaignVoucher() {
   await dbConnect();
-
   const now = new Date();
-  const notExpired = {
-    $and: [
-      { $or: [{ startDate: { $exists: false } }, { startDate: null }, { startDate: { $lte: now } }] },
-      { $or: [{ endDate: { $exists: false } }, { endDate: null }, { endDate: { $gte: now } }] },
-    ],
-  };
 
-  // 1. Our own previously-created auto voucher, if still active.
-  const existingAuto = await Promotion.findOne({
-    adminStatus: 'Active',
-    $or: [{ code: AUTO_VOUCHER_CODE }, { description: { $regex: AUTO_VOUCHER_MARKER, $options: 'i' } }],
-    ...notExpired,
-  }).lean();
-  if (existingAuto?.code) return existingAuto.code;
-
-  // 2. Any other active, sitewide (no product/category/collection targeting, no minimum-cart-value
-  //    or other eligibility rule), code-based, percentage_discount-on-cart promotion an admin
-  //    already has running — reuse it rather than creating a redundant second sitewide code.
-  //    Mongo can't reliably query "conditions object is empty" given the Mixed/flexible shape
-  //    (an admin-built rule tree can represent "no conditions" several ways), so candidates are
-  //    fetched and filtered in JS using the exact same emptiness check ConditionEvaluator uses
-  //    ("no conditions" = eligible by default) — a conditionally-restricted code (e.g. minimum
-  //    cart value, category-only) must never be picked here, since it could reach a customer it
-  //    silently won't apply to.
-  const sitewideCandidates = await Promotion.find({
+  // 1. Promotion-engine codes. "No conditions" is judged in JS (the rule tree is a flexible Mixed shape).
+  const promos = await Promotion.find({
     adminStatus: 'Active',
     code: { $exists: true, $type: 'string', $ne: '' },
-    actions: {
-      $elemMatch: { type: 'percentage_discount', target: 'cart' },
-    },
-    ...notExpired,
+    actions: { $elemMatch: { type: 'percentage_discount', target: 'cart' } },
+    ...activeWindow(now),
   }).limit(25).lean();
-  const existingSitewide = sitewideCandidates.find(
-    (p) => !p.conditions || Object.keys(p.conditions).length === 0
-  );
-  if (existingSitewide?.code) return existingSitewide.code;
-
-  // 3. Nothing suitable exists — create our own 15%-off sitewide voucher and reuse it from now on.
-  try {
-    const created = await Promotion.create({
-      title: 'Abandoned Cart Win-Back (Auto)',
-      description: `Automatically created and reused by the ${AUTO_VOUCHER_MARKER} system. Do not delete — abandoned-cart recovery emails reference this code. Safe to pause/archive; a new one will be created automatically if needed.`,
-      code: AUTO_VOUCHER_CODE,
-      isAutomatic: false,
-      adminStatus: 'Active',
-      priority: 0,
-      stackable: false,
-      exclusive: false,
-      conditions: {},
-      actions: [{ type: 'percentage_discount', target: 'cart', value: AUTO_VOUCHER_DISCOUNT_PERCENT }],
-      // Schema defaults: unlimited total uses, 1 use per customer — fine for a shared sitewide code.
-    });
-    return created.code;
-  } catch (err) {
-    // Two overlapping cron runs can both reach step 3 before either commits — the unique
-    // index on `code` rejects the loser. That's fine: the winner's voucher already exists,
-    // so just look it up instead of failing this cart's recovery email.
-    if (err?.code === 11000) {
-      const winner = await Promotion.findOne({ code: AUTO_VOUCHER_CODE }).lean();
-      if (winner?.code) return winner.code;
-    }
-    throw err;
+  const promo = promos.find((p) => !p.conditions || Object.keys(p.conditions).length === 0);
+  if (promo?.code) {
+    const action = (promo.actions || []).find((a) => a.type === 'percentage_discount' && a.target === 'cart');
+    return { code: promo.code, label: action?.value ? `${Number(action.value)}% off` : 'a discount' };
   }
+
+  // 2. Simple coupons: active, in date, not exhausted, open to everyone, no restrictions.
+  const coupons = await Discount.find({
+    isActive: true,
+    isDeleted: { $ne: true },
+    source: { $ne: PERSONAL_VOUCHER_SOURCE },
+    ...activeWindow(now),
+  }).limit(50).lean();
+  const coupon = coupons.find((c) =>
+    !(c.specificCustomers?.length) && !(c.specificCustomerEmails?.length) &&
+    !(c.specificProducts?.length) && !(c.specificCategories?.length) &&
+    !c.userRegistrationRequired && !c.newsletterSubscribedOnly && !c.firstOrderOnly &&
+    !c.oneRedemptionPerDevice && !(c.minPurchase > 0) && !(c.minQuantity > 0) && !c.excludeSaleItems &&
+    (!c.usageLimit || (c.usageCount || 0) < c.usageLimit)
+  );
+  if (coupon?.code) {
+    return {
+      code: coupon.code,
+      label: coupon.type === 'percentage' ? `${Number(coupon.value)}% off` : `$${Number(coupon.value)} off`,
+    };
+  }
+
+  return null;
+}
+
+/** "Donald Spanton" -> "DONALD"; strips accents/symbols; falls back to the email prefix, then "WELCOME". */
+export function personalCodeBase(cart, email) {
+  const clean = (v) =>
+    String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 12);
+  const fullName = cart?.shippingAddress?.fullName || '';
+  return (
+    clean(cart?.contact?.firstName) ||
+    clean(fullName.trim().split(/\s+/)[0]) ||
+    clean(String(email || '').split('@')[0]) ||
+    'WELCOME'
+  );
+}
+
+/**
+ * Creates (or reuses) a personalized, single-use code for this customer, e.g. DONALD15.
+ * Locked to their email, 1 use total. If they abandon again before using it, the same unused code
+ * is reused instead of minting another. Name clashes (another Donald) get a letter suffix.
+ */
+export async function getOrCreatePersonalVoucher(cart, email) {
+  await dbConnect();
+  const normalizedEmail = String(email).toLowerCase().trim();
+
+  const existing = await Discount.findOne({
+    source: PERSONAL_VOUCHER_SOURCE,
+    specificCustomerEmails: normalizedEmail,
+    isActive: true,
+    isDeleted: { $ne: true },
+    usageCount: { $lt: 1 },
+  }).lean();
+  if (existing?.code) return { code: existing.code, label: `${PERSONAL_VOUCHER_PERCENT}% off`, oneTime: true };
+
+  const base = `${personalCodeBase(cart, normalizedEmail)}${PERSONAL_VOUCHER_PERCENT}`;
+  const suffixes = ['', ...'ABCDEFGHJKLMNPQRSTUVWXYZ'.split('')];
+
+  for (const suffix of suffixes) {
+    const code = base + suffix;
+    try {
+      await Discount.create({
+        code,
+        type: 'percentage',
+        value: PERSONAL_VOUCHER_PERCENT,
+        usageLimit: 1,
+        usagePerUserLimit: 1,
+        specificCustomerEmails: [normalizedEmail],
+        // Customer-specific codes cannot be represented in Stripe; local-only like the admin ones.
+        stripeSyncStatus: 'unsupported',
+        source: PERSONAL_VOUCHER_SOURCE,
+        isActive: true,
+      });
+      return { code, label: `${PERSONAL_VOUCHER_PERCENT}% off`, oneTime: true };
+    } catch (err) {
+      if (err?.code === 11000) continue; // code already taken (unique index) - try the next suffix
+      throw err;
+    }
+  }
+  throw new Error(`Could not allocate a personal voucher code for ${normalizedEmail}`);
 }
 
 /**
@@ -119,9 +155,9 @@ export async function sendAbandonedCartRecoveryEmails({ windowMinutes = 60, maxA
   }
 
   const results = [];
-  // Resolved once up-front (not lazily per-cart) so the atomic claim below can stamp the real
-  // code at claim time, before the email is actually sent.
-  const voucherCode = await getOrCreateAbandonedCartVoucher();
+  // An ongoing campaign is the same for every cart, so look it up once. When none is running,
+  // each customer gets their own personalized one-time code instead (created per cart below).
+  const campaign = await findOngoingCampaignVoucher();
 
   for (const cart of candidates) {
     const email = cart.contact?.email?.trim();
@@ -152,7 +188,7 @@ export async function sendAbandonedCartRecoveryEmails({ windowMinutes = 60, maxA
       // run retries it instead of leaving it permanently (falsely) marked as sent.
       const claimResult = await AbandonedCart.updateOne(
         { _id: cart._id, 'recoveryEmail.sent': { $ne: true } },
-        { $set: { 'recoveryEmail.sent': true, 'recoveryEmail.sentAt': new Date(), 'recoveryEmail.voucherCode': voucherCode } }
+        { $set: { 'recoveryEmail.sent': true, 'recoveryEmail.sentAt': new Date() } }
       );
       if (claimResult.matchedCount === 0) {
         results.push({ id: cart._id, email, sent: false, reason: 'already-claimed' });
@@ -160,9 +196,16 @@ export async function sendAbandonedCartRecoveryEmails({ windowMinutes = 60, maxA
       }
       claimed = true;
 
-      await sendAbandonedCartEmail(email, cart, voucherCode, { discountPercent: AUTO_VOUCHER_DISCOUNT_PERCENT });
+      // Only the claim winner creates a personal code, so there are no orphan codes from lost races.
+      const voucher = campaign || (await getOrCreatePersonalVoucher(cart, email));
+      await AbandonedCart.updateOne({ _id: cart._id }, { $set: { 'recoveryEmail.voucherCode': voucher.code } });
 
-      results.push({ id: cart._id, email, sent: true, voucherCode });
+      await sendAbandonedCartEmail(email, cart, voucher.code, {
+        discountLabel: voucher.label,
+        oneTime: !!voucher.oneTime,
+      });
+
+      results.push({ id: cart._id, email, sent: true, voucherCode: voucher.code, personal: !!voucher.oneTime });
     } catch (err) {
       if (claimed) {
         await AbandonedCart.updateOne({ _id: cart._id }, { $set: { 'recoveryEmail.sent': false } }).catch(() => {});
