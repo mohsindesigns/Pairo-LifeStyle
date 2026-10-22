@@ -7,6 +7,7 @@ dotenv.config({ path: ".env.local" });
 // Capture outgoing emails instead of sending them.
 const sent = [];
 vi.mock("@/lib/email", () => ({
+  isSmtpConfigured: () => true,
   sendAbandonedCartEmail: vi.fn(async (email, cart, code, opts) => {
     sent.push({ email, code, opts });
   }),
@@ -19,6 +20,7 @@ import {
   getOrCreatePersonalVoucher,
   personalCodeBase,
   sendAbandonedCartRecoveryEmails,
+  getAbandonedCartDiagnostics,
 } from "@/lib/abandonedCartService";
 import { validateLegacyDiscount } from "@/lib/couponValidator";
 
@@ -142,6 +144,34 @@ describe("abandoned-cart voucher: ongoing campaign or personal one-time code", (
     const mail = sent.find((m) => m.email === email);
     expect(mail.opts).toMatchObject({ discountLabel: "10% off", oneTime: false });
     expect(await Discount.countDocuments({ specificCustomerEmails: email })).toBe(0);
+  });
+
+  it("a failed send is reported as an error and retried next run, not marked as sent", async () => {
+    await Discount.updateMany({ code: `${TAG}CAMP`.toUpperCase() }, { $set: { isActive: true } });
+    const { sendAbandonedCartEmail } = await import("@/lib/email");
+    sendAbandonedCartEmail.mockImplementationOnce(async () => { throw new Error("SMTP is not configured"); });
+
+    const email = emailOf("fail1");
+    await makeCart("Sam Fail", email);
+    const res = await sendAbandonedCartRecoveryEmails({ windowMinutes: 60, limit: 200 });
+    expect(res.results.find((r) => r.email === email)).toMatchObject({ sent: false, reason: "error" });
+
+    const cart = await AbandonedCart.findOne({ sessionKey: `${TAG}-${email}` }).lean();
+    expect(cart.recoveryEmail.sent).toBe(false); // claim reverted, so the next run tries again
+
+    const retry = await sendAbandonedCartRecoveryEmails({ windowMinutes: 60, limit: 200 });
+    expect(retry.results.find((r) => r.email === email)).toMatchObject({ sent: true });
+  });
+
+  it("half-typed addresses are never queued, and diagnostics explain the counts", async () => {
+    const bad = `${TAG}-halftyped@gm`;
+    await makeCart("Half Typed", bad);
+    const res = await sendAbandonedCartRecoveryEmails({ windowMinutes: 60, limit: 200 });
+    expect(res.results.find((r) => r.email === bad)).toBeUndefined();
+
+    const d = await getAbandonedCartDiagnostics({ windowMinutes: 60 });
+    expect(typeof d.smtpConfigured).toBe("boolean");
+    expect(d.carts.invalidEmail).toBeGreaterThanOrEqual(1);
   });
 
   it("a restricted code is never treated as a campaign", async () => {

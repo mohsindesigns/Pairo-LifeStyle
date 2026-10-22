@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendAbandonedCartRecoveryEmails } from "@/lib/abandonedCartService";
+import { sendAbandonedCartRecoveryEmails, getAbandonedCartDiagnostics } from "@/lib/abandonedCartService";
 
 /**
  * Triggers a scan for abandoned checkout sessions and sends each one a win-back voucher email
@@ -33,9 +33,16 @@ export async function POST(req) {
   }
 
   try {
-    const summary = await sendAbandonedCartRecoveryEmails();
-    console.log(`[Cron] Abandoned cart scan: scanned=${summary.scanned} sent=${summary.sent}`);
-    return NextResponse.json({ success: true, ...summary });
+    // Optional overrides for testing, e.g. ?windowMinutes=1 sends to carts idle for just 1 minute
+    // (default 60). Still requires the cron secret.
+    const { searchParams } = new URL(req.url);
+    const w = Number(searchParams.get("windowMinutes"));
+    const windowMinutes = Number.isFinite(w) && searchParams.get("windowMinutes") !== null ? Math.min(Math.max(w, 0), 1440) : 60;
+
+    const summary = await sendAbandonedCartRecoveryEmails({ windowMinutes });
+    const diagnostics = await getAbandonedCartDiagnostics({ windowMinutes });
+    console.log(`[Cron] Abandoned cart scan: scanned=${summary.scanned} sent=${summary.sent} smtp=${diagnostics.smtpConfigured}`);
+    return NextResponse.json({ success: true, ...summary, diagnostics });
   } catch (error) {
     console.error("[Cron] Abandoned cart scan failed:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

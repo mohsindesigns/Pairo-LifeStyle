@@ -3,12 +3,15 @@ import AbandonedCart from '@/models/AbandonedCart';
 import Order from '@/models/Order';
 import Promotion from '@/models/Promotion';
 import Discount from '@/models/Discount';
-import { sendAbandonedCartEmail } from './email';
+import { sendAbandonedCartEmail, isSmtpConfigured } from './email';
 
 // Personalized one-time win-back codes are tagged so they are identifiable (and reusable if the
 // same person abandons again before using their code).
 const PERSONAL_VOUCHER_SOURCE = 'abandoned-cart';
 const PERSONAL_VOUCHER_PERCENT = 15;
+// The checkout autosaves while the shopper is still typing, so a half-typed address can be stored.
+// Only plausible addresses are queued, so junk never sits at the front of the queue starving real carts.
+const EMAIL_PATTERN = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$';
 
 const activeWindow = (now) => ({
   $and: [
@@ -124,6 +127,37 @@ export async function getOrCreatePersonalVoucher(cart, email) {
 }
 
 /**
+ * Explains WHY carts are or are not getting emails: counts every cart by the reason it is
+ * excluded from (or included in) the next run. Returned by the cron endpoint so a "nothing
+ * arrived" report can be diagnosed in one call instead of guessing.
+ */
+export async function getAbandonedCartDiagnostics({ windowMinutes = 60, maxAgeHours = 72 } = {}) {
+  await dbConnect();
+  const now = Date.now();
+  const cutoff = new Date(now - windowMinutes * 60 * 1000);
+  const oldest = new Date(now - maxAgeHours * 60 * 60 * 1000);
+  const active = { status: 'active' };
+  const queued = { ...active, 'recoveryEmail.sent': { $ne: true }, 'contact.email': { $regex: EMAIL_PATTERN } };
+
+  const [total, recovered, noEmail, invalidEmail, alreadyEmailed, waiting, tooOld, eligible] = await Promise.all([
+    AbandonedCart.countDocuments({}),
+    AbandonedCart.countDocuments({ status: 'recovered' }),
+    AbandonedCart.countDocuments({ ...active, $or: [{ 'contact.email': { $exists: false } }, { 'contact.email': '' }] }),
+    AbandonedCart.countDocuments({ ...active, 'contact.email': { $nin: ['', null], $not: { $regex: EMAIL_PATTERN } } }),
+    AbandonedCart.countDocuments({ ...active, 'recoveryEmail.sent': true }),
+    AbandonedCart.countDocuments({ ...queued, updatedAt: { $gt: cutoff } }),
+    AbandonedCart.countDocuments({ ...queued, updatedAt: { $lt: oldest } }),
+    AbandonedCart.countDocuments({ ...queued, updatedAt: { $lte: cutoff, $gte: oldest } }),
+  ]);
+
+  return {
+    smtpConfigured: isSmtpConfigured(),
+    windowMinutes,
+    carts: { total, recovered, noEmail, invalidEmail, alreadyEmailed, waitingForQuietPeriod: waiting, olderThanMaxAge: tooOld, eligibleNow: eligible },
+  };
+}
+
+/**
  * Scans for checkout sessions that captured an email but never turned into an order within
  * `windowMinutes`, and have not already received a recovery email, then sends each one the
  * abandoned-cart voucher email. Designed to be called repeatedly (e.g. every 15-30 min via a
@@ -142,7 +176,7 @@ export async function sendAbandonedCartRecoveryEmails({ windowMinutes = 60, maxA
   // aren't ancient (avoid resurrecting month-old test/junk rows if the cron was down a while).
   const candidates = await AbandonedCart.find({
     status: 'active',
-    'contact.email': { $exists: true, $ne: '' },
+    'contact.email': { $regex: EMAIL_PATTERN },
     'recoveryEmail.sent': { $ne: true },
     updatedAt: { $lte: cutoff, $gte: oldestEligible },
   })
@@ -188,7 +222,8 @@ export async function sendAbandonedCartRecoveryEmails({ windowMinutes = 60, maxA
       // run retries it instead of leaving it permanently (falsely) marked as sent.
       const claimResult = await AbandonedCart.updateOne(
         { _id: cart._id, 'recoveryEmail.sent': { $ne: true } },
-        { $set: { 'recoveryEmail.sent': true, 'recoveryEmail.sentAt': new Date() } }
+        { $set: { 'recoveryEmail.sent': true, 'recoveryEmail.sentAt': new Date() } },
+        { timestamps: false }
       );
       if (claimResult.matchedCount === 0) {
         results.push({ id: cart._id, email, sent: false, reason: 'already-claimed' });
@@ -198,7 +233,7 @@ export async function sendAbandonedCartRecoveryEmails({ windowMinutes = 60, maxA
 
       // Only the claim winner creates a personal code, so there are no orphan codes from lost races.
       const voucher = campaign || (await getOrCreatePersonalVoucher(cart, email));
-      await AbandonedCart.updateOne({ _id: cart._id }, { $set: { 'recoveryEmail.voucherCode': voucher.code } });
+      await AbandonedCart.updateOne({ _id: cart._id }, { $set: { 'recoveryEmail.voucherCode': voucher.code } }, { timestamps: false });
 
       await sendAbandonedCartEmail(email, cart, voucher.code, {
         discountLabel: voucher.label,
@@ -208,7 +243,8 @@ export async function sendAbandonedCartRecoveryEmails({ windowMinutes = 60, maxA
       results.push({ id: cart._id, email, sent: true, voucherCode: voucher.code, personal: !!voucher.oneTime });
     } catch (err) {
       if (claimed) {
-        await AbandonedCart.updateOne({ _id: cart._id }, { $set: { 'recoveryEmail.sent': false } }).catch(() => {});
+        // timestamps:false — touching updatedAt here would make the cart look "fresh" again and delay the retry by a full quiet window.
+        await AbandonedCart.updateOne({ _id: cart._id }, { $set: { 'recoveryEmail.sent': false } }, { timestamps: false }).catch(() => {});
       }
       console.error(`[AbandonedCart] Failed to send recovery email for ${email}:`, err.message);
       results.push({ id: cart._id, email, sent: false, reason: 'error', error: err.message });

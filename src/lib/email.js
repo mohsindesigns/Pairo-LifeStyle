@@ -138,7 +138,7 @@ const BRAND = {
   danger: '#9A3B3B',
 };
 
-function isSmtpConfigured() {
+export function isSmtpConfigured() {
   return Boolean(smtpConfig?.auth?.user && smtpConfig?.auth?.pass);
 }
 
@@ -1110,9 +1110,9 @@ export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, char
  * (see src/lib/abandonedCartService.js). `cartSnapshot` is an AbandonedCart
  * doc (or plain object with the same shape: items, cartSubtotal, cartTotal,
  * contact, shippingAddress). `voucherCode` is the sitewide percentage-discount
- * Promotion code to feature. Never throws — best-effort, called from a cron route.
+ * code to feature.
  */
-export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, { discountPercent = 15, discountLabel = null, oneTime = false } = {}) {
+export function buildAbandonedCartEmail(cartSnapshot, voucherCode, { discountPercent = 15, discountLabel = null, oneTime = false } = {}) {
   const offerText = discountLabel || `${discountPercent}% off`;
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
@@ -1159,12 +1159,25 @@ export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, {
     preheader: `We saved your cart — here's ${offerText} to come back.`,
   });
 
+  return { subject: `You left something behind — here's ${offerText}`, html };
+}
+
+/**
+ * Sends the abandoned-cart email. THROWS if SMTP is not configured or the send fails, so the caller
+ * (abandonedCartService) can report the real reason and retry on the next run instead of falsely
+ * marking the cart as emailed.
+ */
+export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, options = {}) {
+  if (!isSmtpConfigured()) throw new Error('SMTP is not configured (SMTP_USER / SMTP_PASS missing) - email was not sent');
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const { subject, html } = buildAbandonedCartEmail(cartSnapshot, voucherCode, options);
   return dispatchEmail({
     to: email,
-    subject: `You left something behind — here's ${offerText}`,
+    subject,
     html,
     from: getFromAddress(storeName),
     label: `Abandoned cart recovery (${email})`,
+    critical: true,
   });
 }
 
