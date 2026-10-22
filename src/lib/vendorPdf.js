@@ -208,6 +208,35 @@ function drawText(doc, font, size, str, xPx, baselinePx, color, align = "left") 
 
 const stripHtml = (s) => String(s ?? "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 
+const decodeEntities = (t) =>
+  t.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"').replace(/&#0?39;|&apos;/gi, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+
+/**
+ * Turns a rich-text product description into clean lines. Block boundaries (list items, paragraphs,
+ * line breaks, headings) become line breaks so adjacent items are never glued together, and a leading
+ * "Product Specification(s):" heading that merchants paste into the description is dropped (the PDF
+ * prints its own heading). `isList` is true when the source was a bullet list, i.e. it is really a
+ * specification list and should be drawn as bullets.
+ */
+function parseDescription(html) {
+  const src = String(html ?? "");
+  const isList = /<li[\s>]/i.test(src);
+  const text = decodeEntities(
+    src
+      .replace(/<\s*br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li|ul|ol|h[1-6]|tr|table|section|blockquote)\s*>/gi, "\n")
+      .replace(/<[^>]*>/g, "")
+  );
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .map((l) => l.replace(/^product specifications?\s*:?\s*/i, "").trim())
+    .filter(Boolean);
+  return { lines, isList };
+}
+
 function buildBullets(item, specs) {
   const out = [];
   const seen = new Set();
@@ -504,11 +533,19 @@ export function buildVendorPdf({ order, lines }) {
     }
 
     const bullets = buildBullets(item, specs);
+    // No specification entries: fall back to the product description. A bullet-list description is
+    // really a spec list, so it is drawn as bullets; prose is drawn as a paragraph.
+    let descText = "";
+    if (!bullets.length && description) {
+      const parsed = parseDescription(description);
+      if (parsed.isList) bullets.push(...parsed.lines);
+      else descText = parsed.lines.join(" ");
+    }
     if (isM2M && item.madeToMeasure.notes) bullets.push(`Fitting Notes: ${stripHtml(item.madeToMeasure.notes)}`);
 
     // A tall chart (e.g. 10 measurements) gets more room, paid for by tightening the bullet
     // spacing: budget = column height minus what the specification list needs at ~27px pitch.
-    const descLines = !bullets.length && description ? Math.min(4, Math.ceil(stripHtml(description).length / 55)) : 0;
+    const descLines = descText ? Math.min(4, Math.ceil(descText.length / 55)) : 0;
     const specNeeds = 52 + 32 + Math.max(bullets.length - 1, descLines - 1, 0) * 27 + 15;
     const chartMaxHeight = Math.max(215, Math.min(320, COL_BOTTOM - 240 - specNeeds - 12));
 
@@ -540,7 +577,7 @@ export function buildVendorPdf({ order, lines }) {
       }
     }
 
-    drawSpecification(doc, F, SZ, bullets, bottom + 52, stripHtml(description));
+    drawSpecification(doc, F, SZ, bullets, bottom + 52, descText);
   });
 
   return new Promise((resolve, reject) => {
