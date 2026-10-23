@@ -405,7 +405,7 @@ export async function resolveSEOMetadata(options = {}) {
           const questions = await ProductQuestion.find({
             productId: entity._id || entity.id,
             status: "Approved",
-            isDeleted: false
+            isDeleted: { $ne: true }
           }).lean();
 
           questions

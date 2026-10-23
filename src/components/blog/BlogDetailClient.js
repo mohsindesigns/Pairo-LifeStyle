@@ -269,7 +269,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
          .blog-content p {
            margin-bottom: 1.25rem !important;
          }
-        .blog-content h1, .blog-content h2, .blog-content h3, .blog-content h4 {
+        .blog-content h1, .blog-content h2, .blog-content h3, .blog-content h4, .blog-content h5, .blog-content h6 {
           font-family: var(--brand-font), sans-serif !important;
           text-transform: uppercase !important;
           margin-top: 2rem !important;
@@ -278,10 +278,13 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
           font-weight: 800 !important;
           letter-spacing: -0.01em !important;
         }
-        .blog-content h1 { font-size: 22px !important; }
-        .blog-content h2 { font-size: 18px !important; }
-        .blog-content h3 { font-size: 16px !important; }
-        .blog-content h4 { font-size: 14px !important; }
+        /* A clear step between each level; h5/h6 were unstyled and looked like body text */
+        .blog-content h1 { font-size: 26px !important; line-height: 1.25 !important; }
+        .blog-content h2 { font-size: 22px !important; line-height: 1.3 !important; }
+        .blog-content h3 { font-size: 19px !important; line-height: 1.35 !important; }
+        .blog-content h4 { font-size: 17px !important; line-height: 1.4 !important; }
+        .blog-content h5 { font-size: 15px !important; line-height: 1.4 !important; }
+        .blog-content h6 { font-size: 14px !important; line-height: 1.4 !important; letter-spacing: 0.04em !important; }
         .blog-content a {
           color: #1a1a1a !important;
           text-decoration: underline !important;

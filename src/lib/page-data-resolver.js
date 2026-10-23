@@ -9,7 +9,7 @@ export async function resolvePageSections(sections) {
     try {
       // Resolve Product Grid Data
       if (section.type === 'product_grid') {
-        const query = { isDeleted: false, status: 'Published' };
+        const query = { isDeleted: { $ne: true }, status: 'Published' };
         let products = [];
 
         if (config.showType === 'products' && config.productIds && config.productIds.length > 0) {
@@ -218,7 +218,7 @@ export async function resolvePageSections(sections) {
               { _id: { $in: objectIds } },
               { slug: { $in: slugs } }
             ],
-            isDeleted: false,
+            isDeleted: { $ne: true },
             status: 'Published'
           }).lean();
         }

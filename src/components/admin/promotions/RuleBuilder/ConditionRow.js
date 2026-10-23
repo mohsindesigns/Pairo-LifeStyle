@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Trash2, GripVertical, ChevronDown } from 'lucide-react';
+import { childRulePath, joinPath } from '../promotionEditorUtils';
+
 
 // Each condition field maps to ONE sensible comparison automatically, so admins never
 // have to pick a raw operator (>=, in, contains…). The row reads like a plain sentence:
@@ -35,33 +37,38 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
 
   const count = selectedSet.size;
   return (
-    <div className="relative flex-1 min-w-0">
+    <div className="relative min-w-0" style={{ flex: '1 1 200px' }}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between gap-2 text-[13px] border border-gray-300 px-2 py-1 rounded-sm bg-white outline-none focus:border-[#2271b1]"
+        className="wp-select wp-full flex items-center justify-between gap-2 text-left"
+        style={{ paddingRight: 8 }}
+        aria-haspopup="true"
+        aria-expanded={open}
       >
-        <span className={`truncate ${count ? 'text-[#1d2327]' : 'text-gray-400'}`}>
+        <span className={`truncate ${count ? 'wp-strong' : 'wp-muted'}`}>
           {count ? `${count} selected` : (placeholder || 'Select…')}
         </span>
-        <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+        <ChevronDown className="w-4 h-4 shrink-0" aria-hidden="true" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-sm shadow-lg py-1">
+          <div
+            className="absolute z-20 w-full overflow-y-auto"
+            style={{ marginTop: 2, maxHeight: 240, background: '#fff', border: '1px solid var(--wp-border)', boxShadow: '0 3px 8px rgba(0,0,0,0.12)', padding: '4px 0' }}
+          >
             {options.length === 0 ? (
-              <div className="px-2.5 py-2 text-[12px] text-gray-400">No options available</div>
+              <div className="wp-muted" style={{ padding: '8px 10px' }}>No options available</div>
             ) : (
               options.map((o) => (
-                <label key={o.id} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px] hover:bg-[#f0f6fa] cursor-pointer">
+                <label key={o.id} className="wp-check hover:bg-[#f0f6fc]" style={{ padding: '4px 10px', minHeight: 40 }}>
                   <input
                     type="checkbox"
                     checked={selectedSet.has(String(o.id))}
                     onChange={() => toggle(o.id)}
-                    className="accent-[#2271b1]"
                   />
-                  <span className="truncate text-[#1d2327]">{o.label}</span>
+                  <span className="truncate">{o.label}</span>
                 </label>
               ))
             )}
@@ -74,7 +81,7 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
 
 export default function ConditionRow({ rule, path, index, onUpdate, onRemove, catalogData }) {
   const { products = [], categories = [], collections = [] } = catalogData || {};
-  const base = `${path}.rules.${index}`;
+  const base = childRulePath(path, index);
   const config = FIELD_CONFIG[rule.field] || FIELD_CONFIG.subtotal;
   const isKnownField = Object.prototype.hasOwnProperty.call(FIELD_CONFIG, rule.field);
 
@@ -83,14 +90,15 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
   const handleFieldChange = (newField) => {
     const next = FIELD_CONFIG[newField] || FIELD_CONFIG.subtotal;
     const emptyValue = (next.kind === 'money' || next.kind === 'number') ? '' : [];
-    onUpdate(`${base}.field`, newField);
-    onUpdate(`${base}.op`, next.op);
-    onUpdate(`${base}.value`, emptyValue);
+    onUpdate(joinPath(base, 'field'), newField);
+    onUpdate(joinPath(base, 'op'), next.op);
+    onUpdate(joinPath(base, 'value'), emptyValue);
   };
 
-  const setValue = (v) => onUpdate(`${base}.value`, v);
+  const setValue = (v) => onUpdate(joinPath(base, 'value'), v);
   const arrValue = Array.isArray(rule.value) ? rule.value : [];
   const toOptions = (list) => list.map((x) => ({ id: x._id?.toString() || x.id, label: x.name }));
+
 
   const renderValue = () => {
     // A legacy/unknown field saved before this friendly rebuild (e.g. user_id) — preserve its
@@ -102,15 +110,17 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
           value={typeof rule.value === "string" ? rule.value : (Array.isArray(rule.value) ? rule.value.join(", ") : "")}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Value"
-          className="flex-1 min-w-0 text-[13px] border border-gray-300 px-2 py-1 rounded-sm outline-none focus:border-[#2271b1]"
+          aria-label="Condition value"
+          className="wp-input min-w-0"
+          style={{ flex: '1 1 200px' }}
         />
       );
     }
     switch (config.kind) {
       case 'money':
         return (
-          <div className="flex items-center flex-1 min-w-0 border border-gray-300 rounded-sm bg-white focus-within:border-[#2271b1]">
-            <span className="px-2 text-gray-400 text-[13px]">$</span>
+          <div className="flex items-center min-w-0 gap-1" style={{ flex: '1 1 200px' }}>
+            <span className="wp-muted" aria-hidden="true">$</span>
             <input
               type="number"
               min="0"
@@ -118,7 +128,8 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
               value={rule.value ?? ''}
               onChange={(e) => setValue(e.target.value)}
               placeholder="0.00"
-              className="flex-1 min-w-0 text-[13px] px-1 py-1 outline-none bg-transparent"
+              aria-label={`${config.label} in dollars`}
+              className="wp-input min-w-0 flex-1"
             />
           </div>
         );
@@ -131,7 +142,9 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
             value={rule.value ?? ''}
             onChange={(e) => setValue(e.target.value)}
             placeholder="e.g. 2"
-            className="flex-1 min-w-0 text-[13px] border border-gray-300 px-2 py-1 rounded-sm outline-none focus:border-[#2271b1]"
+            aria-label={config.label}
+            className="wp-input min-w-0"
+            style={{ flex: '1 1 200px' }}
           />
         );
       case 'products':
@@ -148,15 +161,20 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
   };
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-white border border-gray-200 rounded-sm shadow-sm hover:border-[#2271b1] transition-colors group">
-      <div className="cursor-grab text-gray-300 group-hover:text-gray-400 shrink-0">
+    <div
+      className="flex flex-wrap items-center gap-2 min-w-0"
+      style={{ background: '#fff', border: '1px solid var(--wp-border-2)', padding: 8 }}
+    >
+      <span className="wp-hide-sm shrink-0" style={{ color: '#a7aaad' }} aria-hidden="true">
         <GripVertical className="w-4 h-4" />
-      </div>
+      </span>
 
       <select
         value={rule.field}
         onChange={(e) => handleFieldChange(e.target.value)}
-        className="text-[13px] border border-gray-300 p-1 rounded-sm outline-none focus:border-[#2271b1] bg-white shrink-0"
+        aria-label="Condition field"
+        className="wp-select min-w-0"
+        style={{ flex: '0 1 200px' }}
       >
         {!isKnownField && rule.field && (
           <option value={rule.field}>{`Legacy: ${rule.field}`}</option>
@@ -166,15 +184,18 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
         ))}
       </select>
 
-      <span className="text-[12px] text-gray-500 italic whitespace-nowrap shrink-0">{config.phrase}</span>
+      <span className="wp-muted whitespace-nowrap shrink-0">{config.phrase}</span>
 
       {renderValue()}
 
       <button
+        type="button"
         onClick={() => onRemove(path, index)}
-        className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-sm transition-all shrink-0"
+        className="wp-btn shrink-0"
+        style={{ borderColor: 'var(--wp-danger)', color: 'var(--wp-danger)', padding: 0, minWidth: 40 }}
+        aria-label="Remove condition"
       >
-        <Trash2 className="w-4 h-4" />
+        <Trash2 className="w-4 h-4" aria-hidden="true" />
       </button>
     </div>
   );

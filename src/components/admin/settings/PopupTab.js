@@ -8,10 +8,9 @@ import {
 } from "lucide-react";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 
-const inputClass = "w-full border border-[#8c8f94] rounded-[3px] px-3 py-[7px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white";
-const labelClass = "block text-[13px] font-semibold text-[#1d2327] mb-[4px]";
-const descClass = "text-[12px] text-[#646970] mt-[2px]";
-const sectionTitle = "text-[14px] font-bold text-[#1d2327] pb-2 mb-4 border-b border-[#c3c4c7]";
+import { Postbox, Notice } from "@/components/admin/ui";
+
+const ctrlWrap = { flex: "1 1 320px", minWidth: 0 };
 
 export default function PopupTab({ config, onChange }) {
   const popup = {
@@ -97,286 +96,260 @@ export default function PopupTab({ config, onChange }) {
   }, [testModalOpen]);
 
   return (
-    <div className="space-y-8">
-      {/* ── Status Card ── */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px] p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-              popup.enabled ? "bg-emerald-100 text-emerald-700" : "bg-neutral-100 text-neutral-500"
-            }`}>
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h3 className="text-[15px] font-bold text-[#1d2327]">Storefront Popup</h3>
-                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                  popup.enabled
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-neutral-100 text-neutral-600 border border-neutral-300"
-                }`}>
-                  {popup.enabled ? (
-                    <>
-                      <CheckCircle2 className="w-3 h-3" /> Live on Storefront
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-3 h-3" /> Disabled
-                    </>
-                  )}
-                </span>
-              </div>
-              <p className="text-[12px] text-[#646970] mt-1">
-                Show an announcement or promotional modal to visitors when they load the website.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={() => setTestModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-semibold text-[#2271b1] border border-[#2271b1] hover:bg-[#f0f6fb] rounded-[3px] transition-colors cursor-pointer"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              Preview Popup
-            </button>
-
-            <label className="relative inline-flex items-center cursor-pointer">
+    <div>
+      {/* ── Status ── */}
+      <Postbox
+        title="Storefront popup"
+        aside={
+          <span className={`wp-pill wp-pill-sm ${popup.enabled ? "wp-st-published" : "wp-st-draft"}`}>
+            {popup.enabled ? (
+              <>
+                <CheckCircle2 className="w-3 h-3 mr-1" aria-hidden="true" /> Live on storefront
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-3 h-3 mr-1" aria-hidden="true" /> Disabled
+              </>
+            )}
+          </span>
+        }
+      >
+        <div className="wp-frow">
+          <span className="wp-flabel">Popup</span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2" style={ctrlWrap}>
+            <label className="wp-check" htmlFor="popup-enabled">
               <input
+                id="popup-enabled"
                 type="checkbox"
                 checked={Boolean(popup.enabled)}
                 onChange={(e) => update("enabled", e.target.checked)}
-                className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-neutral-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2271b1]"></div>
+              Show the popup on the storefront
             </label>
+            <button
+              type="button"
+              onClick={() => setTestModalOpen(true)}
+              className="wp-btn"
+            >
+              <Eye className="w-3.5 h-3.5" aria-hidden="true" />
+              Preview popup
+            </button>
           </div>
+          <p className="wp-hint">Show an announcement or promotional modal to visitors when they load the website.</p>
         </div>
-      </div>
+      </Postbox>
 
       {/* ── Main Layout: Form & Live Preview ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="wp-cols">
         {/* Left Column: Settings Form */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="wp-col-main">
           {/* Banner Image Section */}
-          <div className="bg-white border border-[#c3c4c7] rounded-[3px] p-5 shadow-sm">
-            <h4 className={sectionTitle}>Banner Image</h4>
-            <p className={descClass + " mb-4"}>
+          <Postbox title="Banner image">
+            <p className="wp-desc mt-0 mb-3">
               Optional top banner image. If left empty, the popup will gracefully display in a sleek text-centered luxury style.
             </p>
 
-            <div className="space-y-3">
-              {hasBanner && (
-                <div className="relative rounded-lg overflow-hidden border border-[#c3c4c7] bg-neutral-50 max-w-md aspect-[16/9] group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={bannerUrl}
-                    alt="Popup Banner"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setMediaPickerOpen(true)}
-                      className="px-3 py-1.5 bg-white text-[#1d2327] rounded text-[12px] font-medium hover:bg-neutral-100 shadow cursor-pointer"
-                    >
-                      Change
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => update("bannerUrl", "")}
-                      className="px-3 py-1.5 bg-red-600 text-white rounded text-[12px] font-medium hover:bg-red-700 shadow cursor-pointer"
-                    >
-                      Remove
-                    </button>
-                  </div>
+            {hasBanner && (
+              <div className="relative overflow-hidden border border-[#c3c4c7] bg-[#f0f0f1] max-w-md aspect-[16/9] group mb-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={bannerUrl}
+                  alt="Popup Banner"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMediaPickerOpen(true)}
+                    className="wp-btn"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => update("bannerUrl", "")}
+                    className="wp-btn" style={{ color: "#b32d2e", borderColor: "#b32d2e" }}
+                  >
+                    Remove
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
 
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="wp-frow">
+              <span className="wp-flabel">Media library</span>
+              <div className="flex flex-wrap items-center gap-3" style={ctrlWrap}>
                 <button
                   type="button"
                   onClick={() => setMediaPickerOpen(true)}
-                  className="inline-flex items-center gap-1.5 border border-[#2271b1] text-[#2271b1] hover:bg-[#f0f6fb] px-3 py-1.5 rounded-[3px] text-[12px] font-medium transition-colors cursor-pointer"
+                  className="wp-btn"
                 >
-                  <ImageIcon className="w-3.5 h-3.5" />
+                  <ImageIcon className="w-3.5 h-3.5" aria-hidden="true" />
                   {hasBanner ? "Replace from Media Library" : "Select from Media Library"}
                 </button>
                 {hasBanner && (
                   <button
                     type="button"
                     onClick={() => update("bannerUrl", "")}
-                    className="text-red-600 hover:text-red-800 text-[12px] font-medium hover:underline cursor-pointer"
+                    className="inline-flex items-center min-h-[30px] max-[782px]:min-h-10 px-1 text-[#b32d2e] hover:underline"
                   >
-                    Remove Image
+                    Remove image
                   </button>
                 )}
               </div>
-
-              <div className="pt-2">
-                <label className="block text-[11px] font-medium text-[#646970] mb-1">
-                  Or paste direct image URL
-                </label>
-                <input
-                  type="url"
-                  value={popup.bannerUrl || ""}
-                  onChange={(e) => update("bannerUrl", e.target.value)}
-                  placeholder="https://..."
-                  className={inputClass}
-                />
-              </div>
             </div>
-          </div>
+
+            <div className="wp-frow">
+              <label className="wp-flabel" htmlFor="popup-banner-url">Or image URL</label>
+              <input
+                id="popup-banner-url"
+                type="url"
+                value={popup.bannerUrl || ""}
+                onChange={(e) => update("bannerUrl", e.target.value)}
+                placeholder="https://..."
+                className="wp-input"
+              />
+              <p className="wp-hint">Paste a direct image URL instead of choosing from the library.</p>
+            </div>
+          </Postbox>
 
           {/* Content Section */}
-          <div className="bg-white border border-[#c3c4c7] rounded-[3px] p-5 shadow-sm space-y-4">
-            <h4 className={sectionTitle}>Popup Content</h4>
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-[3px] text-[12px] text-amber-800">
-              💡 <strong>Tip:</strong> Any field left empty (badge, title, description, or button) will <strong>not</strong> be displayed on the storefront popup.
-            </div>
+          <Postbox title="Popup content">
+            <Notice type="info">
+              <strong>Tip:</strong> Any field left empty (badge, title, description, or button) will <strong>not</strong> be displayed on the storefront popup.
+            </Notice>
 
-            <div>
-              <label className={labelClass}>Badge / Eyebrow Text (Optional)</label>
+            <div className="wp-frow">
+              <label className="wp-flabel" htmlFor="popup-badge">Badge / eyebrow text</label>
               <input
+                id="popup-badge"
                 type="text"
                 value={popup.badgeText || ""}
                 onChange={(e) => update("badgeText", e.target.value)}
                 placeholder="e.g. EXCLUSIVE OFFER, NEW ARRIVALS, VIP ACCESS"
-                className={inputClass}
+                className="wp-input"
               />
-              <p className={descClass}>Small uppercase label displayed above the title. Leave blank to hide.</p>
+              <p className="wp-hint">Optional. Small uppercase label displayed above the title. Leave blank to hide.</p>
             </div>
 
-            <div>
-              <label className={labelClass}>Popup Title (Optional)</label>
+            <div className="wp-frow">
+              <label className="wp-flabel" htmlFor="popup-title">Popup title</label>
               <input
+                id="popup-title"
                 type="text"
                 value={popup.title || ""}
                 onChange={(e) => update("title", e.target.value)}
                 placeholder="e.g. Experience Pure Luxury Shearling"
-                className={inputClass}
+                className="wp-input"
               />
-              <p className={descClass}>Main headline of the popup. Leave blank to hide.</p>
+              <p className="wp-hint">Optional. Main headline of the popup. Leave blank to hide.</p>
             </div>
 
-            <div>
-              <label className={labelClass}>Description / Message (Optional)</label>
-              <textarea
-                rows={4}
-                value={popup.description || ""}
-                onChange={(e) => update("description", e.target.value)}
-                placeholder="e.g. Subscribe today to receive our seasonal lookbook and enjoy complimentary bespoke monogramming on your first handcrafted shearling jacket."
-                className={`${inputClass} resize-y min-h-[90px]`}
+            <div className="wp-frow items-start">
+              <label className="wp-flabel pt-1" htmlFor="popup-description">Description / message</label>
+              <div style={ctrlWrap}>
+                <textarea
+                  id="popup-description"
+                  rows={4}
+                  value={popup.description || ""}
+                  onChange={(e) => update("description", e.target.value)}
+                  placeholder="e.g. Subscribe today to receive our seasonal lookbook and enjoy complimentary bespoke monogramming on your first handcrafted shearling jacket."
+                  className="wp-textarea min-h-[90px] max-w-[520px]"
+                />
+              </div>
+              <p className="wp-hint">Optional. Supporting promotional or informative text. Leave blank to hide.</p>
+            </div>
+
+            <div className="wp-frow">
+              <label className="wp-flabel" htmlFor="popup-button-label">Button label</label>
+              <input
+                id="popup-button-label"
+                type="text"
+                value={popup.buttonLabel || ""}
+                onChange={(e) => update("buttonLabel", e.target.value)}
+                placeholder="e.g. Shop Collection, Claim Discount"
+                className="wp-input"
               />
-              <p className={descClass}>Supporting promotional or informative text. Leave blank to hide.</p>
+              <p className="wp-hint">Optional. Text on the main call-to-action button. Leave blank to hide button.</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className={labelClass}>Button Label (Optional)</label>
-                <input
-                  type="text"
-                  value={popup.buttonLabel || ""}
-                  onChange={(e) => update("buttonLabel", e.target.value)}
-                  placeholder="e.g. Shop Collection, Claim Discount"
-                  className={inputClass}
-                />
-                <p className={descClass}>Text on the main call-to-action button. Leave blank to hide button.</p>
+            <div className="wp-frow">
+              <label className="wp-flabel" htmlFor="popup-button-link">Button link</label>
+              <input
+                id="popup-button-link"
+                type="text"
+                value={popup.buttonLink || ""}
+                onChange={(e) => update("buttonLink", e.target.value)}
+                placeholder="e.g. /shop, /custom-jacket, https://..."
+                className="wp-input"
+              />
+              <p className="wp-hint">Optional. Destination URL. If empty, the button will not appear.</p>
+            </div>
+
+            <div className="wp-frow">
+              <span className="wp-flabel">Link target</span>
+              <div style={ctrlWrap}>
+                <label className="wp-check" htmlFor="popup-new-tab">
+                  <input
+                    id="popup-new-tab"
+                    type="checkbox"
+                    checked={Boolean(popup.openInNewTab)}
+                    onChange={(e) => update("openInNewTab", e.target.checked)}
+                  />
+                  Open link in a new tab
+                </label>
               </div>
-
-              <div>
-                <label className={labelClass}>Button Link (Optional)</label>
-                <input
-                  type="text"
-                  value={popup.buttonLink || ""}
-                  onChange={(e) => update("buttonLink", e.target.value)}
-                  placeholder="e.g. /shop, /custom-jacket, https://..."
-                  className={inputClass}
-                />
-                <p className={descClass}>Destination URL. If empty, the button will not appear.</p>
-              </div>
             </div>
-
-            <div className="pt-2">
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={Boolean(popup.openInNewTab)}
-                  onChange={(e) => update("openInNewTab", e.target.checked)}
-                  className="rounded border-[#8c8f94] text-[#2271b1] focus:ring-[#2271b1]"
-                />
-                <span className="text-[13px] text-[#1d2327]">Open link in a new tab</span>
-              </label>
-            </div>
-          </div>
+          </Postbox>
 
           {/* Behavior & Display Rules */}
-          <div className="bg-white border border-[#c3c4c7] rounded-[3px] p-5 shadow-sm space-y-4">
-            <h4 className={sectionTitle}>Display Rules & Timing</h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className={labelClass}>Display Frequency</label>
-                <select
-                  value={popup.frequency || "session"}
-                  onChange={(e) => update("frequency", e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="session">Once per session (Recommended)</option>
-                  <option value="daily">Once every 24 hours</option>
-                  <option value="always">Every page load (Testing mode)</option>
-                </select>
-                <p className={descClass}>
-                  Controls how frequently the popup appears to the same visitor.
-                </p>
-              </div>
-
-              <div>
-                <label className={labelClass}>
-                  Display Delay ({popup.delaySeconds ?? 1} second{(popup.delaySeconds ?? 1) === 1 ? "" : "s"})
-                </label>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="0.5"
-                    value={Number.isFinite(Number(popup.delaySeconds)) ? Number(popup.delaySeconds) : 1}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      update("delaySeconds", isNaN(val) ? 1 : Math.max(0, val));
-                    }}
-                    className="flex-1 accent-[#2271b1]"
-                  />
-                  <span className="text-[13px] font-mono font-bold w-12 text-right text-[#1d2327]">
-                    {popup.delaySeconds ?? 1}s
-                  </span>
-                </div>
-                <p className={descClass}>
-                  Time to wait after the page loads before revealing the popup.
-                </p>
-              </div>
+          <Postbox title="Display rules and timing">
+            <div className="wp-frow">
+              <label className="wp-flabel" htmlFor="popup-frequency">Display frequency</label>
+              <select
+                id="popup-frequency"
+                value={popup.frequency || "session"}
+                onChange={(e) => update("frequency", e.target.value)}
+                className="wp-select"
+              >
+                <option value="session">Once per session (Recommended)</option>
+                <option value="daily">Once every 24 hours</option>
+                <option value="always">Every page load (Testing mode)</option>
+              </select>
+              <p className="wp-hint">Controls how frequently the popup appears to the same visitor.</p>
             </div>
-          </div>
+
+            <div className="wp-frow">
+              <label className="wp-flabel" htmlFor="popup-delay">
+                Display delay ({popup.delaySeconds ?? 1} second{(popup.delaySeconds ?? 1) === 1 ? "" : "s"})
+              </label>
+              <div className="flex items-center gap-3 min-h-10" style={{ ...ctrlWrap, maxWidth: 360 }}>
+                <input
+                  id="popup-delay"
+                  type="range"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={Number.isFinite(Number(popup.delaySeconds)) ? Number(popup.delaySeconds) : 1}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    update("delaySeconds", isNaN(val) ? 1 : Math.max(0, val));
+                  }}
+                  className="flex-1 min-w-0 accent-[#2271b1]"
+                />
+                <span className="wp-strong font-mono w-12 text-right" aria-hidden="true">
+                  {popup.delaySeconds ?? 1}s
+                </span>
+              </div>
+              <p className="wp-hint">Time to wait after the page loads before revealing the popup.</p>
+            </div>
+          </Postbox>
         </div>
 
         {/* Right Column: Live Interactive Preview */}
-        <div className="lg:col-span-5 sticky top-6 space-y-4">
-          <div className="bg-white border border-[#c3c4c7] rounded-[3px] p-5 shadow-sm">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#c3c4c7]">
-              <div>
-                <h4 className="text-[13px] font-bold uppercase tracking-wider text-[#1d2327]">
-                  Live Preview
-                </h4>
-                <p className="text-[11px] text-[#646970]">
-                  Updates in real time as you edit
-                </p>
-              </div>
-              <span className="text-[11px] px-2 py-0.5 bg-neutral-100 border border-neutral-200 rounded font-medium text-neutral-600">
-                Customer View
-              </span>
-            </div>
+        <div className="wp-col-side lg:sticky lg:top-6">
+          <Postbox title="Live preview" aside="Customer view">
+            <p className="wp-desc mt-0 mb-3">Updates in real time as you edit.</p>
 
             {/* Preview Box Simulation */}
             <div className="bg-neutral-900/80 p-4 sm:p-6 rounded-xl flex items-center justify-center min-h-[360px]">
@@ -449,11 +422,11 @@ export default function PopupTab({ config, onChange }) {
               )}
             </div>
 
-            <div className="mt-4 pt-3 border-t border-[#f0f0f1] text-[11px] text-[#646970] space-y-1">
-              <p>• Empty elements automatically collapse and hide.</p>
-              <p>• Clicking &quot;Save Changes&quot; in the bottom bar will publish updates live.</p>
-            </div>
-          </div>
+            <ul className="wp-desc mt-3 mb-0 pl-4 list-disc space-y-1">
+              <li>Empty elements automatically collapse and hide.</li>
+              <li>Click &quot;Save changes&quot; below to publish updates live.</li>
+            </ul>
+          </Postbox>
         </div>
       </div>
 

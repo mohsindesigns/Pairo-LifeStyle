@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import Script from "@/models/Script";
 import { can } from "@/lib/rbac";
 import { logAction } from "@/lib/audit";
+import { slugifyScriptName, slugCandidate, firstFreeSlug, scriptListFilter } from "./helpers";
 
 export async function GET(req) {
     const session = await getServerSession(authOptions);
@@ -14,7 +15,9 @@ export async function GET(req) {
 
     await dbConnect();
     try {
-        const scripts = await Script.find().sort({ priority: 1, createdAt: -1 }).lean();
+        // Live scripts by default; ?trash=1 = only the Trash, ?scope=all = both.
+        const filter = scriptListFilter(new URL(req.url).searchParams);
+        const scripts = await Script.find(filter).sort({ priority: 1, createdAt: -1 }).lean();
         return NextResponse.json(scripts);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -51,9 +54,12 @@ export async function POST(req) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
-        const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-        
-        const { auditLog, version, ...cleanBody } = body;
+        // Slugs are unique: a second "Google Analytics" becomes google-analytics-2 instead of a
+        // duplicate-key error.
+        const base = slugifyScriptName(name);
+        const slug = await firstFreeSlug((n) => slugCandidate(base, n), (s) => Script.exists({ slug: s }));
+
+        const { auditLog, version, isDeleted, deletedAt, slug: _ignoredSlug, ...cleanBody } = body;
         
         const newScript = await Script.create({
             ...cleanBody,

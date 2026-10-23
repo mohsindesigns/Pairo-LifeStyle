@@ -32,7 +32,7 @@ export async function GET(req) {
         .limit(500)
         .lean(),
 
-      Order.find({ affiliateReferralCode: { $ne: null } })
+      Order.find({ affiliateReferralCode: { $ne: null }, isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(200)
         .lean()

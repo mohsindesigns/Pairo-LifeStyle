@@ -1,210 +1,372 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { 
-  FileText, 
-  Package, 
-  MessageSquare, 
-  ShoppingBag, 
-  ChevronRight, 
-  ExternalLink,
-  Plus,
-  Settings,
-  HelpCircle,
-  Clock,
-  ArrowRight,
-  Image as ImageIcon,
-  TrendingUp,
-  Bell
-} from "lucide-react";
+import { PenLine, Gift, Star, HelpCircle, Link2, Ruler, Package, ShoppingCart, Users, FileText, Layers, RefreshCw } from "lucide-react";
+import { DASHBOARD_RANGES, getRangeWindow, bucketKeys, bucketLabel, percentChange } from "@/lib/admin-dashboard";
+import { Page, PageHeader, Postbox, Notice, StatusPill, ORDER_STATUSES, formatMoney, formatDate, timeAgo, Skeleton } from "@/components/admin/ui";
 
-// ── WordPress-Style Meta Box ───────────────────────────────
-function MetaBox({ title, children, footer, className = "" }) {
+const RANGE_KEY = "admin_dashboard_range";
+const subscribeToNothing = () => () => {};
+
+const ACTIVITY_ICONS = {
+  "custom-inquiry": PenLine,
+  "gifting-inquiry": Gift,
+  review: Star,
+  question: HelpCircle,
+  affiliate: Link2,
+  "size-reply": Ruler,
+};
+
+function readSavedRange() {
+  try {
+    const saved = localStorage.getItem(RANGE_KEY);
+    return DASHBOARD_RANGES[saved] ? saved : "7d";
+  } catch {
+    return "7d";
+  }
+}
+
+function Delta({ current, previous, money, currency, label }) {
+  const pct = percentChange(current, previous);
+  if (pct === null) return <div className="wp-stat-delta">No data for the {label}</div>;
+  const dir = pct > 0 ? "wp-up" : pct < 0 ? "wp-down" : "";
+  const sign = pct > 0 ? "+" : "";
+  const was = money ? formatMoney(previous, currency) : previous.toLocaleString();
   return (
-    <div className={`bg-white border border-[#c3c4c7] shadow-sm mb-5 ${className}`}>
-      {title && (
-        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between">
-          <h2 className="text-[14px] font-bold text-[#1d2327]">{title}</h2>
-          <button className="text-gray-400 hover:text-gray-600">
-            <ChevronRight className="w-4 h-4 rotate-90" />
-          </button>
-        </div>
-      )}
-      <div className="p-3 xs:p-4">
-        {children}
-      </div>
-      {footer && (
-        <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] px-3 py-2">
-          {footer}
-        </div>
-      )}
+    <div className={`wp-stat-delta ${dir}`}>
+      {sign}{pct.toFixed(1)}% <span className="wp-muted" style={{ fontWeight: 400 }}>vs {was} the {label}</span>
     </div>
   );
 }
 
-// ── Main Dashboard ─────────────────────────────────────────
-export default function AdminDashboard() {
-  const [stats, setStats] = useState({
-    products: 0,
-    posts: 0,
-    orders: 0,
-    revenue: 0,
-    recentOrders: []
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/admin/analytics")
-      .then(res => res.json())
-      .then(json => {
-        if (json.success) {
-          const d = json.data;
-          setStats({
-            products: d.totalProducts || 0,
-            posts: d.totalBlogs || 0,
-            orders: d.overall?.[0]?.totalOrders || 0,
-            revenue: d.overall?.[0]?.totalSales || 0,
-            recentOrders: d.recentOrders || []
-          });
-        }
-        setLoading(false);
-      });
-  }, []);
+function SalesChart({ rangeWindow, buckets, currency }) {
+  const keys = bucketKeys(rangeWindow);
+  const bars = keys.map((k) => ({ key: k, gross: buckets?.[k]?.gross || 0, orders: buckets?.[k]?.orders || 0 }));
+  const max = Math.max(0, ...bars.map((b) => b.gross));
+  const total = bars.reduce((s, b) => s + b.gross, 0);
+  // Keep axis labels readable: at most ~12 visible labels whatever the bucket count.
+  const every = Math.ceil(bars.length / 12);
 
   return (
-    <div className="font-sans text-[#3c434a] bg-[#f0f2f1] min-h-screen p-2 xs:p-3 sm:p-4 md:p-6 w-full max-w-full overflow-hidden">
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-4 xs:mb-6">
-          <h1 className="text-[18px] xs:text-[20px] sm:text-[23px] font-medium text-[#1d2327]">Dashboard Overview</h1>
+    <figure style={{ margin: 0 }}>
+      <figcaption className="wp-sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
+        Sales chart, total {formatMoney(total, currency)}
+      </figcaption>
+      <div className="wp-chart">
+        {bars.map((b) => {
+          const label = bucketLabel(b.key, rangeWindow.unit);
+          const tip = `${label}: ${formatMoney(b.gross, currency)} · ${b.orders} order${b.orders === 1 ? "" : "s"}`;
+          return (
+            <div key={b.key} className="wp-bar-col" tabIndex={0} aria-label={tip}>
+              <span className="wp-bar-tip">{tip}</span>
+              <div
+                className={`wp-bar ${b.gross ? "" : "is-empty"}`}
+                style={{ height: max ? `${Math.max(1, (b.gross / max) * 100)}%` : "2px" }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="wp-chart-x" aria-hidden="true">
+        {bars.map((b, i) => (
+          <span key={b.key}>{i % every === 0 ? bucketLabel(b.key, rangeWindow.unit) : ""}</span>
+        ))}
+      </div>
+    </figure>
+  );
+}
+
+function SectionError({ message, onRetry }) {
+  return (
+    <div className="wp-empty" role="alert">
+      {message}{" "}
+      <button type="button" className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={onRetry}>
+        Try again
+      </button>
+    </div>
+  );
+}
+
+function LoadingRows({ rows = 4 }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "4px 0" }}>
+      {Array.from({ length: rows }).map((_, i) => <Skeleton key={i} height={18} />)}
+    </div>
+  );
+}
+
+// Recent orders grid: 5 columns on desktop; on phones (<=782px, where .wp-hide-sm hides
+// Customer and Date) the remaining Order / Status / Total get their own 3-column template.
+const RECENT_GRID = "grid-cols-[minmax(0,1fr)_auto_minmax(72px,auto)] min-[783px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_minmax(0,1fr)_auto_minmax(80px,auto)]";
+
+export default function AdminDashboard() {
+  // The saved range only exists in the browser; the server render and hydration use the default.
+  const savedRange = useSyncExternalStore(subscribeToNothing, readSavedRange, () => null);
+  const [pickedRange, setPickedRange] = useState(null);
+  const range = pickedRange || savedRange || "7d";
+  const [reloadKey, setReloadKey] = useState(0);
+  const [welcomeHidden, setWelcomeHidden] = useState(false);
+  // Last finished request. `loading` is derived: true until a response for the current key lands.
+  const [state, setState] = useState({ key: null, error: null, data: null, errors: {}, permissions: null, win: null });
+
+  const rangeWindow = useMemo(() => getRangeWindow(range), [range]);
+  const requestKey = `${range}|${reloadKey}`;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      from: rangeWindow.from.toISOString(),
+      to: rangeWindow.to.toISOString(),
+      unit: rangeWindow.unit,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    });
+    fetch(`/api/admin/dashboard?${params}`, { signal: controller.signal })
+      .then(async (res) => {
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) throw new Error(json?.error || `Request failed (${res.status})`);
+        setState({ key: requestKey, error: null, data: json.data, errors: json.errors || {}, permissions: json.permissions, win: rangeWindow });
+      })
+      .catch((err) => {
+        if (err.name === "AbortError") return;
+        setState((s) => ({ ...s, key: requestKey, error: err.message || "Could not load the dashboard." }));
+      });
+    return () => controller.abort();
+  }, [rangeWindow, requestKey]);
+
+  const pickRange = (key) => {
+    setPickedRange(key);
+    try { localStorage.setItem(RANGE_KEY, key); } catch {}
+  };
+  const retry = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  const { error, data, errors, permissions } = state;
+  const loading = state.key !== requestKey;
+  const sales = data?.sales;
+  const orders = data?.orders;
+  const stock = data?.stock;
+  const glance = data?.glance || {};
+  const activity = data?.activity || [];
+  const currency = orders?.recent?.[0]?.currency || "USD";
+  const firstLoad = loading && !data;
+  const periodLabel = { today: "previous day", "7d": "previous 7 days", "30d": "previous 30 days", year: "same period before" }[range];
+
+  const pendingCount = orders?.statusCounts?.Pending || 0;
+  const lowCount = stock?.lowStockTotal || 0;
+  const showSales = permissions ? permissions.sales : true;
+  const showOrders = permissions ? permissions.orders : true;
+  const showProducts = permissions ? permissions.products : true;
+  const nothingVisible = permissions && !permissions.sales && !permissions.orders && !permissions.products && activity.length === 0 && Object.keys(glance).length === 0;
+
+  const avg = (t) => (t?.orders ? t.gross / t.orders : 0);
+
+  return (
+    <Page>
+      <PageHeader
+        title="Dashboard"
+        aside={showSales && (
+          <div className="wp-seg" role="group" aria-label="Date range">
+            {Object.entries(DASHBOARD_RANGES).map(([key, def]) => (
+              <button key={key} type="button" aria-pressed={range === key} onClick={() => pickRange(key)}>
+                {def.label}
+              </button>
+            ))}
+          </div>
+        )}
+      />
+
+      {error && !loading && (
+        <Notice type="error">
+          The dashboard could not be loaded: {error}.{" "}
+          <button type="button" className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={retry}>
+            <RefreshCw className="w-3 h-3 inline" /> Try again
+          </button>
+        </Notice>
+      )}
+
+      {!welcomeHidden && !firstLoad && !error && (pendingCount > 0 || lowCount > 0) && (
+        <Notice type="info" onDismiss={() => setWelcomeHidden(true)}>
+          You have{" "}
+          {pendingCount > 0 && <Link className="wp-link" href="/admin/orders">{pendingCount} order{pendingCount === 1 ? "" : "s"} waiting to be confirmed</Link>}
+          {pendingCount > 0 && lowCount > 0 && " and "}
+          {lowCount > 0 && <Link className="wp-link" href="/admin/products">{lowCount} product{lowCount === 1 ? "" : "s"} running low on stock</Link>}.
+        </Notice>
+      )}
+
+      {nothingVisible && (
+        <Notice type="info">Your role doesn’t include any dashboard reports. Use the menu on the left to get to the sections you work in.</Notice>
+      )}
+
+      {showSales && (
+        <div className="wp-stats" aria-busy={loading}>
+          {[
+            { label: "Gross sales", value: sales && formatMoney(sales.current.gross, currency), delta: sales && <Delta current={sales.current.gross} previous={sales.previous.gross} money currency={currency} label={periodLabel} /> },
+            { label: "Orders", value: sales && sales.current.orders.toLocaleString(), delta: sales && <Delta current={sales.current.orders} previous={sales.previous.orders} label={periodLabel} /> },
+            { label: "Average order", value: sales && formatMoney(avg(sales.current), currency), delta: sales && <Delta current={avg(sales.current)} previous={avg(sales.previous)} money currency={currency} label={periodLabel} /> },
+            { label: "New customers", value: sales && sales.current.newCustomers.toLocaleString(), delta: sales && <Delta current={sales.current.newCustomers} previous={sales.previous.newCustomers} label={periodLabel} /> },
+          ].map((s) => (
+            <div key={s.label} className="wp-stat">
+              <div className="wp-stat-label">{s.label}</div>
+              {s.value != null ? (
+                <>
+                  <div className="wp-stat-value">{s.value}</div>
+                  {s.delta}
+                </>
+              ) : errors.sales ? (
+                <div className="wp-stat-value wp-muted">—</div>
+              ) : (
+                <Skeleton height={28} width="70%" style={{ margin: "6px 0" }} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="wp-cols" style={{ rowGap: 0 }}>
+        <div className="wp-col-main">
+          {showSales && (
+            <Postbox
+              id="sales"
+              title="Sales"
+              aside={DASHBOARD_RANGES[range].label}
+              footer={sales && (
+                <>
+                  <span>Total <strong className="wp-strong">{formatMoney(sales.current.gross, currency)}</strong> from {sales.current.orders} order{sales.current.orders === 1 ? "" : "s"}</span>
+                  <span className="wp-spacer" />
+                  <span className="wp-muted wp-small">Cancelled and refunded orders are not counted.</span>
+                </>
+              )}
+            >
+              {errors.sales ? <SectionError message={errors.sales} onRetry={retry} /> : sales ? (
+                <SalesChart rangeWindow={state.win || rangeWindow} buckets={sales.buckets} currency={currency} />
+              ) : <Skeleton height={220} />}
+            </Postbox>
+          )}
+
+          {showOrders && (
+            <Postbox id="recent" title="Recent orders" aside={<Link className="wp-link" href="/admin/orders">View all orders</Link>} flush>
+              {errors.orders ? <div className="wp-inside"><SectionError message={errors.orders} onRetry={retry} /></div>
+                : !orders ? <div className="wp-inside"><LoadingRows rows={5} /></div>
+                : orders.recent.length === 0 ? <div className="wp-inside wp-empty" style={{ padding: "14px 12px" }}>No orders yet.</div>
+                : (
+                  <div role="table" aria-label="Recent orders">
+                    <div role="row" className={`wp-row is-head ${RECENT_GRID}`}>
+                      <span role="columnheader">Order</span>
+                      <span role="columnheader" className="wp-hide-sm">Customer</span>
+                      <span role="columnheader" className="wp-hide-sm">Date</span>
+                      <span role="columnheader">Status</span>
+                      <span role="columnheader" className="wp-num">Total</span>
+                    </div>
+                    {orders.recent.map((o, i) => (
+                      <div role="row" key={o._id} className={`wp-row ${RECENT_GRID} ${i % 2 ? "is-alt" : ""}`}>
+                        <span role="cell" style={{ minWidth: 0 }}>
+                          <Link className="wp-row-title" href={`/admin/orders/${o._id}`}>#{o.orderNumber}</Link>
+                          <span className="wp-mobile-meta">{o.customer} · {formatDate(o.createdAt)}</span>
+                        </span>
+                        <span role="cell" className="wp-hide-sm" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.customer}</span>
+                        <span role="cell" className="wp-hide-sm wp-muted">{formatDate(o.createdAt)}</span>
+                        <span role="cell"><StatusPill status={o.status} small /></span>
+                        <span role="cell" className="wp-num wp-strong">{formatMoney(o.total, o.currency)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </Postbox>
+          )}
+
+          {showSales && (
+            <Postbox id="top" title="Top sellers" aside={DASHBOARD_RANGES[range].label} flush>
+              {errors.sales ? <div className="wp-inside"><SectionError message={errors.sales} onRetry={retry} /></div>
+                : !sales ? <div className="wp-inside"><LoadingRows /></div>
+                : sales.topSellers.length === 0 ? <div className="wp-inside wp-empty" style={{ padding: "14px 12px" }}>No sales in this period.</div>
+                : sales.topSellers.map((t, i) => (
+                  <div key={`${t.productId}-${t.name}`} className={`wp-row ${i % 2 ? "is-alt" : ""}`} style={{ gridTemplateColumns: "40px minmax(0,1fr) auto minmax(90px,auto)" }}>
+                    <span className="wp-thumb" aria-hidden="true">
+                      {t.image ? <img src={t.image} alt="" /> : (t.name || "?").slice(0, 2).toUpperCase()}
+                    </span>
+                    <span style={{ minWidth: 0 }}>
+                      {t.productId ? <Link className="wp-row-title" href={`/admin/products/${t.productId}`}>{t.name}</Link> : <span className="wp-strong">{t.name}</span>}
+                    </span>
+                    <span className="wp-num wp-muted">{t.units} sold</span>
+                    <span className="wp-num wp-strong">{formatMoney(t.revenue, currency)}</span>
+                  </div>
+                ))}
+            </Postbox>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 xs:gap-5 items-start">
-          
-          {/* Left Column (Primary) */}
-          <div className="lg:col-span-3 min-w-0">
-            
-            {/* At a Glance */}
-            <MetaBox title="At a Glance">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4">
-                 <div className="space-y-4">
-                    <Link href="/admin/blogs" className="flex items-center gap-2 group">
-                       <FileText className="w-4 h-4 text-gray-400 group-hover:text-[#2271b1] shrink-0" />
-                       <span className="text-[13px] text-[#2271b1] hover:underline font-medium">{stats.posts} Posts</span>
-                    </Link>
-                    <Link href="/admin/media" className="flex items-center gap-2 group">
-                       <ImageIcon className="w-4 h-4 text-gray-400 group-hover:text-[#2271b1] shrink-0" />
-                       <span className="text-[13px] text-[#2271b1] hover:underline font-medium">Media Library</span>
-                    </Link>
-                 </div>
-                 <div className="space-y-4">
-                    <Link href="/admin/products" className="flex items-center gap-2 group">
-                       <Package className="w-4 h-4 text-gray-400 group-hover:text-[#2271b1] shrink-0" />
-                       <span className="text-[13px] text-[#2271b1] hover:underline font-medium">{stats.products} Products</span>
-                    </Link>
-                    <div className="flex items-center gap-2">
-                       <MessageSquare className="w-4 h-4 text-gray-400 shrink-0" />
-                       <span className="text-[13px] text-gray-600">0 Comments</span>
+        <div className="wp-col-side">
+          {showOrders && (
+            <Postbox id="status" title="Orders by status">
+              {errors.orders ? <SectionError message={errors.orders} onRetry={retry} />
+                : !orders ? <LoadingRows rows={6} />
+                : ORDER_STATUSES.filter((s) => orders.statusCounts[s]).length === 0 ? <div className="wp-empty">No orders yet.</div>
+                : ORDER_STATUSES.filter((s) => orders.statusCounts[s]).map((s) => (
+                  <div key={s} className="wp-kv">
+                    <span className="wp-kv-k"><StatusPill status={s} small /></span>
+                    <Link className="wp-kv-v wp-link" href="/admin/orders">{orders.statusCounts[s]}</Link>
+                  </div>
+                ))}
+            </Postbox>
+          )}
+
+          {showProducts && (
+            <Postbox id="stock" title="Low stock" aside={stock?.lowStockTotal > stock?.lowStock?.length ? `${stock.lowStockTotal} in total` : null}>
+              {errors.stock ? <SectionError message={errors.stock} onRetry={retry} />
+                : !stock ? <LoadingRows rows={3} />
+                : stock.lowStock.length === 0 ? <div className="wp-empty">Everything is above its low-stock threshold.</div>
+                : stock.lowStock.map((p, i) => (
+                  <div key={`${p.productId}-${p.variant || i}`} className="wp-kv">
+                    <span className="wp-kv-k">
+                      <Link className="wp-link" href={`/admin/products/${p.productId}?focus=stock`}>{p.name}</Link>
+                      {p.variant && <span className="wp-muted wp-small" style={{ display: "block" }}>{p.variant}</span>}
+                    </span>
+                    <span className={p.stock <= 0 ? "wp-down wp-strong" : "wp-strong"} style={p.stock > 0 ? { color: "var(--wp-warn)" } : undefined}>
+                      {p.stock <= 0 ? "Out of stock" : `${p.stock} left`}
+                    </span>
+                  </div>
+                ))}
+            </Postbox>
+          )}
+
+          {(firstLoad || activity.length > 0 || errors.activity) && (
+            <Postbox id="activity" title="Needs your attention">
+              {errors.activity ? <SectionError message={errors.activity} onRetry={retry} />
+                : firstLoad ? <LoadingRows />
+                : activity.map((a, i) => {
+                  const Icon = ACTIVITY_ICONS[a.kind] || HelpCircle;
+                  return (
+                    <div key={`${a.kind}-${i}`} className="wp-activity">
+                      <span className="wp-activity-ico" aria-hidden="true"><Icon className="w-4 h-4" /></span>
+                      <div style={{ minWidth: 0 }}>
+                        <div><strong className="wp-strong">{a.title}</strong> {a.text}</div>
+                        <div className="wp-muted wp-small">{timeAgo(a.at)} · <Link className="wp-link" href={a.href}>{a.action}</Link></div>
+                      </div>
                     </div>
-                 </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-[#f0f0f1] text-[12px] xs:text-[13px] text-gray-500 italic">
-                 Pairo v1.0.0 running Modern Theme.
-              </div>
-            </MetaBox>
+                  );
+                })}
+            </Postbox>
+          )}
 
-            {/* Activity */}
-            <MetaBox title="Recent Activity">
-               <div className="space-y-4">
-                  {loading ? (
-                    <p className="text-[13px] text-gray-400 italic">Loading activity...</p>
-                  ) : stats.recentOrders.length === 0 ? (
-                    <p className="text-[13px] text-gray-400 italic">No recent activity found.</p>
-                  ) : (
-                    <div className="divide-y divide-[#f0f0f1]">
-                       {stats.recentOrders.map((order, idx) => (
-                          <div key={idx} className="py-3 first:pt-0 last:pb-0 flex flex-col xs:flex-row xs:items-center justify-between gap-1 xs:gap-2 group">
-                             <div className="flex items-start gap-2.5 min-w-0">
-                                <div className="mt-1 shrink-0">
-                                   <div className="w-2 h-2 rounded-full bg-[#2271b1]" />
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                   <Link href={`/admin/orders/${order._id}`} className="text-[13px] font-bold text-[#2271b1] group-hover:underline truncate">
-                                      Order #{order.orderNumber}
-                                   </Link>
-                                   <span className="text-[11px] xs:text-[12px] text-gray-500 truncate">by {order.shippingAddress?.fullName}</span>
-                                </div>
-                             </div>
-                             <span className="text-[11px] text-gray-400 font-mono shrink-0 pl-4 xs:pl-0">{new Date(order.createdAt).toLocaleDateString()}</span>
-                          </div>
-                       ))}
-                    </div>
-                  )}
-               </div>
-            </MetaBox>
-
-          </div>
-
-          {/* Right Column (Secondary) */}
-          <div className="lg:col-span-2 space-y-4 xs:space-y-5 min-w-0">
-             
-             {/* WooCommerce Status */}
-             <MetaBox title="WooCommerce Status">
-                <div className="space-y-4 xs:space-y-6">
-                   <div className="flex items-center justify-between border-b border-[#f0f0f1] pb-3">
-                      <div className="flex flex-col">
-                         <span className="text-[11px] xs:text-[12px] text-gray-500 uppercase font-bold tracking-wider">Net Sales</span>
-                         <span className="text-[20px] xs:text-[24px] font-light text-[#1d2327]">${stats.revenue.toLocaleString()}</span>
-                      </div>
-                      <TrendingUp className="w-7 h-7 xs:w-8 xs:h-8 text-[#00a32a] opacity-20 shrink-0" />
-                   </div>
-                   
-                   <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 xs:gap-4">
-                      <div className="bg-[#f6f7f7] p-2.5 xs:p-3 rounded-[2px] border border-[#ccd0d4]">
-                         <span className="text-[11px] text-gray-500 block mb-1">Orders</span>
-                         <span className="text-[16px] xs:text-[18px] font-bold text-[#1d2327]">{stats.orders}</span>
-                      </div>
-                      <div className="bg-[#f6f7f7] p-2.5 xs:p-3 rounded-[2px] border border-[#ccd0d4]">
-                         <span className="text-[11px] text-gray-500 block mb-1">Awaiting Processing</span>
-                         <span className="text-[16px] xs:text-[18px] font-bold text-[#d63638]">0</span>
-                      </div>
-                   </div>
-
-                   <Link href="/admin/orders" className="text-[12px] xs:text-[13px] text-[#2271b1] hover:underline flex items-center gap-1 font-medium">
-                      View all orders <ArrowRight className="w-3 h-3" />
-                   </Link>
+          {Object.keys(glance).length > 0 && (
+            <Postbox id="glance" title="At a glance">
+              {[
+                { key: "publishedProducts", label: "published products", href: "/admin/products", icon: Package },
+                { key: "draftProducts", label: "draft products", href: "/admin/products", icon: Package },
+                { key: "orders", label: "orders", href: "/admin/orders", icon: ShoppingCart },
+                { key: "customers", label: "customers", href: "/admin/customers", icon: Users },
+                { key: "posts", label: "blog posts", href: "/admin/blogs", icon: FileText },
+                { key: "pages", label: "pages", href: "/admin/pages", icon: Layers },
+              ].filter((g) => glance[g.key] != null).map((g) => (
+                <div key={g.key} className="wp-kv">
+                  <g.icon className="w-4 h-4" style={{ color: "#8c8f94" }} aria-hidden="true" />
+                  <Link className="wp-kv-k wp-link" href={g.href}>{glance[g.key].toLocaleString()} {g.label}</Link>
                 </div>
-             </MetaBox>
-
-             {/* Quick Links */}
-             <MetaBox title="Quick Links">
-                <div className="grid grid-cols-1 gap-2">
-                   {[
-                      { label: "Site Settings", href: "/admin/settings", icon: Settings },
-                      { label: "E-commerce Support", href: "#", icon: HelpCircle },
-                      { label: "View Storefront", href: "/", icon: ExternalLink },
-                   ].map((item, i) => (
-                      <Link key={i} href={item.href} className="flex items-center justify-between p-2 hover:bg-[#f6f7f7] rounded-[2px] transition-colors group">
-                         <div className="flex items-center gap-3">
-                            <item.icon className="w-4 h-4 text-gray-400 group-hover:text-[#2271b1]" />
-                            <span className="text-[13px] text-[#2271b1] font-medium">{item.label}</span>
-                         </div>
-                         <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-[#2271b1]" />
-                      </Link>
-                   ))}
-                </div>
-             </MetaBox>
-
-             {/* Dashboard Widgets Help */}
-             <div className="text-[12px] text-gray-500 px-2 flex items-center gap-2">
-                <HelpCircle className="w-3 h-3" />
-                <span>Learn more about <button className="text-[#2271b1] hover:underline">Dashboard Widgets</button></span>
-             </div>
-
-          </div>
-
+              ))}
+            </Postbox>
+          )}
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

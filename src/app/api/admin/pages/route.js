@@ -17,7 +17,14 @@ export async function GET(req) {
 
     await dbConnect();
     try {
-        const pages = await Page.find().sort({ createdAt: -1 }).lean();
+        // Trashed pages are hidden by default; ?trash=1 returns only the Trash, ?scope=all returns both.
+        const { searchParams } = new URL(req.url);
+        const filter = searchParams.get("scope") === "all"
+            ? {}
+            : searchParams.get("trash") === "1"
+                ? { isDeleted: true }
+                : { isDeleted: { $ne: true } };
+        const pages = await Page.find(filter).sort({ createdAt: -1 }).lean();
         return NextResponse.json(pages);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -33,6 +40,13 @@ export async function POST(req) {
     await dbConnect();
     try {
         const body = await req.json();
+        // Trash fields are managed only by DELETE / restore, never set on create.
+        delete body.isDeleted;
+        delete body.deletedAt;
+        delete body.statusBeforeTrash;
+        // System pages are seeded, never created from the admin.
+        delete body.isSystem;
+        delete body._id;
         const { title, slug, template, sections } = body;
 
         if (!title || !slug) {
@@ -66,7 +80,7 @@ export async function POST(req) {
 
         const existing = await Page.findOne({ slug: cleanSlug });
         if (existing) {
-            return NextResponse.json({ error: "Page with this slug already exists" }, { status: 400 });
+            return NextResponse.json({ error: existing.isDeleted ? "A page with this slug is in the Trash" : "Page with this slug already exists" }, { status: 400 });
         }
 
         // Seed template default sections if no sections are explicitly provided

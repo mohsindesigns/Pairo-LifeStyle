@@ -6,24 +6,64 @@ import Link from "next/link";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
+import { can } from "@/lib/rbac";
+
+// "+ New" menu: every module that has an Add screen, shown only to roles that may create it.
+const NEW_ITEMS = [
+  { label: "Product", href: "/admin/products/new", perm: "products.create" },
+  { label: "Post", href: "/admin/blogs/new", perm: "blogs.create" },
+  { label: "Page", href: "/admin/pages/new", perm: "pages.create" },
+  { label: "Order", href: "/admin/orders/new", perm: "orders.create" },
+  { label: "Customer", href: "/admin/customers/new", perm: "customers.edit" },
+  { label: "Product category", href: "/admin/products/categories/new", perm: "products.create" },
+  { label: "Post category", href: "/admin/blogs/categories/new", perm: "blogs.create" },
+  { label: "Size chart", href: "/admin/products/size-charts/new", perm: "products.create" },
+  { label: "Promotion", href: "/admin/promotions/new", perm: "promotions.manage" },
+  { label: "Media", href: "/admin/media", perm: "media.manage" },
+  { label: "Script", href: "/admin/settings/scripts/new", perm: "scripts.create" },
+  { label: "User", href: "/admin/settings/team/new", perm: "staff.create" },
+  { label: "Role", href: "/admin/settings/roles/new", perm: "staff.manage_roles" },
+];
+
+// Search: these words steer which product/page actions are shown, they are not matched against records.
+const COMMAND_WORDS = [
+  "edit", "modify", "change", "update",
+  "price", "pricing", "sale", "cost", "regular",
+  "seo", "meta", "search", "google",
+  "stock", "inventory", "quantity", "qty", "manage",
+  "variant", "variants", "color", "colors", "size", "sizes",
+  "faq", "faqs", "question", "questions", "answer",
+  "stat", "stats", "statistics", "analytics",
+  "add", "new", "create", "delete", "remove"
+];
+const SEARCH_DEBOUNCE_MS = 250;
+
+// Size-confirmation mailbox sync: at most once per interval across all open admin tabs.
+const NOTIFICATION_POLL_MS = 35000;
+const SIZE_SYNC_MIN_GAP_MS = 30000; // a little under the poll interval so timer jitter never skips a tick
+const SIZE_SYNC_KEY = "admin_size_sync_at";
+
+function claimSizeSyncSlot() {
+  try {
+    const last = Number(localStorage.getItem(SIZE_SYNC_KEY)) || 0;
+    const now = Date.now();
+    if (now - last < SIZE_SYNC_MIN_GAP_MS) return false;
+    localStorage.setItem(SIZE_SYNC_KEY, String(now));
+    return true;
+  } catch {
+    return true; // storage unavailable: fall back to syncing from this tab
+  }
+}
 
 export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
   const { data: session } = useSession();
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [showProfile, setShowProfile] = useState(false);
 
-  // Spotlight Search Index State
-  const [products, setProducts] = useState([]);
-  const [pages, setPages] = useState([]);
-  const [blogs, setBlogs] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [discounts, setDiscounts] = useState([]);
-  const [affiliates, setAffiliates] = useState([]);
-  const [promotions, setPromotions] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [scripts, setScripts] = useState([]);
+  // Spotlight Search: results for the last fetched query key (see /api/admin/search)
+  const [searchData, setSearchData] = useState({ key: "", results: {} });
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -73,74 +113,39 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchSafely = async (url) => {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return [];
-      return await res.json();
-    } catch (e) {
-      console.error(`Failed to fetch ${url}`, e);
-      return [];
-    }
-  };
+  // Search words (minus command words) + whether the "home seo" shortcut is wanted.
+  // The key identifies one server query; results are only used when they match it.
+  const searchKey = useMemo(() => {
+    const queryWords = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    const words = queryWords.filter(w => !COMMAND_WORDS.includes(w));
+    if (words.length === 0) return "";
+    const q = searchQuery.toLowerCase();
+    const home = q.includes("home") && q.includes("seo") ? "1" : "0";
+    return `${home}|${words.join(" ")}`;
+  }, [searchQuery]);
 
-  // Load Search Indexes
+  // Lazy, debounced search: nothing is fetched until the admin types a real search word.
   useEffect(() => {
-    const fetchSearchData = async () => {
+    if (!searchKey) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      const [home, q] = [searchKey.slice(0, 1), searchKey.slice(2)];
       try {
-        const [prodsRes, pagesRes, blogsRes, catsRes, custsRes, ordersRes, discRes, affRes, promoRes, revsRes, scriptsRes] = await Promise.all([
-          fetchSafely("/api/admin/products"),
-          fetchSafely("/api/admin/pages"),
-          fetchSafely("/api/admin/blogs"),
-          fetchSafely("/api/admin/categories"),
-          fetchSafely("/api/admin/customers"),
-          fetchSafely("/api/admin/orders"),
-          fetchSafely("/api/admin/discounts"),
-          fetchSafely("/api/admin/affiliates/list"),
-          fetchSafely("/api/admin/promotions"),
-          fetchSafely("/api/admin/reviews"),
-          fetchSafely("/api/admin/scripts")
-        ]);
-
-        if (Array.isArray(prodsRes)) setProducts(prodsRes);
-        else if (prodsRes?.success && Array.isArray(prodsRes.products)) setProducts(prodsRes.products);
-
-        if (Array.isArray(pagesRes)) setPages(pagesRes);
-        else if (pagesRes?.success && Array.isArray(pagesRes.pages)) setPages(pagesRes.pages);
-
-        if (Array.isArray(blogsRes)) setBlogs(blogsRes);
-        else if (blogsRes?.success && Array.isArray(blogsRes.blogs)) setBlogs(blogsRes.blogs);
-
-        if (Array.isArray(catsRes)) setCategories(catsRes);
-        else if (catsRes?.success && Array.isArray(catsRes.categories)) setCategories(catsRes.categories);
-
-        if (Array.isArray(custsRes)) setCustomers(custsRes);
-        else if (custsRes?.success && Array.isArray(custsRes.customers)) setCustomers(custsRes.customers);
-
-        if (Array.isArray(ordersRes)) setOrders(ordersRes);
-        else if (ordersRes?.success && Array.isArray(ordersRes.orders)) setOrders(ordersRes.orders);
-
-        if (Array.isArray(discRes)) setDiscounts(discRes);
-        else if (discRes?.success && Array.isArray(discRes.discounts)) setDiscounts(discRes.discounts);
-        else if (discRes?.success && Array.isArray(discRes.coupons)) setDiscounts(discRes.coupons);
-
-        if (Array.isArray(affRes)) setAffiliates(affRes);
-        else if (affRes?.success && Array.isArray(affRes.affiliates)) setAffiliates(affRes.affiliates);
-
-        if (Array.isArray(promoRes)) setPromotions(promoRes);
-        else if (promoRes?.success && Array.isArray(promoRes.promotions)) setPromotions(promoRes.promotions);
-
-        if (Array.isArray(revsRes)) setReviews(revsRes);
-        else if (revsRes?.success && Array.isArray(revsRes.reviews)) setReviews(revsRes.reviews);
-
-        if (Array.isArray(scriptsRes)) setScripts(scriptsRes);
-        else if (scriptsRes?.success && Array.isArray(scriptsRes.scripts)) setScripts(scriptsRes.scripts);
+        const res = await fetch(`/api/admin/search?q=${encodeURIComponent(q)}${home === "1" ? "&home=1" : ""}`, { signal: controller.signal });
+        const data = res.ok ? await res.json() : null;
+        setSearchData({ key: searchKey, results: data?.success && data.results ? data.results : {} });
       } catch (err) {
-        console.error("Failed to load search indexes", err);
+        if (err?.name !== "AbortError") {
+          console.error("Admin search failed", err);
+          setSearchData({ key: searchKey, results: {} });
+        }
       }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
     };
-    fetchSearchData();
-  }, []);
+  }, [searchKey]);
 
   // Fetch Notifications
   const fetchNotifications = async () => {
@@ -149,9 +154,11 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
         fetch("/api/admin/orders?status=Pending").then(r => r.json().catch(() => ({}))),
         fetch("/api/admin/affiliates/requests").then(r => r.json().catch(() => ({}))),
         fetch("/api/admin/products").then(r => r.json().catch(() => ([]))),
-        // Check the support mailbox for new size-confirmation replies (server throttles this), then list unread threads
-        fetch("/api/admin/size-confirmations/sync", { method: "POST" })
-          .catch(() => null)
+        // Check the support mailbox for new size-confirmation replies (server throttles this; we also
+        // only sync from one visible tab per interval), then list unread threads
+        (document.visibilityState === "visible" && claimSizeSyncSlot()
+          ? fetch("/api/admin/size-confirmations/sync", { method: "POST" }).catch(() => null)
+          : Promise.resolve(null))
           .then(() => fetch("/api/admin/size-confirmations?unread=1"))
           .then(r => r.json().catch(() => ({})))
           .catch(() => ({}))
@@ -164,15 +171,16 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
           const last = c.replies?.[c.replies.length - 1];
           const who = c.customerName || c.customerEmail;
           const excerpt = (last?.text || "").replace(/\s+/g, " ").slice(0, 80);
+          // Includes reply count so a new reply on a dismissed thread notifies again
+          const noticeId = `size-${c._id}-${c.replies?.length || 0}`;
           list.push({
-            // Includes reply count so a new reply on a dismissed thread notifies again
-            id: `size-${c._id}-${c.replies?.length || 0}`,
+            id: noticeId,
             type: "info",
             label: "Size Reply",
             text: `${who} replied about Order #${c.orderNumber}${excerpt ? `: "${excerpt}${(last?.text || "").length > 80 ? "…" : ""}"` : "."}`,
             actions: [
               { label: "View", href: `/admin/orders/${c.orderId}` },
-              { label: "Mark read", action: () => handleSizeReplyRead(c._id) }
+              { label: "Mark read", action: () => handleSizeReplyRead(c._id, noticeId) }
             ]
           });
         });
@@ -186,7 +194,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
             label: "Order",
             text: `Order #${order.orderNumber} is pending confirmation.`,
             actions: [
-              { label: "Confirm", action: () => handleOrderAction(order._id, "Confirmed") },
+              { label: "Confirm", action: () => handleOrderConfirm(order._id, order.orderNumber) },
               { label: "View", href: `/admin/orders/${order._id}` }
             ]
           });
@@ -201,8 +209,8 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
             label: "Affiliate",
             text: `Request from ${app.name} is pending review.`,
             actions: [
-              { label: "Approve", action: () => handleAffiliateAction(app._id, "Approve") },
-              { label: "Reject", action: () => handleAffiliateAction(app._id, "Reject") }
+              { label: "Approve", action: () => handleAffiliateAction(app._id, "Approve", app.name) },
+              { label: "Reject", action: () => handleAffiliateAction(app._id, "Reject", app.name) }
             ]
           });
         });
@@ -229,48 +237,99 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 35000);
-    return () => clearInterval(interval);
+    // Poll only while this tab is visible; refresh as soon as it becomes visible again.
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    }, NOTIFICATION_POLL_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
-  const handleOrderAction = async (id, status) => {
+  // Notice action handlers return true on success, so the notice is only marked read then.
+
+  // Advances a Pending order to Confirmed only (one step, never skips). Re-checks the live
+  // status first so a stale notice can't move an order that has already progressed.
+  const handleOrderConfirm = async (id, orderNumber) => {
+    const ok = await showConfirm(
+      `Mark Order #${orderNumber} as Confirmed?`,
+      "Confirm order",
+      { confirmText: "Confirm order" }
+    );
+    if (!ok) return false;
     setUpdatingId(`order-${id}`);
     try {
+      const current = await fetch(`/api/admin/orders/${id}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
+      if (!current?.order) {
+        toast.error("Failed to load order. Please try again.");
+        return false;
+      }
+      if (current.order.status !== "Pending") {
+        toast.error(`Order #${orderNumber} is already ${current.order.status}.`);
+        await fetchNotifications();
+        return false;
+      }
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status: "Confirmed" })
       });
       if (res.ok) {
-        toast.success(`Order status updated to ${status}!`);
+        toast.success("Order status updated to Confirmed!");
         await fetchNotifications();
-      } else {
-        toast.error("Failed to update order.");
+        return true;
       }
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "Failed to update order.");
+      return false;
     } catch (err) {
       console.error(err);
+      toast.error("Failed to update order.");
+      return false;
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const handleSizeReplyRead = async (confirmationId) => {
-    setUpdatingId(`size-${confirmationId}`);
+  const handleSizeReplyRead = async (confirmationId, noticeId) => {
+    setUpdatingId(noticeId);
     try {
-      await fetch(`/api/admin/size-confirmations/${confirmationId}`, {
+      const res = await fetch(`/api/admin/size-confirmations/${confirmationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "markRead" })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to mark reply as read.");
+        return false;
+      }
       await fetchNotifications();
+      return true;
     } catch (err) {
       console.error(err);
+      toast.error("Failed to mark reply as read.");
+      return false;
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const handleAffiliateAction = async (applicationId, action) => {
+  const handleAffiliateAction = async (applicationId, action, name) => {
+    const isApprove = action === "Approve";
+    const ok = await showConfirm(
+      isApprove
+        ? `Approve the affiliate application from ${name}?`
+        : `Reject the affiliate application from ${name}?`,
+      isApprove ? "Approve application" : "Reject application",
+      isApprove ? { confirmText: "Approve" } : { confirmText: "Reject", danger: true }
+    );
+    if (!ok) return false;
     setUpdatingId(`affiliate-${applicationId}`);
     try {
       const res = await fetch("/api/admin/affiliates/requests", {
@@ -279,14 +338,17 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
         body: JSON.stringify({ applicationId, action })
       });
       if (res.ok) {
-        toast.success(`Affiliate application ${action === 'Approve' ? 'approved' : 'rejected'} successfully!`);
+        toast.success(`Affiliate application ${isApprove ? 'approved' : 'rejected'} successfully!`);
         await fetchNotifications();
-      } else {
-        const data = await res.json();
-        toast.error(`Failed: ${data.error || "Unknown error"}`);
+        return true;
       }
+      const data = await res.json().catch(() => ({}));
+      toast.error(`Failed: ${data.error || "Unknown error"}`);
+      return false;
     } catch (err) {
       console.error(err);
+      toast.error("Failed to update affiliate application.");
+      return false;
     } finally {
       setUpdatingId(null);
     }
@@ -367,279 +429,160 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
     const isFaqs = queryWords.includes("faq") || queryWords.includes("faqs") || queryWords.includes("question") || queryWords.includes("questions") || queryWords.includes("answer");
     const isStats = queryWords.includes("stat") || queryWords.includes("stats") || queryWords.includes("statistics") || queryWords.includes("analytics");
 
-    const commandWords = [
-      "edit", "modify", "change", "update",
-      "price", "pricing", "sale", "cost", "regular",
-      "seo", "meta", "search", "google",
-      "stock", "inventory", "quantity", "qty", "manage",
-      "variant", "variants", "color", "colors", "size", "sizes",
-      "faq", "faqs", "question", "questions", "answer",
-      "stat", "stats", "statistics", "analytics",
-      "add", "new", "create", "delete", "remove"
-    ];
-
-    const searchWords = queryWords.filter(w => !commandWords.includes(w));
+    const searchWords = queryWords.filter(w => !COMMAND_WORDS.includes(w));
     const results = [];
+    // Server results for the current query (empty while the debounced request is in flight)
+    const found = searchKey && searchData.key === searchKey ? searchData.results : {};
+    const list = (key) => (Array.isArray(found[key]) ? found[key] : []);
 
     if (searchWords.length > 0) {
       // 1. Products matches
-      products.forEach(p => {
-        const nameLower = p.name.toLowerCase();
-        const skuLower = (p.sku || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w) || skuLower.includes(w));
+      list("products").forEach(p => {
+        const hasCommand = isPrice || isStock || isVariants || isSeo || isFaqs || isStats;
 
-        if (matchesAll) {
-          const hasCommand = isPrice || isStock || isVariants || isSeo || isFaqs || isStats;
-
-          if (!hasCommand || isEdit) {
-            results.push({
-              category: "Products",
-              title: `Edit Details: "${p.name}"`,
-              href: `/admin/products/${p._id}`,
-              desc: `Update description, image settings and categories`
-            });
-          }
-          if (isPrice || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit Price: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=pricing`,
-              desc: `Update Regular price & Sale price`
-            });
-          }
-          if (isStock || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit Stock: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=stock`,
-              desc: `Manage stock inventory size and tracking settings`
-            });
-          }
-          if (isVariants || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit Variants: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=variants`,
-              desc: `Configure color swatches, size configurations and variable engines`
-            });
-          }
-          if (isSeo || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit SEO: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=seo`,
-              desc: `Set page focus keywords and description`
-            });
-          }
-          if (isFaqs || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit FAQs: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=faqs`,
-              desc: `Manage product FAQs`
-            });
-          }
-          if (isStats || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit Badges: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=stats`,
-              desc: `Manage custom highlight bullets`
-            });
-          }
+        if (!hasCommand || isEdit) {
+          results.push({
+            category: "Products",
+            title: `Edit Details: "${p.title}"`,
+            href: p.href,
+            desc: `Update description, image settings and categories`
+          });
+        }
+        if (isPrice || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit Price: "${p.title}"`,
+            href: `${p.href}?focus=pricing`,
+            desc: `Update Regular price & Sale price`
+          });
+        }
+        if (isStock || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit Stock: "${p.title}"`,
+            href: `${p.href}?focus=stock`,
+            desc: `Manage stock inventory size and tracking settings`
+          });
+        }
+        if (isVariants || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit Variants: "${p.title}"`,
+            href: `${p.href}?focus=variants`,
+            desc: `Configure color swatches, size configurations and variable engines`
+          });
+        }
+        if (isSeo || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit SEO: "${p.title}"`,
+            href: `${p.href}?focus=seo`,
+            desc: `Set page focus keywords and description`
+          });
+        }
+        if (isFaqs || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit FAQs: "${p.title}"`,
+            href: `${p.href}?focus=faqs`,
+            desc: `Manage product FAQs`
+          });
+        }
+        if (isStats || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit Badges: "${p.title}"`,
+            href: `${p.href}?focus=stats`,
+            desc: `Manage custom highlight bullets`
+          });
         }
       });
 
       // 2. Pages matches
-      pages.forEach(pg => {
-        const titleLower = pg.title.toLowerCase();
-        const matchesAll = searchWords.every(w => titleLower.includes(w));
-
-        if (matchesAll) {
-          const hasCommand = isSeo;
-          if (!hasCommand) {
-            results.push({
-              category: "Pages",
-              title: `Edit Sections: "${pg.title}"`,
-              href: `/admin/pages/${pg._id}?tab=content`,
-              desc: `Configure templates and layout elements`
-            });
-          }
-          if (isSeo || !hasCommand) {
-            results.push({
-              category: "Pages",
-              title: `Edit SEO: "${pg.title}"`,
-              href: `/admin/pages/${pg._id}?tab=seo`,
-              desc: `Manage search engine tags and custom snippets`
-            });
-          }
+      list("pages").forEach(pg => {
+        if (!isSeo) {
+          results.push({
+            category: "Pages",
+            title: `Edit Sections: "${pg.title}"`,
+            href: `${pg.href}?tab=content`,
+            desc: `Configure templates and layout elements`
+          });
         }
+        results.push({
+          category: "Pages",
+          title: `Edit SEO: "${pg.title}"`,
+          href: `${pg.href}?tab=seo`,
+          desc: `Manage search engine tags and custom snippets`
+        });
       });
 
       // Specific custom match for "home seo"
-      const homeMatches = searchQuery.toLowerCase().includes("home") && searchQuery.toLowerCase().includes("seo");
-      if (homeMatches) {
-        const homePage = pages.find(p => p.slug === "home" || p.slug === "" || p.title.toLowerCase() === "home");
-        if (homePage) {
-          results.unshift({
-            category: "Shortcut",
-            title: `Configure Homepage SEO`,
-            href: `/admin/pages/${homePage._id}?tab=seo`,
-            desc: `Direct navigation to home page SEO suite`
-          });
-        }
+      const homePage = list("homePage")[0];
+      if (homePage) {
+        results.unshift({
+          category: "Shortcut",
+          title: `Configure Homepage SEO`,
+          href: homePage.href,
+          desc: `Direct navigation to home page SEO suite`
+        });
       }
 
       // 3. Blogs matches
-      blogs.forEach(b => {
-        const titleLower = b.title.toLowerCase();
-        const matchesAll = searchWords.every(w => titleLower.includes(w));
-
-        if (matchesAll) {
-          const hasCommand = isSeo;
-          if (!hasCommand) {
-            results.push({
-              category: "Blogs",
-              title: `Edit Post: "${b.title}"`,
-              href: `/admin/blogs/${b._id}?tab=content`,
-              desc: `Update article body text, visual sections, and categories`
-            });
-          }
-          if (isSeo || !hasCommand) {
-            results.push({
-              category: "Blogs",
-              title: `Edit Blog SEO: "${b.title}"`,
-              href: `/admin/blogs/${b._id}?tab=seo`,
-              desc: `Update keywords and meta info for this article`
-            });
-          }
+      list("blogs").forEach(b => {
+        if (!isSeo) {
+          results.push({
+            category: "Blogs",
+            title: `Edit Post: "${b.title}"`,
+            href: `${b.href}?tab=content`,
+            desc: `Update article body text, visual sections, and categories`
+          });
         }
+        results.push({
+          category: "Blogs",
+          title: `Edit Blog SEO: "${b.title}"`,
+          href: `${b.href}?tab=seo`,
+          desc: `Update keywords and meta info for this article`
+        });
       });
 
       // 4. Categories matches
-      categories.forEach(cat => {
-        const nameLower = cat.name.toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Categories",
-            title: `Edit Category: "${cat.name}"`,
-            href: `/admin/products/categories/${cat._id}`,
-            desc: `Configure subcategories and banner tags`
-          });
-        }
+      list("categories").forEach(cat => {
+        results.push({ category: "Categories", title: `Edit Category: "${cat.title}"`, href: cat.href, desc: `Configure subcategories and banner tags` });
       });
 
       // 5. Customers matches
-      customers.forEach(cust => {
-        const nameLower = (cust.name || "").toLowerCase();
-        const emailLower = (cust.email || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w) || emailLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Customers",
-            title: `Edit Customer: "${cust.name || cust.email}"`,
-            href: `/admin/customers/${cust._id}`,
-            desc: `Inspect and edit customer records`
-          });
-        }
+      list("customers").forEach(cust => {
+        results.push({ category: "Customers", title: `Edit Customer: "${cust.title}"`, href: cust.href, desc: `Inspect and edit customer records` });
       });
 
       // 6. Orders matches
-      orders.forEach(order => {
-        const orderNumStr = String(order.orderNumber);
-        const custNameLower = (order.shippingAddress?.fullName || "").toLowerCase();
-        const custEmailLower = (order.customer?.email || "").toLowerCase();
-        const matchesAll = searchWords.every(w => orderNumStr.includes(w) || custNameLower.includes(w) || custEmailLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Orders",
-            title: `Edit Order: #${order.orderNumber} (${order.shippingAddress?.fullName || "Guest"})`,
-            href: `/admin/orders/${order._id}`,
-            desc: `Confirm, fulfill, or edit items`
-          });
-        }
+      list("orders").forEach(order => {
+        results.push({ category: "Orders", title: `Edit Order: ${order.title}`, href: order.href, desc: `Confirm, fulfill, or edit items` });
       });
 
       // 7. Coupons matches
-      discounts.forEach(d => {
-        const codeLower = (d.code || "").toLowerCase();
-        const matchesAll = searchWords.every(w => codeLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Coupons",
-            title: `Manage Coupon: "${d.code}"`,
-            href: `/admin/discounts?search=${d.code}`,
-            desc: `Edit limitations, value or expiration`
-          });
-        }
+      list("discounts").forEach(d => {
+        results.push({ category: "Coupons", title: `Manage Coupon: "${d.title}"`, href: d.href, desc: `Edit limitations, value or expiration` });
       });
 
       // 8. Affiliates matches
-      affiliates.forEach(aff => {
-        const nameLower = (aff.name || "").toLowerCase();
-        const emailLower = (aff.email || "").toLowerCase();
-        const codeLower = (aff.code || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w) || emailLower.includes(w) || codeLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Affiliates",
-            title: `Edit Partner: "${aff.name} (${aff.code})"`,
-            href: `/admin/affiliates?view=list&search=${aff.code || aff.email}`,
-            desc: `Update commission shares and review performance`
-          });
-        }
+      list("affiliates").forEach(aff => {
+        results.push({ category: "Affiliates", title: `Edit Partner: "${aff.title}"`, href: aff.href, desc: `Update commission shares and review performance` });
       });
 
       // 9. Promotions matches
-      promotions.forEach(promo => {
-        const nameLower = (promo.name || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Promotions",
-            title: `Edit Promotion: "${promo.name}"`,
-            href: `/admin/promotions/${promo._id}`,
-            desc: `Configure dynamic cart/checkout deals`
-          });
-        }
+      list("promotions").forEach(promo => {
+        results.push({ category: "Promotions", title: `Edit Promotion: "${promo.title}"`, href: promo.href, desc: `Configure dynamic cart/checkout deals` });
       });
 
       // 10. Reviews matches
-      reviews.forEach(rev => {
-        const authorLower = (rev.author || "").toLowerCase();
-        const contentLower = (rev.content || "").toLowerCase();
-        const matchesAll = searchWords.every(w => authorLower.includes(w) || contentLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Reviews",
-            title: `Manage Review by "${rev.author}"`,
-            href: `/admin/reviews?search=${rev.author}`,
-            desc: `Approve, reply, delete or shadow-ban review`
-          });
-        }
+      list("reviews").forEach(rev => {
+        results.push({ category: "Reviews", title: `Manage Review by "${rev.title}"`, href: rev.href, desc: `Approve, reply, delete or shadow-ban review` });
       });
 
       // 11. Custom Scripts matches
-      scripts.forEach(sc => {
-        const nameLower = (sc.name || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Scripts",
-            title: `Edit Script: "${sc.name}"`,
-            href: `/admin/settings/scripts/${sc._id}`,
-            desc: `Edit injected pixel/code`
-          });
-        }
+      list("scripts").forEach(sc => {
+        results.push({ category: "Scripts", title: `Edit Script: "${sc.title}"`, href: sc.href, desc: `Edit injected pixel/code` });
       });
     }
 
@@ -664,7 +607,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
     }
 
     return results;
-  }, [searchQuery, products, pages, blogs, categories, customers, orders, discounts, affiliates, promotions, reviews, scripts]);
+  }, [searchQuery, searchKey, searchData]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && searchResults.length > 0) {
@@ -675,122 +618,154 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
     }
   };
 
-  return (
-    <header className="h-11 md:h-8 bg-[#1d2327] sticky top-0 z-[100] flex items-center justify-between gap-1 px-1 md:px-3 text-[#f0f0f1] font-sans select-none max-w-full">
+  // Shared admin-bar item look (WordPress #wpadminbar): 13px #f0f0f1, hover bg #2c3338 / text #72aee6
+  const newItems = NEW_ITEMS.filter((it) => can(session?.user, it.perm));
 
-      {/* Left items: Menu toggle (mobile), Brand logo & Visit Site */}
-      <div className="flex items-center gap-0.5 xs:gap-1 md:gap-4 shrink-0">
+  const barItem = "flex items-center gap-1.5 h-11 md:h-8 px-2 md:px-[7px] text-[13px] leading-8 text-[#f0f0f1] no-underline hover:bg-[#2c3338] hover:text-[#72aee6] focus:outline-none focus-visible:bg-[#2c3338] focus-visible:text-[#72aee6] cursor-pointer shrink-0";
+  const barItemActive = "bg-[#2c3338] text-[#72aee6]";
+  const subItem = "flex items-center gap-2 w-full min-h-10 md:min-h-[26px] px-3 py-1 text-left text-[13px] leading-[1.4] text-[#f0f0f1] no-underline hover:text-[#72aee6] hover:bg-[#2c3338] focus:outline-none focus-visible:text-[#72aee6] cursor-pointer";
+
+  return (
+    <header
+      id="wpadminbar"
+      className="h-11 md:h-8 bg-[#1d2327] sticky top-0 z-[100] flex items-center justify-between gap-0 px-0 text-[13px] text-[#f0f0f1] font-sans select-none max-w-full"
+    >
+
+      {/* Left items: Menu toggle (mobile), site name / visit store, + New */}
+      <div className="flex items-center h-full shrink-0">
         <button
           type="button"
           onClick={onMenuToggle}
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
           aria-controls="admin-sidebar"
-          className={`md:hidden flex items-center justify-center w-8 xs:w-10 h-11 hover:bg-[#2c3338] hover:text-[#72aee6] transition-colors cursor-pointer shrink-0 ${menuOpen ? "bg-[#2c3338] text-[#72aee6]" : ""}`}
+          className={`md:hidden flex items-center justify-center w-11 h-11 text-[#f0f0f1] hover:bg-[#2c3338] hover:text-[#72aee6] cursor-pointer shrink-0 ${menuOpen ? barItemActive : ""}`}
         >
-          {menuOpen ? <X className="w-4 h-4 xs:w-5 xs:h-5" /> : <Menu className="w-4 h-4 xs:w-5 xs:h-5" />}
+          {menuOpen ? <X className="w-5 h-5" aria-hidden="true" /> : <Menu className="w-5 h-5" aria-hidden="true" />}
         </button>
-        <Link href="/" className="flex items-center gap-1.5 hover:text-[#72aee6] transition-colors group px-1 md:px-2 py-1 h-8 shrink-0">
-          <div className="w-4 h-4 bg-white/20 rounded-sm flex items-center justify-center shrink-0">
-            <span className="text-[10px] font-black italic text-white">P</span>
-          </div>
-          <span className="text-[13px] font-bold hidden sm:block">Pairo Admin</span>
+        <Link href="/" className={barItem} title="Pairo Admin">
+          <span className="w-5 h-5 md:w-4 md:h-4 rounded-[2px] bg-[#a7aaad] text-[#1d2327] flex items-center justify-center shrink-0 text-[11px] font-semibold" aria-hidden="true">
+            P
+          </span>
+          <span className="hidden sm:inline">Pairo Admin</span>
         </Link>
-        <Link href="/" target="_blank" className="hidden xs:flex items-center gap-1 hover:text-[#72aee6] text-[13px] transition-colors px-1.5 md:px-2 py-1 h-8 shrink-0" title="Visit Store">
-          <Globe className="w-3.5 h-3.5" />
+        <Link href="/" target="_blank" className={`${barItem} hidden xs:flex`} title="Visit Store">
+          <Globe className="w-4 h-4 md:w-3.5 md:h-3.5 text-[#a7aaad]" aria-hidden="true" />
           <span className="hidden md:inline">Visit Store</span>
+          <span className="sr-only md:hidden">Visit Store</span>
         </Link>
-      </div>
 
-      {/* Center items: Global Spotlight Search Box */}
-      <div className="relative flex items-center h-8 flex-1 min-w-0 md:flex-none mx-1 md:mx-0" ref={searchRef}>
-        <div className="flex items-center gap-1 bg-[#2c3338] border border-white/10 hover:border-white/30 rounded-[3px] px-1.5 xs:px-2 py-0.5 transition-all w-full md:w-auto min-w-0">
-          <Search className="w-3 h-3 text-[#a7aaad] shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setShowSearchResults(true)}
-            onKeyDown={handleKeyDown}
-            placeholder="Search..."
-            aria-label="Search admin"
-            className="w-full min-w-0 md:w-48 lg:w-64 bg-transparent border-none text-[11px] text-[#f0f0f1] placeholder-[#a7aaad] outline-none h-5"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-white shrink-0">
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-
-        {/* Command Search Results Dropdown */}
-        {showSearchResults && (
-          <div className="fixed md:absolute left-1 right-1 top-11 md:top-full md:left-0 md:right-auto mt-1 bg-[#2c3338] border border-white/10 shadow-2xl rounded-[3px] max-h-[min(300px,calc(100dvh-4rem))] overflow-y-auto z-[110] divide-y divide-white/5 md:w-80 max-w-[calc(100vw-0.5rem)]">
-            {searchResults.length === 0 ? (
-              <div className="p-4 text-center text-[#a7aaad] text-[11px] italic">
-                No matches found.
-              </div>
-            ) : (
-              searchResults.map((res, i) => (
-                <Link
-                  key={i}
-                  href={res.href}
-                  onClick={() => {
-                    setShowSearchResults(false);
-                    setSearchQuery("");
-                  }}
-                  className="px-3 py-2 flex items-start justify-between gap-2 hover:bg-[#353c42] transition-all group text-left cursor-pointer"
-                >
-                  <div>
-                    <div className="text-[12px] font-bold text-[#f0f0f1] group-hover:text-[#72aee6] leading-tight">
-                      {res.title}
-                    </div>
-                    <div className="text-[10px] text-[#a7aaad] mt-0.5 leading-snug">
-                      {res.desc}
-                    </div>
-                  </div>
-                  <span className="text-[8px] font-black uppercase bg-white/10 text-[#72aee6] px-1.5 py-0.5 rounded-[2px] shrink-0 self-center">
-                    {res.category}
-                  </span>
-                </Link>
-              ))
-            )}
+        {/* + New (hover / keyboard focus opens the submenu, like WordPress) */}
+        {newItems.length > 0 && (
+          <div className="relative h-full hidden sm:flex items-center group">
+            <Link href={newItems[0].href} className={`${barItem} group-hover:bg-[#2c3338] group-hover:text-[#72aee6] group-focus-within:bg-[#2c3338]`} aria-haspopup="true">
+              <Plus className="w-4 h-4 text-[#a7aaad] group-hover:text-[#72aee6]" aria-hidden="true" />
+              <span>New</span>
+            </Link>
+            <div className="hidden group-hover:block group-focus-within:block absolute top-full left-0 min-w-[180px] bg-[#2c3338] shadow-[0_3px_5px_rgba(0,0,0,0.2)] py-1.5 z-[110]">
+              {newItems.map((it) => (
+                <Link key={it.href} href={it.href} className={subItem}>{it.label}</Link>
+              ))}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Right items: Howdy Profile & Notifications */}
-      <div className="flex items-center gap-0 h-8 shrink-0">
+      {/* Right items: Search, Notifications & Account */}
+      <div className="flex items-center h-full min-w-0 flex-1 justify-end">
+
+        {/* Global Spotlight Search Box */}
+        <div className="relative flex items-center h-full flex-1 min-w-0 md:flex-none px-1 md:px-2" ref={searchRef}>
+          <label className="flex items-center gap-1.5 w-full md:w-auto min-w-0 h-8 md:h-6 px-2 rounded-[2px] bg-[#2c3338] border border-transparent focus-within:bg-[#f0f0f1] focus-within:border-[#2271b1] group/search cursor-text">
+            <Search className="w-4 h-4 md:w-3.5 md:h-3.5 text-[#a7aaad] group-focus-within/search:text-[#646970] shrink-0" aria-hidden="true" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setShowSearchResults(true)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search..."
+              aria-label="Search admin"
+              className="w-full min-w-0 md:w-44 lg:w-56 bg-transparent border-0 p-0 text-[16px] md:text-[13px] text-[#f0f0f1] focus:text-[#1d2327] placeholder-[#a7aaad] outline-none shadow-none focus:ring-0"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                className="flex items-center justify-center w-6 h-6 -mr-1 text-[#a7aaad] hover:text-[#d63638] shrink-0 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            )}
+          </label>
+
+          {/* Command Search Results Dropdown */}
+          {showSearchResults && (
+            <div className="fixed md:absolute left-0 right-0 top-11 md:top-full md:left-auto md:right-2 md:w-80 max-w-full bg-[#2c3338] shadow-[0_3px_5px_rgba(0,0,0,0.2)] max-h-[min(320px,calc(100dvh-4rem))] overflow-y-auto z-[110] py-1.5">
+              {searchResults.length === 0 ? (
+                <div className="px-3 py-3 text-[13px] text-[#a7aaad]">
+                  No matches found.
+                </div>
+              ) : (
+                searchResults.map((res, i) => (
+                  <Link
+                    key={i}
+                    href={res.href}
+                    onClick={() => {
+                      setShowSearchResults(false);
+                      setSearchQuery("");
+                    }}
+                    className="flex items-start justify-between gap-3 px-3 py-1.5 min-h-10 md:min-h-0 text-left text-[#f0f0f1] no-underline hover:text-[#72aee6] focus:outline-none focus-visible:text-[#72aee6] group cursor-pointer"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-[13px] leading-[1.4]">
+                        {res.title}
+                      </span>
+                      <span className="block text-[12px] leading-[1.4] text-[#a7aaad] group-hover:text-[#c3c4c7]">
+                        {res.desc}
+                      </span>
+                    </span>
+                    <span className="text-[12px] leading-[1.4] text-[#a7aaad] shrink-0">
+                      {res.category}
+                    </span>
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Notifications Dropdown (WP Overlay Notice Module) */}
-        <div className="relative h-8 flex items-center" ref={dropdownRef}>
+        <div className="relative h-full flex items-center" ref={dropdownRef}>
           <button
+            type="button"
             onClick={() => setShowNotifications(!showNotifications)}
-            aria-label="Notifications"
-            className={`flex items-center gap-1.5 px-2 md:px-3 h-11 md:h-full hover:bg-[#2c3338] transition-all text-[#f0f0f1] hover:text-[#72aee6] cursor-pointer ${
-              showNotifications ? "bg-[#2c3338] text-[#72aee6]" : ""
-            }`}
+            aria-label={unreadNotices.length > 0 ? `Notifications, ${unreadNotices.length} unread` : "Notifications"}
+            aria-expanded={showNotifications}
+            aria-haspopup="true"
+            className={`${barItem} ${showNotifications ? barItemActive : ""}`}
           >
-            <Bell className="w-4 h-4 md:w-3.5 md:h-3.5" />
+            <Bell className="w-4 h-4 md:w-3.5 md:h-3.5 text-[#a7aaad]" aria-hidden="true" />
             {unreadNotices.length > 0 && (
-              <span className="bg-[#d63638] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none shrink-0 min-w-[16px] text-center">
+              <span className="inline-block bg-[#d63638] text-white text-[9px] leading-[17px] h-[17px] min-w-[17px] px-[5px] rounded-[9px] text-center shrink-0" aria-hidden="true">
                 {unreadNotices.length > 99 ? "99+" : unreadNotices.length}
               </span>
             )}
           </button>
 
           {showNotifications && (
-            <div className="fixed md:absolute left-1 right-1 top-11 md:top-full md:left-auto md:right-0 md:w-96 max-w-[calc(100vw-0.5rem)] bg-white border border-[#c3c4c7] shadow-xl py-0 z-[110] text-[13px] text-gray-700 rounded-none border-t-transparent text-left">
+            <div className="fixed md:absolute left-0 right-0 top-11 md:top-full md:left-auto md:right-0 md:w-96 max-w-full bg-white border border-[#c3c4c7] shadow-[0_3px_5px_rgba(0,0,0,0.2)] z-[110] text-[13px] text-[#3c434a] text-left">
               {/* Header */}
-              <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-[#1d2327] uppercase tracking-wider">Admin Notices</span>
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[#dcdcde]">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[14px] font-semibold text-[#1d2327]">Notifications</span>
                   {unreadNotices.length > 0 ? (
-                    <span className="bg-[#d63638] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-[2px]">
+                    <span className="text-[12px] text-[#d63638]">
                       {unreadNotices.length} Pending
                     </span>
                   ) : (
-                    <span className="bg-[#00a32a] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-[2px]">
+                    <span className="text-[12px] text-[#00a32a]">
                       All Caught Up
                     </span>
                   )}
@@ -800,58 +775,61 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                   <button
                     type="button"
                     onClick={markAllAsRead}
-                    className="text-[11px] text-[#2271b1] hover:text-[#135e96] font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                    className="inline-flex items-center gap-1 min-h-10 md:min-h-0 bg-transparent border-0 p-0 text-[13px] text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer"
                     title="Mark all notifications as read"
                   >
-                    <CheckCheck className="w-3.5 h-3.5" />
+                    <CheckCheck className="w-4 h-4" aria-hidden="true" />
                     Read all
                   </button>
                 )}
               </div>
 
-              {/* Filter Tabs */}
-              <div className="flex items-center bg-[#f0f0f1] border-b border-[#c3c4c7] px-3 py-1 text-[11px] gap-3">
+              {/* Filter Tabs (WordPress subsubsub style) */}
+              <div className="flex items-center flex-wrap gap-x-1 px-3 py-1.5 border-b border-[#dcdcde] bg-[#f6f7f7] text-[13px] text-[#646970]">
                 <button
                   type="button"
                   onClick={() => setNoticeFilter("unread")}
-                  className={`font-semibold pb-0.5 border-b-2 transition-all cursor-pointer ${
+                  aria-pressed={noticeFilter === "unread"}
+                  className={`min-h-10 md:min-h-0 bg-transparent border-0 p-0 cursor-pointer ${
                     noticeFilter === "unread"
-                      ? "text-[#1d2327] border-[#2271b1]"
-                      : "text-[#646970] border-transparent hover:text-[#1d2327]"
+                      ? "text-[#1d2327] font-semibold"
+                      : "text-[#2271b1] hover:text-[#135e96]"
                   }`}
                 >
-                  Unread ({unreadNotices.length})
+                  Unread <span className="text-[#646970] font-normal">({unreadNotices.length})</span>
                 </button>
+                <span aria-hidden="true">|</span>
                 <button
                   type="button"
                   onClick={() => setNoticeFilter("all")}
-                  className={`font-semibold pb-0.5 border-b-2 transition-all cursor-pointer ${
+                  aria-pressed={noticeFilter === "all"}
+                  className={`min-h-10 md:min-h-0 bg-transparent border-0 p-0 cursor-pointer ${
                     noticeFilter === "all"
-                      ? "text-[#1d2327] border-[#2271b1]"
-                      : "text-[#646970] border-transparent hover:text-[#1d2327]"
+                      ? "text-[#1d2327] font-semibold"
+                      : "text-[#2271b1] hover:text-[#135e96]"
                   }`}
                 >
-                  All ({notifications.length})
+                  All <span className="text-[#646970] font-normal">({notifications.length})</span>
                 </button>
 
                 {noticeFilter === "all" && dismissedIds.length > 0 && (
                   <button
                     type="button"
                     onClick={resetAllRead}
-                    className="ml-auto text-[10px] text-[#646970] hover:text-[#d63638] hover:underline flex items-center gap-0.5 cursor-pointer"
+                    className="ml-auto inline-flex items-center gap-1 min-h-10 md:min-h-0 bg-transparent border-0 p-0 text-[13px] text-[#b32d2e] hover:text-[#d63638] hover:underline cursor-pointer"
                     title="Unmark all read notifications"
                   >
-                    <RotateCcw className="w-2.5 h-2.5" />
+                    <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                     Reset
                   </button>
                 )}
               </div>
 
               {/* Notice Items */}
-              <div className="max-h-[min(280px,calc(100dvh-7rem))] overflow-y-auto divide-y divide-[#f0f0f1]">
+              <div className="max-h-[min(320px,calc(100dvh-8rem))] overflow-y-auto">
                 {displayedNotices.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400 text-xs flex flex-col items-center justify-center gap-1.5">
-                    <Check className="w-5 h-5 text-[#00a32a]" />
+                  <div className="px-4 py-6 text-center text-[13px] text-[#646970] flex flex-col items-center justify-center gap-1.5">
+                    <Check className="w-5 h-5 text-[#00a32a]" aria-hidden="true" />
                     <span>
                       {noticeFilter === "unread"
                         ? "No unread notifications."
@@ -861,7 +839,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                       <button
                         type="button"
                         onClick={() => setNoticeFilter("all")}
-                        className="text-[#2271b1] hover:underline text-[11px] mt-1 cursor-pointer"
+                        className="min-h-10 md:min-h-0 bg-transparent border-0 p-0 text-[13px] text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer"
                       >
                         View all notices ({notifications.length})
                       </button>
@@ -870,7 +848,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                 ) : (
                   displayedNotices.map((notice) => {
                     const isRead = dismissedIds.includes(notice.id);
-                    let borderClass = isRead ? "border-l-gray-300 opacity-60" : "border-l-[#72aee6]";
+                    let borderClass = isRead ? "border-l-[#dcdcde]" : "border-l-[#72aee6]";
                     if (!isRead) {
                       if (notice.type === "warning") borderClass = "border-l-[#dba617]";
                       if (notice.type === "error") borderClass = "border-l-[#d63638]";
@@ -881,24 +859,22 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                     return (
                       <div
                         key={notice.id}
-                        className={`p-2.5 xs:p-3 pl-3 border-l-4 ${borderClass} hover:bg-[#f6f7f7] relative flex flex-col gap-1.5 transition-all ${
-                          isRead ? "bg-gray-50/60" : ""
+                        className={`relative flex flex-col gap-1 py-2 pl-3 pr-12 border-l-4 border-b border-b-[#f0f0f1] ${borderClass} ${
+                          isRead ? "bg-[#f6f7f7]" : "bg-white"
                         }`}
                       >
-                        <div className="pr-10">
-                          <span className="font-bold text-[#1d2327] text-[11px] uppercase mr-1.5">
-                            [{notice.label}]
-                          </span>
-                          <span className="text-[12px] text-[#2c3338] leading-normal">
-                            {notice.text}
-                          </span>
+                        <p className={`m-0 text-[13px] leading-[1.5] ${isRead ? "text-[#646970]" : "text-[#3c434a]"}`}>
+                          <strong className={`font-semibold ${isRead ? "text-[#646970]" : "text-[#1d2327]"}`}>
+                            {notice.label}:
+                          </strong>{" "}
+                          {notice.text}
                           {isRead && (
-                            <span className="ml-2 text-[10px] text-gray-400 italic">
+                            <span className="ml-1.5 text-[12px] text-[#8c8f94]">
                               (Read)
                             </span>
                           )}
-                        </div>
-                        <div className="flex items-center gap-3">
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
                           {notice.actions.map((act, i) => {
                             if (act.href) {
                               return (
@@ -909,7 +885,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                                     dismissNotice(notice.id);
                                     setShowNotifications(false);
                                   }}
-                                  className="text-[#2271b1] hover:text-[#135e96] underline text-[11px] font-semibold"
+                                  className="inline-flex items-center min-h-10 md:min-h-0 text-[#2271b1] hover:text-[#135e96] no-underline hover:underline"
                                 >
                                   {act.label}
                                 </Link>
@@ -921,34 +897,36 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                                 type="button"
                                 disabled={isUpdating}
                                 onClick={async () => {
-                                  dismissNotice(notice.id);
-                                  await act.action();
+                                  const succeeded = await act.action();
+                                  if (succeeded) dismissNotice(notice.id);
                                 }}
-                                className="text-[#2271b1] hover:text-[#135e96] underline text-[11px] font-semibold cursor-pointer disabled:opacity-50"
+                                className="inline-flex items-center min-h-10 md:min-h-0 bg-transparent border-0 p-0 text-[13px] text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer disabled:opacity-60 disabled:cursor-default"
                               >
                                 {isUpdating ? "Processing..." : act.label}
                               </button>
                             );
                           })}
                         </div>
-                        <div className="absolute right-1.5 top-1.5">
+                        <div className="absolute right-1 top-1">
                           {isRead ? (
                             <button
                               type="button"
                               onClick={() => unmarkNotice(notice.id)}
-                              className="text-[#8c8f94] hover:text-[#2271b1] p-1 rounded transition-colors cursor-pointer text-[10px]"
+                              className="flex items-center justify-center w-10 h-10 md:w-7 md:h-7 bg-transparent border-0 text-[#8c8f94] hover:text-[#2271b1] cursor-pointer"
                               title="Mark as unread"
+                              aria-label="Mark as unread"
                             >
-                              <RotateCcw className="w-3 h-3" />
+                              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                             </button>
                           ) : (
                             <button
                               type="button"
                               onClick={() => dismissNotice(notice.id)}
-                              className="text-[#8c8f94] hover:text-black p-0.5 rounded-full cursor-pointer"
+                              className="flex items-center justify-center w-10 h-10 md:w-7 md:h-7 bg-transparent border-0 text-[#8c8f94] hover:text-[#d63638] cursor-pointer"
                               title="Mark as read"
+                              aria-label="Mark as read"
                             >
-                              <X className="w-3.5 h-3.5" />
+                              <X className="w-4 h-4" aria-hidden="true" />
                             </button>
                           )}
                         </div>
@@ -960,20 +938,20 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
 
               {/* Footer */}
               {displayedNotices.length > 0 && (
-                <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] px-3 py-1.5 flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-t border-[#dcdcde] bg-[#f6f7f7] text-[12px] text-[#646970]">
                   {unreadNotices.length > 0 ? (
                     <button
                       type="button"
                       onClick={markAllAsRead}
-                      className="text-[#2271b1] hover:text-[#135e96] font-medium flex items-center gap-1 hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1 min-h-10 md:min-h-0 bg-transparent border-0 p-0 text-[13px] text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer"
                     >
-                      <CheckCheck className="w-3.5 h-3.5" />
+                      <CheckCheck className="w-4 h-4" aria-hidden="true" />
                       Mark all as read
                     </button>
                   ) : (
-                    <span className="text-gray-500 text-[10px]">All notices read</span>
+                    <span>All notices read</span>
                   )}
-                  <span className="text-gray-400 text-[10px]">
+                  <span>
                     {unreadNotices.length} unread of {notifications.length}
                   </span>
                 </div>
@@ -983,33 +961,42 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
         </div>
 
         {/* User Account / Profile Dropdown */}
-        <div className="relative h-8 flex items-center" ref={profileRef}>
+        <div className="relative h-full flex items-center" ref={profileRef}>
           <button
+            type="button"
             onMouseEnter={() => setShowProfile(true)}
             onClick={() => setShowProfile(!showProfile)}
             aria-label="Account menu"
-            className={`flex items-center gap-1.5 xs:gap-2 px-1.5 xs:px-2 md:px-3 h-11 md:h-full hover:bg-[#2c3338] transition-all text-[#f0f0f1] hover:text-[#72aee6] ${showProfile ? 'bg-[#2c3338]' : ''}`}
+            aria-expanded={showProfile}
+            aria-haspopup="true"
+            className={`${barItem} ${showProfile ? barItemActive : ""}`}
           >
-            <span className="text-[13px] hidden lg:inline whitespace-nowrap">Howdy, <span className="font-bold">{session?.user?.name || "Admin"}</span></span>
-            <div className="w-6 h-6 md:w-5 md:h-5 bg-white/10 rounded-full flex items-center justify-center overflow-hidden">
-              <User className="w-3.5 h-3.5 text-[#a7aaad]" />
-            </div>
+            <span className="hidden lg:inline whitespace-nowrap">Howdy, {session?.user?.name || "Admin"}</span>
+            <span className="w-6 h-6 md:w-[18px] md:h-[18px] bg-[#3c434a] flex items-center justify-center overflow-hidden shrink-0" aria-hidden="true">
+              <User className="w-3.5 h-3.5 md:w-3 md:h-3 text-[#a7aaad]" />
+            </span>
           </button>
 
           {showProfile && (
             <div
               onMouseLeave={() => setShowProfile(false)}
-              className="absolute top-full right-0 w-48 xs:w-56 max-w-[calc(100vw-0.5rem)] bg-[#2c3338] border border-transparent shadow-xl py-1 z-[101] text-[13px] border-t-white/10"
+              className="absolute top-full right-0 w-56 max-w-[100vw] bg-[#2c3338] shadow-[0_3px_5px_rgba(0,0,0,0.2)] py-1.5 z-[110] text-[13px]"
             >
-              <div className="px-4 py-3 bg-[#2c3338] border-b border-white/5 mb-1 text-left">
-                <span className="font-bold text-white truncate block">{session?.user?.name || "Admin"}</span>
-                <span className="text-[#a7aaad] text-[11px] truncate block mt-0.5">{session?.user?.email}</span>
+              <div className="flex items-start gap-3 px-3 py-2 text-left">
+                <span className="w-16 h-16 bg-[#3c434a] flex items-center justify-center shrink-0" aria-hidden="true">
+                  <User className="w-7 h-7 text-[#a7aaad]" />
+                </span>
+                <span className="min-w-0 pt-0.5">
+                  <span className="block truncate text-[#f0f0f1]">{session?.user?.name || "Admin"}</span>
+                  <span className="block truncate text-[12px] text-[#a7aaad]">{session?.user?.email}</span>
+                </span>
               </div>
               <button
+                type="button"
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="w-full text-left px-4 py-2 text-[#72aee6] hover:text-[#f0f0f1] hover:bg-[#353c42] transition-colors flex items-center gap-2"
+                className={subItem}
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
                 Log Out
               </button>
             </div>

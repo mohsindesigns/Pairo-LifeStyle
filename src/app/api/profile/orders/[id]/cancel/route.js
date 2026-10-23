@@ -20,7 +20,8 @@ export async function PATCH(req, { params }) {
     // Atomic fetch-and-update to prevent race conditions during cancellation
     const order = await Order.findOne({ 
       _id: id, 
-      "customer.userId": session.user.id 
+      "customer.userId": session.user.id,
+      isDeleted: { $ne: true }
     });
 
     if (!order) {

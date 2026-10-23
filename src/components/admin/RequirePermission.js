@@ -24,8 +24,10 @@ export default function RequirePermission({ permission, children }) {
 
   if (!allowed) {
     return (
-      <div className="bg-white border border-[#ccd0d4] p-6 text-[13px] text-[#646970] m-4 rounded-[3px]">
-        You don&apos;t have permission to view this page.
+      <div className="wp-page">
+        <div className="wp-notice wp-notice-error" role="alert" style={{ marginTop: 16 }}>
+          <p>Sorry, you don&apos;t have permission to view this page.</p>
+        </div>
       </div>
     );
   }

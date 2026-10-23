@@ -25,6 +25,9 @@ export async function POST(req, { params }) {
 
     const inquiry = await CustomJacketInquiry.findById(id);
     if (!inquiry) return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
+    if (inquiry.isDeleted) {
+      return NextResponse.json({ error: "Restore this inquiry from the Trash before converting it" }, { status: 409 });
+    }
     if (inquiry.orderId) {
       return NextResponse.json({ error: "This inquiry has already been converted to an order" }, { status: 409 });
     }

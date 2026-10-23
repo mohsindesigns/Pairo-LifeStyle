@@ -14,7 +14,7 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const orders = await Order.find({ "customer.userId": session.user.id })
+    const orders = await Order.find({ "customer.userId": session.user.id, isDeleted: { $ne: true } })
       .populate('items.productId', 'images image')
       .sort({ createdAt: -1 })
       .lean();

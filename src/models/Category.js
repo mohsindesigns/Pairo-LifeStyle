@@ -11,7 +11,8 @@ const CategorySchema = new mongoose.Schema({
   status: { type: String, enum: ['Draft', 'Published'], default: 'Published' },
   isFeatured: { type: Boolean, default: false },
   showInFilters: { type: Boolean, default: true },
-  isDeleted: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
   seo: {
     title: String,
     description: String,

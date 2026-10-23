@@ -43,7 +43,7 @@ export async function GET(req) {
       AffiliateApplication.countDocuments({ status: 'Approved' }),
       AffiliateApplication.countDocuments({ status: 'Rejected' }),
       AffiliateClick.countDocuments(),
-      Order.countDocuments({ affiliateId: { $ne: null } }),
+      Order.countDocuments({ affiliateId: { $ne: null }, isDeleted: { $ne: true } }),
 
       // Commission amounts by status
       AffiliateCommission.aggregate([
@@ -70,7 +70,7 @@ export async function GET(req) {
         .lean(),
 
       // Recent 5 referred orders
-      Order.find({ affiliateId: { $ne: null } })
+      Order.find({ affiliateId: { $ne: null }, isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(5)
         .populate("affiliateId", "name referralCode")
@@ -87,7 +87,7 @@ export async function GET(req) {
 
       // Total revenue from referred orders
       Order.aggregate([
-        { $match: { affiliateId: { $ne: null } } },
+        { $match: { affiliateId: { $ne: null }, isDeleted: { $ne: true } } },
         { $group: { _id: null, total: { $sum: "$financials.total" } } }
       ]),
 
@@ -100,7 +100,7 @@ export async function GET(req) {
 
       // Monthly orders trend (last 6 months)
       Order.aggregate([
-        { $match: { affiliateId: { $ne: null }, createdAt: { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) } } },
+        { $match: { affiliateId: { $ne: null }, isDeleted: { $ne: true }, createdAt: { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) } } },
         { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
         { $sort: { "_id.year": 1, "_id.month": 1 } }
       ])

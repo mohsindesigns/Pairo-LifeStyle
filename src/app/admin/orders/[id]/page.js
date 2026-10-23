@@ -1,31 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  ChevronLeft,
-  User,
-  MapPin,
-  CreditCard,
-  Clock,
-  Package,
-  Users,
-  ExternalLink,
-  Copy,
-  Send,
-  FileText,
-  Sparkles,
-  Globe,
-  Printer,
-} from "lucide-react";
+import { ChevronLeft, MapPin, ExternalLink, Copy, Send, FileText } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
 import InvoiceTemplate from "@/components/admin/InvoiceTemplate";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, Postbox, Notice, StatusPill, formatMoney } from "@/components/admin/ui";
 import { can } from "@/lib/rbac";
 import { formatCurrency } from "@/lib/currency";
-import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
 import { usePopup } from "@/context/PopupContext";
 import { isPayableByLink } from "@/lib/customOrderConstants";
 import RequirePermission from "@/components/admin/RequirePermission";
@@ -33,6 +17,7 @@ import SizeConfirmationPanel from "@/components/admin/SizeConfirmationPanel";
 
 export default function OrderDetailPage() {
   const { id } = useParams();
+  const router = useRouter();
   const { data: session } = useSession();
   const { showConfirm } = usePopup();
   const [order, setOrder] = useState(null);
@@ -52,6 +37,7 @@ export default function OrderDetailPage() {
   const [savingAmount, setSavingAmount] = useState(false);
   const [convertingToCard, setConvertingToCard] = useState(false);
   const [exportingVendorPdf, setExportingVendorPdf] = useState(false);
+  const [trashBusy, setTrashBusy] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -82,10 +68,12 @@ export default function OrderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      const data = await res.json();
-      if (data.success) setOrder(data.order);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) setOrder(data.order);
+      else toast.error(data.error || "Couldn't update the order status.");
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't update the order status.");
     } finally {
       setUpdating(false);
     }
@@ -100,27 +88,20 @@ export default function OrderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timelineMessage: newNote }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
         setOrder(data.order);
         setNewNote("");
+        toast.success("Note added.");
+      } else {
+        toast.error(data.error || "Couldn't add the note.");
       }
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't add the note.");
     } finally {
       setUpdating(false);
     }
-  };
-
-  const getPaymentStatusBadge = (status) => {
-    const styles = {
-      'Paid': BADGE_COLORS.green,
-      'Pending': BADGE_COLORS.amber,
-      'Failed': BADGE_COLORS.red,
-      'Refunded': BADGE_COLORS.gray,
-      'Partially Refunded': BADGE_COLORS.gray,
-    };
-    return styles[status] || DEFAULT_BADGE_COLOR;
   };
 
   const remainingRefundable = order
@@ -332,42 +313,93 @@ export default function OrderDetailPage() {
     const info = getNextStatusInfo(order?.status);
     if (!info) {
       if (order?.status === 'Delivered') {
-        return (
-          <div className="w-full text-center py-2 bg-green-50 border border-green-200 text-green-700 text-xs font-bold uppercase rounded-[3px]">
-            Delivered
-          </div>
-        );
+        return <StatusPill status="Delivered" />;
       }
       return null;
     }
 
     return (
       <button
+        type="button"
         onClick={() => updateStatus(info.nextStatus)}
         disabled={updating}
-        className="w-full bg-[#2271b1] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-[#135e96] transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        className="wp-btn wp-btn-primary"
       >
         {updating ? "Updating..." : info.label}
       </button>
     );
   };
 
+  // "Process Refund" on a Cancelled order. A paid Stripe order goes through the
+  // refund endpoint (full remaining balance, same server-side checks as the Refund
+  // form); that endpoint marks the order Refunded once fully refunded. Anything
+  // else (unpaid / non-Stripe / already fully refunded) only changes the status.
+  const processCancelledRefund = async () => {
+    const stripeRefundable =
+      order?.payment?.provider === 'stripe' &&
+      !!order.payment?.stripePaymentIntentId &&
+      (order.payment?.status === 'Paid' || order.payment?.status === 'Partially Refunded') &&
+      remainingRefundable > 0;
+
+    if (!stripeRefundable) {
+      const ok = await showConfirm(
+        `No payment will be refunded — this order has no captured Stripe payment left to refund. The order status will just be set to Refunded.`,
+        "Mark order as Refunded?",
+        { confirmText: "Mark as Refunded" }
+      );
+      if (ok) updateStatus('Refunded');
+      return;
+    }
+
+    if (!canRefund) {
+      toast.error("You don't have permission to issue refunds.");
+      return;
+    }
+
+    const amountText = formatMoney(remainingRefundable, currencyCode);
+    const ok = await showConfirm(
+      `${amountText} will be refunded to the customer via Stripe, and the order will be marked Refunded. This cannot be undone.`,
+      `Refund ${amountText}?`,
+      { confirmText: `Refund ${amountText}`, danger: true }
+    );
+    if (!ok) return;
+
+    setUpdating(true);
+    try {
+      // No amount sent: the server refunds the full remaining refundable balance.
+      const res = await fetch(`/api/admin/orders/${id}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        toast.error(data.error || "Refund failed.");
+        return;
+      }
+      setOrder(data.order);
+      toast.success(`Refund of ${amountText} issued via Stripe.`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Refund failed. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const renderCancelRefundButton = () => {
     if (!order) return null;
     if (order.status === 'Refunded') {
-      return (
-        <div className="w-full text-center py-2 bg-gray-50 border border-gray-200 text-gray-500 text-xs font-bold uppercase rounded-[3px]">
-          Refunded
-        </div>
-      );
+      return <StatusPill status="Refunded" />;
     }
 
     if (order.status === 'Cancelled') {
       return (
         <button
-          onClick={() => updateStatus('Refunded')}
+          type="button"
+          onClick={processCancelledRefund}
           disabled={updating}
-          className="w-full bg-[#2271b1] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-[#135e96] transition-colors shadow-sm disabled:opacity-50"
+          className="wp-btn"
         >
           {updating ? "Updating..." : "Process Refund"}
         </button>
@@ -376,6 +408,7 @@ export default function OrderDetailPage() {
 
     return (
       <button
+        type="button"
         onClick={async () => {
           const ok = await showConfirm("Are you sure you want to cancel this order?");
           if (ok) {
@@ -383,818 +416,935 @@ export default function OrderDetailPage() {
           }
         }}
         disabled={updating}
-        className="w-full border border-red-500 text-red-600 py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-red-50 transition-colors disabled:opacity-50"
+        className="wp-btn"
+        style={{ borderColor: "#b32d2e", color: "#b32d2e" }}
       >
         {updating ? "Updating..." : "Cancel Order"}
       </button>
     );
   };
 
+  const readError = async (res, fallback) => {
+    const data = await res.json().catch(() => ({}));
+    return data.error || fallback;
+  };
+
+  // Server-side copy (POST /api/admin/orders/[id]/duplicate): a Pending draft at the
+  // original prices — no stock change, no emails, no commissions. Opens the copy.
+  const duplicateThisOrder = async () => {
+    setTrashBusy(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${order._id}/duplicate`, { method: "POST" });
+      if (!res.ok) throw new Error(await readError(res, "Failed to duplicate order."));
+      const data = await res.json();
+      toast.success(`Order #${order.orderNumber} duplicated as #${data.order.orderNumber} (Pending draft).`);
+      router.push(`/admin/orders/${data.order._id}`);
+    } catch (err) {
+      toast.error(err.message || "Failed to duplicate order.");
+    } finally {
+      setTrashBusy(false);
+    }
+  };
+
+  const moveToTrash = async () => {
+    setTrashBusy(true);
+    try {
+      const res = await fetch(`/api/admin/orders?id=${order._id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readError(res, "Failed to move order to trash."));
+      toast.success(`Order #${order.orderNumber} moved to the Trash.`);
+      router.push("/admin/orders");
+    } catch (err) {
+      toast.error(err.message || "Failed to move order to trash.");
+      setTrashBusy(false);
+    }
+  };
+
+  const restoreFromTrash = async () => {
+    setTrashBusy(true);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: order._id, isDeleted: false }),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Failed to restore order."));
+      setOrder((prev) => ({ ...prev, isDeleted: false, deletedAt: null }));
+      toast.success(`Order #${order.orderNumber} restored.`);
+    } catch (err) {
+      toast.error(err.message || "Failed to restore order.");
+    } finally {
+      setTrashBusy(false);
+    }
+  };
+
+  const deletePermanently = async () => {
+    const ok = await showConfirm(
+      `Order #${order.orderNumber} will be deleted permanently. This cannot be undone.`,
+      "Delete permanently?",
+      { confirmText: "Delete Permanently", danger: true }
+    );
+    if (!ok) return;
+    setTrashBusy(true);
+    try {
+      const res = await fetch(`/api/admin/orders?id=${order._id}&permanent=true`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readError(res, "Failed to delete order."));
+      toast.success("Order deleted permanently.");
+      router.push("/admin/orders");
+    } catch (err) {
+      toast.error(err.message || "Failed to delete order.");
+      setTrashBusy(false);
+    }
+  };
+
+  const canTrash = ["orders.update", "orders.edit", "orders.delete"].some((k) => can(session?.user, k));
+  const linkBtn = { background: "none", border: 0, padding: 0, cursor: "pointer", fontSize: 13, minHeight: 36, display: "inline-flex", alignItems: "center" };
+
+  const backLink = (
+    <Link href="/admin/orders" className="wp-btn">
+      <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Back to orders
+    </Link>
+  );
+
   if (loading) return (
-    <AdminPageLayout title="Order Details" breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Orders", href: "/admin/orders" }, { label: "Loading" }]}>
-       <div className="p-20 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">Loading order details...</div>
-    </AdminPageLayout>
+    <Page>
+      <PageHeader title="Edit order" actions={backLink} />
+      <Postbox>
+        <p className="wp-muted" style={{ margin: 0 }}>Loading order details...</p>
+      </Postbox>
+    </Page>
   );
 
   if (!order) return (
-    <AdminPageLayout title="Order Details" breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Orders", href: "/admin/orders" }, { label: "Error" }]}>
-       <div className="p-20 text-center text-[13px] text-red-500 font-bold bg-white border border-[#ccd0d4]">Order not found.</div>
-    </AdminPageLayout>
+    <Page>
+      <PageHeader title="Edit order" actions={backLink} />
+      <Notice type="error">Order not found.</Notice>
+    </Page>
+  );
+
+  const PAYMENT_CLASS = {
+    Paid: "wp-st-paid",
+    Pending: "wp-st-unpaid",
+    Failed: "wp-st-failed",
+    Refunded: "wp-st-refunded",
+    "Partially Refunded": "wp-st-refunded",
+  };
+
+  const totalRow = (label, value, opts = {}) => (
+    <div className="wp-kv" style={opts.strong ? { borderTop: "1px solid #dcdcde", marginTop: 4, paddingTop: 10 } : undefined}>
+      <span className={`wp-kv-k ${opts.strong ? "wp-strong" : "wp-muted"}`}>{label}</span>
+      <span className="wp-kv-v" style={{ fontSize: opts.strong ? 15 : undefined, color: opts.color }}>{value}</span>
+    </div>
   );
 
   return (
     <RequirePermission permission="orders.view">
-    <AdminPageLayout
-      title={`Order #${order.orderNumber}`}
-      breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Orders", href: "/admin/orders" }, { label: `Edit Order` }]}
-    >
+    <Page>
+      <PageHeader title="Edit order" actions={backLink} />
+
+      {order.isDeleted && (
+        <div className="wp-notice wp-notice-warning print:hidden" role="status">
+          <p style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 12px" }}>
+            <span>This order is in the Trash. Restore it to change its status.</span>
+            <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="wp-btn" disabled={trashBusy} onClick={restoreFromTrash}>Restore</button>
+              <button type="button" className="wp-btn" style={{ borderColor: "#b32d2e", color: "#b32d2e" }} disabled={trashBusy} onClick={deletePermanently}>
+                Delete Permanently
+              </button>
+            </span>
+          </p>
+        </div>
+      )}
+
       <InvoiceTemplate order={order} />
 
-      <div className="space-y-6 print:hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="wp-cols print:hidden">
 
-          {/* Left Column */}
-          <div className="lg:col-span-8 space-y-6">
+        {/* ===================== MAIN COLUMN ===================== */}
+        <div className="wp-col-main">
 
-            {/* Order Data Box */}
-            <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px] overflow-hidden">
-              <div className="px-3 xs:px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
-                <h2 className="text-[14px] font-bold text-[#1d2327]">Order Details</h2>
-                <span className="text-[11px] text-[#646970]">
-                  {order.createdAt ? new Date(order.createdAt).toLocaleString() : "N/A"}
-                </span>
-              </div>
-              <div className="p-3 xs:p-5 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
-
-                {/* Customer */}
-                <div className="space-y-3">
-                  <h3 className="text-[13px] font-bold flex items-center gap-2 text-gray-700">
-                    <User className="w-4 h-4 text-[#8c8f94]" /> General
-                  </h3>
-                  <div className="text-[13px] space-y-1">
-                    <p className="font-bold text-[#1d2327]">{order.shippingAddress?.fullName || "—"}</p>
-                    <p className="text-[#2271b1] hover:underline cursor-pointer">{order.customer?.email || "—"}</p>
-                    <p className="text-[#646970] pt-2 italic text-[11px]">
-                      Purchased as {order.customer?.isGuest ? "Guest" : "Member"}
-                    </p>
-                  </div>
-                  {order.affiliateId && (
-                    <div className="pt-4 border-t border-[#ccd0d4] space-y-2">
-                      <p className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-[3px] border border-blue-100 inline-block text-[11px] uppercase tracking-wider">
-                        Referred Order
-                      </p>
-                      <div className="text-[13px] space-y-1">
-                        <p className="font-bold text-[#1d2327]">{order.affiliateId.name || "—"}</p>
-                        <p className="text-[#646970] text-[12px]">Code: <span className="font-mono font-bold text-black">{order.affiliateId.referralCode || order.affiliateReferralCode}</span></p>
-                        <p className="text-[11px] text-[#8c8f94] font-mono">
-                          ID: {order.affiliateId.affiliateId || "—"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Shipping */}
-                <div className="space-y-3">
-                  <h3 className="text-[13px] font-bold flex items-center gap-2 text-gray-700">
-                    <MapPin className="w-4 h-4 text-[#8c8f94]" /> Shipping
-                  </h3>
-                  <div className="text-[13px] space-y-1 leading-relaxed">
-                    <p>{order.shippingAddress?.street || "—"}</p>
-                    <p>
-                      {order.shippingAddress?.city || "—"}
-                      {order.shippingAddress?.county ? `, ${order.shippingAddress.county}` : ""}
-                      {order.shippingAddress?.state ? `, ${order.shippingAddress.state}` : ""}
-                      {order.shippingAddress?.zip ? ` ${order.shippingAddress.zip}` : ""}
-                    </p>
-                    <p>{order.shippingAddress?.country || "—"}</p>
-                    <p className="pt-2 text-[#2271b1] font-medium">
-                      {order.shippingAddress?.phone || "No phone provided"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Payment */}
-                <div className="space-y-3">
-                  <h3 className="text-[13px] font-bold flex items-center gap-2 text-gray-700">
-                    <CreditCard className="w-4 h-4 text-[#8c8f94]" /> Payment
-                  </h3>
-                  <div className="text-[13px] space-y-1">
-                    <span className={`inline-block px-2 py-0.5 rounded-[3px] text-[11px] font-bold uppercase tracking-wider border ${getPaymentStatusBadge(order.payment?.status)}`}>
-                      {order.payment?.status || "Pending"}
-                    </span>
-                    <p className="text-[#646970] mt-1">
-                      Method: {order.payment?.method || "Cash on Delivery"}
-                    </p>
-                    {order.payment?.method === "Cash on Delivery" && order.payment?.status !== "Paid" && (
-                      <button
-                        onClick={convertToCard}
-                        disabled={convertingToCard}
-                        className="mt-2 flex items-center gap-1.5 border border-[#8c8f94] text-[#3c434a] px-2.5 py-1.5 rounded-[3px] text-[11px] font-bold uppercase hover:bg-gray-50 transition-colors disabled:opacity-50"
-                      >
-                        <Send className="w-3 h-3" /> {convertingToCard ? "Updating..." : "Update to Card & Send Invoice"}
-                      </button>
-                    )}
-                    {order.payment?.provider === 'stripe' && order.payment?.stripePaymentIntentId && (
-                      <a
-                        href={`https://dashboard.stripe.com/payments/${order.payment.stripePaymentIntentId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#2271b1] hover:underline inline-flex items-center gap-1 text-[12px] pt-1"
-                      >
-                        View in Stripe <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                    {order.payment?.paidAt && (
-                      <p className="text-[#646970] text-[12px]">
-                        Paid: {new Date(order.payment.paidAt).toLocaleString()}
-                      </p>
-                    )}
-                    {order.payment?.refundedAmount > 0 && (
-                      <p className="text-[#646970] text-[12px]">
-                        Refunded: {formatCurrency(order.payment.refundedAmount, currencyCode)}
-                      </p>
-                    )}
-                    <p className="text-[10px] text-[#8c8f94] font-mono break-all pt-2">
-                      ID: {order._id}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Pinpoint IP & Location */}
-                <div className="space-y-3">
-                  <h3 className="text-[13px] font-bold flex items-center gap-2 text-gray-700">
-                    <Globe className="w-4 h-4 text-[#8c8f94]" /> IP & Pinpoint Location
-                  </h3>
-                  <div className="text-[13px] space-y-1.5 leading-relaxed">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[#646970] text-[12px]">IP:</span>
-                      <span className="font-mono font-semibold text-[#1d2327] bg-gray-100 px-1.5 py-0.5 rounded text-[12px]">
-                        {order.customer?.ipAddress || "—"}
-                      </span>
-                      {order.customer?.ipAddress && order.customer?.ipAddress !== "unknown" && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(order.customer.ipAddress);
-                            toast.success("IP copied!");
-                          }}
-                          title="Copy IP"
-                          className="text-[#8c8f94] hover:text-black transition-colors"
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-
-                    {order.customer?.ipLocation ? (
-                      <div className="space-y-1 pt-1.5 border-t border-[#f0f0f1] text-[12px]">
-                        <p className="text-[#1d2327]">
-                          <span className="text-[#646970]">City: </span>
-                          <span className="font-medium">{order.customer.ipLocation.city || "—"}</span>
-                        </p>
-                        <p className="text-[#1d2327]">
-                          <span className="text-[#646970]">State: </span>
-                          <span className="font-medium">{order.customer.ipLocation.state || order.customer.ipLocation.region || "—"}</span>
-                        </p>
-                        <p className="text-[#1d2327]">
-                          <span className="text-[#646970]">County: </span>
-                          <span className="font-semibold text-blue-900 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                            {order.customer.ipLocation.county || "—"}
-                          </span>
-                        </p>
-                        <p className="text-[#1d2327]">
-                          <span className="text-[#646970]">Country: </span>
-                          <span className="font-medium">
-                            {order.customer.ipLocation.country || "—"}
-                            {order.customer.ipLocation.countryCode ? ` (${order.customer.ipLocation.countryCode})` : ""}
-                          </span>
-                        </p>
-                        {(order.customer.ipLocation.postal || order.customer.ipLocation.zip) && (
-                          <p className="text-[#1d2327]">
-                            <span className="text-[#646970]">Postal / Zip: </span>
-                            <span className="font-mono">{order.customer.ipLocation.postal || order.customer.ipLocation.zip}</span>
-                          </p>
-                        )}
-                        {order.customer.ipLocation.isp && (
-                          <p className="text-[#646970] text-[11px] truncate" title={order.customer.ipLocation.isp}>
-                            ISP: <span className="text-gray-800">{order.customer.ipLocation.isp}</span>
-                          </p>
-                        )}
-                        {(order.customer.ipLocation.lat != null && order.customer.ipLocation.lon != null) && (
-                          <div className="pt-2">
-                            <a
-                              href={order.customer.ipLocation.mapsUrl || `https://www.google.com/maps?q=${order.customer.ipLocation.lat},${order.customer.ipLocation.lon}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded transition-colors"
-                            >
-                              <MapPin className="w-3.5 h-3.5 text-red-500" />
-                              Pinpoint Map ({Number(order.customer.ipLocation.lat).toFixed(4)}, {Number(order.customer.ipLocation.lon).toFixed(4)})
-                              <ExternalLink className="w-3 h-3 ml-0.5" />
-                            </a>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-[#646970] italic pt-1">
-                        {order.customer?.ipAddress ? "Location lookup pending or unavailable" : "No IP address captured"}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Customer Note */}
-              {order.customerNote && (
-                <div className="mx-6 mb-6 p-4 bg-[#fcf3d7] border border-[#ffeeba] text-[13px] text-[#856404] italic rounded-[2px]">
-                  <strong>Customer Note:</strong> &ldquo;{order.customerNote}&rdquo;
-                </div>
-              )}
-
-              {/* Refund Action */}
-              {canShowRefundButton && (
-                <div className="mx-3 xs:mx-5 sm:mx-6 mb-4 xs:mb-6 p-3 xs:p-4 bg-white border border-[#ccd0d4] rounded-[2px]">
-                  {!showRefundForm ? (
-                    <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-3 xs:gap-4">
-                      <p className="text-[12px] text-[#646970]">
-                        Remaining refundable balance:{" "}
-                        <span className="font-bold text-[#1d2327]">
-                          {formatCurrency(remainingRefundable, currencyCode)}
-                        </span>
-                      </p>
-                      <button
-                        onClick={openRefundForm}
-                        className="border border-red-500 text-red-600 px-4 py-1.5 rounded-[3px] font-bold text-xs uppercase hover:bg-red-50 transition-colors"
-                      >
-                        Refund
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <label className="text-[12px] font-bold text-[#1d2327] block">
-                        Refund Amount ({currencyCode})
-                      </label>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <input
-                          type="number"
-                          min="0.01"
-                          max={remainingRefundable}
-                          step="0.01"
-                          value={refundAmount}
-                          onChange={(e) => setRefundAmount(e.target.value)}
-                          className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 text-[13px] outline-none focus:border-[#2271b1] w-full xs:w-40"
-                        />
-                        <button
-                          onClick={submitRefund}
-                          disabled={refunding}
-                          className="bg-red-600 text-white px-4 py-1.5 rounded-[3px] font-bold text-xs uppercase hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {refunding ? "Processing..." : "Confirm Refund"}
-                        </button>
-                        <button
-                          onClick={cancelRefundForm}
-                          disabled={refunding}
-                          className="border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-xs font-bold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      {refundError && (
-                        <p className="text-[12px] text-red-600 font-medium">{refundError}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+          {/* Order data */}
+          <section className="wp-postbox" aria-labelledby="order-data-title">
+            <div style={{ padding: "16px 16px 0" }}>
+              <h2 id="order-data-title" style={{ margin: 0, fontSize: 20, fontWeight: 400, color: "#1d2327", lineHeight: 1.3 }}>
+                Order #{order.orderNumber} details
+              </h2>
+              <p className="wp-muted" style={{ margin: "4px 0 0" }}>
+                Payment via {order.payment?.method || "Cash on Delivery"}.
+                {order.payment?.paidAt && <> Paid on {new Date(order.payment.paidAt).toLocaleString()}.</>}
+                {order.customer?.ipAddress && <> Customer IP: <span className="font-mono">{order.customer.ipAddress}</span></>}
+              </p>
             </div>
 
-            {/* Custom Jacket Specifications */}
-            {order.customJacketInquiryId && order.customJacketSnapshot && (
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px] overflow-hidden">
-                <div className="px-3 xs:px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                  <h2 className="text-[14px] font-bold text-[#1d2327]">Custom Jacket Specifications</h2>
-                </div>
-                <div className="p-3 xs:p-5 sm:p-6 space-y-4 xs:space-y-5">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 xs:gap-4 text-[13px]">
-                    {[
-                      ["Jacket Type", order.customJacketSnapshot.jacketType],
-                      ["Gender", order.customJacketSnapshot.gender],
-                      ["Leather", order.customJacketSnapshot.preferredLeather],
-                      ["Color", order.customJacketSnapshot.preferredColor],
-                      ["Size", order.customJacketSnapshot.size],
-                      ["Budget", order.customJacketSnapshot.budget],
-                      ["Deadline", order.customJacketSnapshot.deadline],
-                    ].map(([label, val]) => val ? (
-                      <div key={label}>
-                        <p className="text-[10px] xs:text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-                        <p className="text-[#1d2327] font-medium mt-0.5 break-words">{val}</p>
-                      </div>
-                    ) : null)}
-                  </div>
-                  {order.customJacketSnapshot.additionalNotes && (
-                    <div>
-                      <p className="text-[10px] xs:text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-1.5">Additional Notes</p>
-                      <p className="text-[12px] xs:text-[13px] text-[#1d2327] leading-relaxed bg-gray-50 p-2.5 xs:p-3 rounded-lg break-words">
-                        {order.customJacketSnapshot.additionalNotes}
-                      </p>
-                    </div>
-                  )}
-                  {order.customJacketSnapshot.referenceImages?.length > 0 && (
-                    <div>
-                      <p className="text-[10px] xs:text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">
-                        Reference Images ({order.customJacketSnapshot.referenceImages.length})
-                      </p>
-                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                        {order.customJacketSnapshot.referenceImages.map((url, i) => (
-                          <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-lg overflow-hidden border border-gray-100 group/img">
-                            <img src={url} alt={`Reference ${i + 1}`} className="w-full h-full object-cover group-hover/img:opacity-80 transition-opacity" />
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            <div className="wp-order-cols">
 
-            {/* Order Items Box */}
-            <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden rounded-[2px]">
-              <div className="px-3 xs:px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-                <h2 className="text-[14px] font-bold text-[#1d2327]">Items to Fulfill</h2>
-              </div>
-              <div className="overflow-x-auto max-w-full">
-                <table className="w-full min-w-[460px] text-left border-collapse text-[13px]">
-                  <thead>
-                    <tr className="bg-[#fcfcfc] border-b border-[#ccd0d4]">
-                      <th className="px-3 xs:px-4 sm:px-6 py-3 font-bold text-[#646970]">Product</th>
-                      <th className="px-3 xs:px-4 sm:px-6 py-3 font-bold text-[#646970]">Cost</th>
-                      <th className="px-3 xs:px-4 sm:px-6 py-3 font-bold text-[#646970]">Qty</th>
-                      <th className="px-3 xs:px-4 sm:px-6 py-3 font-bold text-[#646970] text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    {(order.items || []).map((item, i) => (
-                      <tr key={i} className="hover:bg-[#f6f7f7] transition-colors">
-                        <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4 flex gap-3 xs:gap-4 items-start">
-                          <div className="w-10 h-12 xs:w-12 xs:h-14 bg-gray-50 border border-[#ccd0d4] rounded overflow-hidden shrink-0">
-                            {item.image && (
-                              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                            )}
-                          </div>
-                          <div className="space-y-1 min-w-0">
-                            <p className="text-[#2271b1] font-bold hover:underline cursor-pointer">{item.name}</p>
-                            <div className="flex flex-col gap-1">
-                              {item.selectedVariant?.options &&
-                                Object.entries(item.selectedVariant.options).map(([key, val]) => (
-                                  <p key={key} className="text-[11px] text-[#646970]">
-                                    <span className="font-bold text-[#2c3338]">{key}:</span> {val}
-                                  </p>
-                                ))}
-                              <p className="text-[11px] text-gray-400 font-mono">
-                                SKU: {item.sku || "—"}
-                              </p>
-                            </div>
-                            {/* Made to Measure */}
-                            {item.madeToMeasure?.enabled && (
-                              <div className="mt-2">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wide">
-                                  ✦ Made to Measure
-                                </span>
-                                {Object.keys(item.madeToMeasure.measurements || {}).length > 0 && (
-                                  <details className="mt-1.5">
-                                    <summary className="text-[11px] text-[#2271b1] cursor-pointer hover:underline select-none">View measurements ({item.madeToMeasure.unit})</summary>
-                                    <div className="mt-2 grid grid-cols-2 xs:grid-cols-3 gap-x-4 gap-y-1 text-[11px] text-[#1d2327]">
-                                      {Object.entries(item.madeToMeasure.measurements).map(([k, v]) => v ? (
-                                        <div key={k}>
-                                          <span className="font-semibold capitalize text-[#646970]">{k.replace(/([A-Z])/g, ' $1')}: </span>
-                                          {v} {item.madeToMeasure.unit}
-                                        </div>
-                                      ) : null)}
-                                    </div>
-                                    {item.madeToMeasure.notes && (
-                                      <p className="mt-2 text-[11px] italic text-[#646970]">Note: {item.madeToMeasure.notes}</p>
-                                    )}
-                                  </details>
-                                )}
-                              </div>
-                            )}
-                            {/* Customize Product options */}
-                            {item.customization?.enabled && (
-                              <div className="mt-3 pt-2 border-t border-neutral-100">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 border border-purple-200 text-purple-700 rounded text-[9px] font-bold uppercase tracking-wide">
-                                  ✦ Custom Design Selections
-                                </span>
-                                <div className="mt-2 space-y-1.5 text-[11px] text-[#1d2327]">
-                                  {item.customization.leatherColor && item.customization.leatherColor !== "None" && (
-                                    <div><span className="font-semibold text-[#646970]">Leather Color:</span> {item.customization.leatherColor} {item.customization.leatherColorNote && `(${item.customization.leatherColorNote})`}</div>
-                                  )}
-                                  {item.customization.leatherType && item.customization.leatherType !== "None" && (
-                                    <div><span className="font-semibold text-[#646970]">Leather Type:</span> {item.customization.leatherType} {item.customization.leatherTypeNote && `(${item.customization.leatherTypeNote})`}</div>
-                                  )}
-                                  {item.customization.innerLining && item.customization.innerLining !== "None" && (
-                                    <div><span className="font-semibold text-[#646970]">Inner Lining:</span> {item.customization.innerLining} {item.customization.innerLiningNote && `(${item.customization.innerLiningNote})`}</div>
-                                  )}
-                                  {item.customization.hardwareColor && item.customization.hardwareColor !== "None" && (
-                                    <div><span className="font-semibold text-[#646970]">Hardware:</span> {item.customization.hardwareColor} {item.customization.hardwareColorNote && `(${item.customization.hardwareColorNote})`}</div>
-                                  )}
-                                  {item.customization.fur?.type && item.customization.fur.type !== "None" && (
-                                    <div>
-                                      <span className="font-semibold text-[#646970]">Fur:</span> {item.customization.fur.type}
-                                      {item.customization.fur.color && ` · ${item.customization.fur.color}`}
-                                      {item.customization.fur.density && ` · ${item.customization.fur.density}`}
-                                      {item.customization.fur.placement?.length > 0 && ` · ${item.customization.fur.placement.join(", ")}`}
-                                      {item.customization.fur.removable !== null && item.customization.fur.removable !== undefined && ` · ${item.customization.fur.removable ? "Removable" : "Fixed"}`}
-                                    </div>
-                                  )}
-                                  {item.customization.artwork && Object.values(item.customization.artwork).some(Boolean) && (
-                                    <div className="mt-2 pt-2 border-t border-neutral-100 space-y-1">
-                                      <span className="font-bold text-[9px] uppercase tracking-wider text-neutral-400 block">Uploaded Artwork</span>
-                                      {Object.entries(item.customization.artwork).map(([placement, art]) => {
-                                        if (!art || !art.url) return null;
-                                        return (
-                                          <div key={placement} className="flex items-center gap-2 pl-2 text-[11px]">
-                                            <span className="font-semibold capitalize text-[#646970]">{placement.replace(/([A-Z])/g, ' $1')}:</span>
-                                            <a href={art.url} target="_blank" rel="noopener noreferrer" className="text-[#2271b1] hover:underline truncate max-w-[200px]">
-                                              {art.name || "Download File"}
-                                            </a>
-                                            {placement === "other" && art.note && <span className="text-neutral-400 italic">({art.note})</span>}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            {/* Corporate Gifting selections */}
-                            {item.corporateGifting?.enabled && (
-                              <div className="mt-3 pt-2 border-t border-neutral-100">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-wide">
-                                  ✦ Corporate Gifting — {(item.corporateGifting.selections || []).length} items
-                                </span>
-                                <div className="mt-2 space-y-2 text-[11px] text-[#1d2327]">
-                                  {(item.corporateGifting.selections || []).map((sel, selIdx) => (
-                                    <div key={sel.itemId || selIdx} className="flex items-center gap-2">
-                                      {sel.image && (
-                                        <img src={sel.image} alt={sel.name} className="w-6 h-6 rounded object-cover border border-[#ccd0d4] shrink-0" />
-                                      )}
-                                      <span className="font-semibold text-[#2c3338]">{sel.name}</span>
-                                      {sel.priceDelta > 0 && <span className="text-[#646970]">+${Number(sel.priceDelta).toLocaleString()}</span>}
-                                      {sel.artwork?.url ? (
-                                        <a href={sel.artwork.url} target="_blank" rel="noopener noreferrer" className="text-[#2271b1] hover:underline truncate max-w-[160px]">
-                                          {sel.artwork.name || "View logo"}
-                                        </a>
-                                      ) : (
-                                        <span className="text-neutral-400 italic">No logo uploaded</span>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4">
-                          ${(item.priceAtPurchase || 0).toLocaleString()}
-                        </td>
-                        <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4">× {item.quantity || 1}</td>
-                        <td className="px-3 xs:px-4 sm:px-6 py-3 xs:py-4 text-right font-bold text-[#1d2327]">
-                          ${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Financial Summary */}
-              <div className="p-3 xs:p-5 sm:p-6 bg-gray-50/50 border-t border-[#ccd0d4] flex flex-col items-stretch xs:items-end space-y-2">
-                <div className="flex justify-between w-full xs:w-56 text-[13px]">
-                  <span className="text-[#646970]">Subtotal:</span>
-                  <span className="font-bold text-[#1d2327]">
-                    ${(order.financials?.subtotal || 0).toLocaleString()}
-                  </span>
+              {/* General */}
+              <div style={{ minWidth: 0 }}>
+                <h3>General</h3>
+                <div className="wp-field">
+                  <div className="wp-label">Date created</div>
+                  <div>{order.createdAt ? new Date(order.createdAt).toLocaleString() : "N/A"}</div>
                 </div>
-                {order.financials?.discountTotal && Number(order.financials.discountTotal) > 0 ? (
-                  <div className="flex justify-between w-full xs:w-56 text-[13px]">
-                    <span className="text-[#646970]">Promo Discount:</span>
-                    <span className="text-green-700 font-medium">
-                      -${(Number(order.financials.discountTotal)).toLocaleString()}
-                    </span>
-                  </div>
-                ) : null}
-                {order.financials?.affiliateDiscountAmount && Number(order.financials.affiliateDiscountAmount) > 0 ? (
-                  <div className="flex justify-between w-full xs:w-56 text-[13px]">
-                    <span className="text-[#646970] flex items-center gap-1">
-                      Referral Discount
-                      {order.financials.affiliateDiscountType === 'Percentage' && (
-                        <span className="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-1 py-0.5 rounded">
-                          {order.financials.affiliateDiscountValue}%
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-emerald-700 font-medium">
-                      -${(Number(order.financials.affiliateDiscountAmount)).toFixed(2)}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between w-full xs:w-56 text-[13px]">
-                  <span className="text-[#646970]">Shipping:</span>
-                  <span className="text-green-700 font-medium">
-                    {order.financials?.shippingCost > 0
-                      ? `$${order.financials.shippingCost.toLocaleString()}`
-                      : 'Free'}
-                  </span>
+                <div className="wp-field">
+                  <div className="wp-label">Status</div>
+                  <StatusPill status={order.status} />
                 </div>
-                {order.financials?.tax > 0 && (
-                  <div className="flex justify-between w-full xs:w-56 text-[13px]">
-                    <span className="text-[#646970]">Tax:</span>
-                    <span className="font-medium text-[#1d2327]">${order.financials.tax.toLocaleString()}</span>
+                <div className="wp-field">
+                  <div className="wp-label">Customer</div>
+                  <div className="wp-strong">{order.shippingAddress?.fullName || "—"}</div>
+                  {order.customer?.email ? (
+                    <a href={`mailto:${order.customer.email}`} className="wp-link" style={{ wordBreak: "break-all" }}>{order.customer.email}</a>
+                  ) : (
+                    <div>—</div>
+                  )}
+                  <p className="wp-desc">Purchased as {order.customer?.isGuest ? "Guest" : "Member"}</p>
+                </div>
+                {order.affiliateId && (
+                  <div className="wp-field" style={{ borderTop: "1px solid #f0f0f1", paddingTop: 10 }}>
+                    <div className="wp-label">Referred order</div>
+                    <div className="wp-strong">{order.affiliateId.name || "—"}</div>
+                    <div className="wp-muted">Code: <span className="font-mono wp-strong">{order.affiliateId.referralCode || order.affiliateReferralCode}</span></div>
+                    <div className="wp-muted wp-small font-mono">ID: {order.affiliateId.affiliateId || "—"}</div>
                   </div>
                 )}
-                <div className="flex justify-between w-full xs:w-56 text-[15px] xs:text-[16px] font-bold border-t border-[#ccd0d4] pt-2 mt-2 text-[#1d2327]">
-                  <span>Total:</span>
-                  <span>${(order.financials?.total || 0).toLocaleString()}</span>
+              </div>
+
+              {/* Shipping */}
+              <div style={{ minWidth: 0 }}>
+                <h3>Shipping</h3>
+                <address className="wp-addr">
+                  {order.shippingAddress?.fullName && <>{order.shippingAddress.fullName}<br /></>}
+                  {order.shippingAddress?.street || "—"}<br />
+                  {order.shippingAddress?.city || "—"}
+                  {order.shippingAddress?.county ? `, ${order.shippingAddress.county}` : ""}
+                  {order.shippingAddress?.state ? `, ${order.shippingAddress.state}` : ""}
+                  {order.shippingAddress?.zip ? ` ${order.shippingAddress.zip}` : ""}<br />
+                  {order.shippingAddress?.country || "—"}
+                </address>
+                <div className="wp-field" style={{ marginTop: 10 }}>
+                  <div className="wp-label">Phone</div>
+                  {order.shippingAddress?.phone ? (
+                    <a href={`tel:${order.shippingAddress.phone}`} className="wp-link">{order.shippingAddress.phone}</a>
+                  ) : (
+                    <span className="wp-muted">No phone provided</span>
+                  )}
                 </div>
+                {order.customerNote && (
+                  <div className="wp-field">
+                    <div className="wp-label">Customer provided note</div>
+                    <p style={{ margin: 0, wordBreak: "break-word" }}>&ldquo;{order.customerNote}&rdquo;</p>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
 
-          {/* Right Column */}
-          <div className="lg:col-span-4 space-y-6">
-
-            {/* Status Box */}
-            <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
-              <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-                <h2 className="text-[14px] font-bold text-[#1d2327]">Order Status</h2>
-              </div>
-              <div className="p-4 space-y-4">
-                <div className="flex justify-between items-center text-[11px] text-[#646970] border-b border-gray-100 pb-3">
-                  <span className="font-bold">Current Status:</span>
-                  <span className="font-mono font-bold text-[#1d2327] bg-gray-100 px-2.5 py-0.5 rounded text-[11px] uppercase">
-                    {order.status}
+              {/* Payment */}
+              <div style={{ minWidth: 0 }}>
+                <h3>Payment</h3>
+                <div className="wp-field">
+                  <span className={`wp-pill ${PAYMENT_CLASS[order.payment?.status] || "wp-st-unpaid"}`}>
+                    {order.payment?.status || "Pending"}
                   </span>
                 </div>
-                <div className="space-y-3 pt-1">
-                  {renderProgressButton()}
-                  {renderCancelRefundButton()}
+                <div className="wp-kv">
+                  <span className="wp-kv-k wp-muted">Method</span>
+                  <span className="wp-kv-v">{order.payment?.method || "Cash on Delivery"}</span>
                 </div>
-                <div className="text-[11px] text-[#646970] pt-2 flex justify-between">
-                  <span>Created: {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "N/A"}</span>
-                  <span>Time: {order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A"}</span>
+                {order.payment?.paidAt && (
+                  <div className="wp-kv">
+                    <span className="wp-kv-k wp-muted">Paid</span>
+                    <span className="wp-kv-v">{new Date(order.payment.paidAt).toLocaleString()}</span>
+                  </div>
+                )}
+                {order.payment?.refundedAmount > 0 && (
+                  <div className="wp-kv">
+                    <span className="wp-kv-k wp-muted">Refunded</span>
+                    <span className="wp-kv-v">{formatCurrency(order.payment.refundedAmount, currencyCode)}</span>
+                  </div>
+                )}
+                {order.payment?.method === "Cash on Delivery" && order.payment?.status !== "Paid" && (
+                  <button
+                    type="button"
+                    onClick={convertToCard}
+                    disabled={convertingToCard}
+                    className="wp-btn"
+                    style={{ marginTop: 10, whiteSpace: "normal", textAlign: "left" }}
+                  >
+                    <Send className="w-4 h-4" aria-hidden="true" /> {convertingToCard ? "Updating..." : "Update to Card & Send Invoice"}
+                  </button>
+                )}
+                {order.payment?.provider === 'stripe' && order.payment?.stripePaymentIntentId && (
+                  <p style={{ margin: "10px 0 0" }}>
+                    <a
+                      href={`https://dashboard.stripe.com/payments/${order.payment.stripePaymentIntentId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="wp-link"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                    >
+                      View in Stripe <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                    </a>
+                  </p>
+                )}
+                <p className="wp-muted wp-small font-mono" style={{ margin: "10px 0 0", wordBreak: "break-all" }}>
+                  ID: {order._id}
+                </p>
+              </div>
+
+            </div>
+          </section>
+
+          {/* Custom Jacket Specifications */}
+          {order.customJacketInquiryId && order.customJacketSnapshot && (
+            <Postbox title="Custom jacket specifications">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "12px 16px" }}>
+                {[
+                  ["Jacket Type", order.customJacketSnapshot.jacketType],
+                  ["Gender", order.customJacketSnapshot.gender],
+                  ["Leather", order.customJacketSnapshot.preferredLeather],
+                  ["Color", order.customJacketSnapshot.preferredColor],
+                  ["Size", order.customJacketSnapshot.size],
+                  ["Budget", order.customJacketSnapshot.budget],
+                  ["Deadline", order.customJacketSnapshot.deadline],
+                ].map(([label, val]) => val ? (
+                  <div key={label} style={{ minWidth: 0 }}>
+                    <div className="wp-muted">{label}</div>
+                    <div className="wp-strong" style={{ wordBreak: "break-word" }}>{val}</div>
+                  </div>
+                ) : null)}
+              </div>
+              {order.customJacketSnapshot.additionalNotes && (
+                <div style={{ marginTop: 16 }}>
+                  <div className="wp-label">Additional notes</div>
+                  <div className="wp-note-body" style={{ wordBreak: "break-word" }}>
+                    {order.customJacketSnapshot.additionalNotes}
+                  </div>
                 </div>
+              )}
+              {order.customJacketSnapshot.referenceImages?.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <div className="wp-label">
+                    Reference images ({order.customJacketSnapshot.referenceImages.length})
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 8 }}>
+                    {order.customJacketSnapshot.referenceImages.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", aspectRatio: "1 / 1", overflow: "hidden", border: "1px solid #dcdcde" }}>
+                        <img src={url} alt={`Reference ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Postbox>
+          )}
+
+          {/* Items */}
+          <section className="wp-postbox" aria-labelledby="order-items-title">
+            <div className="wp-postbox-head">
+              <h2 id="order-items-title">Items</h2>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+            <table className="wp-list-table">
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col" className="wp-num wp-hide-sm" style={{ textAlign: "right" }}>Cost</th>
+                  <th scope="col" className="wp-num wp-hide-sm" style={{ textAlign: "right" }}>Qty</th>
+                  <th scope="col" className="wp-num" style={{ textAlign: "right" }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(order.items || []).map((item, i) => (
+                  <tr key={i}>
+                    <td style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <div className="wp-thumb">
+                          {item.image && (
+                            <img src={item.image} alt={item.name} />
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word" }}>
+                          <div className="wp-strong">{item.name}</div>
+                          <div className="wp-muted wp-small">SKU: <span className="font-mono">{item.sku || "—"}</span></div>
+                          {item.selectedVariant?.options &&
+                            Object.entries(item.selectedVariant.options).map(([key, val]) => (
+                              <div key={key} className="wp-small">
+                                <span className="wp-strong">{key}:</span> {val}
+                              </div>
+                            ))}
+                          <div className="wp-mobile-meta">
+                            {formatMoney(item.priceAtPurchase, currencyCode)} × {item.quantity || 1}
+                          </div>
+
+                          {/* Made to Measure */}
+                          {item.madeToMeasure?.enabled && (
+                            <div style={{ marginTop: 8 }}>
+                              <span className="wp-pill wp-pill-sm wp-st-confirmed">Made to measure</span>
+                              {Object.keys(item.madeToMeasure.measurements || {}).length > 0 && (
+                                <details style={{ marginTop: 6 }}>
+                                  <summary className="wp-link" style={{ cursor: "pointer" }}>View measurements ({item.madeToMeasure.unit})</summary>
+                                  <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "2px 16px" }}>
+                                    {Object.entries(item.madeToMeasure.measurements).map(([k, v]) => v ? (
+                                      <div key={k} className="wp-small">
+                                        <span className="wp-muted capitalize">{k.replace(/([A-Z])/g, ' $1')}: </span>
+                                        {v} {item.madeToMeasure.unit}
+                                      </div>
+                                    ) : null)}
+                                  </div>
+                                  {item.madeToMeasure.notes && (
+                                    <p className="wp-desc">Note: {item.madeToMeasure.notes}</p>
+                                  )}
+                                </details>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Customize Product options */}
+                          {item.customization?.enabled && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0f0f1" }}>
+                              <span className="wp-pill wp-pill-sm wp-st-packed">Custom design selections</span>
+                              <div style={{ marginTop: 6 }} className="wp-small">
+                                {item.customization.leatherColor && item.customization.leatherColor !== "None" && (
+                                  <div><span className="wp-muted">Leather Color:</span> {item.customization.leatherColor} {item.customization.leatherColorNote && `(${item.customization.leatherColorNote})`}</div>
+                                )}
+                                {item.customization.leatherType && item.customization.leatherType !== "None" && (
+                                  <div><span className="wp-muted">Leather Type:</span> {item.customization.leatherType} {item.customization.leatherTypeNote && `(${item.customization.leatherTypeNote})`}</div>
+                                )}
+                                {item.customization.innerLining && item.customization.innerLining !== "None" && (
+                                  <div><span className="wp-muted">Inner Lining:</span> {item.customization.innerLining} {item.customization.innerLiningNote && `(${item.customization.innerLiningNote})`}</div>
+                                )}
+                                {item.customization.hardwareColor && item.customization.hardwareColor !== "None" && (
+                                  <div><span className="wp-muted">Hardware:</span> {item.customization.hardwareColor} {item.customization.hardwareColorNote && `(${item.customization.hardwareColorNote})`}</div>
+                                )}
+                                {item.customization.fur?.type && item.customization.fur.type !== "None" && (
+                                  <div>
+                                    <span className="wp-muted">Fur:</span> {item.customization.fur.type}
+                                    {item.customization.fur.color && ` · ${item.customization.fur.color}`}
+                                    {item.customization.fur.density && ` · ${item.customization.fur.density}`}
+                                    {item.customization.fur.placement?.length > 0 && ` · ${item.customization.fur.placement.join(", ")}`}
+                                    {item.customization.fur.removable !== null && item.customization.fur.removable !== undefined && ` · ${item.customization.fur.removable ? "Removable" : "Fixed"}`}
+                                  </div>
+                                )}
+                                {item.customization.artwork && Object.values(item.customization.artwork).some(Boolean) && (
+                                  <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid #f0f0f1" }}>
+                                    <div className="wp-strong">Uploaded artwork</div>
+                                    {Object.entries(item.customization.artwork).map(([placement, art]) => {
+                                      if (!art || !art.url) return null;
+                                      return (
+                                        <div key={placement} style={{ display: "flex", flexWrap: "wrap", gap: "0 6px" }}>
+                                          <span className="wp-muted capitalize">{placement.replace(/([A-Z])/g, ' $1')}:</span>
+                                          <a href={art.url} target="_blank" rel="noopener noreferrer" className="wp-link" style={{ wordBreak: "break-all" }}>
+                                            {art.name || "Download File"}
+                                          </a>
+                                          {placement === "other" && art.note && <span className="wp-muted">({art.note})</span>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Corporate Gifting selections */}
+                          {item.corporateGifting?.enabled && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0f0f1" }}>
+                              <span className="wp-pill wp-pill-sm wp-st-processing">
+                                Corporate gifting: {(item.corporateGifting.selections || []).length} items
+                              </span>
+                              <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }} className="wp-small">
+                                {(item.corporateGifting.selections || []).map((sel, selIdx) => (
+                                  <div key={sel.itemId || selIdx} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 8px" }}>
+                                    {sel.image && (
+                                      <img src={sel.image} alt={sel.name} style={{ width: 24, height: 24, objectFit: "cover", border: "1px solid #dcdcde", flex: "none" }} />
+                                    )}
+                                    <span className="wp-strong">{sel.name}</span>
+                                    {sel.priceDelta > 0 && <span className="wp-muted">+{formatMoney(Number(sel.priceDelta), currencyCode)}</span>}
+                                    {sel.artwork?.url ? (
+                                      <a href={sel.artwork.url} target="_blank" rel="noopener noreferrer" className="wp-link" style={{ wordBreak: "break-all" }}>
+                                        {sel.artwork.name || "View logo"}
+                                      </a>
+                                    ) : (
+                                      <span className="wp-muted">No logo uploaded</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="wp-num wp-hide-sm" style={{ whiteSpace: "nowrap" }}>
+                      {formatMoney(item.priceAtPurchase, currencyCode)}
+                    </td>
+                    <td className="wp-num wp-hide-sm" style={{ whiteSpace: "nowrap" }}>× {item.quantity || 1}</td>
+                    <td className="wp-num wp-strong" style={{ whiteSpace: "nowrap" }}>
+                      {formatMoney((item.priceAtPurchase || 0) * (item.quantity || 1), currencyCode)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+
+            {/* Totals */}
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px", borderTop: "1px solid #dcdcde" }}>
+              <div style={{ width: "100%", maxWidth: 300 }}>
+                {totalRow("Items subtotal:", formatMoney(order.financials?.subtotal, currencyCode))}
+                {order.financials?.discountTotal && Number(order.financials.discountTotal) > 0
+                  ? totalRow("Promo discount:", `-${formatMoney(Number(order.financials.discountTotal), currencyCode)}`, { color: "#2f6f1a" })
+                  : null}
+                {order.financials?.affiliateDiscountAmount && Number(order.financials.affiliateDiscountAmount) > 0
+                  ? totalRow(
+                      <>
+                        Referral discount
+                        {order.financials.affiliateDiscountType === 'Percentage' && (
+                          <> ({order.financials.affiliateDiscountValue}%)</>
+                        )}:
+                      </>,
+                      `-${formatMoney(Number(order.financials.affiliateDiscountAmount), currencyCode)}`,
+                      { color: "#2f6f1a" }
+                    )
+                  : null}
+                {totalRow(
+                  "Shipping:",
+                  order.financials?.shippingCost > 0
+                    ? formatMoney(order.financials.shippingCost, currencyCode)
+                    : 'Free'
+                )}
+                {order.financials?.tax > 0 && totalRow("Tax:", formatMoney(order.financials.tax, currencyCode))}
+                {totalRow("Order total:", formatMoney(order.financials?.total, currencyCode), { strong: true })}
               </div>
             </div>
 
-            {/* Payment & Invoice Actions (Custom Orders only) */}
-            {isPayableByLink(order) && (
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
-                <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-                  <h2 className="text-[14px] font-bold text-[#1d2327]">Payment & Invoice</h2>
-                </div>
-                <div className="p-4 space-y-4">
-                  {/* Final Amount — set by admin after reviewing customization, drives the payment link + invoice */}
-                  <div className="space-y-2 pb-4 border-b border-gray-100">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block">
-                      Final Amount (after customization)
+            {/* Refund Action */}
+            {canShowRefundButton && (
+              <div className="wp-box-foot">
+                {!showRefundForm ? (
+                  <>
+                    <span className="wp-muted">
+                      Remaining refundable balance:{" "}
+                      <span className="wp-strong">{formatCurrency(remainingRefundable, currencyCode)}</span>
+                    </span>
+                    <span className="wp-spacer" />
+                    <button type="button" onClick={openRefundForm} className="wp-btn">
+                      Refund
+                    </button>
+                  </>
+                ) : (
+                  <div style={{ width: "100%" }}>
+                    <label htmlFor="refund-amount" className="wp-label">
+                      Refund amount ({currencyCode})
                     </label>
-                    {editingAmount ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={amountInput}
-                          onChange={(e) => setAmountInput(e.target.value)}
-                          autoFocus
-                          className="flex-1 border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[13px] outline-none focus:border-[#2271b1]"
-                        />
-                        <button
-                          onClick={saveAmount}
-                          disabled={savingAmount}
-                          className="px-3 py-1.5 bg-[#2271b1] text-white rounded-[3px] text-[11px] font-bold uppercase hover:bg-[#135e96] disabled:opacity-50"
-                        >
-                          {savingAmount ? "..." : "Save"}
-                        </button>
-                        <button
-                          onClick={() => setEditingAmount(false)}
-                          disabled={savingAmount}
-                          className="px-3 py-1.5 border border-[#8c8f94] rounded-[3px] text-[11px] font-bold uppercase hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <span className="text-[20px] font-black text-[#1d2327]">
-                          {currencyCode} {(order.financials?.total || 0).toLocaleString()}
-                        </span>
-                        {order.payment?.status !== "Paid" && (
-                          <button
-                            onClick={startEditAmount}
-                            className="text-[11px] font-bold text-[#2271b1] hover:text-[#135e96] uppercase"
-                          >
-                            Edit
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {order.paymentLink?.url && order.payment?.status !== "Paid" && (
-                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-[3px] px-2 py-1.5">
-                        Changing the amount deactivates the current payment link — you&apos;ll need to generate a new one.
-                      </p>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                      <input
+                        id="refund-amount"
+                        type="number"
+                        min="0.01"
+                        max={remainingRefundable}
+                        step="0.01"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(e.target.value)}
+                        className="wp-input"
+                        style={{ width: 160 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={submitRefund}
+                        disabled={refunding}
+                        className="wp-btn wp-btn-primary"
+                      >
+                        {refunding ? "Processing..." : "Confirm Refund"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelRefundForm}
+                        disabled={refunding}
+                        className="wp-btn"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {refundError && (
+                      <p className="wp-desc" role="alert" style={{ color: "#b32d2e" }}>{refundError}</p>
                     )}
                   </div>
-
-                  {order.payment?.status === "Paid" ? (
-                    <div className="w-full text-center py-2 bg-green-50 border border-green-200 text-green-700 text-xs font-bold uppercase rounded-[3px]">
-                      Payment Received
-                    </div>
-                  ) : order.paymentLink?.url ? (
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block">Payment Link</label>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          readOnly
-                          value={order.paymentLink.url}
-                          className="flex-1 border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[11px] bg-gray-50 outline-none font-mono"
-                        />
-                        <button
-                          onClick={copyPaymentLink}
-                          title="Copy link"
-                          className="p-1.5 border border-[#8c8f94] rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1]"
-                        >
-                          <Copy className="w-3.5 h-3.5 text-[#3c434a]" />
-                        </button>
-                      </div>
-                      {order.paymentLink.sentAt && (
-                        <p className="text-[11px] text-[#646970]">
-                          Sent {new Date(order.paymentLink.sentAt).toLocaleString()} ({order.paymentLink.sentCount || 1}x)
-                        </p>
-                      )}
-                      <div className="flex flex-col xs:flex-row gap-2 pt-1">
-                        <button
-                          onClick={sendPaymentLinkToCustomer}
-                          disabled={sendingLink}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-[#2271b1] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-[#135e96] transition-colors disabled:opacity-50"
-                        >
-                          <Send className="w-3.5 h-3.5" /> {sendingLink ? "Sending..." : "Send to Customer"}
-                        </button>
-                        <button
-                          onClick={() => generatePaymentLink(true)}
-                          disabled={generatingLink}
-                          title="Regenerate link"
-                          className="px-3 py-2 border border-[#8c8f94] rounded-[3px] text-xs font-bold uppercase hover:bg-gray-50 disabled:opacity-50 text-center"
-                        >
-                          {generatingLink ? "..." : "Regenerate"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => generatePaymentLink(false)}
-                      disabled={generatingLink}
-                      className="w-full bg-[#1a1a1a] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-black transition-colors disabled:opacity-50"
-                    >
-                      {generatingLink ? "Generating..." : "Generate Payment Link"}
-                    </button>
-                  )}
-
-                  <div className="border-t border-gray-100 pt-3">
-                    <button
-                      onClick={sendInvoice}
-                      disabled={sendingInvoice}
-                      className="w-full flex items-center justify-center gap-1.5 border border-[#8c8f94] text-[#3c434a] py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    >
-                      <FileText className="w-3.5 h-3.5" /> {sendingInvoice ? "Sending..." : "Send Invoice"}
-                    </button>
-                    {order.invoice?.sentAt ? (
-                      <p className="text-[11px] text-[#646970] mt-1.5 text-center">
-                        Last sent {new Date(order.invoice.sentAt).toLocaleString()} ({order.invoice.sentCount || 1}x)
-                      </p>
-                    ) : order.payment?.status !== "Paid" ? (
-                      <p className="text-[11px] text-[#646970] mt-1.5 text-center">
-                        Includes a Pay Now link{order.paymentLink?.url ? "" : " (generated automatically if none exists yet)"}.
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
+                )}
               </div>
             )}
+          </section>
+        </div>
 
-            {/* Vendor-facing production PDF (product image + name + size chart with ordered size highlighted) */}
-            {can(session?.user, "orders.view") && (
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
-                <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
-                  <Printer className="w-3.5 h-3.5 text-[#2271b1]" />
-                  <h2 className="text-[14px] font-bold text-[#1d2327]">Vendor Export</h2>
+        {/* ===================== SIDE COLUMN ===================== */}
+        <div className="wp-col-side">
+
+          {/* Order actions */}
+          <Postbox
+            title="Order actions"
+            footer={order.isDeleted ? null : (
+              <>
+                {renderCancelRefundButton()}
+                <span className="wp-spacer" />
+                {renderProgressButton()}
+              </>
+            )}
+          >
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">Current status</span>
+              <StatusPill status={order.status} />
+            </div>
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">Created</span>
+              <span className="wp-kv-v">
+                {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "N/A"}
+                {" "}
+                {order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+              </span>
+            </div>
+            {!order.isDeleted && (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0 6px", paddingTop: 2, color: "#a7aaad" }}>
+                {can(session?.user, "orders.create") && (
+                  <>
+                    <button type="button" className="wp-link" style={linkBtn} disabled={trashBusy} onClick={duplicateThisOrder}>
+                      Duplicate
+                    </button>
+                    {canTrash && <span aria-hidden="true">|</span>}
+                  </>
+                )}
+                {canTrash && (
+                  <button type="button" className="wp-link" style={{ ...linkBtn, color: "#b32d2e" }} disabled={trashBusy} onClick={moveToTrash}>
+                    Move to Trash
+                  </button>
+                )}
+              </div>
+            )}
+          </Postbox>
+
+          {/* Payment & Invoice Actions (Custom Orders only) */}
+          {isPayableByLink(order) && (
+            <Postbox title="Payment & invoice">
+              {/* Final Amount — set by admin after reviewing customization, drives the payment link + invoice */}
+              <div className="wp-field" style={{ paddingBottom: 12, borderBottom: "1px solid #f0f0f1" }}>
+                <label htmlFor="final-amount" className="wp-label">
+                  Final amount (after customization)
+                </label>
+                {editingAmount ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                    <input
+                      id="final-amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={amountInput}
+                      onChange={(e) => setAmountInput(e.target.value)}
+                      autoFocus
+                      className="wp-input"
+                      style={{ flex: "1 1 120px", minWidth: 0 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={saveAmount}
+                      disabled={savingAmount}
+                      className="wp-btn wp-btn-primary"
+                    >
+                      {savingAmount ? "..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingAmount(false)}
+                      disabled={savingAmount}
+                      className="wp-btn"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span className="wp-strong" style={{ fontSize: 20 }}>
+                      {currencyCode} {(order.financials?.total || 0).toLocaleString()}
+                    </span>
+                    {order.payment?.status !== "Paid" && (
+                      <button type="button" onClick={startEditAmount} className="wp-btn">
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                )}
+                {order.paymentLink?.url && order.payment?.status !== "Paid" && (
+                  <div className="wp-notice wp-notice-warning" style={{ margin: "8px 0 0" }}>
+                    <p>Changing the amount deactivates the current payment link — you&apos;ll need to generate a new one.</p>
+                  </div>
+                )}
+              </div>
+
+              {order.payment?.status === "Paid" ? (
+                <div className="wp-field">
+                  <span className="wp-pill wp-st-paid">Payment received</span>
                 </div>
-                <div className="p-4 space-y-2">
+              ) : order.paymentLink?.url ? (
+                <div className="wp-field">
+                  <label htmlFor="payment-link-url" className="wp-label">Payment link</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      id="payment-link-url"
+                      readOnly
+                      value={order.paymentLink.url}
+                      className="wp-input font-mono"
+                      style={{ flex: 1, minWidth: 0, background: "#f6f7f7" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={copyPaymentLink}
+                      title="Copy link"
+                      aria-label="Copy payment link"
+                      className="wp-btn"
+                    >
+                      <Copy className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                  {order.paymentLink.sentAt && (
+                    <p className="wp-desc">
+                      Sent {new Date(order.paymentLink.sentAt).toLocaleString()} ({order.paymentLink.sentCount || 1}x)
+                    </p>
+                  )}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={sendPaymentLinkToCustomer}
+                      disabled={sendingLink}
+                      className="wp-btn wp-btn-primary"
+                    >
+                      <Send className="w-4 h-4" aria-hidden="true" /> {sendingLink ? "Sending..." : "Send to Customer"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => generatePaymentLink(true)}
+                      disabled={generatingLink}
+                      title="Regenerate link"
+                      className="wp-btn"
+                    >
+                      {generatingLink ? "..." : "Regenerate"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="wp-field">
                   <button
                     type="button"
-                    onClick={exportVendorPdf}
-                    disabled={exportingVendorPdf}
-                    className="w-full flex items-center justify-center gap-1.5 bg-[#1a1a1a] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-black transition-colors disabled:opacity-50 cursor-pointer"
+                    onClick={() => generatePaymentLink(false)}
+                    disabled={generatingLink}
+                    className="wp-btn wp-btn-primary"
                   >
-                    <FileText className="w-3.5 h-3.5" /> {exportingVendorPdf ? "Generating..." : "Print PDF for Vendor"}
+                    {generatingLink ? "Generating..." : "Generate Payment Link"}
                   </button>
-                  <p className="text-[11px] text-[#646970] text-center">
-                    Product photos, names and the ordered size highlighted on each item&apos;s size chart — ready to send to your manufacturing vendor.
+                </div>
+              )}
+
+              <div style={{ borderTop: "1px solid #f0f0f1", paddingTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={sendInvoice}
+                  disabled={sendingInvoice}
+                  className="wp-btn"
+                >
+                  <FileText className="w-4 h-4" aria-hidden="true" /> {sendingInvoice ? "Sending..." : "Send Invoice"}
+                </button>
+                {order.invoice?.sentAt ? (
+                  <p className="wp-desc">
+                    Last sent {new Date(order.invoice.sentAt).toLocaleString()} ({order.invoice.sentCount || 1}x)
                   </p>
-                </div>
+                ) : order.payment?.status !== "Paid" ? (
+                  <p className="wp-desc">
+                    Includes a Pay Now link{order.paymentLink?.url ? "" : " (generated automatically if none exists yet)"}.
+                  </p>
+                ) : null}
               </div>
-            )}
+            </Postbox>
+          )}
 
-            {/* Size Confirmation email + customer replies */}
-            {can(session?.user, "orders.update") && (
-              <SizeConfirmationPanel orderId={id} customerEmail={order.customer?.email} />
-            )}
+          {/* Vendor-facing production PDF (product image + name + size chart with ordered size highlighted) */}
+          {can(session?.user, "orders.view") && (
+            <Postbox title="Vendor export">
+              <button
+                type="button"
+                onClick={exportVendorPdf}
+                disabled={exportingVendorPdf}
+                className="wp-btn"
+              >
+                <FileText className="w-4 h-4" aria-hidden="true" /> {exportingVendorPdf ? "Generating..." : "Print PDF for Vendor"}
+              </button>
+              <p className="wp-desc">
+                Product photos, names and the ordered size highlighted on each item&apos;s size chart — ready to send to your manufacturing vendor.
+              </p>
+            </Postbox>
+          )}
 
-            {/* Affiliate Attribution */}
-            {order.affiliateReferralCode && (
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
-                <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
-                  <Users className="w-3.5 h-3.5 text-[#2271b1]" />
-                  <h2 className="text-[14px] font-bold text-[#1d2327]">Affiliate Attribution</h2>
-                </div>
-                <div className="p-4 space-y-3 text-[13px]">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[#646970] font-medium">Referral Code</span>
-                    <span className="font-mono font-bold text-[#1d2327] bg-gray-100 px-2 py-0.5 rounded text-[12px]">
-                      {order.affiliateReferralCode}
-                    </span>
-                  </div>
-                  {order.financials?.affiliateDiscountType && order.financials.affiliateDiscountType !== 'None' && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-[#646970] font-medium">Customer Discount</span>
-                      <span className="text-emerald-700 font-bold">
-                        {order.financials.affiliateDiscountType === 'Percentage'
-                          ? `${order.financials.affiliateDiscountValue}%`
-                          : `$${order.financials.affiliateDiscountValue}`}
-                        {' '}off
-                        {order.financials.affiliateDiscountAmount > 0 && (
-                          <span className="ml-1 text-emerald-600 font-normal text-[11px]">
-                            (saved ${Number(order.financials.affiliateDiscountAmount).toFixed(2)})
-                          </span>
-                        )}
+          {/* Size Confirmation email + customer replies */}
+          {can(session?.user, "orders.update") && (
+            <SizeConfirmationPanel orderId={id} customerEmail={order.customer?.email} />
+          )}
+
+          {/* Affiliate Attribution */}
+          {order.affiliateReferralCode && (
+            <Postbox title="Affiliate attribution">
+              <div className="wp-kv">
+                <span className="wp-kv-k wp-muted">Referral code</span>
+                <span className="wp-kv-v font-mono">{order.affiliateReferralCode}</span>
+              </div>
+              {order.financials?.affiliateDiscountType && order.financials.affiliateDiscountType !== 'None' && (
+                <div className="wp-kv">
+                  <span className="wp-kv-k wp-muted">Customer discount</span>
+                  <span className="wp-kv-v" style={{ color: "#2f6f1a" }}>
+                    {order.financials.affiliateDiscountType === 'Percentage'
+                      ? `${order.financials.affiliateDiscountValue}%`
+                      : formatMoney(Number(order.financials.affiliateDiscountValue), currencyCode)}
+                    {' '}off
+                    {order.financials.affiliateDiscountAmount > 0 && (
+                      <span className="wp-small" style={{ fontWeight: 400, marginLeft: 4 }}>
+                        (saved {formatMoney(Number(order.financials.affiliateDiscountAmount), currencyCode)})
                       </span>
-                    </div>
-                  )}
-                  <div className="mt-1 pt-3 border-t border-[#ccd0d4]">
-                    <p className="text-[11px] text-[#646970] italic">
-                      Commission calculation uses original subtotal (${(order.financials?.subtotal || 0).toLocaleString()}) before discounts.
-                    </p>
-                  </div>
+                    )}
+                  </span>
                 </div>
-              </div>
-            )}
+              )}
+              <p className="wp-desc">
+                Commission calculation uses original subtotal ({formatMoney(order.financials?.subtotal, currencyCode)}) before discounts.
+              </p>
+            </Postbox>
+          )}
 
-            <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
-              <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-                <h2 className="text-[14px] font-bold text-[#1d2327]">Order Notes</h2>
-              </div>
-              <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar">
-                {(order.timeline || []).slice().reverse().map((event, i) => (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-[3px] text-[12px] leading-relaxed border-l-[3px] ${
-                      event.source === "Admin"
-                        ? "bg-blue-50 border-blue-600 text-blue-900"
-                        : "bg-gray-50 border-gray-400 text-gray-800"
-                    }`}
-                  >
-                    <p className="font-bold mb-1 uppercase text-[10px] tracking-wider">{event.status}</p>
-                    <p className="mb-2">{event.message}</p>
-                    <p className="text-[10px] opacity-60 italic">
-                      {event.timestamp ? new Date(event.timestamp).toLocaleString() : "N/A"} by {event.source}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 border-t border-[#ccd0d4] bg-[#fcfcfc]">
+          {/* Order notes */}
+          <Postbox
+            title="Order notes"
+            footer={
+              <div style={{ width: "100%" }}>
+                <label htmlFor="order-note" className="wp-label">Add note</label>
                 <textarea
+                  id="order-note"
                   placeholder="Add an internal note..."
-                  className="w-full border border-[#ccd0d4] rounded-[3px] p-2 text-[12px] outline-none focus:border-[#2271b1] min-h-[80px] bg-white"
+                  className="wp-textarea"
+                  rows={3}
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
                 />
-                <button
-                  onClick={addAdminNote}
-                  disabled={updating || !newNote.trim()}
-                  className="mt-2 w-full bg-white border border-[#ccd0d4] text-[#2c3338] py-1.5 rounded-[3px] text-[12px] font-bold hover:bg-gray-50 transition-colors shadow-sm"
-                >
-                  Add Note
-                </button>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={addAdminNote}
+                    disabled={updating || !newNote.trim()}
+                    className="wp-btn"
+                  >
+                    Add Note
+                  </button>
+                </div>
               </div>
+            }
+          >
+            {(order.timeline || []).length === 0 ? (
+              <p className="wp-empty" style={{ margin: 0 }}>There are no notes yet.</p>
+            ) : (
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+                {(order.timeline || []).slice().reverse().map((event, i) => (
+                  <li key={i}>
+                    <div
+                      className={`wp-note-body ${event.source === "Customer" ? "is-customer" : event.source === "Admin" ? "" : "is-system"}`}
+                      style={{ wordBreak: "break-word" }}
+                    >
+                      {event.status && <div className="wp-strong" style={{ marginBottom: 2 }}>{event.status}</div>}
+                      {event.message}
+                    </div>
+                    <div className="wp-note-meta">
+                      <span>{event.timestamp ? new Date(event.timestamp).toLocaleString() : "N/A"}</span>
+                      <span>by {event.source}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Postbox>
+
+          {/* IP & location */}
+          <Postbox title="IP & location">
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">IP</span>
+              <span className="wp-kv-v font-mono" style={{ wordBreak: "break-all" }}>{order.customer?.ipAddress || "—"}</span>
+              {order.customer?.ipAddress && order.customer?.ipAddress !== "unknown" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(order.customer.ipAddress);
+                    toast.success("IP copied!");
+                  }}
+                  title="Copy IP"
+                  aria-label="Copy IP address"
+                  className="wp-btn"
+                  style={{ minHeight: 26, padding: "0 6px" }}
+                >
+                  <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              )}
             </div>
 
-          </div>
+            {order.customer?.ipLocation ? (
+              <>
+                <div className="wp-kv">
+                  <span className="wp-kv-k wp-muted">City</span>
+                  <span className="wp-kv-v">{order.customer.ipLocation.city || "—"}</span>
+                </div>
+                <div className="wp-kv">
+                  <span className="wp-kv-k wp-muted">State</span>
+                  <span className="wp-kv-v">{order.customer.ipLocation.state || "—"}</span>
+                </div>
+                <div className="wp-kv">
+                  <span className="wp-kv-k wp-muted">County</span>
+                  <span className="wp-kv-v">{order.customer.ipLocation.county || "—"}</span>
+                </div>
+                <div className="wp-kv">
+                  <span className="wp-kv-k wp-muted">Country</span>
+                  <span className="wp-kv-v">
+                    {order.customer.ipLocation.country || "—"}
+                    {order.customer.ipLocation.countryCode ? ` (${order.customer.ipLocation.countryCode})` : ""}
+                  </span>
+                </div>
+                {order.customer.ipLocation.postal && (
+                  <div className="wp-kv">
+                    <span className="wp-kv-k wp-muted">Postal / Zip</span>
+                    <span className="wp-kv-v font-mono">{order.customer.ipLocation.postal}</span>
+                  </div>
+                )}
+                {order.customer.ipLocation.isp && (
+                  <div className="wp-kv">
+                    <span className="wp-kv-k wp-muted">ISP</span>
+                    <span className="wp-kv-v" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={order.customer.ipLocation.isp}>
+                      {order.customer.ipLocation.isp}
+                    </span>
+                  </div>
+                )}
+                {(order.customer.ipLocation.lat != null && order.customer.ipLocation.lon != null) && (
+                  <p style={{ margin: "10px 0 0" }}>
+                    <a
+                      href={order.customer.ipLocation.mapsUrl || `https://www.google.com/maps?q=${order.customer.ipLocation.lat},${order.customer.ipLocation.lon}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="wp-link"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                    >
+                      <MapPin className="w-4 h-4" aria-hidden="true" />
+                      Pinpoint map ({Number(order.customer.ipLocation.lat).toFixed(4)}, {Number(order.customer.ipLocation.lon).toFixed(4)})
+                      <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                    </a>
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="wp-desc">
+                {order.customer?.ipAddress ? "Location lookup pending or unavailable" : "No IP address captured"}
+              </p>
+            )}
+          </Postbox>
+
         </div>
       </div>
-    </AdminPageLayout>
+    </Page>
     </RequirePermission>
   );
 }

@@ -1,19 +1,38 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { toast } from "react-hot-toast";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
-import { Users, CheckSquare, Coins, Settings, Eye, X, ExternalLink, RefreshCw, BarChart2, Link2, ShoppingCart, MousePointerClick, DollarSign, CreditCard, TrendingUp, AlertCircle } from "lucide-react";
+import { usePopup } from "@/context/PopupContext";
+import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
+import { Eye, X, ExternalLink, FileText, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { paginate } from "@/lib/admin-products-utils";
+import { joinReasons } from "@/app/api/admin/affiliates/list/trash-utils";
 
-export default function AffiliatesManagerClient({ userSession }) {
+const AFFILIATE_TABS = ["overview", "requests", "list", "links", "orders", "conversions", "commissions", "payouts", "analytics", "settings"];
+
+export default function AffiliatesManagerClient() {
+  const { showConfirm, showAlert } = usePopup();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState("requests");
+  const router = useRouter();
+  const pathname = usePathname();
+  // The active tab lives in ?view= (same URLs the sidebar links to); no view = overview.
+  const viewParam = searchParams.get("view");
+  const activeTab = AFFILIATE_TABS.includes(viewParam) ? viewParam : "overview";
+  const setActiveTab = (tab) => {
+    if (tab === activeTab) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", tab);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const [loading, setLoading] = useState(true);
 
   // States
   const [applications, setApplications] = useState([]);
   const [affiliates, setAffiliates] = useState([]);
+  const [trashedAffiliates, setTrashedAffiliates] = useState([]);
+  const [listPage, setListPage] = useState(1);
+  const [appPage, setAppPage] = useState(1);
   const [payouts, setPayouts] = useState([]);
   const [settings, setSettings] = useState({
     defaultCommissionRate: 5,
@@ -27,8 +46,8 @@ export default function AffiliatesManagerClient({ userSession }) {
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [selectedAffiliate, setSelectedAffiliate] = useState(null);
   const [selectedPayout, setSelectedPayout] = useState(null);
-  const [confirmDeleteAffiliate, setConfirmDeleteAffiliate] = useState(null);
-  const [deletingAffiliateId, setDeletingAffiliateId] = useState(null);
+  // Affiliate / application id with a request in flight (disables its row actions)
+  const [busyId, setBusyId] = useState(null);
   // Review Application inputs
   const [reviewAction, setReviewAction] = useState("Approve");
   const [rejectionReason, setRejectionReason] = useState("");
@@ -98,12 +117,12 @@ export default function AffiliatesManagerClient({ userSession }) {
   const [autoPromos, setAutoPromos] = useState([]);
   const [disablingPromos, setDisablingPromos] = useState(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async ({ initial = false } = {}) => {
+    if (!initial) setLoading(true);
     try {
       const [reqsRes, affsRes, paysRes, settsRes, ovRes, actRes, promoRes] = await Promise.all([
         fetch("/api/admin/affiliates/requests").then(r => r.json()),
-        fetch("/api/admin/affiliates/list").then(r => r.json()),
+        fetch("/api/admin/affiliates/list?includeTrashed=1").then(r => r.json()),
         fetch("/api/admin/affiliates/payouts").then(r => r.json()),
         fetch("/api/admin/affiliates/settings").then(r => r.json()),
         fetch("/api/admin/affiliates/overview").then(r => r.json()).catch(() => ({})),
@@ -112,7 +131,10 @@ export default function AffiliatesManagerClient({ userSession }) {
       ]);
 
       if (reqsRes.success) setApplications(reqsRes.applications);
-      if (affsRes.success) setAffiliates(affsRes.affiliates);
+      if (affsRes.success) {
+        setAffiliates(affsRes.affiliates);
+        setTrashedAffiliates(affsRes.trashed || []);
+      }
       if (paysRes.success) setPayouts(paysRes.payouts);
       if (settsRes.success) setSettings(settsRes.settings);
       if (ovRes.success) setOverviewStats(ovRes);
@@ -127,12 +149,45 @@ export default function AffiliatesManagerClient({ userSession }) {
     }
   };
 
+  // Load once on mount; actions call loadData() explicitly afterwards. Switching tabs
+  // only changes ?view= and must not refetch everything.
   useEffect(() => {
-    // Sync tab with ?view= URL param
-    const view = searchParams.get("view");
-    if (view) setActiveTab(view);
-    loadData();
-  }, [searchParams]);
+    // initial: true skips the synchronous setLoading(true) (loading already starts true);
+    // state is only set after the fetches resolve.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData({ initial: true });
+  }, []);
+
+  const resetReviewForm = (app = null) => {
+    setReviewAction("Approve");
+    setRejectionReason("");
+    setNotes("");
+    setCustomCommissionRate(settings.defaultCommissionRate || 5);
+    setCommissionType("Percentage");
+    setReviewDiscountType("None");
+    setReviewDiscountValue("");
+    setReviewReferralCode(app?.referralCode || "");
+    setReferralCodeError("");
+  };
+
+  const closeReviewApplication = () => {
+    setSelectedApplication(null);
+    resetReviewForm();
+  };
+
+  const openPayout = (pay, txId) => {
+    setSelectedPayout(pay);
+    setPayoutAction("Approve");
+    setPayoutTxId(txId);
+    setPayoutNotes("");
+  };
+
+  const closePayout = () => {
+    setSelectedPayout(null);
+    setPayoutAction("Approve");
+    setPayoutTxId("");
+    setPayoutNotes("");
+  };
 
   const handleApplicationReview = async (e) => {
     e.preventDefault();
@@ -158,9 +213,7 @@ export default function AffiliatesManagerClient({ userSession }) {
       if (!res.ok) throw new Error(data.error || "Failed to process review.");
 
       toast.success(reviewAction === "Approve" ? "Application approved!" : "Application rejected.");
-      setSelectedApplication(null);
-      setNotes("");
-      setRejectionReason("");
+      closeReviewApplication();
       loadData();
     } catch (err) {
       toast.error(err.message);
@@ -225,23 +278,78 @@ export default function AffiliatesManagerClient({ userSession }) {
     } finally {
       setSubmittingEdit(false);    }
   };
-  const handleDeleteAffiliate = async (affiliateId) => {
-    setDeletingAffiliateId(affiliateId);
+  // Runs one row request; returns true on success. Errors are toasted.
+  const runRowRequest = async (id, request, successMsg) => {
+    setBusyId(id);
     try {
-      const res = await fetch(`/api/admin/affiliates/list?id=${affiliateId}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete affiliate.");
-
-      toast.success("Affiliate and all associated records deleted successfully.");
-      setConfirmDeleteAffiliate(null);
-      loadData();
+      const res = await request();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Request failed.");
+      toast.success(data.message || successMsg);
+      await loadData();
+      return true;
     } catch (err) {
       toast.error(err.message);
+      return false;
     } finally {
-      setDeletingAffiliateId(null);
+      setBusyId(null);
     }
+  };
+
+  const handleToggleAffiliateStatus = async (aff) => {
+    const next = aff.status === "Active" ? "Suspended" : "Active";
+    if (next === "Suspended" && !(await showConfirm(
+      `Suspend ${aff.name}? They are signed out, can't log in, and their referral links and coupon stop earning until you activate them again.`,
+      "Suspend affiliate",
+      { confirmText: "Suspend", danger: true }
+    ))) return;
+    await runRowRequest(aff._id, () => fetch("/api/admin/affiliates/list", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ affiliateId: aff._id, __v: aff.__v, status: next })
+    }), next === "Active" ? "Affiliate activated." : "Affiliate suspended.");
+  };
+
+  const handleTrashAffiliate = async (aff) => {
+    if (!(await showConfirm(
+      `Move ${aff.name} to the Trash? The account is suspended (no login, no new commissions). Commissions, payouts and history are kept, and you can restore it later.`,
+      "Move to Trash",
+      { confirmText: "Move to Trash" }
+    ))) return;
+    await runRowRequest(aff._id, () => fetch(`/api/admin/affiliates/list?id=${aff._id}`, { method: "DELETE" }), "Affiliate moved to Trash.");
+  };
+
+  const handleRestoreAffiliate = (aff) =>
+    runRowRequest(aff._id, () => fetch("/api/admin/affiliates/list", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ affiliateId: aff._id, action: "restore" })
+    }), "Affiliate restored.");
+
+  const handleDeleteAffiliatePermanently = async (aff) => {
+    if (aff.deleteBlockers?.length) {
+      await showAlert(
+        `${aff.name} has ${joinReasons(aff.deleteBlockers)}. That financial history must be kept, so this affiliate stays in the Trash (suspended) instead of being deleted.`,
+        "Can't delete permanently"
+      );
+      return;
+    }
+    if (!(await showConfirm(
+      `Permanently delete ${aff.name}? This cannot be undone.`,
+      "Delete permanently",
+      { confirmText: "Delete permanently", danger: true }
+    ))) return;
+    await runRowRequest(aff._id, () => fetch(`/api/admin/affiliates/list?id=${aff._id}&permanent=1`, { method: "DELETE" }), "Affiliate deleted permanently.");
+  };
+
+  const handleDeleteApplication = async (app) => {
+    if (!(await showConfirm(
+      `Delete the application from ${app.name}? This cannot be undone.${app.status === "Approved" ? " Their affiliate account is not affected." : ""}`,
+      "Delete application",
+      { confirmText: "Delete", danger: true }
+    ))) return;
+    const ok = await runRowRequest(app._id, () => fetch(`/api/admin/affiliates/requests?id=${app._id}`, { method: "DELETE" }), "Application deleted.");
+    if (ok && viewingApplication?._id === app._id) setViewingApplication(null);
   };
 
   const handlePayoutProcess = async (e) => {
@@ -263,9 +371,7 @@ export default function AffiliatesManagerClient({ userSession }) {
       if (!res.ok) throw new Error(data.error || "Failed to process payout.");
 
       toast.success(payoutAction === "Approve" ? "Payout marked as Paid!" : "Payout request rejected and refunded.");
-      setSelectedPayout(null);
-      setPayoutTxId("");
-      setPayoutNotes("");
+      closePayout();
       loadData();
     } catch (err) {
       toast.error(err.message);
@@ -304,1353 +410,1170 @@ export default function AffiliatesManagerClient({ userSession }) {
 
   if (loading) {
     return (
-      <AdminPageLayout title="Affiliates" breadcrumbs={[{ label: "Affiliates" }]}>
-        <div className="flex items-center justify-center min-h-[400px] bg-white border border-[#ccd0d4] rounded-[3px] shadow-sm">
-          <div className="space-y-4 text-center">
-            <span className="animate-spin inline-block h-8 w-8 border-2 border-black/20 border-t-black rounded-full" />
-            <p className="text-xs uppercase tracking-widest text-[#646970]">Fetching database registers...</p>
+      <Page>
+        <PageHeader title="Affiliates" />
+        <div className="wp-postbox">
+          <div className="wp-inside space-y-3">
+            <span className="sr-only">Loading affiliate records…</span>
+            <Skeleton height={20} width="40%" />
+            <Skeleton height={14} />
+            <Skeleton height={14} />
+            <Skeleton height={14} width="80%" />
           </div>
         </div>
-      </AdminPageLayout>
+      </Page>
     );
   }
 
+  const openEditAffiliate = (aff) => {
+    setSelectedAffiliate(aff);
+    setEditReferralCode(aff.referralCode || "");
+    setEditForm({
+      name: aff.name || "",
+      email: aff.email || "",
+      phone: aff.phone || "",
+      dob: aff.dob ? new Date(aff.dob).toISOString().split('T')[0] : "",
+      commissionRate: aff.commissionRate ?? 5,
+      commissionType: aff.commissionType || "Percentage",
+      customerDiscountType: aff.customerDiscountType || "None",
+      customerDiscountValue: aff.customerDiscountValue || 0,
+      status: aff.status || "Active",
+      couponCode: aff.couponCode || "",
+      password: "",
+      // Address
+      street: aff.address?.street || "",
+      city: aff.address?.city || "",
+      state: aff.address?.state || "",
+      zipCode: aff.address?.zipCode || "",
+      country: aff.address?.country || "",
+      // Banking
+      accountHolder: aff.bankingInfo?.accountHolder || "",
+      bankName: aff.bankingInfo?.bankName || "",
+      accountNumber: aff.bankingInfo?.accountNumber || "",
+      iban: aff.bankingInfo?.iban || "",
+      swiftCode: aff.bankingInfo?.swiftCode || "",
+      routingNumber: aff.bankingInfo?.routingNumber || "",
+      paypalEmail: aff.bankingInfo?.paypalEmail || "",
+      // Business
+      companyName: aff.businessInfo?.companyName || "",
+      website: aff.businessInfo?.website || "",
+      createdAt: aff.createdAt ? new Date(aff.createdAt).toISOString().slice(0, 16) : "",
+    });
+  };
+
+  // Every way of opening the review dialog initialises all review fields from this application.
+  const openReviewApplication = (app, action = "Approve") => {
+    resetReviewForm(app);
+    setReviewAction(action);
+    setSelectedApplication(app);
+  };
+
   return (
-    <AdminPageLayout
-      title="Affiliate Management"
-      breadcrumbs={[{ label: "Affiliates" }]}
-    >
-      <div className="space-y-4 md:space-y-6 text-[#2c3338] font-sans">
+    <Page>
+      <PageHeader title="Affiliates" />
 
-        {/* WP-Style Navigation Lifted to Top: Classic subsubsub */}
-        <ul className="subsubsub text-[13px] text-[#646970] flex flex-nowrap overflow-x-auto whitespace-nowrap pb-1 md:pb-0 md:flex-wrap md:overflow-visible md:whitespace-normal gap-y-1.5 items-center mb-6 select-none leading-relaxed">
+      {/* View switcher */}
+      <div className="wp-tabs" role="tablist" aria-label="Affiliate sections">
+        {[
+          { id: "overview", label: "Overview", count: null },
+          { id: "requests", label: "Applications", count: applications.filter(a => a.status === 'Pending').length },
+          { id: "list", label: "Affiliates", count: affiliates.length },
+          { id: "links", label: "Referral Links", count: null },
+          { id: "orders", label: "Referred Orders", count: activityData.referredOrders?.length ?? null },
+          { id: "conversions", label: "Conversions", count: null },
+          { id: "commissions", label: "Commissions", count: activityData.commissions?.length ?? null },
+          { id: "payouts", label: "Payout Requests", count: payouts.filter(p => p.status === 'Requested').length },
+          { id: "analytics", label: "Analytics", count: null },
+          { id: "settings", label: "Global Settings", count: null }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className="wp-tab min-h-10"
+          >
+            {tab.label}
+            {tab.count !== null && <span className="wp-muted" style={{ fontWeight: 400 }}> ({tab.count})</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Summary strip (shown for all tabs except Overview) */}
+      {activeTab !== "overview" && (
+        <div className="wp-stats">
           {[
-            { id: "overview", label: "Overview", count: null },
-            { id: "requests", label: "Applications", count: applications.filter(a => a.status === 'Pending').length },
-            { id: "list", label: "Active Affiliates", count: affiliates.length },
-            { id: "links", label: "Referral Links", count: null },
-            { id: "orders", label: "Referred Orders", count: activityData.referredOrders?.length ?? null },
-            { id: "conversions", label: "Conversions", count: null },
-            { id: "commissions", label: "Commissions", count: activityData.commissions?.length ?? null },
-            { id: "payouts", label: "Payout Requests", count: payouts.filter(p => p.status === 'Requested').length },
-            { id: "analytics", label: "Analytics", count: null },
-            { id: "settings", label: "Global Settings", count: null }
-          ].map((tab, idx, arr) => (
-            <li key={tab.id} className="flex items-center shrink-0">
-              <button
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`font-semibold cursor-pointer text-left hover:text-[#2271b1] transition-all bg-transparent border-none p-0 outline-none ${
-                  activeTab === tab.id
-                    ? "text-[#1d2327] font-black"
-                    : "text-[#2271b1]"
-                }`}
-              >
-                {tab.label}
-                {tab.count !== null && (
-                  <span className="text-gray-400 font-medium ml-1">({tab.count})</span>
-                )}
-              </button>
-              {idx < arr.length - 1 && (
-                <span className="text-[#c3c4c7] mx-2">|</span>
-              )}
-            </li>
+            { id: "list", label: "Active partners", value: affiliates.filter(a => a.status === "Active").length },
+            { id: "requests", label: "Pending reviews", value: applications.filter(a => a.status === 'Pending').length },
+            { id: "payouts", label: "Pending payouts", value: payouts.filter(p => p.status === 'Requested').length },
+            { id: "settings", label: "Default commission", value: `${settings.defaultCommissionRate}%` }
+          ].map(card => (
+            <StatButton key={card.id} label={card.label} value={card.value} onClick={() => setActiveTab(card.id)} />
           ))}
-        </ul>
+        </div>
+      )}
 
-        {/* Compact Summary Cards (Shown for all tabs except Overview) */}
-        {activeTab !== "overview" && (
-          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { id: "list", label: "Active Partners", value: affiliates.length, icon: Users },
-              { id: "requests", label: "Pending Reviews", value: applications.filter(a => a.status === 'Pending').length, icon: CheckSquare },
-              { id: "payouts", label: "Pending Payouts", value: payouts.filter(p => p.status === 'Requested').length, icon: Coins },
-              { id: "settings", label: "Default Commission", value: `${settings.defaultCommissionRate}%`, icon: Settings }
-            ].map(card => (
-              <div 
-                key={card.id}
-                onClick={() => setActiveTab(card.id)}
-                className="bg-white border border-[#c3c4c7] flex flex-col cursor-pointer hover:border-gray-400 transition-all select-none shadow-sm"
-              >
-                <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 leading-none">
-                  {card.label}
-                </div>
-                <div className="p-3.5 flex items-center justify-between">
-                  <span className="text-xl font-bold text-[#1d2327]">{card.value}</span>
-                  <card.icon className="w-4 h-4 text-gray-400" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Tab: Overview */}
-        {activeTab === "overview" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                { label: "Total Affiliates", value: overviewStats?.stats?.totalAffiliates ?? affiliates.length, icon: Users, tab: "list" },
-                { label: "Total Clicks", value: overviewStats?.stats?.totalClicks ?? 0, icon: MousePointerClick, tab: "conversions" },
-                { label: "Referred Orders", value: overviewStats?.stats?.totalReferralOrders ?? 0, icon: ShoppingCart, tab: "orders" },
-                { label: "Conversion Rate", value: `${overviewStats?.stats?.conversionRate ?? 0}%`, icon: TrendingUp, tab: "conversions" },
-                { label: "Total Revenue", value: `$${(overviewStats?.stats?.totalRevenue ?? 0).toFixed(2)}`, icon: DollarSign, tab: "analytics" },
-                { label: "Commission Paid", value: `$${(overviewStats?.stats?.totalCommissionPaid ?? 0).toFixed(2)}`, icon: CreditCard, tab: "commissions" },
-                { label: "Pending Commission", value: `$${(overviewStats?.stats?.pendingCommission ?? 0).toFixed(2)}`, icon: Coins, tab: "commissions" },
-                { label: "Total Paid Out", value: `$${(overviewStats?.stats?.totalPaid ?? 0).toFixed(2)}`, icon: BarChart2, tab: "payouts" },
-              ].map(({ label, value, icon: Icon, tab }) => (
-                <div 
-                  key={label} 
-                  onClick={() => setActiveTab(tab)}
-                  className="bg-white border border-[#c3c4c7] flex flex-col cursor-pointer hover:border-gray-400 transition-all select-none shadow-sm"
-                >
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 leading-none">
-                    {label}
-                  </div>
-                  <div className="p-3.5 flex items-center justify-between">
-                    <span className="text-xl font-bold text-[#1d2327]">{value}</span>
-                    <Icon className="w-4 h-4 text-gray-400" />
-                  </div>
-                </div>
+      {/* Tab: Overview */}
+      {activeTab === "overview" && (
+        <div>
+          {[
+            [
+              { label: "Total affiliates", value: overviewStats?.stats?.totalAffiliates ?? affiliates.length, tab: "list" },
+              { label: "Total clicks", value: overviewStats?.stats?.totalClicks ?? 0, tab: "conversions" },
+              { label: "Referred orders", value: overviewStats?.stats?.totalReferralOrders ?? 0, tab: "orders" },
+              { label: "Conversion rate", value: `${overviewStats?.stats?.conversionRate ?? 0}%`, tab: "conversions" },
+            ],
+            [
+              { label: "Total revenue", value: formatMoney(overviewStats?.stats?.totalRevenue ?? 0), tab: "analytics" },
+              { label: "Commission paid", value: formatMoney(overviewStats?.stats?.totalCommissionPaid ?? 0), tab: "commissions" },
+              { label: "Pending commission", value: formatMoney(overviewStats?.stats?.pendingCommission ?? 0), tab: "commissions" },
+              { label: "Total paid out", value: formatMoney(overviewStats?.stats?.totalPaid ?? 0), tab: "payouts" },
+            ],
+          ].map((strip, i) => (
+            <div key={i} className="wp-stats">
+              {strip.map(({ label, value, tab }) => (
+                <StatButton key={label} label={label} value={value} onClick={() => setActiveTab(tab)} />
               ))}
             </div>
+          ))}
 
-            {/* Split Grid for Tables */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-6">
-              
-              {/* Top Performing Partners */}
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden flex flex-col">
-                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4] flex flex-wrap justify-between items-center gap-2">
-                  <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wider min-w-0">Top Performing Partners</h3>
-                  <span className="text-[10px] font-bold bg-[#2271b1]/10 text-[#2271b1] px-2 py-0.5 rounded-[2px] uppercase shrink-0">Lifetime</span>
-                </div>
-                {overviewStats?.topAffiliates?.length > 0 ? (
-                  <div className="overflow-x-auto max-w-full flex-1">
-                    <table className="w-full min-w-[400px] text-[13px] border-collapse">
-                      <thead>
-                        <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
-                          <th className="px-4 py-2.5 text-left">Affiliate</th>
-                          <th className="px-4 py-2.5 text-left">Code</th>
-                          <th className="px-4 py-2.5 text-right">Earnings</th>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5">
+            <Postbox id="aff-top" title="Top performing partners" aside="Lifetime" flush>
+              {overviewStats?.topAffiliates?.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="wp-list-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Affiliate</th>
+                        <th scope="col">Code</th>
+                        <th scope="col" className="wp-num">Earnings</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overviewStats.topAffiliates.map(a => (
+                        <tr key={a._id}>
+                          <td>
+                            <div className="flex items-center gap-2">
+                              <span className="wp-avatar" style={{ width: 28, height: 28, fontSize: 12 }} aria-hidden="true">{a.name?.charAt(0)}</span>
+                              <span className="wp-strong">{a.name}</span>
+                            </div>
+                          </td>
+                          <td className="font-mono">{a.referralCode}</td>
+                          <td className="wp-num wp-strong">{formatMoney(a.lifetimeEarnings ?? 0)}</td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#f0f0f1]">
-                        {overviewStats.topAffiliates.map(a => (
-                          <tr key={a._id} className="hover:bg-[#fbfbfb] transition-colors">
-                            <td className="px-4 py-3.5 font-bold text-[#1d2327] flex items-center gap-2">
-                              <div className="w-6 h-6 bg-[#f0f6fb] text-[#2271b1] rounded-full flex items-center justify-center font-bold text-[10px] uppercase shadow-inner">
-                                {a.name?.charAt(0)}
-                              </div>
-                              {a.name}
-                            </td>
-                            <td className="px-4 py-3.5 font-mono text-[12px] text-[#2271b1] font-semibold">{a.referralCode}</td>
-                            <td className="px-4 py-3.5 text-right font-bold text-neutral-800">${(a.lifetimeEarnings ?? 0).toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-gray-400 italic flex-1 flex flex-col justify-center items-center">
-                    <Users className="w-6 h-6 mb-2 opacity-30" />
-                    <span>No partner performance records found.</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Recent Referred Orders */}
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden flex flex-col">
-                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4] flex flex-wrap justify-between items-center gap-2">
-                  <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wider min-w-0">Recent Referred Orders</h3>
-                  <span className="text-[10px] font-bold bg-green-50 text-green-700 px-2 py-0.5 rounded-[2px] uppercase shrink-0">Latest</span>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                {overviewStats?.recentOrders?.length > 0 ? (
-                  <div className="overflow-x-auto max-w-full flex-1">
-                    <table className="w-full min-w-[400px] text-[13px] border-collapse">
-                      <thead>
-                        <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
-                          <th className="px-4 py-2.5 text-left">Order</th>
-                          <th className="px-4 py-2.5 text-left">Ref Code</th>
-                          <th className="px-4 py-2.5 text-right">Total</th>
-                          <th className="px-4 py-2.5 text-right">Date</th>
+              ) : (
+                <p className="wp-empty" style={{ padding: "14px 12px" }}>No partner performance records found.</p>
+              )}
+            </Postbox>
+
+            <Postbox id="aff-recent" title="Recent referred orders" aside="Latest" flush>
+              {overviewStats?.recentOrders?.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="wp-list-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Order</th>
+                        <th scope="col" className="wp-hide-sm">Ref code</th>
+                        <th scope="col" className="wp-num">Total</th>
+                        <th scope="col" className="wp-num wp-hide-sm">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overviewStats.recentOrders.map(o => (
+                        <tr key={o._id}>
+                          <td>
+                            <span className="wp-strong font-mono">{o.orderNumber}</span>
+                            <div className="wp-mobile-meta">{o.affiliateReferralCode} · {new Date(o.createdAt).toLocaleDateString()}</div>
+                          </td>
+                          <td className="wp-hide-sm font-mono">{o.affiliateReferralCode}</td>
+                          <td className="wp-num wp-strong">{formatMoney(o.financials?.total ?? 0)}</td>
+                          <td className="wp-num wp-muted wp-hide-sm">{new Date(o.createdAt).toLocaleDateString()}</td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#f0f0f1]">
-                        {overviewStats.recentOrders.map(o => (
-                          <tr key={o._id} className="hover:bg-[#fbfbfb] transition-colors">
-                            <td className="px-4 py-3 font-mono font-bold text-[12px] text-[#2271b1]">{o.orderNumber}</td>
-                            <td className="px-4 py-3 font-mono text-[12px] text-neutral-600 font-semibold">{o.affiliateReferralCode}</td>
-                            <td className="px-4 py-3 text-right font-bold text-neutral-800">${(o.financials?.total ?? 0).toFixed(2)}</td>
-                            <td className="px-4 py-3 text-right text-gray-400 text-[12px]">{new Date(o.createdAt).toLocaleDateString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-gray-400 italic flex-1 flex flex-col justify-center items-center">
-                    <ShoppingCart className="w-6 h-6 mb-2 opacity-30" />
-                    <span>No referred orders tracked yet.</span>
-                  </div>
-                )}
-              </div>
-
-            </div>
-
-            {!overviewStats && (
-              <div className="bg-white border border-[#ccd0d4] p-6 md:p-12 text-center text-[#646970] rounded-[3px]">
-                <BarChart2 className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                <p className="text-[13px] font-medium">No overview data available yet. Stats will appear once affiliates generate activity.</p>
-              </div>
-            )}
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="wp-empty" style={{ padding: "14px 12px" }}>No referred orders tracked yet.</p>
+              )}
+            </Postbox>
           </div>
-        )}
 
+          {!overviewStats && (
+            <Notice type="info">No overview data available yet. Stats will appear once affiliates generate activity.</Notice>
+          )}
+        </div>
+      )}
 
+      {/* Tab: Referral Links */}
+      {activeTab === "links" && (
+        <div className="wp-table-box">
+          <table className="wp-list-table">
+            <thead>
+              <tr>
+                <th scope="col">Affiliate</th>
+                <th scope="col">Code</th>
+                <th scope="col" className="wp-hide-sm">Customer discount</th>
+                <th scope="col" className="wp-hide-sm">Referral link</th>
+                <th scope="col"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {affiliates.length === 0 ? (
+                <tr><td colSpan="5" className="wp-muted">No active affiliates registered.</td></tr>
+              ) : affiliates.map(aff => {
+                const link = typeof window !== 'undefined' ? `${window.location.origin}/?ref=${aff.referralCode}` : `https://pairolifestyle.com/?ref=${aff.referralCode}`;
+                const discountLabel = aff.customerDiscountType === 'None' || !aff.customerDiscountValue ? 'None' :
+                  aff.customerDiscountType === 'Percentage' ? `${aff.customerDiscountValue}% Off` : `$${aff.customerDiscountValue} Off`;
+                return (
+                  <tr key={aff._id}>
+                    <td style={{ wordBreak: "break-word" }}>
+                      <span className="wp-strong">{aff.name}</span>
+                      <div className="wp-muted wp-small">{aff.email}</div>
+                      <div className="wp-mobile-meta">Discount: {discountLabel}</div>
+                    </td>
+                    <td className="font-mono wp-strong">{aff.referralCode}</td>
+                    <td className="wp-hide-sm">
+                      <span className={`wp-pill wp-pill-sm ${discountLabel === 'None' ? '' : 'wp-st-paid'}`}>{discountLabel}</span>
+                    </td>
+                    <td className="wp-hide-sm font-mono wp-muted wp-small truncate" style={{ maxWidth: 320 }}>{link}</td>
+                    <td className="wp-num">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(link);
+                            toast.success("Link copied!");
+                          } catch {
+                            toast.error("Couldn't copy the link. Copy it manually.");
+                          }
+                        }}
+                        className="wp-btn"
+                        aria-label={`Copy referral link for ${aff.name}`}
+                      >
+                        Copy link
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-        {/* Tab: Referral Links */}
-        {activeTab === "links" && (
-          <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-            <div className="overflow-x-auto max-w-full">
-              <table className="w-full min-w-[520px] text-left border-collapse text-[13px]">
+      {/* Tab: Referred Orders */}
+      {activeTab === "orders" && (() => {
+        const filteredOrds = (activityData.referredOrders || []).filter(o => {
+          const q = orderSearchQuery.trim().toLowerCase();
+          return !q ||
+            o.orderNumber?.toLowerCase().includes(q) ||
+            o.affiliateReferralCode?.toLowerCase().includes(q) ||
+            o.customer?.email?.toLowerCase().includes(q);
+        });
+        return (
+          <div>
+            <div className="wp-toolbar">
+              <span className="wp-spacer" />
+              <SearchBox
+                id="aff-orders-search"
+                label="Search referred orders"
+                value={orderSearchQuery}
+                onChange={setOrderSearchQuery}
+                placeholder="Order number, code, customer email…"
+              />
+            </div>
+            <div className="wp-table-box">
+              <table className="wp-list-table">
                 <thead>
-                  <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                    <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
-                    <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Code</th>
-                    <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Customer Discount</th>
-                    <th className="px-4 py-3 font-bold uppercase text-[11px]">Referral Link</th>
-                    <th className="px-4 py-3 w-24 text-right"></th>
+                  <tr>
+                    <th scope="col">Order</th>
+                    <th scope="col" className="wp-hide-sm">Date</th>
+                    <th scope="col" className="wp-hide-sm">Customer</th>
+                    <th scope="col" className="wp-hide-sm">Ref code</th>
+                    <th scope="col" className="wp-num wp-hide-sm">Subtotal</th>
+                    <th scope="col" className="wp-num wp-hide-sm">Ref discount</th>
+                    <th scope="col" className="wp-num">Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#f0f0f1]">
-                  {affiliates.length === 0 ? (
-                    <tr><td colSpan="5" className="p-8 text-center text-gray-400 italic">No active affiliates registered.</td></tr>
-                  ) : affiliates.map(aff => {
-                    const link = typeof window !== 'undefined' ? `${window.location.origin}/?ref=${aff.referralCode}` : `https://pairolifestyle.com/?ref=${aff.referralCode}`;
-                    const discountLabel = aff.customerDiscountType === 'None' || !aff.customerDiscountValue ? 'None' :
-                      aff.customerDiscountType === 'Percentage' ? `${aff.customerDiscountValue}% Off` : `$${aff.customerDiscountValue} Off`;
-                    return (
-                      <tr key={aff._id} className="hover:bg-[#fbfbfb] transition-colors">
-                        <td className="px-4 py-3">
-                          <span className="font-bold text-[#1d2327]">{aff.name}</span>
-                          <div className="text-[11px] text-[#646970] mt-0.5">{aff.email}</div>
-                        </td>
-                        <td className="px-4 py-3 font-mono font-bold text-black">{aff.referralCode}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold ${discountLabel === 'None' ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-green-700'}`}>
-                            {discountLabel}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-[11px] text-[#646970] truncate max-w-xs">{link}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => { navigator.clipboard.writeText(link); toast.success("Link copied!"); }}
-                            className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[11px] font-bold hover:bg-[#f6f7f7] shadow-sm"
-                          >
-                            Copy
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                <tbody>
+                  {filteredOrds.length === 0 ? (
+                    <tr><td colSpan="7" className="wp-muted">No referred orders match search.</td></tr>
+                  ) : filteredOrds.map(o => (
+                    <tr key={o._id}>
+                      <td style={{ wordBreak: "break-word" }}>
+                        <span className="wp-strong font-mono">{o.orderNumber}</span>
+                        <div className="wp-mobile-meta">
+                          {new Date(o.createdAt).toLocaleDateString()} · {o.affiliateReferralCode}
+                          {o.customer?.email ? ` · ${o.customer.email}` : ""}
+                        </div>
+                      </td>
+                      <td className="wp-hide-sm wp-muted">{new Date(o.createdAt).toLocaleDateString()}</td>
+                      <td className="wp-hide-sm">{o.customer?.email || '—'}</td>
+                      <td className="wp-hide-sm font-mono">{o.affiliateReferralCode}</td>
+                      <td className="wp-num wp-hide-sm">{formatMoney(o.financials?.subtotal ?? 0)}</td>
+                      <td className="wp-num wp-hide-sm" style={{ color: "#2f6f1a" }}>
+                        {o.financials?.affiliateDiscountAmount > 0 ? `-${formatMoney(o.financials.affiliateDiscountAmount)}` : '—'}
+                      </td>
+                      <td className="wp-num wp-strong">{formatMoney(o.financials?.total ?? 0)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
-        )}
+        );
+      })()}
 
-        {/* Tab: Referred Orders */}
-        {activeTab === "orders" && (() => {
-          const filteredOrds = (activityData.referredOrders || []).filter(o => {
-            const q = orderSearchQuery.trim().toLowerCase();
-            return !q ||
-              o.orderNumber?.toLowerCase().includes(q) ||
-              o.affiliateReferralCode?.toLowerCase().includes(q) ||
-              o.customer?.email?.toLowerCase().includes(q);
-          });
-          return (
-            <div className="space-y-3">
-              <div className="flex justify-end">
-                <input
-                  type="text"
-                  value={orderSearchQuery}
-                  onChange={e => setOrderSearchQuery(e.target.value)}
-                  placeholder="Search orders by number, code, customer email..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-80 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
-                />
+      {/* Tab: Conversions */}
+      {activeTab === "conversions" && (() => {
+        const filteredClks = (activityData.clicks || []).filter(c => {
+          const q = clickSearchQuery.trim().toLowerCase();
+          return !q ||
+            c.affiliateId?.name?.toLowerCase().includes(q) ||
+            c.affiliateId?.referralCode?.toLowerCase().includes(q) ||
+            c.referralCode?.toLowerCase().includes(q) ||
+            c.ipAddress?.toLowerCase().includes(q);
+        });
+        return (
+          <div>
+            <div className="wp-stats">
+              <div className="wp-stat">
+                <div className="wp-stat-label">Total clicks</div>
+                <div className="wp-stat-value">{activityData.clicks?.length ?? 0}</div>
               </div>
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <div className="overflow-x-auto max-w-full">
-                  <table className="w-full min-w-[550px] text-left border-collapse text-[13px]">
-                    <thead>
-                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Order #</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Customer</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Ref Code</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Subtotal</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Ref Discount</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Total</th>
+              <div className="wp-stat">
+                <div className="wp-stat-label">Referred orders</div>
+                <div className="wp-stat-value">{activityData.referredOrders?.length ?? 0}</div>
+              </div>
+              <div className="wp-stat">
+                <div className="wp-stat-label">Conversion rate</div>
+                <div className="wp-stat-value">
+                  {activityData.clicks?.length > 0
+                    ? `${((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1)}%`
+                    : '0%'}
+                </div>
+              </div>
+            </div>
+            <div className="wp-toolbar">
+              <span className="wp-spacer" />
+              <SearchBox
+                id="aff-clicks-search"
+                label="Search clicks"
+                value={clickSearchQuery}
+                onChange={setClickSearchQuery}
+                placeholder="Code, name, IP…"
+              />
+            </div>
+            <Postbox id="aff-clicks" title="Recent clicks" flush>
+              <div className="overflow-x-auto">
+                <table className="wp-list-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      <th scope="col">Affiliate</th>
+                      <th scope="col" className="wp-hide-sm">Ref code</th>
+                      <th scope="col" className="wp-hide-sm">IP / source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredClks.length === 0 ? (
+                      <tr><td colSpan="4" className="wp-muted">No clicks match filter.</td></tr>
+                    ) : filteredClks.slice(0, 50).map((c, i) => (
+                      <tr key={c._id || i}>
+                        <td className="wp-muted">{new Date(c.createdAt).toLocaleString()}</td>
+                        <td>
+                          <span className="wp-strong">{c.affiliateId?.name || '—'}</span>
+                          <div className="wp-mobile-meta">
+                            {c.affiliateId?.referralCode || c.referralCode || '—'} · {c.ipAddress || '—'}
+                          </div>
+                        </td>
+                        <td className="wp-hide-sm font-mono">{c.affiliateId?.referralCode || c.referralCode || '—'}</td>
+                        <td className="wp-hide-sm font-mono wp-muted wp-small">{c.ipAddress || '—'}</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#f0f0f1]">
-                      {filteredOrds.length === 0 ? (
-                        <tr><td colSpan="7" className="p-8 text-center text-gray-400 italic">No referred orders match search.</td></tr>
-                      ) : filteredOrds.map(o => (
-                        <tr key={o._id} className="hover:bg-[#fbfbfb]">
-                          <td className="px-4 py-2.5 font-mono font-bold text-[12px] text-[#2271b1]">{o.orderNumber}</td>
-                          <td className="px-4 py-2.5 text-[#646970]">{new Date(o.createdAt).toLocaleDateString()}</td>
-                          <td className="px-4 py-2.5 text-[12px]">{o.customer?.email || '—'}</td>
-                          <td className="px-4 py-2.5 font-mono font-bold">{o.affiliateReferralCode}</td>
-                          <td className="px-4 py-2.5 text-right">${(o.financials?.subtotal ?? 0).toFixed(2)}</td>
-                          <td className="px-4 py-2.5 text-right text-green-700 font-bold">
-                            {o.financials?.affiliateDiscountAmount > 0 ? `-$${o.financials.affiliateDiscountAmount.toFixed(2)}` : '—'}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-bold">${(o.financials?.total ?? 0).toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          );
-        })()}
-
-        {/* Tab: Conversions */}
-        {activeTab === "conversions" && (() => {
-          const filteredClks = (activityData.clicks || []).filter(c => {
-            const q = clickSearchQuery.trim().toLowerCase();
-            return !q ||
-              c.affiliateId?.name?.toLowerCase().includes(q) ||
-              c.affiliateId?.referralCode?.toLowerCase().includes(q) ||
-              c.referralCode?.toLowerCase().includes(q) ||
-              c.ipAddress?.toLowerCase().includes(q);
-          });
-          return (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 xs:grid-cols-3 gap-3 xs:gap-4">
-                <div className="bg-white border border-[#ccd0d4] p-3 xs:p-4 rounded-[3px] shadow-sm text-center">
-                  <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Total Clicks</p>
-                  <p className="text-xl xs:text-2xl font-bold text-[#1d2327]">{activityData.clicks?.length ?? 0}</p>
-                </div>
-                <div className="bg-white border border-[#ccd0d4] p-3 xs:p-4 rounded-[3px] shadow-sm text-center">
-                  <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Referred Orders</p>
-                  <p className="text-xl xs:text-2xl font-bold text-[#1d2327]">{activityData.referredOrders?.length ?? 0}</p>
-                </div>
-                <div className="bg-white border border-[#ccd0d4] p-3 xs:p-4 rounded-[3px] shadow-sm text-center">
-                  <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">Conversion Rate</p>
-                  <p className="text-xl xs:text-2xl font-bold text-[#1d2327]">
-                    {activityData.clicks?.length > 0
-                      ? `${((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1)}%`
-                      : '0%'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <input
-                  type="text"
-                  value={clickSearchQuery}
-                  onChange={e => setClickSearchQuery(e.target.value)}
-                  placeholder="Search clicks by code, name, IP..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
-                />
-              </div>
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4]"><h3 className="text-[13px] font-bold">Recent Clicks</h3></div>
-                <div className="overflow-x-auto max-w-full">
-                  <table className="w-full min-w-[450px] text-[13px]">
-                    <thead><tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[11px] font-bold uppercase text-[#646970]">
-                      <th className="px-4 py-2 text-left">Date</th>
-                      <th className="px-4 py-2 text-left">Affiliate</th>
-                      <th className="px-4 py-2 text-left">Ref Code</th>
-                      <th className="px-4 py-2 text-left">IP / Source</th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-[#f0f0f1]">
-                      {filteredClks.length === 0 ? (
-                        <tr><td colSpan="4" className="p-6 text-center text-gray-400 italic">No clicks match filter.</td></tr>
-                      ) : filteredClks.slice(0, 50).map((c, i) => (
-                        <tr key={c._id || i} className="hover:bg-[#fbfbfb]">
-                          <td className="px-4 py-2 text-[#646970]">{new Date(c.createdAt).toLocaleString()}</td>
-                          <td className="px-4 py-2 font-medium">{c.affiliateId?.name || '—'}</td>
-                          <td className="px-4 py-2 font-mono">{c.affiliateId?.referralCode || c.referralCode || '—'}</td>
-                          <td className="px-4 py-2 font-mono text-[11px] text-[#646970]">{c.ipAddress || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Tab: Commissions */}
-        {activeTab === "commissions" && (() => {
-          const filteredComms = (activityData.commissions || []).filter(c => {
-            const matchesStatus = commissionStatusFilter === "All" || c.status === commissionStatusFilter;
-            const q = commissionSearchQuery.trim().toLowerCase();
-            return matchesStatus && (!q ||
-              c.affiliateId?.name?.toLowerCase().includes(q) ||
-              c.affiliateId?.referralCode?.toLowerCase().includes(q) ||
-              c.orderNumber?.toLowerCase().includes(q));
-          });
-          return (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-1 bg-white border border-[#ccd0d4] rounded-[3px] p-1 shadow-sm">
-                  {["All", "Pending", "Approved", "Rejected"].map(status => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => setCommissionStatusFilter(status)}
-                      className={`px-3 py-1 text-[11px] font-medium rounded-[2px] transition-all cursor-pointer ${
-                        commissionStatusFilter === status
-                          ? status === "Pending" ? "bg-[#fff2cc] text-[#d6b656] font-bold"
-                            : status === "Approved" ? "bg-[#d5e8d4] text-[#274e13] font-bold"
-                            : status === "Rejected" ? "bg-[#f8cecc] text-[#b85450] font-bold"
-                            : "bg-[#1d2327] text-white font-bold"
-                          : "text-[#646970] hover:bg-[#f6f7f7]"
-                      }`}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  value={commissionSearchQuery}
-                  onChange={e => setCommissionSearchQuery(e.target.value)}
-                  placeholder="Search commissions..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
-                />
-              </div>
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <div className="overflow-x-auto max-w-full">
-                  <table className="w-full min-w-[550px] text-left border-collapse text-[13px]">
-                    <thead>
-                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Order</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Rate</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Amount</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Status</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#f0f0f1]">
-                      {filteredComms.length === 0 ? (
-                        <tr><td colSpan="6" className="p-8 text-center text-gray-400 italic">No commissions match filter.</td></tr>
-                      ) : filteredComms.map(c => (
-                        <tr key={c._id} className="hover:bg-[#fbfbfb]">
-                          <td className="px-4 py-2.5">
-                            <span className="font-bold text-[#1d2327]">{c.affiliateId?.name || 'Unknown'}</span>
-                            <div className="text-[11px] text-[#646970] font-mono">{c.affiliateId?.referralCode}</div>
-                          </td>
-                          <td className="px-4 py-2.5 font-mono text-[12px]">{c.orderNumber || '—'}</td>
-                          <td className="px-4 py-2.5">{c.commissionType === 'Fixed' ? `$${c.commissionRate}` : `${c.commissionRate}%`}</td>
-                          <td className="px-4 py-2.5 text-right font-bold text-[#1d2327]">${(c.commissionAmount ?? 0).toFixed(2)}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase ${c.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
-                              c.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-amber-700'
-                              }`}>{c.status}</span>
-                          </td>
-                          <td className="px-4 py-2.5 text-[#646970]">{new Date(c.createdAt).toLocaleDateString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Tab: Analytics */}
-        {activeTab === "analytics" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Conversion Rate", value: overviewStats?.stats?.conversionRate ? `${overviewStats.stats.conversionRate}%` : `${activityData.clicks?.length > 0 ? ((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1) : 0}%` },
-                { label: "Total Clicks", value: overviewStats?.stats?.totalClicks ?? activityData.clicks?.length ?? 0 },
-                { label: "Total Orders", value: overviewStats?.stats?.totalReferralOrders ?? activityData.referredOrders?.length ?? 0 },
-                { label: "Total Revenue", value: `$${(overviewStats?.stats?.totalRevenue ?? 0).toFixed(2)}` },
-              ].map(({ label, value }) => (
-                <div key={label} className="bg-white border border-[#ccd0d4] p-4 rounded-[3px] shadow-sm text-center">
-                  <p className="text-[10px] font-bold text-[#646970] uppercase tracking-wider mb-1">{label}</p>
-                  <p className="text-2xl font-bold text-[#1d2327]">{value}</p>
-                </div>
-              ))}
-            </div>
-
-            {overviewStats?.chartData?.length > 0 && (
-              <div className="bg-white border border-[#ccd0d4] rounded-[3px] p-6 shadow-sm">
-                <h3 className="text-[13px] font-bold text-[#1d2327] mb-4 border-b border-[#ccd0d4] pb-2">Monthly Click & Order Trend</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[13px]">
-                    <thead><tr className="text-[11px] font-bold uppercase text-[#646970] border-b border-[#ccd0d4]">
-                      <th className="py-2 text-left">Month</th>
-                      <th className="py-2 text-right">Clicks</th>
-                      <th className="py-2 text-right">Orders</th>
-                      <th className="py-2 text-right">Conv. Rate</th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-[#f0f0f1]">
-                      {overviewStats.chartData.map(row => (
-                        <tr key={row.month} className="hover:bg-[#fbfbfb]">
-                          <td className="py-2 font-medium">{row.month}</td>
-                          <td className="py-2 text-right">{row.clicks}</td>
-                          <td className="py-2 text-right">{row.orders}</td>
-                          <td className="py-2 text-right">{row.clicks > 0 ? `${((row.orders / row.clicks) * 100).toFixed(1)}%` : '0%'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-            {!overviewStats && (
-              <div className="bg-white border border-[#ccd0d4] p-6 md:p-12 text-center text-[#646970] rounded-[3px]">
-                <TrendingUp className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                <p className="text-[13px] font-medium">Analytics data will appear once affiliates generate clicks and orders.</p>
-              </div>
-            )}
+            </Postbox>
           </div>
-        )}
+        );
+      })()}
 
-        {/* Tab 1: Requests */}
-        {activeTab === "requests" && (() => {
-          const filteredApps = applications.filter(app => {
-            const matchesStatus = appStatusFilter === "All" || app.status === appStatusFilter;
-            const q = appSearchQuery.trim().toLowerCase();
-            const matchesSearch = !q ||
-              app.name?.toLowerCase().includes(q) ||
-              app.email?.toLowerCase().includes(q) ||
-              app.phone?.toLowerCase().includes(q) ||
-              app.address?.country?.toLowerCase().includes(q);
-            return matchesStatus && matchesSearch;
-          });
-          const counts = {
-            All: applications.length,
-            Pending: applications.filter(a => a.status === "Pending").length,
-            Approved: applications.filter(a => a.status === "Approved").length,
-            Rejected: applications.filter(a => a.status === "Rejected").length,
-          };
-          return (
-            <div className="space-y-3">
-              {/* Filter Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {/* Status Tabs */}
-                <div className="flex items-center gap-1 bg-white border border-[#ccd0d4] rounded-[3px] p-1 shadow-sm">
-                  {["All", "Pending", "Approved", "Rejected"].map(status => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => setAppStatusFilter(status)}
-                      className={`px-3 py-1.5 text-[12px] font-medium rounded-[2px] transition-all ${
-                        appStatusFilter === status
-                          ? status === "Pending" ? "bg-[#fff2cc] text-[#d6b656] font-bold"
-                            : status === "Approved" ? "bg-[#d5e8d4] text-[#274e13] font-bold"
-                            : status === "Rejected" ? "bg-[#f8cecc] text-[#b85450] font-bold"
-                            : "bg-[#1d2327] text-white font-bold"
-                          : "text-[#646970] hover:bg-[#f6f7f7]"
-                      }`}
-                    >
-                      {status} <span className="ml-1 opacity-70">({counts[status]})</span>
-                    </button>
+      {/* Tab: Commissions */}
+      {activeTab === "commissions" && (() => {
+        const filteredComms = (activityData.commissions || []).filter(c => {
+          const matchesStatus = commissionStatusFilter === "All" || c.status === commissionStatusFilter;
+          const q = commissionSearchQuery.trim().toLowerCase();
+          return matchesStatus && (!q ||
+            c.affiliateId?.name?.toLowerCase().includes(q) ||
+            c.affiliateId?.referralCode?.toLowerCase().includes(q) ||
+            c.orderNumber?.toLowerCase().includes(q));
+        });
+        return (
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <FilterLinks
+                label="Filter commissions by status"
+                options={["All", "Pending", "Approved", "Rejected"]}
+                value={commissionStatusFilter}
+                onChange={setCommissionStatusFilter}
+              />
+              <SearchBox
+                id="aff-commissions-search"
+                label="Search commissions"
+                value={commissionSearchQuery}
+                onChange={setCommissionSearchQuery}
+                placeholder="Search commissions…"
+              />
+            </div>
+            <div className="wp-table-box mt-2">
+              <table className="wp-list-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Affiliate</th>
+                    <th scope="col" className="wp-hide-sm">Order</th>
+                    <th scope="col" className="wp-hide-sm">Rate</th>
+                    <th scope="col" className="wp-num">Amount</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="wp-hide-sm">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredComms.length === 0 ? (
+                    <tr><td colSpan="6" className="wp-muted">No commissions match filter.</td></tr>
+                  ) : filteredComms.map(c => (
+                    <tr key={c._id}>
+                      <td style={{ wordBreak: "break-word" }}>
+                        <span className="wp-strong">{c.affiliateId?.name || 'Unknown'}</span>
+                        <div className="wp-muted wp-small font-mono">{c.affiliateId?.referralCode}</div>
+                        <div className="wp-mobile-meta">
+                          {c.orderNumber || '—'} · {new Date(c.createdAt).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="wp-hide-sm font-mono">{c.orderNumber || '—'}</td>
+                      <td className="wp-hide-sm">{c.commissionType === 'Fixed' ? `$${c.commissionRate}` : `${c.commissionRate}%`}</td>
+                      <td className="wp-num wp-strong">{formatMoney(c.commissionAmount ?? 0)}</td>
+                      <td><AffPill status={c.status} /></td>
+                      <td className="wp-hide-sm wp-muted">{new Date(c.createdAt).toLocaleDateString()}</td>
+                    </tr>
                   ))}
-                </div>
-                {/* Search */}
-                <input
-                  type="text"
-                  value={appSearchQuery}
-                  onChange={e => setAppSearchQuery(e.target.value)}
-                  placeholder="Search by name, email, phone, country…"
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm"
-                />
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Tab: Analytics */}
+      {activeTab === "analytics" && (
+        <div>
+          <div className="wp-stats">
+            {[
+              { label: "Conversion rate", value: overviewStats?.stats?.conversionRate != null ? `${overviewStats.stats.conversionRate}%` : `${activityData.clicks?.length > 0 ? ((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1) : 0}%` },
+              { label: "Total clicks", value: overviewStats?.stats?.totalClicks ?? activityData.clicks?.length ?? 0 },
+              { label: "Total orders", value: overviewStats?.stats?.totalReferralOrders ?? activityData.referredOrders?.length ?? 0 },
+              { label: "Total revenue", value: formatMoney(overviewStats?.stats?.totalRevenue ?? 0) },
+            ].map(({ label, value }) => (
+              <div key={label} className="wp-stat">
+                <div className="wp-stat-label">{label}</div>
+                <div className="wp-stat-value">{value}</div>
               </div>
-              {/* Table */}
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <div className="overflow-x-auto max-w-full">
-                  <table className="w-full min-w-[650px] text-left border-collapse text-[13px]">
+            ))}
+          </div>
+
+          {overviewStats?.chartData?.length > 0 && (() => {
+            const maxClicks = Math.max(1, ...overviewStats.chartData.map(row => row.clicks || 0));
+            return (
+              <Postbox id="aff-trend" title="Monthly click & order trend" aside="Bars show clicks">
+                <div aria-hidden="true">
+                  <div className="wp-chart">
+                    {overviewStats.chartData.map(row => (
+                      <div key={row.month} className="wp-bar-col">
+                        <span className="wp-bar-tip">{row.month}: {row.clicks} clicks, {row.orders} orders</span>
+                        <div
+                          className={`wp-bar ${row.clicks ? "" : "is-empty"}`}
+                          style={{ height: `${((row.clicks || 0) / maxClicks) * 100}%` }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="wp-chart-x">
+                    {overviewStats.chartData.map(row => <span key={row.month}>{row.month}</span>)}
+                  </div>
+                </div>
+                <div className="overflow-x-auto mt-4">
+                  <table className="wp-list-table">
                     <thead>
-                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-48">Applicant</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-64">Contact details</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-32">Country</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Verification Docs</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-64">Strategy &amp; Reach</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-24">Status</th>
-                        <th className="px-4 py-3 w-28 text-right"></th>
+                      <tr>
+                        <th scope="col">Month</th>
+                        <th scope="col" className="wp-num">Clicks</th>
+                        <th scope="col" className="wp-num">Orders</th>
+                        <th scope="col" className="wp-num">Conv. rate</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#f0f0f1]">
-                      {filteredApps.length === 0 ? (
-                        <tr>
-                          <td colSpan="7" className="p-8 text-center text-gray-400 italic">
-                            {appSearchQuery || appStatusFilter !== "All" ? "No applications match your filter." : "No applications found in database records."}
+                    <tbody>
+                      {overviewStats.chartData.map(row => (
+                        <tr key={row.month}>
+                          <td className="wp-strong">{row.month}</td>
+                          <td className="wp-num">{row.clicks}</td>
+                          <td className="wp-num">{row.orders}</td>
+                          <td className="wp-num">{row.clicks > 0 ? `${((row.orders / row.clicks) * 100).toFixed(1)}%` : '0%'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Postbox>
+            );
+          })()}
+          {!overviewStats && (
+            <Notice type="info">Analytics data will appear once affiliates generate clicks and orders.</Notice>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Applications */}
+      {activeTab === "requests" && (() => {
+        const filteredApps = applications.filter(app => {
+          const matchesStatus = appStatusFilter === "All" || app.status === appStatusFilter;
+          const q = appSearchQuery.trim().toLowerCase();
+          const matchesSearch = !q ||
+            app.name?.toLowerCase().includes(q) ||
+            app.email?.toLowerCase().includes(q) ||
+            app.phone?.toLowerCase().includes(q) ||
+            app.address?.country?.toLowerCase().includes(q);
+          return matchesStatus && matchesSearch;
+        });
+        const { items: pageApps, page: appCurrentPage, totalPages: appTotalPages } = paginate(filteredApps, appPage);
+        const counts = {
+          All: applications.length,
+          Pending: applications.filter(a => a.status === "Pending").length,
+          Approved: applications.filter(a => a.status === "Approved").length,
+          Rejected: applications.filter(a => a.status === "Rejected").length,
+        };
+        return (
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <FilterLinks
+                label="Filter applications by status"
+                options={["All", "Pending", "Approved", "Rejected"]}
+                value={appStatusFilter}
+                onChange={(v) => { setAppStatusFilter(v); setAppPage(1); }}
+                counts={counts}
+              />
+              <SearchBox
+                id="aff-apps-search"
+                label="Search applications"
+                value={appSearchQuery}
+                onChange={(v) => { setAppSearchQuery(v); setAppPage(1); }}
+                placeholder="Name, email, phone, country…"
+              />
+            </div>
+            <Pager total={filteredApps.length} page={appCurrentPage} totalPages={appTotalPages} onPage={setAppPage} />
+            <div className="wp-table-box mt-2">
+              <table className="wp-list-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Applicant</th>
+                    <th scope="col" className="wp-hide-sm">Contact details</th>
+                    <th scope="col" className="wp-hide-sm">Country</th>
+                    <th scope="col" className="wp-hide-sm">Verification docs</th>
+                    <th scope="col" className="wp-hide-sm">Strategy &amp; reach</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredApps.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="wp-muted">
+                        {appSearchQuery || appStatusFilter !== "All" ? "No applications match your filter." : "No applications found in database records."}
+                      </td>
+                    </tr>
+                  ) : (
+                    pageApps.map(app => (
+                      <tr key={app._id}>
+                        <td style={{ wordBreak: "break-word" }}>
+                          <button type="button" className="wp-row-title text-left" onClick={() => setViewingApplication(app)}>
+                            {app.name}
+                          </button>
+                          <div className="wp-muted wp-small">Applied: {new Date(app.createdAt).toLocaleDateString()}</div>
+                          <div className="wp-mobile-meta">
+                            {app.email}{app.address?.country ? ` · ${app.address.country}` : ""}
+                          </div>
+                          <div className="wp-row-actions">
+                            <span><button type="button" className="max-[782px]:min-h-10" onClick={() => setViewingApplication(app)}>View details</button></span>
+                            {app.status === 'Pending' && (
+                              <>
+                                <span><button type="button" className="max-[782px]:min-h-10" onClick={() => openReviewApplication(app, "Approve")}>Approve</button></span>
+                                <span><button type="button" className="max-[782px]:min-h-10" onClick={() => openReviewApplication(app, "Reject")}>Reject</button></span>
+                              </>
+                            )}
+                            <span><button type="button" className="is-danger max-[782px]:min-h-10" disabled={busyId === app._id} onClick={() => handleDeleteApplication(app)}>Delete</button></span>
+                          </div>
+                        </td>
+                        <td className="wp-hide-sm" style={{ wordBreak: "break-all" }}>
+                          <div>{app.email}</div>
+                          <div className="wp-muted wp-small">{app.phone}</div>
+                        </td>
+                        <td className="wp-hide-sm">{app.address?.country}</td>
+                        <td className="wp-hide-sm">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1">
+                            {app.identityDocuments?.map((filename, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setViewingDocUrl(getDocumentUrl(filename))}
+                                className="wp-link inline-flex items-center gap-1"
+                              >
+                                <Eye className="w-3.5 h-3.5" aria-hidden="true" /> Doc #{idx + 1}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="wp-hide-sm" style={{ maxWidth: 260 }}>
+                          <div className="truncate">{app.marketingAnswers?.promotionStrategy}</div>
+                          <div className="wp-muted wp-small">Reach: {app.marketingAnswers?.audienceSize}</div>
+                        </td>
+                        <td><AffPill status={app.status} /></td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Tab: Affiliates List */}
+      {activeTab === "list" && (() => {
+        const isTrashView = listStatusFilter === "Trash";
+        const q = listSearchQuery.trim().toLowerCase();
+        const filteredAffs = (isTrashView ? trashedAffiliates : affiliates).filter(aff => {
+          const matchesStatus = isTrashView || listStatusFilter === "All" || aff.status === listStatusFilter;
+          return matchesStatus && (!q ||
+            aff.name?.toLowerCase().includes(q) ||
+            aff.email?.toLowerCase().includes(q) ||
+            aff.referralCode?.toLowerCase().includes(q) ||
+            aff.couponCode?.toLowerCase().includes(q));
+        });
+        const { items: pageAffs, page: listCurrentPage, totalPages: listTotalPages } = paginate(filteredAffs, listPage);
+        const rateLabel = (aff) => aff.commissionType === "Fixed" ? `$${aff.commissionRate ?? 0} (Fixed)` : `${aff.commissionRate ?? 0}%`;
+        return (
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <FilterLinks
+                label="Filter affiliates by status"
+                options={["All", "Active", "Suspended", "Trash"]}
+                counts={{
+                  All: affiliates.length,
+                  Active: affiliates.filter(a => a.status === "Active").length,
+                  Suspended: affiliates.filter(a => a.status === "Suspended").length,
+                  Trash: trashedAffiliates.length,
+                }}
+                value={listStatusFilter}
+                onChange={(v) => { setListStatusFilter(v); setListPage(1); }}
+              />
+              <SearchBox
+                id="aff-list-search"
+                label="Search affiliates"
+                value={listSearchQuery}
+                onChange={(v) => { setListSearchQuery(v); setListPage(1); }}
+                placeholder="Search affiliates…"
+              />
+            </div>
+            {isTrashView && trashedAffiliates.length > 0 && (
+              <p className="wp-desc" style={{ margin: "8px 0 0" }}>
+                Trashed affiliates are suspended: they can&rsquo;t log in and their links and coupons don&rsquo;t earn. An affiliate with commissions, payouts or referred orders is kept here for your records and can&rsquo;t be deleted permanently.
+              </p>
+            )}
+            <Pager total={filteredAffs.length} page={listCurrentPage} totalPages={listTotalPages} onPage={setListPage} />
+            <div className="wp-table-box">
+              <table className="wp-list-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Affiliate</th>
+                    <th scope="col" className="wp-hide-sm">Referral code</th>
+                    <th scope="col" className="wp-hide-sm">Direct coupon</th>
+                    <th scope="col" className="wp-hide-sm">Commission rate</th>
+                    <th scope="col" className="wp-num">Available balance</th>
+                    <th scope="col" className="wp-num wp-hide-sm">Lifetime earnings</th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageAffs.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="wp-muted">
+                        {q ? "No affiliates match your search."
+                          : isTrashView ? "Trash is empty."
+                          : listStatusFilter === "All" ? "No affiliates yet. Approve an application to add one."
+                          : "No affiliates in this view."}
+                      </td>
+                    </tr>
+                  ) : (
+                    pageAffs.map(aff => {
+                      const busy = busyId === aff._id;
+                      return (
+                        <tr key={aff._id}>
+                          <td style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                            {isTrashView ? (
+                              <span className="wp-row-title">{aff.name}</span>
+                            ) : (
+                              <button type="button" className="wp-row-title text-left" onClick={() => openEditAffiliate(aff)}>
+                                {aff.name}
+                              </button>
+                            )}
+                            <div className="wp-muted wp-small">{aff.email}</div>
+                            <div className="wp-mobile-meta">
+                              {aff.referralCode} · {rateLabel(aff)}
+                            </div>
+                            <div className="wp-row-actions">
+                              {isTrashView ? (
+                                <>
+                                  <span><button type="button" className="max-[782px]:min-h-10" disabled={busy} onClick={() => handleRestoreAffiliate(aff)}>Restore</button></span>
+                                  {aff.deleteBlockers?.length ? (
+                                    <span><button type="button" className="max-[782px]:min-h-10" onClick={() => handleDeleteAffiliatePermanently(aff)} title={`Kept: ${aff.deleteBlockers.join(", ")}`}>Why can&rsquo;t I delete?</button></span>
+                                  ) : (
+                                    <span><button type="button" className="is-danger max-[782px]:min-h-10" disabled={busy} onClick={() => handleDeleteAffiliatePermanently(aff)}>Delete permanently</button></span>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <span><button type="button" className="max-[782px]:min-h-10" onClick={() => openEditAffiliate(aff)}>Edit</button></span>
+                                  <span>
+                                    <button type="button" className="max-[782px]:min-h-10" disabled={busy} onClick={() => handleToggleAffiliateStatus(aff)}>
+                                      {aff.status === "Active" ? "Suspend" : "Activate"}
+                                    </button>
+                                  </span>
+                                  <span><button type="button" className="is-danger max-[782px]:min-h-10" disabled={busy} onClick={() => handleTrashAffiliate(aff)}>Trash</button></span>
+                                </>
+                              )}
+                            </div>
                           </td>
+                          <td className="wp-hide-sm font-mono wp-strong" style={{ wordBreak: "break-all" }}>{aff.referralCode}</td>
+                          <td className="wp-hide-sm font-mono wp-muted" style={{ wordBreak: "break-all" }}>{aff.couponCode || "—"}</td>
+                          <td className="wp-hide-sm">{rateLabel(aff)}</td>
+                          <td className="wp-num wp-strong">{formatMoney(aff.balance ?? 0)}</td>
+                          <td className="wp-num wp-hide-sm wp-muted">{formatMoney(aff.lifetimeEarnings ?? 0)}</td>
+                          <td><AffPill status={isTrashView ? "Trashed" : aff.status} /></td>
                         </tr>
-                      ) : (
-                        filteredApps.map(app => (
-                          <tr key={app._id} className="hover:bg-[#fbfbfb] transition-colors">
-                            <td className="px-4 py-3">
-                              <span className="font-bold text-[#1d2327]">{app.name}</span>
-                              <div className="text-[11px] text-[#646970] mt-0.5">Applied: {new Date(app.createdAt).toLocaleDateString()}</div>
-                            </td>
-                            <td className="px-4 py-3 font-mono text-[12px]">
-                              <div>{app.email}</div>
-                              <div className="text-[#646970] mt-0.5 text-[11px]">{app.phone}</div>
-                            </td>
-                            <td className="px-4 py-3">{app.address?.country}</td>
-                            <td className="px-4 py-3 font-mono text-[12px]">
-                              {app.identityDocuments?.map((filename, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => setViewingDocUrl(getDocumentUrl(filename))}
-                                  className="text-[#2271b1] hover:text-[#135e96] underline mr-3 inline-flex items-center gap-1"
-                                >
-                                  <Eye className="w-3.5 h-3.5" /> Doc #{idx + 1}
-                                </button>
-                              ))}
-                            </td>
-                            <td className="px-4 py-3 max-w-xs">
-                              <div className="truncate text-gray-600">{app.marketingAnswers?.promotionStrategy}</div>
-                              <div className="text-[10px] text-[#646970] font-bold uppercase tracking-wide mt-0.5">Reach: {app.marketingAnswers?.audienceSize}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
-                                app.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
-                                app.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-[#d6b656]'
-                              }`}>
-                                {app.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
-                              <button
-                                onClick={() => setViewingApplication(app)}
-                                className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
-                              >
-                                View Details
-                              </button>
-                              {app.status === 'Pending' && (
-                                <button
-                                  onClick={() => {
-                                    setSelectedApplication(app);
-                                    setCustomCommissionRate(settings.defaultCommissionRate || 5);
-                                    setReviewReferralCode(app.referralCode || "");
-                                  }}
-                                  className="bg-[#2271b1] border border-[#2271b1] text-white px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] hover:border-[#135e96] transition-all shadow-sm"
-                                >
-                                  Review
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-          );
-        })()}
+          </div>
+        );
+      })()}
 
-        {/* Tab 2: Affiliates List */}
-        {activeTab === "list" && (() => {
-          const filteredAffs = affiliates.filter(aff => {
-            const matchesStatus = listStatusFilter === "All" || aff.status === listStatusFilter;
-            const q = listSearchQuery.trim().toLowerCase();
-            return matchesStatus && (!q ||
-              aff.name?.toLowerCase().includes(q) ||
-              aff.email?.toLowerCase().includes(q) ||
-              aff.referralCode?.toLowerCase().includes(q) ||
-              aff.couponCode?.toLowerCase().includes(q));
-          });
-          return (
-            <div className="space-y-3">
-              {/* Filter Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-1 bg-white border border-[#ccd0d4] rounded-[3px] p-1 shadow-sm">
-                  {["All", "Active", "Suspended"].map(status => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => setListStatusFilter(status)}
-                      className={`px-3 py-1 text-[11px] font-medium rounded-[2px] transition-all cursor-pointer ${
-                        listStatusFilter === status
-                          ? status === "Active" ? "bg-[#d5e8d4] text-[#274e13] font-bold"
-                            : status === "Suspended" ? "bg-[#f8cecc] text-[#b85450] font-bold"
-                            : "bg-[#1d2327] text-white font-bold"
-                          : "text-[#646970] hover:bg-[#f6f7f7]"
-                      }`}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  value={listSearchQuery}
-                  onChange={e => setListSearchQuery(e.target.value)}
-                  placeholder="Search affiliates..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
-                />
-              </div>
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <div className="overflow-x-auto max-w-full">
-                  <table className="w-full min-w-[700px] text-left border-collapse text-[13px]">
-                    <thead>
-                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Referral Code</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Direct Coupon</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-32">Commission Rate</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Available Balance</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Lifetime Earnings</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-24">Status</th>
-                        <th className="px-4 py-3 w-28 text-right"></th>
+      {/* Tab: Payouts */}
+      {activeTab === "payouts" && (() => {
+        const filteredPays = payouts.filter(pay => {
+          const matchesStatus = payoutStatusFilter === "All" || pay.status === payoutStatusFilter;
+          const q = payoutSearchQuery.trim().toLowerCase();
+          return matchesStatus && (!q ||
+            pay.affiliateId?.name?.toLowerCase().includes(q) ||
+            pay.affiliateId?.email?.toLowerCase().includes(q) ||
+            pay.affiliateId?.referralCode?.toLowerCase().includes(q) ||
+            pay.transactionId?.toLowerCase().includes(q));
+        });
+        return (
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <FilterLinks
+                label="Filter payouts by status"
+                options={["All", "Requested", "Paid", "Rejected"]}
+                value={payoutStatusFilter}
+                onChange={setPayoutStatusFilter}
+              />
+              <SearchBox
+                id="aff-payouts-search"
+                label="Search payouts"
+                value={payoutSearchQuery}
+                onChange={setPayoutSearchQuery}
+                placeholder="Search payouts…"
+              />
+            </div>
+            <div className="wp-table-box mt-2">
+              <table className="wp-list-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Affiliate</th>
+                    <th scope="col" className="wp-num">Amount</th>
+                    <th scope="col" className="wp-hide-sm">Method</th>
+                    <th scope="col" className="wp-hide-sm">Date</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="wp-hide-sm">Reference ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPays.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="wp-muted">No payout requests match filter.</td>
+                    </tr>
+                  ) : (
+                    filteredPays.map(pay => (
+                      <tr key={pay._id}>
+                        <td style={{ wordBreak: "break-word" }}>
+                          {pay.status === 'Requested' ? (
+                            <button
+                              type="button"
+                              className="wp-row-title text-left"
+                              onClick={() => openPayout(pay, `TX-${Date.now()}`)}
+                            >
+                              {pay.affiliateId?.name || "Deleted Affiliate"}
+                            </button>
+                          ) : (
+                            <span className="wp-strong">{pay.affiliateId?.name || "Deleted Affiliate"}</span>
+                          )}
+                          <div className="wp-muted wp-small">Code: {pay.affiliateId?.referralCode || "—"}</div>
+                          <div className="wp-mobile-meta">
+                            {pay.paymentMethod} · {new Date(pay.createdAt).toLocaleDateString()}
+                          </div>
+                          {pay.status === 'Requested' && (
+                            <div className="wp-row-actions">
+                              <span>
+                                <button
+                                  type="button"
+                                  onClick={() => openPayout(pay, `TX-${Date.now()}`)}
+                                >
+                                  Process payout
+                                </button>
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="wp-num wp-strong">{formatMoney(pay.amount)}</td>
+                        <td className="wp-hide-sm font-mono wp-muted">{pay.paymentMethod}</td>
+                        <td className="wp-hide-sm wp-muted">{new Date(pay.createdAt).toLocaleDateString()}</td>
+                        <td><AffPill status={pay.status} /></td>
+                        <td className="wp-hide-sm font-mono wp-muted wp-small" style={{ wordBreak: "break-all" }}>{pay.transactionId || "—"}</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#f0f0f1]">
-                      {filteredAffs.length === 0 ? (
-                        <tr>
-                          <td colSpan="8" className="p-8 text-center text-gray-400 italic">No active affiliates match filter.</td>
-                        </tr>
-                      ) : (
-                        filteredAffs.map(aff => (
-                          <tr key={aff._id} className="hover:bg-[#fbfbfb] transition-colors">
-                            <td className="px-4 py-3">
-                              <span className="font-bold text-[#1d2327]">{aff.name}</span>
-                              <div className="text-[11px] text-[#646970] mt-0.5">{aff.email}</div>
-                            </td>
-                            <td className="px-4 py-3 font-mono font-semibold text-black">{aff.referralCode}</td>
-                            <td className="px-4 py-3 font-mono text-primary/60">{aff.couponCode || "—"}</td>
-                            <td className="px-4 py-3 font-bold text-black">
-                              {aff.commissionType === "Fixed" ? `$${aff.commissionRate} (Fixed)` : `${aff.commissionRate}%`}
-                            </td>
-                            <td className="px-4 py-3 font-bold text-[#1d2327]">${aff.balance?.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-[#646970]">${aff.lifetimeEarnings?.toFixed(2)}</td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${aff.status === 'Active' ? 'bg-[#d5e8d4] text-[#274e13]' : 'bg-[#f8cecc] text-[#b85450]'
-                                }`}>
-                                {aff.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                onClick={() => {
-                                  setSelectedAffiliate(aff);
-                                  setEditReferralCode(aff.referralCode || "");
-                                  setEditForm({
-                                    name: aff.name || "",
-                                    email: aff.email || "",
-                                    phone: aff.phone || "",
-                                    dob: aff.dob ? new Date(aff.dob).toISOString().split('T')[0] : "",
-                                    commissionRate: aff.commissionRate ?? 5,
-                                    commissionType: aff.commissionType || "Percentage",
-                                    customerDiscountType: aff.customerDiscountType || "None",
-                                    customerDiscountValue: aff.customerDiscountValue || 0,
-                                    status: aff.status || "Active",
-                                    couponCode: aff.couponCode || "",
-                                    password: "",
-                                    // Address
-                                    street: aff.address?.street || "",
-                                    city: aff.address?.city || "",
-                                    state: aff.address?.state || "",
-                                    zipCode: aff.address?.zipCode || "",
-                                    country: aff.address?.country || "",
-                                    // Banking
-                                    accountHolder: aff.bankingInfo?.accountHolder || "",
-                                    bankName: aff.bankingInfo?.bankName || "",
-                                    accountNumber: aff.bankingInfo?.accountNumber || "",
-                                    iban: aff.bankingInfo?.iban || "",
-                                    swiftCode: aff.bankingInfo?.swiftCode || "",
-                                    routingNumber: aff.bankingInfo?.routingNumber || "",
-                                    paypalEmail: aff.bankingInfo?.paypalEmail || "",
-                                    // Business
-                                    companyName: aff.businessInfo?.companyName || "",
-                                    website: aff.businessInfo?.website || "",
-                                    createdAt: aff.createdAt ? new Date(aff.createdAt).toISOString().slice(0, 16) : "",
-                                  });
-                                }}
-                                className="bg-white border border-[#ccd0d4] text-[#2c3338] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f6f7f7] transition-all shadow-sm"
-                              >
-                                Modify
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteAffiliate(aff)}
-                                className="border border-[#b85450] text-[#b85450] bg-white px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f8cecc] transition-all shadow-sm ml-2"
-                              >
-                                Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          );
-        })()}
+          </div>
+        );
+      })()}
 
-        {/* Tab 3: Payouts */}
-        {activeTab === "payouts" && (() => {
-          const filteredPays = payouts.filter(pay => {
-            const matchesStatus = payoutStatusFilter === "All" || pay.status === payoutStatusFilter;
-            const q = payoutSearchQuery.trim().toLowerCase();
-            return matchesStatus && (!q ||
-              pay.affiliateId?.name?.toLowerCase().includes(q) ||
-              pay.affiliateId?.email?.toLowerCase().includes(q) ||
-              pay.affiliateId?.referralCode?.toLowerCase().includes(q) ||
-              pay.transactionId?.toLowerCase().includes(q));
-          });
-          return (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-1 bg-white border border-[#ccd0d4] rounded-[3px] p-1 shadow-sm">
-                  {["All", "Requested", "Paid", "Rejected"].map(status => (
-                    <button
-                      key={status}
-                      type="button"
-                      onClick={() => setPayoutStatusFilter(status)}
-                      className={`px-3 py-1 text-[11px] font-medium rounded-[2px] transition-all cursor-pointer ${
-                        payoutStatusFilter === status
-                          ? status === "Requested" ? "bg-[#fff2cc] text-[#d6b656] font-bold"
-                            : status === "Paid" ? "bg-[#d5e8d4] text-[#274e13] font-bold"
-                            : status === "Rejected" ? "bg-[#f8cecc] text-[#b85450] font-bold"
-                            : "bg-[#1d2327] text-white font-bold"
-                          : "text-[#646970] hover:bg-[#f6f7f7]"
-                      }`}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                </div>
+      {/* Tab: Settings */}
+      {activeTab === "settings" && (
+        <form onSubmit={handleSettingsSubmit} style={{ maxWidth: 860 }}>
+          <Postbox
+            id="aff-settings"
+            title="Global settings"
+            footer={
+              <button type="submit" disabled={savingSettings} className="wp-btn wp-btn-primary">
+                {savingSettings ? "Saving settings…" : "Save settings"}
+              </button>
+            }
+          >
+            <div className="wp-frow">
+              <label htmlFor="aff-set-rate" className="wp-flabel">Default commission rate (%)</label>
+              <input
+                id="aff-set-rate"
+                type="number"
+                min="0"
+                max="100"
+                value={settings.defaultCommissionRate}
+                onChange={(e) => setSettings({ ...settings, defaultCommissionRate: Number(e.target.value) })}
+                required
+                className="wp-input"
+              />
+              <p className="wp-hint">Default percentage credited to partners per checkout conversion.</p>
+            </div>
+
+            <div className="wp-frow">
+              <label htmlFor="aff-set-cookie" className="wp-flabel">Cookie window (days)</label>
+              <input
+                id="aff-set-cookie"
+                type="number"
+                min="1"
+                value={settings.cookieDurationDays}
+                onChange={(e) => setSettings({ ...settings, cookieDurationDays: Number(e.target.value) })}
+                required
+                className="wp-input"
+              />
+              <p className="wp-hint">Number of days tracking referrals remain valid after link visits.</p>
+            </div>
+
+            <div className="wp-frow">
+              <label htmlFor="aff-set-min" className="wp-flabel">Minimum withdrawal ($)</label>
+              <input
+                id="aff-set-min"
+                type="number"
+                min="1"
+                value={settings.minimumPayoutAmount}
+                onChange={(e) => setSettings({ ...settings, minimumPayoutAmount: Number(e.target.value) })}
+                required
+                className="wp-input"
+              />
+              <p className="wp-hint">Minimum available balance required to request cash withdrawals.</p>
+            </div>
+
+            <div className="wp-frow">
+              <label htmlFor="aff-set-email" className="wp-flabel">Support contact email</label>
+              <input
+                id="aff-set-email"
+                type="email"
+                value={settings.supportEmail}
+                onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
+                required
+                className="wp-input"
+              />
+              <p className="wp-hint">Recipient of new partner signup notifications.</p>
+            </div>
+
+            <div className="wp-frow">
+              <span className="wp-flabel">Auto-approve signups</span>
+              <label className="wp-check">
                 <input
-                  type="text"
-                  value={payoutSearchQuery}
-                  onChange={e => setPayoutSearchQuery(e.target.value)}
-                  placeholder="Search payouts..."
-                  className="border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[13px] w-full xs:w-72 focus:outline-none focus:border-[#2271b1] shadow-sm bg-white"
+                  type="checkbox"
+                  checked={settings.autoApproveApplications}
+                  onChange={(e) => setSettings({ ...settings, autoApproveApplications: e.target.checked })}
                 />
-              </div>
-              <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] overflow-hidden">
-                <div className="overflow-x-auto max-w-full">
-                  <table className="w-full min-w-[600px] text-left border-collapse text-[13px]">
-                    <thead>
-                      <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                        <th className="px-4 py-3 font-bold uppercase text-[11px]">Affiliate</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Amount</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-40">Method</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-36">Date</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-28">Status</th>
-                        <th className="px-4 py-3 font-bold uppercase text-[11px] w-48">Reference ID</th>
-                        <th className="px-4 py-3 w-28 text-right"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#f0f0f1]">
-                      {filteredPays.length === 0 ? (
-                        <tr>
-                          <td colSpan="7" className="p-8 text-center text-gray-400 italic">No payout requests match filter.</td>
-                        </tr>
-                      ) : (
-                        filteredPays.map(pay => (
-                          <tr key={pay._id} className="hover:bg-[#fbfbfb] transition-colors">
-                            <td className="px-4 py-3">
-                              <span className="font-bold text-[#1d2327]">{pay.affiliateId?.name || "Deleted Affiliate"}</span>
-                              <div className="text-[11px] text-[#646970] mt-0.5">Code: {pay.affiliateId?.referralCode || "—"}</div>
-                            </td>
-                            <td className="px-4 py-3 font-bold text-[#1d2327]">${pay.amount?.toFixed(2)}</td>
-                            <td className="px-4 py-3 font-mono text-[#646970]">{pay.paymentMethod}</td>
-                            <td className="px-4 py-3 text-gray-600">{new Date(pay.createdAt).toLocaleDateString()}</td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${pay.status === 'Paid' ? 'bg-[#d5e8d4] text-[#274e13]' :
-                                pay.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-[#d6b656]'
-                                }`}>
-                                {pay.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 font-mono text-[11px] text-gray-500">{pay.transactionId || "—"}</td>
-                            <td className="px-4 py-3 text-right">
-                              {pay.status === 'Requested' && (
-                                <button
-                                  onClick={() => {
-                                    setSelectedPayout(pay);
-                                    setPayoutTxId(`TX-${Date.now()}`);
-                                  }}
-                                  className="bg-white border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded-[3px] text-[12px] font-bold hover:bg-[#f0f6fb] transition-all shadow-sm"
-                                >
-                                  Process
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                <span>Automatically approve applications</span>
+              </label>
+              <p className="wp-hint">If enabled, registrations automatically bypass staff review and generate partner accounts immediately.</p>
             </div>
-          );
-        })()}
+          </Postbox>
 
-        {/* Tab 4: Settings (WordPress form layout) */}
-        {activeTab === "settings" && (
-          <form onSubmit={handleSettingsSubmit} className="bg-white border border-[#ccd0d4] shadow-sm rounded-[3px] p-6 max-w-3xl space-y-6">
-            <h3 className="text-[15px] font-bold text-[#1d2327] border-b border-[#ccd0d4] pb-2">Global Settings Options</h3>
-            <div className="space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center gap-4 py-2 border-b border-[#f0f0f1]">
-                <label className="text-[13px] font-bold text-[#1d2327] md:w-56">Default Commission Rate (%)</label>
-                <div className="flex-1">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={settings.defaultCommissionRate}
-                    onChange={(e) => setSettings({ ...settings, defaultCommissionRate: Number(e.target.value) })}
-                    required
-                    className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none text-[13px] w-full max-w-[200px]"
-                  />
-                  <p className="text-[12px] text-[#646970] mt-1">Default percentage credited to partners per checkout conversion.</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row md:items-center gap-4 py-2 border-b border-[#f0f0f1]">
-                <label className="text-[13px] font-bold text-[#1d2327] md:w-56">Cookie Window (Days)</label>
-                <div className="flex-1">
-                  <input
-                    type="number"
-                    min="1"
-                    value={settings.cookieDurationDays}
-                    onChange={(e) => setSettings({ ...settings, cookieDurationDays: Number(e.target.value) })}
-                    required
-                    className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none text-[13px] w-full max-w-[200px]"
-                  />
-                  <p className="text-[12px] text-[#646970] mt-1">Number of days tracking referrals remain valid after link visits.</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row md:items-center gap-4 py-2 border-b border-[#f0f0f1]">
-                <label className="text-[13px] font-bold text-[#1d2327] md:w-56">Minimum Withdrawal ($)</label>
-                <div className="flex-1">
-                  <input
-                    type="number"
-                    min="1"
-                    value={settings.minimumPayoutAmount}
-                    onChange={(e) => setSettings({ ...settings, minimumPayoutAmount: Number(e.target.value) })}
-                    required
-                    className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none text-[13px] w-full max-w-[200px]"
-                  />
-                  <p className="text-[12px] text-[#646970] mt-1">Minimum available balance required to request cash withdrawals.</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row md:items-center gap-4 py-2 border-b border-[#f0f0f1]">
-                <label className="text-[13px] font-bold text-[#1d2327] md:w-56">Support Contact Email</label>
-                <div className="flex-1">
-                  <input
-                    type="email"
-                    value={settings.supportEmail}
-                    onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
-                    required
-                    className="border border-[#8c8f94] rounded-[3px] px-3 py-1.5 focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none text-[13px] w-full max-w-[400px]"
-                  />
-                  <p className="text-[12px] text-[#646970] mt-1">Recipient of new partner signup notifications.</p>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row md:items-start gap-4 py-2">
-                <label className="text-[13px] font-bold text-[#1d2327] md:w-56">Auto-Approve Signups</label>
-                <div className="flex-1">
-                  <label className="flex items-center gap-2 cursor-pointer mt-1">
-                    <input
-                      type="checkbox"
-                      checked={settings.autoApproveApplications}
-                      onChange={(e) => setSettings({ ...settings, autoApproveApplications: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1]"
-                    />
-                    <span className="text-[13px] text-[#1d2327]">Automatically approve applications</span>
-                  </label>
-                  <p className="text-[12px] text-[#646970] mt-1">If enabled, registrations automatically bypass staff review and generate partner accounts immediately.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Danger Zone: Automatic Promotions */}
-            <div className="border border-red-200 rounded-[3px] p-5 bg-red-50 space-y-3">
-              <h4 className="text-[13px] font-bold text-red-800 uppercase tracking-wider">⚠ Automatic Promotions Diagnostic</h4>
-              <p className="text-[12px] text-red-700">
+          {/* Danger zone: automatic promotions */}
+          <Postbox id="aff-promos" title="Automatic promotions diagnostic">
+            <div className="wp-notice wp-notice-warning" style={{ boxShadow: "none" }}>
+              <p>
                 If orders are showing an unexpected promo discount, it is caused by an active automatic promotion in your database.
                 {autoPromos.length > 0
                   ? ` Found ${autoPromos.length} active automatic promotion(s) below:`
                   : " No active automatic promotions found in database."}
               </p>
-              {autoPromos.length > 0 && (
-                <div className="space-y-2">
-                  {autoPromos.map(p => (
-                    <div key={p._id} className="flex items-center justify-between bg-white border border-red-200 rounded-[3px] px-3 py-2">
-                      <div>
-                        <span className="font-bold text-[13px] text-[#1d2327]">{p.title || p.name}</span>
-                        <span className="ml-2 text-[11px] text-red-600 font-mono">isAutomatic: true</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!confirm(`Deactivate "${p.title || p.name}"?`)) return;
-                          const r = await fetch("/api/admin/promotions", {
-                            method: "PATCH",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ promotionId: p._id, adminStatus: "Draft" })
-                          });
-                          if (r.ok) { toast.success("Promotion deactivated."); loadData(); }
-                          else toast.error("Failed to deactivate.");
-                        }}
-                        className="bg-red-600 text-white px-3 py-1 rounded-[3px] text-[11px] font-bold hover:bg-red-700 cursor-pointer"
-                      >
-                        Deactivate
-                      </button>
+            </div>
+            {autoPromos.length > 0 && (
+              <div>
+                {autoPromos.map(p => (
+                  <div key={p._id} className="wp-kv flex-wrap">
+                    <div className="wp-kv-k">
+                      <span className="wp-strong">{p.title || p.name}</span>
+                      <span className="wp-muted wp-small font-mono ml-2">isAutomatic: true</span>
                     </div>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!(await showConfirm(`Deactivate "${p.title || p.name}"?`, "Deactivate promotion", { confirmText: "Deactivate", danger: true }))) return;
+                        const r = await fetch("/api/admin/promotions", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ promotionId: p._id, adminStatus: "Draft" })
+                        });
+                        if (r.ok) { toast.success("Promotion deactivated."); loadData(); }
+                        else toast.error("Failed to deactivate.");
+                      }}
+                      className="wp-btn"
+                      style={DANGER_OUTLINE}
+                      aria-label={`Deactivate ${p.title || p.name}`}
+                    >
+                      Deactivate
+                    </button>
+                  </div>
+                ))}
+                <div className="pt-3">
                   <button
                     type="button"
                     disabled={disablingPromos}
                     onClick={async () => {
-                      if (!confirm("Deactivate ALL automatic promotions? This will stop all surprise discounts.")) return;
+                      if (!(await showConfirm("Deactivate ALL automatic promotions? This will stop all surprise discounts.", "Deactivate all", { confirmText: "Deactivate all", danger: true }))) return;
                       setDisablingPromos(true);
-                      const r = await fetch("/api/admin/promotions", { method: "DELETE" });
-                      const d = await r.json();
-                      if (r.ok) { toast.success(d.message); loadData(); }
-                      else toast.error("Failed.");
-                      setDisablingPromos(false);
+                      try {
+                        const r = await fetch("/api/admin/promotions", { method: "DELETE" });
+                        const d = await r.json().catch(() => ({}));
+                        if (!r.ok) throw new Error(d.error || "Failed to deactivate automatic promotions.");
+                        toast.success(d.message || "Automatic promotions deactivated.");
+                        loadData();
+                      } catch (err) {
+                        toast.error(err.message || "Failed to deactivate automatic promotions.");
+                      } finally {
+                        setDisablingPromos(false);
+                      }
                     }}
-                    className="w-full bg-red-700 text-white px-4 py-2 text-[12px] font-bold rounded-[3px] hover:bg-red-800 disabled:opacity-50 uppercase tracking-wider cursor-pointer"
+                    className="wp-btn"
+                    style={DANGER_SOLID}
                   >
-                    {disablingPromos ? "Deactivating..." : "Deactivate ALL Automatic Promotions"}
+                    {disablingPromos ? "Deactivating…" : "Deactivate all automatic promotions"}
                   </button>
                 </div>
+              </div>
+            )}
+          </Postbox>
+        </form>
+      )}
+
+      {/* Modal: View Application Details */}
+      {viewingApplication && (
+        <div className="wp-modal-backdrop">
+          <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="aff-app-title" style={{ maxWidth: 760 }}>
+            <div className="wp-modal-head">
+              <h2 id="aff-app-title">Application: {viewingApplication.name}</h2>
+              <CloseButton onClick={() => setViewingApplication(null)} />
+            </div>
+
+            <div className="wp-modal-body space-y-5">
+              <section>
+                <SectionTitle>General contact profile</SectionTitle>
+                {viewingApplication.profilePhoto && (
+                  <div className="flex items-center gap-3 pb-2">
+                    <img
+                      src={getDocumentUrl(viewingApplication.profilePhoto)}
+                      alt="Profile avatar"
+                      className="w-16 h-16 rounded-full object-cover border border-[#c3c4c7] bg-[#f0f0f1]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.profilePhoto))}
+                      className="wp-link"
+                    >
+                      View full photo
+                    </button>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                  <KV label="Full legal name">{viewingApplication.name}</KV>
+                  <KV label="Email address">{viewingApplication.email}</KV>
+                  <KV label="Phone number">{viewingApplication.phone}</KV>
+                  <KV label="Date of birth">{viewingApplication.dob ? new Date(viewingApplication.dob).toLocaleDateString() : "—"}</KV>
+                  <KV label="Submission date">{new Date(viewingApplication.createdAt).toLocaleString()}</KV>
+                  <KV label="Preferred referral code">
+                    {viewingApplication.referralCode
+                      ? <code className="font-mono">{viewingApplication.referralCode}</code>
+                      : <span className="wp-muted" style={{ fontWeight: 400 }}>Will be auto-generated</span>
+                    }
+                  </KV>
+                  <KV label="Status"><AffPill status={viewingApplication.status} /></KV>
+                </div>
+              </section>
+
+              <section>
+                <SectionTitle>Postal address</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                  <KV label="Street">{viewingApplication.address?.street || "—"}</KV>
+                  <KV label="City">{viewingApplication.address?.city || "—"}</KV>
+                  <KV label="State / province">{viewingApplication.address?.state || "—"}</KV>
+                  <KV label="Zip / postal code">{viewingApplication.address?.zipCode || "—"}</KV>
+                  <KV label="Country">{viewingApplication.address?.country || "—"}</KV>
+                </div>
+              </section>
+
+              <section>
+                <SectionTitle>Banking &amp; payout profile</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                  <KV label="Account holder name">{viewingApplication.bankingInfo?.accountHolder || "—"}</KV>
+                  <KV label="Bank name">{viewingApplication.bankingInfo?.bankName || "—"}</KV>
+                  <KV label="Account / IBAN"><span className="font-mono">{viewingApplication.bankingInfo?.accountNumber || "—"}</span></KV>
+                  <KV label="SWIFT / BIC code"><span className="font-mono">{viewingApplication.bankingInfo?.swiftCode || "—"}</span></KV>
+                  <KV label="Routing number"><span className="font-mono">{viewingApplication.bankingInfo?.routingNumber || "—"}</span></KV>
+                  <KV label="PayPal email">{viewingApplication.bankingInfo?.paypalEmail || "—"}</KV>
+                </div>
+              </section>
+
+              <section>
+                <SectionTitle>Marketing strategy &amp; reach</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                  <KV label="Company name">{viewingApplication.companyName || "—"}</KV>
+                  <KV label="Website">
+                    {viewingApplication.website ? (
+                      <a href={viewingApplication.website} target="_blank" rel="noreferrer" className="wp-link inline-flex items-center gap-1" style={{ fontWeight: 400 }}>
+                        {viewingApplication.website} <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                      </a>
+                    ) : "—"}
+                  </KV>
+                  <KV label="Social media channels">{viewingApplication.socialLinks || "—"}</KV>
+                  <KV label="Monthly reach / traffic">{viewingApplication.marketingAnswers?.audienceSize || "—"}</KV>
+                  <KV label="Affiliate experience">{viewingApplication.marketingAnswers?.experience || "—"}</KV>
+                </div>
+                <div className="mt-3">
+                  <div className="wp-label">Promotion methodology</div>
+                  <p className="whitespace-pre-line m-0 p-2.5 border border-[#dcdcde] bg-[#f6f7f7]" style={{ lineHeight: 1.6 }}>
+                    {viewingApplication.marketingAnswers?.promotionStrategy || "—"}
+                  </p>
+                </div>
+              </section>
+
+              <section>
+                <SectionTitle>Identity &amp; verification comparison</SectionTitle>
+                <VerificationThumbs record={viewingApplication} getUrl={getDocumentUrl} onOpen={setViewingDocUrl} />
+              </section>
+
+              <section>
+                <SectionTitle>KYC / identity &amp; bank verification documents</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {viewingApplication.identityDocuments && viewingApplication.identityDocuments.length > 0 && (
+                    viewingApplication.identityDocuments.map((filename, idx) => (
+                      <DocRow key={`id-${idx}`} filename={filename} url={getDocumentUrl(filename)} onPreview={() => setViewingDocUrl(getDocumentUrl(filename))} />
+                    ))
+                  )}
+                  {viewingApplication.bankVerificationDocument && (
+                    <DocRow
+                      filename={viewingApplication.bankVerificationDocument}
+                      url={getDocumentUrl(viewingApplication.bankVerificationDocument)}
+                      onPreview={() => setViewingDocUrl(getDocumentUrl(viewingApplication.bankVerificationDocument))}
+                      note="Bank document"
+                    />
+                  )}
+                  {(!viewingApplication.identityDocuments || viewingApplication.identityDocuments.length === 0) && !viewingApplication.bankVerificationDocument && (
+                    <p className="wp-empty" style={{ margin: 0 }}>No document attachments present.</p>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <div className="wp-modal-foot flex-wrap">
+              <button type="button" onClick={() => setViewingApplication(null)} className="wp-btn">
+                Close
+              </button>
+              {viewingApplication.status === "Pending" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    openReviewApplication(viewingApplication);
+                    setViewingApplication(null);
+                  }}
+                  className="wp-btn wp-btn-primary"
+                >
+                  Proceed to review
+                </button>
               )}
             </div>
-
-            <div className="pt-4 border-t border-[#ccd0d4]">
-              <button
-                type="submit"
-                disabled={savingSettings}
-                className="bg-[#2271b1] border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] text-white px-4 py-2 text-[13px] font-medium rounded-[3px] disabled:opacity-50 cursor-pointer shadow-sm font-bold uppercase tracking-wider"
-              >
-                {savingSettings ? "Saving Settings..." : "Save Settings"}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Modal 0: View Application Details */}
-        {viewingApplication && (
-          <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-4 flex justify-center items-start md:py-8">
-            <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-2xl w-full flex flex-col">
-              <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between flex-shrink-0">
-                <h3 className="text-[14px] font-bold text-[#1d2327]">Application Details: {viewingApplication.name}</h3>
-                <button
-                  type="button"
-                  onClick={() => setViewingApplication(null)}
-                  className="text-gray-400 hover:text-black focus:outline-none"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-6 text-[13px] text-gray-700">
-                {/* 1. General Profile */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">General Contact Profile</h4>
-
-                  {viewingApplication.profilePhoto && (
-                    <div className="flex items-center gap-3 pb-3">
-                      <img
-                        src={getDocumentUrl(viewingApplication.profilePhoto)}
-                        alt="Profile avatar"
-                        className="w-16 h-16 rounded-full object-cover border border-[#ccd0d4] bg-neutral-100"
-                      />
-                      <div>
-                        <p className="text-[11px] font-bold text-[#646970] uppercase">Uploaded Profile Photo</p>
-                        <button
-                          type="button"
-                          onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.profilePhoto))}
-                          className="text-[#2271b1] hover:underline text-[12px] font-medium"
-                        >
-                          View Full Photo
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-                    <div><span className="text-[#646970] font-semibold">Full Legal Name:</span> <span className="text-[#1d2327] font-medium">{viewingApplication.name}</span></div>
-                    <div><span className="text-[#646970] font-semibold">Email Address:</span> <span className="text-[#2271b1]">{viewingApplication.email}</span></div>
-                    <div><span className="text-[#646970] font-semibold">Phone Number:</span> <span className="text-[#1d2327]">{viewingApplication.phone}</span></div>
-                    <div><span className="text-[#646970] font-semibold">Date of Birth:</span> <span className="text-[#1d2327]">{viewingApplication.dob ? new Date(viewingApplication.dob).toLocaleDateString() : "—"}</span></div>
-                    <div><span className="text-[#646970] font-semibold">Submission Date:</span> <span className="text-[#1d2327]">{new Date(viewingApplication.createdAt).toLocaleString()}</span></div>
-                    <div>
-                      <span className="text-[#646970] font-semibold">Preferred Referral Code:</span>{" "}
-                      {viewingApplication.referralCode
-                        ? <code className="bg-[#fff2cc] border border-[#d6b656] text-[#634f00] px-2 py-0.5 rounded text-[12px] font-mono font-bold">{viewingApplication.referralCode}</code>
-                        : <span className="text-[#646970] italic">Will be auto-generated</span>
-                      }
-                    </div>
-                    <div>
-                      <span className="text-[#646970] font-semibold">Status:</span>{" "}
-                      <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${viewingApplication.status === 'Approved' ? 'bg-[#d5e8d4] text-[#274e13]' :
-                        viewingApplication.status === 'Rejected' ? 'bg-[#f8cecc] text-[#b85450]' : 'bg-[#fff2cc] text-[#d6b656]'
-                        }`}>
-                        {viewingApplication.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Postal Address */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">Postal Address</h4>
-                  <div className="space-y-1">
-                    <div><span className="text-[#646970] font-semibold">Street:</span> <span className="text-[#1d2327]">{viewingApplication.address?.street || "—"}</span></div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <div><span className="text-[#646970] font-semibold">City:</span> <span className="text-[#1d2327]">{viewingApplication.address?.city || "—"}</span></div>
-                      <div><span className="text-[#646970] font-semibold">State/Province:</span> <span className="text-[#1d2327]">{viewingApplication.address?.state || "—"}</span></div>
-                      <div><span className="text-[#646970] font-semibold">Zip/Postal Code:</span> <span className="text-[#1d2327]">{viewingApplication.address?.zipCode || "—"}</span></div>
-                    </div>
-                    <div><span className="text-[#646970] font-semibold">Country:</span> <span className="text-[#1d2327]">{viewingApplication.address?.country || "—"}</span></div>
-                  </div>
-                </div>
-
-                {/* 3. Payout & Banking Info */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">Banking & Payout Profile</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 bg-[#f6f7f7] p-3 border border-[#ccd0d4] rounded-[3px]">
-                    <div className="sm:col-span-2"><span className="text-[#646970] font-semibold">Account Holder Name:</span> <span className="text-[#1d2327] font-bold">{viewingApplication.bankingInfo?.accountHolder || "—"}</span></div>
-                    <div><span className="text-[#646970] font-semibold">Bank Name:</span> <span className="text-[#1d2327]">{viewingApplication.bankingInfo?.bankName || "—"}</span></div>
-                    <div><span className="text-[#646970] font-semibold">Account / IBAN:</span> <span className="text-[#1d2327] font-mono">{viewingApplication.bankingInfo?.accountNumber || "—"}</span></div>
-                    <div><span className="text-[#646970] font-semibold">SWIFT/BIC Code:</span> <span className="text-[#1d2327] font-mono">{viewingApplication.bankingInfo?.swiftCode || "—"}</span></div>
-                    <div><span className="text-[#646970] font-semibold">Routing Number:</span> <span className="text-[#1d2327] font-mono">{viewingApplication.bankingInfo?.routingNumber || "—"}</span></div>
-                    <div className="sm:col-span-2"><span className="text-[#646970] font-semibold">PayPal Email Address:</span> <span className="text-[#1d2327]">{viewingApplication.bankingInfo?.paypalEmail || "—"}</span></div>
-                  </div>
-                </div>
-
-                {/* 4. Business & Strategy */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">Marketing Strategy & Reach</h4>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div><span className="text-[#646970] font-semibold">Company Name:</span> <span className="text-[#1d2327]">{viewingApplication.companyName || "—"}</span></div>
-                      <div>
-                        <span className="text-[#646970] font-semibold">Website:</span>{" "}
-                        {viewingApplication.website ? (
-                          <a href={viewingApplication.website} target="_blank" rel="noreferrer" className="text-[#2271b1] hover:underline inline-flex items-center gap-1">
-                            {viewingApplication.website} <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[#646970] font-semibold">Social Media Channels:</span>{" "}
-                      <span className="text-[#1d2327]">{viewingApplication.socialLinks || "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div><span className="text-[#646970] font-semibold">Monthly Reach / Traffic:</span> <span className="text-[#1d2327] font-medium">{viewingApplication.marketingAnswers?.audienceSize || "—"}</span></div>
-                      <div><span className="text-[#646970] font-semibold">Affiliate Experience:</span> <span className="text-[#1d2327] font-medium">{viewingApplication.marketingAnswers?.experience || "—"}</span></div>
-                    </div>
-                    <div>
-                      <span className="text-[#646970] font-semibold block mb-0.5">Promotion Methodology:</span>
-                      <p className="bg-[#f6f7f7] p-2.5 border border-[#ccd0d4] rounded-[2px] text-gray-600 text-[12px] whitespace-pre-line leading-relaxed">
-                        {viewingApplication.marketingAnswers?.promotionStrategy || "—"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Verification Comparison Panel */}
-                <div className="bg-[#f0f6fa] border border-[#ccd0d4] p-4 rounded-[3px] space-y-3">
-                  <p className="text-[10px] font-bold text-[#2271b1] uppercase tracking-wider">Identity & Verification Comparison Panel</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1 text-center">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Profile Photo</p>
-                      {viewingApplication.profilePhoto ? (
-                        <div 
-                          className="relative border border-[#ccd0d4] rounded-[3px] overflow-hidden bg-white aspect-square cursor-pointer hover:border-black transition-all"
-                          onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.profilePhoto))}
-                        >
-                          <img 
-                            src={getDocumentUrl(viewingApplication.profilePhoto)} 
-                            alt="Profile" 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="border border-dashed border-neutral-300 rounded-[3px] aspect-square flex items-center justify-center text-[11px] text-gray-400 italic">No Photo</div>
-                      )}
-                    </div>
-
-                    <div className="space-y-1 text-center">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Live Selfie</p>
-                      {viewingApplication.liveSelfie ? (
-                        <div 
-                          className="relative border border-[#ccd0d4] rounded-[3px] overflow-hidden bg-white aspect-square cursor-pointer hover:border-black transition-all"
-                          onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.liveSelfie))}
-                        >
-                          <img 
-                            src={getDocumentUrl(viewingApplication.liveSelfie)} 
-                            alt="Live Selfie" 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="border border-dashed border-neutral-300 rounded-[3px] aspect-square flex items-center justify-center text-[11px] text-gray-400 italic">No Selfie</div>
-                      )}
-                    </div>
-
-                    <div className="space-y-1 text-center">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Bank Document</p>
-                      {viewingApplication.bankVerificationDocument ? (
-                        viewingApplication.bankVerificationDocument.toLowerCase().endsWith('.pdf') ? (
-                          <div 
-                            className="border border-[#ccd0d4] rounded-[3px] bg-white aspect-square flex flex-col items-center justify-center cursor-pointer hover:border-black transition-all p-2 text-center"
-                            onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.bankVerificationDocument))}
-                          >
-                            <ShoppingCart className="w-8 h-8 text-neutral-400 mb-1" />
-                            <span className="text-[8px] font-mono text-neutral-600 truncate w-full">{viewingApplication.bankVerificationDocument}</span>
-                          </div>
-                        ) : (
-                          <div 
-                            className="relative border border-[#ccd0d4] rounded-[3px] overflow-hidden bg-white aspect-square cursor-pointer hover:border-black transition-all"
-                            onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.bankVerificationDocument))}
-                          >
-                            <img 
-                              src={getDocumentUrl(viewingApplication.bankVerificationDocument)} 
-                              alt="Bank Verification" 
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )
-                      ) : (
-                        <div className="border border-dashed border-neutral-300 rounded-[3px] aspect-square flex items-center justify-center text-[11px] text-gray-400 italic">No Bank Doc</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. Documents */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-[12px] uppercase tracking-wider text-[#1d2327] border-b border-[#ccd0d4] pb-1">KYC / Identity & Bank Verification Documents</h4>
-                  <div className="flex flex-wrap gap-3">
-                    {/* Identity Documents */}
-                    {viewingApplication.identityDocuments && viewingApplication.identityDocuments.length > 0 && (
-                      viewingApplication.identityDocuments.map((filename, idx) => (
-                        <div key={`id-${idx}`} className="border border-[#ccd0d4] p-3 rounded-[3px] bg-[#f6f7f7] flex items-center justify-between gap-4 w-full sm:w-[48%]">
-                          <span className="font-mono text-[11px] truncate max-w-[150px]" title={filename}>{filename}</span>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setViewingDocUrl(getDocumentUrl(filename))}
-                              className="text-[#2271b1] hover:text-[#135e96] hover:underline font-bold text-[11px] uppercase cursor-pointer"
-                            >
-                              Preview
-                            </button>
-                            <a
-                              href={getDocumentUrl(filename)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-gray-600 hover:text-black hover:underline font-bold text-[11px] uppercase inline-flex items-center gap-0.5"
-                            >
-                              Download <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </div>
-                        </div>
-                      ))
-                    )}
-
-                    {/* Bank Verification Document */}
-                    {viewingApplication.bankVerificationDocument && (
-                      <div className="border border-[#ccd0d4] p-3 rounded-[3px] bg-amber-50/50 flex items-center justify-between gap-4 w-full sm:w-[48%]">
-                        <span className="font-mono text-[11px] truncate max-w-[150px]" title={viewingApplication.bankVerificationDocument}>
-                          {viewingApplication.bankVerificationDocument}
-                        </span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setViewingDocUrl(getDocumentUrl(viewingApplication.bankVerificationDocument))}
-                            className="text-amber-700 hover:text-amber-900 hover:underline font-bold text-[11px] uppercase cursor-pointer"
-                          >
-                            Preview
-                          </button>
-                          <a
-                            href={getDocumentUrl(viewingApplication.bankVerificationDocument)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-gray-600 hover:text-black hover:underline font-bold text-[11px] uppercase inline-flex items-center gap-0.5"
-                          >
-                            Download <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      </div>
-                    )}
-
-                    {(!viewingApplication.identityDocuments || viewingApplication.identityDocuments.length === 0) && !viewingApplication.bankVerificationDocument && (
-                      <p className="text-gray-400 italic text-[12px]">No document attachments present.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 border-t border-[#ccd0d4] bg-[#f6f7f7] flex justify-end gap-2 flex-shrink-0">
-                {viewingApplication.status === "Pending" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedApplication(viewingApplication);
-                      setCustomCommissionRate(settings.defaultCommissionRate || 5);
-                      setViewingApplication(null);
-                    }}
-                    className="bg-[#2271b1] border border-[#2271b1] text-white hover:bg-[#135e96] hover:border-[#135e96] px-4 py-2 text-[12px] font-bold rounded-[3px] shadow-sm uppercase tracking-wider cursor-pointer"
-                  >
-                    Proceed to Review
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setViewingApplication(null)}
-                  className="border border-[#ccd0d4] bg-white text-gray-700 hover:bg-[#f6f7f7] px-4 py-2 text-[12px] font-bold rounded-[3px] shadow-sm uppercase tracking-wider cursor-pointer"
-                >
-                  Close Detail
-                </button>
-              </div>
-            </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Modal 1: Review Application */}
-        {selectedApplication && (
-          <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-2 xs:p-3 sm:p-4 flex justify-center items-start md:py-8">
-            <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-md w-full">
-              <div className="p-3 xs:p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
-                <h3 className="text-[14px] font-bold text-[#1d2327]">Review: {selectedApplication.name}</h3>
-                <button
-                  type="button"
-                  onClick={() => setSelectedApplication(null)}
-                  className="text-gray-400 hover:text-black focus:outline-none"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+      {/* Modal: Review Application */}
+      {selectedApplication && (
+        <div className="wp-modal-backdrop">
+          <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="aff-review-title" style={{ maxWidth: 520 }}>
+            <div className="wp-modal-head">
+              <h2 id="aff-review-title">Review: {selectedApplication.name}</h2>
+              <CloseButton onClick={closeReviewApplication} />
+            </div>
 
-              <form onSubmit={handleApplicationReview} className="p-3 xs:p-4 sm:p-6 space-y-3 xs:space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Action *</label>
+            <form onSubmit={handleApplicationReview}>
+              <div className="wp-modal-body">
+                <div className="wp-field">
+                  <label htmlFor="aff-rv-action" className="wp-label">Action *</label>
                   <select
+                    id="aff-rv-action"
                     value={reviewAction}
                     onChange={(e) => setReviewAction(e.target.value)}
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                    className="wp-select wp-full"
                   >
                     <option value="Approve">Approve and Register Account</option>
                     <option value="Reject">Reject Application</option>
@@ -1659,48 +1582,51 @@ export default function AffiliatesManagerClient({ userSession }) {
 
                 {reviewAction === "Approve" ? (
                   <>
-                    <div className="space-y-1">
-                      <label className="text-[12px] font-bold text-[#1d2327]">Commission Type *</label>
+                    <div className="wp-field">
+                      <label htmlFor="aff-rv-ctype" className="wp-label">Commission type *</label>
                       <select
+                        id="aff-rv-ctype"
                         value={commissionType}
                         onChange={(e) => {
                           setCommissionType(e.target.value);
                           setCustomCommissionRate(e.target.value === "Percentage" ? 5 : 10);
                         }}
-                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                        className="wp-select wp-full"
                       >
                         <option value="Percentage">Percentage Commission (%)</option>
                         <option value="Fixed">Fixed Commission ($)</option>
                       </select>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[12px] font-bold text-[#1d2327]">
-                        {commissionType === "Percentage" ? "Commission Rate (%) *" : "Fixed Commission Amount ($) *"}
+                    <div className="wp-field">
+                      <label htmlFor="aff-rv-rate" className="wp-label">
+                        {commissionType === "Percentage" ? "Commission rate (%) *" : "Fixed commission amount ($) *"}
                       </label>
                       <input
+                        id="aff-rv-rate"
                         type="number"
                         min="0"
                         max={commissionType === "Percentage" ? 100 : 10000}
                         value={customCommissionRate}
                         onChange={(e) => setCustomCommissionRate(Number(e.target.value))}
                         required
-                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                        className="wp-input wp-full"
                       />
                     </div>
 
                     {/* Customer Discount — independent from commission */}
-                    <div className="border-t border-[#eee] pt-4 space-y-3">
-                      <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Customer Discount (optional)</p>
-                      <div className="space-y-1">
-                        <label className="text-[12px] font-bold text-[#1d2327]">Discount Type</label>
+                    <fieldset className="border-t border-[#dcdcde] pt-3 mb-3.5">
+                      <legend className="wp-strong pr-2">Customer discount (optional)</legend>
+                      <div className="wp-field">
+                        <label htmlFor="aff-rv-dtype" className="wp-label">Discount type</label>
                         <select
+                          id="aff-rv-dtype"
                           value={reviewDiscountType}
                           onChange={(e) => {
                             setReviewDiscountType(e.target.value);
                             setReviewDiscountValue("");
                           }}
-                          className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                          className="wp-select wp-full"
                         >
                           <option value="None">None — No customer discount</option>
                           <option value="Percentage">Percentage Discount (%)</option>
@@ -1708,35 +1634,35 @@ export default function AffiliatesManagerClient({ userSession }) {
                         </select>
                       </div>
                       {reviewDiscountType !== "None" && (
-                        <div className="space-y-1">
-                          <label className="text-[12px] font-bold text-[#1d2327]">
-                            {reviewDiscountType === "Percentage" ? "Discount Rate (%)" : "Discount Amount ($)"}
+                        <div className="wp-field">
+                          <label htmlFor="aff-rv-dval" className="wp-label">
+                            {reviewDiscountType === "Percentage" ? "Discount rate (%)" : "Discount amount ($)"}
                           </label>
                           <input
+                            id="aff-rv-dval"
                             type="number"
                             min="0"
                             max={reviewDiscountType === "Percentage" ? 100 : 10000}
                             value={reviewDiscountValue}
                             onChange={(e) => setReviewDiscountValue(e.target.value)}
                             placeholder={reviewDiscountType === "Percentage" ? "Enter percentage (e.g. 10)" : "Enter fixed amount (e.g. 5)"}
-                            className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                            className="wp-input wp-full"
                           />
-                          <p className="text-[11px] text-[#646970]">
-                            Customers using this referral link will receive this discount on their order.
-                          </p>
+                          <p className="wp-desc">Customers using this referral link will receive this discount on their order.</p>
                         </div>
                       )}
-                    </div>
+                    </fieldset>
 
-                    <div className="space-y-1">
-                      <label className="text-[12px] font-bold text-[#1d2327]">Referral Code *</label>
+                    <div className="wp-field">
+                      <label htmlFor="aff-rv-code" className="wp-label">Referral code *</label>
                       <div className="flex gap-2">
                         <input
+                          id="aff-rv-code"
                           type="text"
                           value={reviewReferralCode}
                           onChange={e => setReviewReferralCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
                           placeholder="Auto-generated from name if empty"
-                          className="flex-1 border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono"
+                          className="wp-input flex-1 min-w-0 font-mono"
                         />
                         <button
                           type="button"
@@ -1744,172 +1670,232 @@ export default function AffiliatesManagerClient({ userSession }) {
                             const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
                             setReviewReferralCode(Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join(""));
                           }}
-                          className="shrink-0 bg-[#f6f7f7] border border-[#ccd0d4] text-[#2c3338] hover:bg-[#e0e0e0] px-3 py-1.5 rounded-[3px] text-[12px] font-bold transition-all"
+                          className="wp-btn shrink-0"
                           title="Generate a random referral code"
                         >
                           Generate
                         </button>
                       </div>
                       {selectedApplication?.referralCode && (
-                        <p className="text-[11px] text-[#646970]">Applicant requested: <code className="font-mono font-bold text-amber-700">{selectedApplication.referralCode}</code></p>
+                        <p className="wp-desc">Applicant requested: <code className="font-mono wp-strong">{selectedApplication.referralCode}</code></p>
                       )}
                     </div>
                   </>
                 ) : (
-                  <div className="space-y-1">
-                    <label className="text-[12px] font-bold text-[#1d2327]">Rejection Reason *</label>
+                  <div className="wp-field">
+                    <label htmlFor="aff-rv-reason" className="wp-label">Rejection reason *</label>
                     <textarea
+                      id="aff-rv-reason"
                       value={rejectionReason}
                       onChange={(e) => setRejectionReason(e.target.value)}
                       required
                       rows="3"
                       placeholder="Reason for rejecting the request..."
-                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] resize-none"
+                      className="wp-textarea"
                     />
                   </div>
                 )}
 
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Internal Audit Notes</label>
+                <div className="wp-field" style={{ marginBottom: 0 }}>
+                  <label htmlFor="aff-rv-notes" className="wp-label">Internal audit notes</label>
                   <textarea
+                    id="aff-rv-notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows="2"
                     placeholder="Comments visible to staff only..."
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] resize-none"
+                    className="wp-textarea"
                   />
                 </div>
-
-                <div className="pt-4 flex justify-end gap-2 border-t border-[#ccd0d4]">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedApplication(null)}
-                    className="border border-[#ccd0d4] bg-white text-[#2c3338] hover:bg-[#f6f7f7] px-4 py-2 text-[13px] font-medium rounded-[3px]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingReview}
-                    className="bg-[#2271b1] border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] text-white px-4 py-2 text-[13px] font-medium rounded-[3px] disabled:opacity-50"
-                  >
-                    {submittingReview ? "Processing..." : "Confirm Review"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Modal 2: Modify Affiliate */}
-        {selectedAffiliate && (
-          <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-2 xs:p-3 sm:p-4 flex justify-center items-start md:py-8">
-            <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-2xl w-full">
-              <div className="p-3 xs:p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
-                <h3 className="text-[14px] font-bold text-[#1d2327]">Edit Affiliate: {selectedAffiliate.name}</h3>
-                <button
-                  type="button"
-                  onClick={() => setSelectedAffiliate(null)}
-                  className="text-gray-400 hover:text-black focus:outline-none"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
 
-              <form onSubmit={handleAffiliateEditSubmit} className="p-3 xs:p-4 sm:p-6 space-y-3 xs:space-y-4">
-                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 xs:gap-4 bg-[#f6f7f7] border border-[#ccd0d4] p-2.5 xs:p-3 rounded-[3px] text-[12px]">
-                  <div>
-                    <span className="font-bold text-[#646970] block uppercase tracking-wider text-[10px]">Affiliate ID</span>
-                    <span className="text-black font-semibold font-mono text-[13px]">{selectedAffiliate.affiliateId || "—"}</span>
+              <div className="wp-modal-foot">
+                <button type="button" onClick={closeReviewApplication} className="wp-btn">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submittingReview} className="wp-btn wp-btn-primary">
+                  {submittingReview ? "Processing…" : "Confirm review"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Affiliate */}
+      {selectedAffiliate && (
+        <div className="wp-modal-backdrop">
+          <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="aff-edit-title" style={{ maxWidth: 760 }}>
+            <div className="wp-modal-head">
+              <h2 id="aff-edit-title">Edit affiliate: {selectedAffiliate.name}</h2>
+              <CloseButton onClick={() => setSelectedAffiliate(null)} />
+            </div>
+
+            <form onSubmit={handleAffiliateEditSubmit}>
+              <div className="wp-modal-body">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 p-3 mb-4 bg-[#f6f7f7] border border-[#dcdcde]">
+                  <div className="wp-field">
+                    <div className="wp-label">Affiliate ID</div>
+                    <div className="font-mono wp-strong" style={{ minHeight: 30, display: "flex", alignItems: "center" }}>{selectedAffiliate.affiliateId || "—"}</div>
                   </div>
-                  <div>
-                    <label className="font-bold text-[#646970] block uppercase tracking-wider text-[10px] mb-1">Account Created At</label>
+                  <div className="wp-field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="aff-ed-created" className="wp-label">Account created at</label>
                     <input
+                      id="aff-ed-created"
                       type="datetime-local"
                       value={editForm.createdAt}
                       onChange={(e) => setEditForm({ ...editForm, createdAt: e.target.value })}
-                      className="border border-[#8c8f94] bg-white rounded-[3px] px-2 py-0.5 outline-none text-[12px] font-mono text-black w-full"
+                      className="wp-input wp-full font-mono"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Display Name</label>
-                  <input
-                    type="text"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    required
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                  />
+                <SectionTitle>Account</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-name" className="wp-label">Display name</label>
+                    <input
+                      id="aff-ed-name"
+                      type="text"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      required
+                      className="wp-input wp-full"
+                    />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-email" className="wp-label">Email address</label>
+                    <input
+                      id="aff-ed-email"
+                      type="email"
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      required
+                      className="wp-input wp-full"
+                    />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-phone" className="wp-label">Phone number</label>
+                    <input
+                      id="aff-ed-phone"
+                      type="text"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      className="wp-input wp-full"
+                    />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-dob" className="wp-label">Date of birth</label>
+                    <input
+                      id="aff-ed-dob"
+                      type="date"
+                      value={editForm.dob}
+                      onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
+                      className="wp-input wp-full"
+                    />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-status" className="wp-label">Status</label>
+                    <select
+                      id="aff-ed-status"
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      className="wp-select wp-full"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Suspended">Suspended</option>
+                    </select>
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-pass" className="wp-label">Reset password</label>
+                    <input
+                      id="aff-ed-pass"
+                      type="password"
+                      value={editForm.password}
+                      onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                      placeholder="Leave empty to keep unchanged"
+                      className="wp-input wp-full"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Email Address</label>
-                  <input
-                    type="email"
-                    value={editForm.email}
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    required
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Phone Number</label>
-                  <input
-                    type="text"
-                    value={editForm.phone}
-                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Date of Birth</label>
-                  <input
-                    type="date"
-                    value={editForm.dob}
-                    onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Commission Type</label>
-                  <select
-                    value={editForm.commissionType}
-                    onChange={(e) => setEditForm({ ...editForm, commissionType: e.target.value })}
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                  >
-                    <option value="Percentage">Percentage Commission (%)</option>
-                    <option value="Fixed">Fixed Commission ($)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">
-                    {editForm.commissionType === "Percentage" ? "Commission Rate (%)" : "Fixed Commission Amount ($)"}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max={editForm.commissionType === "Percentage" ? 100 : 10000}
-                    value={editForm.commissionRate}
-                    onChange={(e) => setEditForm({ ...editForm, commissionRate: Number(e.target.value) })}
-                    required
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                  />
+                <SectionTitle>Commission &amp; codes</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-ctype" className="wp-label">Commission type</label>
+                    <select
+                      id="aff-ed-ctype"
+                      value={editForm.commissionType}
+                      onChange={(e) => setEditForm({ ...editForm, commissionType: e.target.value })}
+                      className="wp-select wp-full"
+                    >
+                      <option value="Percentage">Percentage Commission (%)</option>
+                      <option value="Fixed">Fixed Commission ($)</option>
+                    </select>
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-rate" className="wp-label">
+                      {editForm.commissionType === "Percentage" ? "Commission rate (%)" : "Fixed commission amount ($)"}
+                    </label>
+                    <input
+                      id="aff-ed-rate"
+                      type="number"
+                      min="0"
+                      max={editForm.commissionType === "Percentage" ? 100 : 10000}
+                      value={editForm.commissionRate}
+                      onChange={(e) => setEditForm({ ...editForm, commissionRate: Number(e.target.value) })}
+                      required
+                      className="wp-input wp-full"
+                    />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-coupon" className="wp-label">Assigned coupon code</label>
+                    <input
+                      id="aff-ed-coupon"
+                      type="text"
+                      value={editForm.couponCode}
+                      onChange={(e) => setEditForm({ ...editForm, couponCode: e.target.value })}
+                      placeholder="Leave empty for none"
+                      className="wp-input wp-full font-mono"
+                    />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-code" className="wp-label">Referral code</label>
+                    <div className="flex gap-2">
+                      <input
+                        id="aff-ed-code"
+                        type="text"
+                        value={editReferralCode}
+                        onChange={e => setEditReferralCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                        placeholder="Unique referral code"
+                        className="wp-input flex-1 min-w-0 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+                          setEditReferralCode(Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join(""));
+                        }}
+                        className="wp-btn shrink-0"
+                        title="Generate a random referral code"
+                      >
+                        Generate
+                      </button>
+                    </div>
+                    <p className="wp-desc">Current: <code className="font-mono wp-strong">{selectedAffiliate?.referralCode || "N/A"}</code></p>
+                  </div>
                 </div>
 
                 {/* Customer Discount — independent from commission */}
-                <div className="border-t border-[#eee] pt-4 space-y-3">
-                  <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Customer Discount</p>
-                  <div className="space-y-1">
-                    <label className="text-[12px] font-bold text-[#1d2327]">Discount Type</label>
+                <SectionTitle>Customer discount</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-dtype" className="wp-label">Discount type</label>
                     <select
+                      id="aff-ed-dtype"
                       value={editForm.customerDiscountType}
                       onChange={(e) => setEditForm({ ...editForm, customerDiscountType: e.target.value, customerDiscountValue: "" })}
-                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                      className="wp-select wp-full"
                     >
                       <option value="None">None — No customer discount</option>
                       <option value="Percentage">Percentage Discount (%)</option>
@@ -1917,374 +1903,193 @@ export default function AffiliatesManagerClient({ userSession }) {
                     </select>
                   </div>
                   {editForm.customerDiscountType !== "None" && (
-                    <div className="space-y-1">
-                      <label className="text-[12px] font-bold text-[#1d2327]">
-                        {editForm.customerDiscountType === "Percentage" ? "Discount Rate (%)" : "Discount Amount ($)"}
+                    <div className="wp-field">
+                      <label htmlFor="aff-ed-dval" className="wp-label">
+                        {editForm.customerDiscountType === "Percentage" ? "Discount rate (%)" : "Discount amount ($)"}
                       </label>
                       <input
+                        id="aff-ed-dval"
                         type="number"
                         min="0"
                         max={editForm.customerDiscountType === "Percentage" ? 100 : 10000}
                         value={editForm.customerDiscountValue === 0 ? "" : editForm.customerDiscountValue}
                         onChange={(e) => setEditForm({ ...editForm, customerDiscountValue: e.target.value })}
                         placeholder={editForm.customerDiscountType === "Percentage" ? "Enter percentage (e.g. 10)" : "Enter fixed amount (e.g. 5)"}
-                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                        className="wp-input wp-full"
                       />
-                      <p className="text-[11px] text-[#646970]">
-                        Customers using this referral link will receive this discount on their order.
-                      </p>
+                      <p className="wp-desc">Customers using this referral link will receive this discount on their order.</p>
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Status</label>
-                  <select
-                    value={editForm.status}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Suspended">Suspended / Suspended</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Assigned Coupon Code</label>
-                  <input
-                    type="text"
-                    value={editForm.couponCode}
-                    onChange={(e) => setEditForm({ ...editForm, couponCode: e.target.value })}
-                    placeholder="Leave empty for none"
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Referral Code</label>
-                  <div className="flex gap-2">
+                {/* Business Info */}
+                <SectionTitle>Business info</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-company" className="wp-label">Company / brand name</label>
                     <input
+                      id="aff-ed-company"
                       type="text"
-                      value={editReferralCode}
-                      onChange={e => setEditReferralCode(e.target.value.toUpperCase().replace(/\s/g, ""))}
-                      placeholder="Unique referral code"
-                      className="flex-1 border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono"
+                      value={editForm.companyName}
+                      onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
+                      className="wp-input wp-full"
+                      placeholder="Company name"
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-                        setEditReferralCode(Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join(""));
-                      }}
-                      className="shrink-0 bg-[#f6f7f7] border border-[#ccd0d4] text-[#2c3338] hover:bg-[#e0e0e0] px-3 py-1.5 rounded-[3px] text-[12px] font-bold"
-                      title="Generate a random referral code"
-                    >
-                      Generate
-                    </button>
                   </div>
-                  <p className="text-[11px] text-[#646970]">Current: <code className="font-mono font-bold">{selectedAffiliate?.referralCode || "N/A"}</code></p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Reset Password</label>
-                  <input
-                    type="password"
-                    value={editForm.password}
-                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                    placeholder="Leave empty to keep unchanged"
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                  />
-                </div>
-
-                {/* Business Info Section */}
-                <div className="border-t border-[#eee] pt-4 space-y-3">
-                  <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Business Info</p>
-                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Company / Brand Name</label>
-                      <input
-                        type="text"
-                        value={editForm.companyName}
-                        onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
-                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                        placeholder="Company name"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Website URL</label>
-                      <input
-                        type="text"
-                        value={editForm.website}
-                        onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
-                        placeholder="https://example.com"
-                      />
-                    </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-website" className="wp-label">Website URL</label>
+                    <input
+                      id="aff-ed-website"
+                      type="text"
+                      value={editForm.website}
+                      onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                      className="wp-input wp-full"
+                      placeholder="https://example.com"
+                    />
                   </div>
                 </div>
 
-                {/* Address Section */}
-                <div className="border-t border-[#eee] pt-4 space-y-3">
-                  <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Address</p>
-                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                    <div className="col-span-1 xs:col-span-2 space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Street</label>
-                      <input type="text" value={editForm.street} onChange={e => setEditForm({ ...editForm, street: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" placeholder="Street address" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">City</label>
-                      <input type="text" value={editForm.city} onChange={e => setEditForm({ ...editForm, city: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">State / Province</label>
-                      <input type="text" value={editForm.state} onChange={e => setEditForm({ ...editForm, state: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Zip / Postal Code</label>
-                      <input type="text" value={editForm.zipCode} onChange={e => setEditForm({ ...editForm, zipCode: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Country</label>
-                      <input type="text" value={editForm.country} onChange={e => setEditForm({ ...editForm, country: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
-                    </div>
+                {/* Address */}
+                <SectionTitle>Address</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="wp-field sm:col-span-2">
+                    <label htmlFor="aff-ed-street" className="wp-label">Street</label>
+                    <input id="aff-ed-street" type="text" value={editForm.street} onChange={e => setEditForm({ ...editForm, street: e.target.value })} className="wp-input wp-full" placeholder="Street address" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-city" className="wp-label">City</label>
+                    <input id="aff-ed-city" type="text" value={editForm.city} onChange={e => setEditForm({ ...editForm, city: e.target.value })} className="wp-input wp-full" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-state" className="wp-label">State / province</label>
+                    <input id="aff-ed-state" type="text" value={editForm.state} onChange={e => setEditForm({ ...editForm, state: e.target.value })} className="wp-input wp-full" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-zip" className="wp-label">Zip / postal code</label>
+                    <input id="aff-ed-zip" type="text" value={editForm.zipCode} onChange={e => setEditForm({ ...editForm, zipCode: e.target.value })} className="wp-input wp-full" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-country" className="wp-label">Country</label>
+                    <input id="aff-ed-country" type="text" value={editForm.country} onChange={e => setEditForm({ ...editForm, country: e.target.value })} className="wp-input wp-full" />
                   </div>
                 </div>
 
-                {/* Banking Section */}
-                <div className="border-t border-[#eee] pt-4 space-y-3">
-                  <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Banking Info</p>
-                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                    <div className="col-span-1 xs:col-span-2 space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Account Holder Name</label>
-                      <input type="text" value={editForm.accountHolder} onChange={e => setEditForm({ ...editForm, accountHolder: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Bank Name</label>
-                      <input type="text" value={editForm.bankName} onChange={e => setEditForm({ ...editForm, bankName: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Account Number</label>
-                      <input type="text" value={editForm.accountNumber} onChange={e => setEditForm({ ...editForm, accountNumber: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">IBAN</label>
-                      <input type="text" value={editForm.iban} onChange={e => setEditForm({ ...editForm, iban: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">SWIFT / BIC</label>
-                      <input type="text" value={editForm.swiftCode} onChange={e => setEditForm({ ...editForm, swiftCode: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">Routing Number</label>
-                      <input type="text" value={editForm.routingNumber} onChange={e => setEditForm({ ...editForm, routingNumber: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono" />
-                    </div>
-                    <div className="col-span-1 xs:col-span-2 space-y-1">
-                      <label className="text-[11px] font-bold text-[#1d2327]">PayPal Email</label>
-                      <input type="email" value={editForm.paypalEmail} onChange={e => setEditForm({ ...editForm, paypalEmail: e.target.value })} className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]" />
-                    </div>
+                {/* Banking */}
+                <SectionTitle>Banking info</SectionTitle>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="wp-field sm:col-span-2">
+                    <label htmlFor="aff-ed-holder" className="wp-label">Account holder name</label>
+                    <input id="aff-ed-holder" type="text" value={editForm.accountHolder} onChange={e => setEditForm({ ...editForm, accountHolder: e.target.value })} className="wp-input wp-full" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-bank" className="wp-label">Bank name</label>
+                    <input id="aff-ed-bank" type="text" value={editForm.bankName} onChange={e => setEditForm({ ...editForm, bankName: e.target.value })} className="wp-input wp-full" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-acct" className="wp-label">Account number</label>
+                    <input id="aff-ed-acct" type="text" value={editForm.accountNumber} onChange={e => setEditForm({ ...editForm, accountNumber: e.target.value })} className="wp-input wp-full font-mono" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-iban" className="wp-label">IBAN</label>
+                    <input id="aff-ed-iban" type="text" value={editForm.iban} onChange={e => setEditForm({ ...editForm, iban: e.target.value })} className="wp-input wp-full font-mono" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-swift" className="wp-label">SWIFT / BIC</label>
+                    <input id="aff-ed-swift" type="text" value={editForm.swiftCode} onChange={e => setEditForm({ ...editForm, swiftCode: e.target.value })} className="wp-input wp-full font-mono" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-routing" className="wp-label">Routing number</label>
+                    <input id="aff-ed-routing" type="text" value={editForm.routingNumber} onChange={e => setEditForm({ ...editForm, routingNumber: e.target.value })} className="wp-input wp-full font-mono" />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="aff-ed-paypal" className="wp-label">PayPal email</label>
+                    <input id="aff-ed-paypal" type="email" value={editForm.paypalEmail} onChange={e => setEditForm({ ...editForm, paypalEmail: e.target.value })} className="wp-input wp-full" />
                   </div>
                 </div>
-                {/* Verification Comparison Panel */}
-                <div className="bg-[#f0f6fa] border border-[#ccd0d4] p-3 xs:p-4 rounded-[3px] space-y-3">
-                  <p className="text-[10px] font-bold text-[#2271b1] uppercase tracking-wider">Identity & Verification Comparison Panel</p>
-                  <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 xs:gap-3">
-                    <div className="space-y-1 text-center">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Profile Photo</p>
-                      {selectedAffiliate.profilePhoto ? (
-                        <div 
-                          className="relative border border-[#ccd0d4] rounded-[3px] overflow-hidden bg-white aspect-square cursor-pointer hover:border-black transition-all"
-                          type="button"
-                          onClick={() => setViewingDocUrl(getDocumentUrl(selectedAffiliate.profilePhoto))}
-                        >
-                          <img 
-                            src={getDocumentUrl(selectedAffiliate.profilePhoto)} 
-                            alt="Profile" 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="border border-dashed border-neutral-300 rounded-[3px] aspect-square flex items-center justify-center text-[11px] text-gray-400 italic">No Photo</div>
-                      )}
-                    </div>
 
-                    <div className="space-y-1 text-center">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Live Selfie</p>
-                      {selectedAffiliate.liveSelfie ? (
-                        <div 
-                          className="relative border border-[#ccd0d4] rounded-[3px] overflow-hidden bg-white aspect-square cursor-pointer hover:border-black transition-all"
-                          type="button"
-                          onClick={() => setViewingDocUrl(getDocumentUrl(selectedAffiliate.liveSelfie))}
-                        >
-                          <img 
-                            src={getDocumentUrl(selectedAffiliate.liveSelfie)} 
-                            alt="Live Selfie" 
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="border border-dashed border-neutral-300 rounded-[3px] aspect-square flex items-center justify-center text-[11px] text-gray-400 italic">No Selfie</div>
-                      )}
-                    </div>
-
-                    <div className="space-y-1 text-center">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Bank Document</p>
-                      {selectedAffiliate.bankVerificationDocument ? (
-                        selectedAffiliate.bankVerificationDocument.toLowerCase().endsWith('.pdf') ? (
-                          <div 
-                            className="border border-[#ccd0d4] rounded-[3px] bg-white aspect-square flex flex-col items-center justify-center cursor-pointer hover:border-black transition-all p-2 text-center"
-                            onClick={() => setViewingDocUrl(getDocumentUrl(selectedAffiliate.bankVerificationDocument))}
-                          >
-                            <ShoppingCart className="w-8 h-8 text-neutral-400 mb-1" />
-                            <span className="text-[8px] font-mono text-neutral-600 truncate w-full">{selectedAffiliate.bankVerificationDocument}</span>
-                          </div>
-                        ) : (
-                          <div 
-                            className="relative border border-[#ccd0d4] rounded-[3px] overflow-hidden bg-white aspect-square cursor-pointer hover:border-black transition-all"
-                            type="button"
-                            onClick={() => setViewingDocUrl(getDocumentUrl(selectedAffiliate.bankVerificationDocument))}
-                          >
-                            <img 
-                              src={getDocumentUrl(selectedAffiliate.bankVerificationDocument)} 
-                              alt="Bank Verification" 
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )
-                      ) : (
-                        <div className="border border-dashed border-neutral-300 rounded-[3px] aspect-square flex items-center justify-center text-[11px] text-gray-400 italic">No Bank Doc</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <SectionTitle>Identity &amp; verification comparison</SectionTitle>
+                <VerificationThumbs record={selectedAffiliate} getUrl={getDocumentUrl} onOpen={setViewingDocUrl} />
 
                 {/* Documents & Photos */}
                 {(selectedAffiliate?.profilePhoto || selectedAffiliate?.identityDocuments?.length > 0 || selectedAffiliate?.bankVerificationDocument) && (
-                  <div className="border-t border-[#eee] pt-4 space-y-4">
-                    <p className="text-[11px] font-bold text-[#646970] uppercase tracking-widest">Verification & Documents</p>
-                    
+                  <div className="mt-4">
+                    <SectionTitle>Verification &amp; documents</SectionTitle>
+
                     {selectedAffiliate?.profilePhoto && (
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 mb-3">
                         <img
                           src={getDocumentUrl(selectedAffiliate.profilePhoto)}
                           alt="Profile avatar"
-                          className="w-16 h-16 rounded-full object-cover border border-[#ccd0d4] bg-neutral-100"
+                          className="w-16 h-16 rounded-full object-cover border border-[#c3c4c7] bg-[#f0f0f1]"
                         />
-                        <div>
-                          <p className="text-[11px] font-bold text-[#646970] uppercase">Uploaded Profile Photo</p>
-                          <button
-                            type="button"
-                            onClick={() => setViewingDocUrl(getDocumentUrl(selectedAffiliate.profilePhoto))}
-                            className="text-[#2271b1] hover:underline text-[12px] font-medium"
-                          >
-                            View Full Photo
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setViewingDocUrl(getDocumentUrl(selectedAffiliate.profilePhoto))}
+                          className="wp-link"
+                        >
+                          View full photo
+                        </button>
                       </div>
                     )}
 
                     {selectedAffiliate?.identityDocuments?.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-[11px] font-bold text-[#646970] uppercase">Identity Documents</p>
-                        <div className="flex flex-wrap gap-2">
+                      <div className="mb-3">
+                        <div className="wp-label">Identity documents</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {selectedAffiliate.identityDocuments.map((filename, idx) => (
-                            <div key={`id-doc-${idx}`} className="border border-[#ccd0d4] p-2.5 rounded-[3px] bg-[#f6f7f7] flex items-center justify-between gap-4 text-xs">
-                              <span className="font-mono truncate max-w-[150px]" title={filename}>{filename}</span>
-                              <div className="flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setViewingDocUrl(getDocumentUrl(filename))}
-                                  className="text-[#2271b1] hover:text-[#135e96] hover:underline font-bold text-[10px] uppercase cursor-pointer"
-                                >
-                                  Preview
-                                </button>
-                                <a
-                                  href={getDocumentUrl(filename)}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-gray-600 hover:text-black hover:underline font-bold text-[10px] uppercase inline-flex items-center gap-0.5"
-                                >
-                                  Download <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </div>
-                            </div>
+                            <DocRow key={`id-doc-${idx}`} filename={filename} url={getDocumentUrl(filename)} onPreview={() => setViewingDocUrl(getDocumentUrl(filename))} />
                           ))}
                         </div>
                       </div>
                     )}
 
                     {selectedAffiliate?.bankVerificationDocument && (
-                      <div className="space-y-1">
-                        <p className="text-[11px] font-bold text-[#646970] uppercase">Bank Verification Statement</p>
-                        <div className="border border-[#ccd0d4] p-2.5 rounded-[3px] bg-amber-50/50 flex items-center justify-between gap-4 text-xs">
-                          <span className="font-mono truncate max-w-[150px]" title={selectedAffiliate.bankVerificationDocument}>
-                            {selectedAffiliate.bankVerificationDocument}
-                          </span>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setViewingDocUrl(getDocumentUrl(selectedAffiliate.bankVerificationDocument))}
-                              className="text-amber-700 hover:text-amber-900 hover:underline font-bold text-[10px] uppercase cursor-pointer"
-                            >
-                              Preview
-                            </button>
-                            <a
-                              href={getDocumentUrl(selectedAffiliate.bankVerificationDocument)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-gray-600 hover:text-black hover:underline font-bold text-[10px] uppercase inline-flex items-center gap-0.5"
-                            >
-                              Download <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </div>
+                      <div>
+                        <div className="wp-label">Bank verification statement</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <DocRow
+                            filename={selectedAffiliate.bankVerificationDocument}
+                            url={getDocumentUrl(selectedAffiliate.bankVerificationDocument)}
+                            onPreview={() => setViewingDocUrl(getDocumentUrl(selectedAffiliate.bankVerificationDocument))}
+                          />
                         </div>
                       </div>
                     )}
                   </div>
                 )}
-
-                <div className="pt-4 flex justify-end gap-2 border-t border-[#ccd0d4]">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAffiliate(null)}
-                    className="border border-[#ccd0d4] bg-white text-[#2c3338] hover:bg-[#f6f7f7] px-4 py-2 text-[13px] font-medium rounded-[3px]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingEdit}
-                    className="bg-[#2271b1] border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] text-white px-4 py-2 text-[13px] font-medium rounded-[3px] disabled:opacity-50"
-                  >
-                    {submittingEdit ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Modal 3: Process Payout */}
-        {selectedPayout && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 xs:p-3 sm:p-4">
-            <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-md w-full overflow-hidden">
-              <div className="p-3 xs:p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
-                <h3 className="text-[14px] font-bold text-[#1d2327]">Process Payout: ${selectedPayout.amount?.toFixed(2)}</h3>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPayout(null)}
-                  className="text-gray-400 hover:text-black focus:outline-none"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
 
-              <form onSubmit={handlePayoutProcess} className="p-3 xs:p-4 sm:p-6 space-y-3 xs:space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Action *</label>
+              <div className="wp-modal-foot">
+                <button type="button" onClick={() => setSelectedAffiliate(null)} className="wp-btn">
+                  Cancel
+                </button>
+                <button type="submit" disabled={submittingEdit} className="wp-btn wp-btn-primary">
+                  {submittingEdit ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Process Payout */}
+      {selectedPayout && (
+        <div className="wp-modal-backdrop">
+          <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="aff-payout-title" style={{ maxWidth: 480 }}>
+            <div className="wp-modal-head">
+              <h2 id="aff-payout-title">Process payout: {formatMoney(selectedPayout.amount)}</h2>
+              <CloseButton onClick={closePayout} />
+            </div>
+
+            <form onSubmit={handlePayoutProcess}>
+              <div className="wp-modal-body">
+                <div className="wp-field">
+                  <label htmlFor="aff-po-action" className="wp-label">Action *</label>
                   <select
+                    id="aff-po-action"
                     value={payoutAction}
                     onChange={(e) => setPayoutAction(e.target.value)}
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px]"
+                    className="wp-select wp-full"
                   >
                     <option value="Approve">Mark Payout as Paid</option>
                     <option value="Reject">Reject Request (Refund Balance)</option>
@@ -2292,140 +2097,253 @@ export default function AffiliatesManagerClient({ userSession }) {
                 </div>
 
                 {payoutAction === "Approve" && (
-                  <div className="space-y-1">
-                    <label className="text-[12px] font-bold text-[#1d2327]">Transaction ID / Reference *</label>
+                  <div className="wp-field">
+                    <label htmlFor="aff-po-tx" className="wp-label">Transaction ID / reference *</label>
                     <input
+                      id="aff-po-tx"
                       type="text"
                       value={payoutTxId}
                       onChange={(e) => setPayoutTxId(e.target.value)}
                       required
                       placeholder="e.g. PayPal TxID or bank trace ref"
-                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] font-mono"
+                      className="wp-input wp-full font-mono"
                     />
                   </div>
                 )}
 
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold text-[#1d2327]">Feedback Notes</label>
+                <div className="wp-field" style={{ marginBottom: 0 }}>
+                  <label htmlFor="aff-po-notes" className="wp-label">Feedback notes</label>
                   <textarea
+                    id="aff-po-notes"
                     value={payoutNotes}
                     onChange={(e) => setPayoutNotes(e.target.value)}
                     rows="3"
                     placeholder="Sent in notification email to partner..."
-                    className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-1.5 outline-none text-[13px] resize-none"
+                    className="wp-textarea"
                   />
                 </div>
-
-                <div className="pt-4 flex justify-end gap-2 border-t border-[#ccd0d4]">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPayout(null)}
-                    className="border border-[#ccd0d4] bg-white text-[#2c3338] hover:bg-[#f6f7f7] px-4 py-2 text-[13px] font-medium rounded-[3px]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submittingPayout}
-                    className="bg-[#2271b1] border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] text-white px-4 py-2 text-[13px] font-medium rounded-[3px] disabled:opacity-50"
-                  >
-                    {submittingPayout ? "Processing..." : "Confirm"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Modal 4: Secure Document Viewer */}
-        {viewingDocUrl && (
-          <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-2 xs:p-3 sm:p-4">
-            <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-              <div className="p-3 xs:p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
-                <h3 className="text-[14px] font-bold text-[#1d2327]">KYC Document Viewer</h3>
-                <button
-                  type="button"
-                  onClick={() => setViewingDocUrl(null)}
-                  className="text-gray-400 hover:text-black focus:outline-none"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
 
-              <div className="flex-1 overflow-auto bg-[#f0f0f1] p-4 flex items-center justify-center min-h-[300px]">
-                {viewingDocUrl.toLowerCase().includes("file=") && viewingDocUrl.toLowerCase().endsWith(".pdf") ? (
-                  <iframe
-                    src={viewingDocUrl}
-                    title="Document PDF"
-                    className="w-full h-[60vh] border-0 bg-white"
-                  />
-                ) : (
-                  <img
-                    src={viewingDocUrl}
-                    alt="KYC Document Preview"
-                    className="max-h-[60vh] object-contain border shadow-sm bg-white"
-                  />
-                )}
-              </div>
-
-              <div className="p-4 border-t border-[#ccd0d4] flex justify-end gap-2 bg-[#f6f7f7]">
-                <a
-                  href={viewingDocUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="bg-[#2271b1] border border-[#2271b1] hover:bg-[#135e96] hover:border-[#135e96] text-white px-4 py-2 text-[13px] font-medium rounded-[3px] text-center inline-flex items-center gap-1.5 font-bold uppercase tracking-wider"
-                >
-                  <ExternalLink className="w-4 h-4" /> Open in New Tab
-                </a>
-                <button
-                  onClick={() => setViewingDocUrl(null)}
-                  className="border border-[#ccd0d4] bg-white text-[#2c3338] hover:bg-[#f6f7f7] px-4 py-2 text-[13px] font-medium rounded-[3px]"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Affiliate Confirmation Modal */}
-        {confirmDeleteAffiliate && (
-          <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-4 flex justify-center items-center">
-            <div className="bg-white rounded-[3px] border border-[#ccd0d4] shadow-2xl max-w-md w-full p-6 space-y-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <h3 className="text-[14px] font-bold text-red-600">Delete Affiliate Account?</h3>
-                  <p className="text-[13px] text-gray-600 leading-relaxed">
-                    Are you sure you want to permanently delete <strong>{confirmDeleteAffiliate.name}</strong> ({confirmDeleteAffiliate.referralCode})?
-                  </p>
-                  <p className="text-[11px] text-gray-500">
-                    This action will permanently delete all associated clicks, payouts, ledger entries, and commissions. This cannot be undone.
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteAffiliate(null)}
-                  className="border border-[#ccd0d4] bg-white text-[#2c3338] hover:bg-[#f6f7f7] px-4 py-2 text-[13px] font-medium rounded-[3px]"
-                >
+              <div className="wp-modal-foot">
+                <button type="button" onClick={closePayout} className="wp-btn">
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteAffiliate(confirmDeleteAffiliate._id)}
-                  disabled={deletingAffiliateId === confirmDeleteAffiliate._id}
-                  className="bg-red-600 border border-red-600 hover:bg-red-700 text-white px-4 py-2 text-[13px] font-medium rounded-[3px] disabled:opacity-50"
-                >
-                  {deletingAffiliateId === confirmDeleteAffiliate._id ? "Deleting..." : "Delete Permanently"}
+                <button type="submit" disabled={submittingPayout} className="wp-btn wp-btn-primary">
+                  {submittingPayout ? "Processing…" : "Confirm"}
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Secure Document Viewer */}
+      {viewingDocUrl && (
+        <div className="wp-modal-backdrop">
+          <div className="wp-modal flex flex-col" role="dialog" aria-modal="true" aria-labelledby="aff-doc-title" style={{ maxWidth: 900 }}>
+            <div className="wp-modal-head">
+              <h2 id="aff-doc-title">KYC document viewer</h2>
+              <CloseButton onClick={() => setViewingDocUrl(null)} />
+            </div>
+
+            <div className="flex-1 overflow-auto bg-[#f0f0f1] p-4 flex items-center justify-center min-h-[300px]">
+              {viewingDocUrl.toLowerCase().includes("file=") && viewingDocUrl.toLowerCase().endsWith(".pdf") ? (
+                <iframe
+                  src={viewingDocUrl}
+                  title="Document PDF"
+                  className="w-full h-[60vh] border-0 bg-white"
+                />
+              ) : (
+                <img
+                  src={viewingDocUrl}
+                  alt="KYC Document Preview"
+                  className="max-w-full max-h-[60vh] object-contain border border-[#dcdcde] bg-white"
+                />
+              )}
+            </div>
+
+            <div className="wp-modal-foot flex-wrap">
+              <button type="button" onClick={() => setViewingDocUrl(null)} className="wp-btn">
+                Close
+              </button>
+              <a href={viewingDocUrl} target="_blank" rel="noreferrer" className="wp-btn wp-btn-primary">
+                <ExternalLink className="w-4 h-4" aria-hidden="true" /> Open in new tab
+              </a>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
+    </Page>
+  );
+}
+
+/* ---------- presentational helpers (no state, no data access) ---------- */
+
+const DANGER_SOLID = { background: "#b32d2e", borderColor: "#b32d2e", color: "#fff" };
+const DANGER_OUTLINE = { borderColor: "#b32d2e", color: "#b32d2e" };
+
+const PILL_CLASS = {
+  Pending: "wp-st-unpaid",
+  Requested: "wp-st-unpaid",
+  Approved: "wp-st-paid",
+  Active: "wp-st-paid",
+  Paid: "wp-st-paid",
+  Rejected: "wp-st-failed",
+  Suspended: "wp-st-failed",
+  Trashed: "wp-st-draft",
+};
+
+function AffPill({ status }) {
+  return <span className={`wp-pill wp-pill-sm ${PILL_CLASS[status] || "wp-st-pending"}`}>{status}</span>;
+}
+
+function StatButton({ label, value, onClick }) {
+  return (
+    <button type="button" onClick={onClick} className="wp-stat text-left cursor-pointer hover:bg-[#f6f7f7] focus-visible:bg-[#f6f7f7]">
+      <span className="wp-stat-label block">{label}</span>
+      <span className="wp-stat-value block">{value}</span>
+    </button>
+  );
+}
+
+function FilterLinks({ label, options, value, onChange, counts }) {
+  return (
+    <nav className="wp-subsub" aria-label={label}>
+      {options.map((opt, i) => (
+        <span key={opt} className="inline-flex items-center">
+          {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+          <button
+            type="button"
+            aria-pressed={value === opt}
+            className={`max-[782px]:min-h-10 ${value === opt ? "is-current" : ""}`}
+            onClick={() => onChange(opt)}
+          >
+            {opt}
+            {counts && <span className="wp-count"> ({counts[opt]})</span>}
+          </button>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+function SearchBox({ id, label, value, onChange, placeholder }) {
+  // Filters live while typing; Enter / Search just keeps the term (no page reload).
+  return (
+    <form className="wp-search" role="search" onSubmit={(e) => { e.preventDefault(); onChange(value.trim()); }}>
+      <label htmlFor={id} className="sr-only">{label}</label>
+      <input
+        id={id}
+        type="search"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="wp-input w-[240px]"
+      />
+      <button type="submit" className="wp-btn">Search</button>
+    </form>
+  );
+}
+
+function Pager({ total, page, totalPages, onPage }) {
+  const go = (n) => onPage(Math.min(Math.max(1, n), totalPages));
+  return (
+    <div className="wp-toolbar">
+      <span className="wp-spacer" />
+      <div className="wp-pages">
+        <span>{total} {total === 1 ? "item" : "items"}</span>
+        <button type="button" className="wp-pager" aria-label="First page" disabled={page <= 1} onClick={() => go(1)}><ChevronsLeft className="w-4 h-4" /></button>
+        <button type="button" className="wp-pager" aria-label="Previous page" disabled={page <= 1} onClick={() => go(page - 1)}><ChevronLeft className="w-4 h-4" /></button>
+        <span>{page} of {totalPages}</span>
+        <button type="button" className="wp-pager" aria-label="Next page" disabled={page >= totalPages} onClick={() => go(page + 1)}><ChevronRight className="w-4 h-4" /></button>
+        <button type="button" className="wp-pager" aria-label="Last page" disabled={page >= totalPages} onClick={() => go(totalPages)}><ChevronsRight className="w-4 h-4" /></button>
       </div>
-    </AdminPageLayout>
+    </div>
+  );
+}
+
+function CloseButton({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Close dialog"
+      className="inline-flex items-center justify-center w-10 h-10 -mr-2 text-[#646970] hover:text-[#1d2327] cursor-pointer"
+    >
+      <X className="w-5 h-5" aria-hidden="true" />
+    </button>
+  );
+}
+
+function SectionTitle({ children }) {
+  return (
+    <h3 className="wp-strong m-0 mb-1 pb-1.5 border-b border-[#dcdcde]" style={{ fontSize: 14 }}>
+      {children}
+    </h3>
+  );
+}
+
+function KV({ label, children }) {
+  return (
+    <div className="wp-kv items-start">
+      <span className="wp-kv-k wp-muted">{label}</span>
+      <span className="wp-kv-v text-right min-w-0" style={{ wordBreak: "break-word" }}>{children}</span>
+    </div>
+  );
+}
+
+function DocRow({ filename, url, onPreview, note }) {
+  return (
+    <div className="flex items-center justify-between gap-3 p-2.5 border border-[#dcdcde] bg-[#f6f7f7] min-w-0">
+      <span className="font-mono wp-small truncate min-w-0" title={filename}>
+        {note && <span className="wp-muted" style={{ fontFamily: "inherit" }}>{note}: </span>}
+        {filename}
+      </span>
+      <span className="flex gap-3 shrink-0">
+        <button type="button" onClick={onPreview} className="wp-link cursor-pointer">Preview</button>
+        <a href={url} target="_blank" rel="noreferrer" className="wp-link inline-flex items-center gap-1">
+          Download <ExternalLink className="w-3 h-3" aria-hidden="true" />
+        </a>
+      </span>
+    </div>
+  );
+}
+
+/** Profile photo / live selfie / bank document side by side, each opening the document viewer. */
+function VerificationThumbs({ record, getUrl, onOpen }) {
+  const tile = "block w-full aspect-square border border-[#c3c4c7] bg-white overflow-hidden cursor-pointer hover:border-[#2271b1] focus-visible:border-[#2271b1]";
+  const empty = "flex w-full aspect-square items-center justify-center border border-dashed border-[#c3c4c7] wp-muted wp-small";
+  const items = [
+    { key: "profilePhoto", label: "Profile photo", missing: "No photo", alt: "Profile" },
+    { key: "liveSelfie", label: "Live selfie", missing: "No selfie", alt: "Live Selfie" },
+    { key: "bankVerificationDocument", label: "Bank document", missing: "No bank doc", alt: "Bank Verification" },
+  ];
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-2">
+      {items.map(({ key, label, missing, alt }) => {
+        const file = record[key];
+        const isPdf = key === "bankVerificationDocument" && file && file.toLowerCase().endsWith(".pdf");
+        return (
+          <div key={key} className="text-center min-w-0">
+            <div className="wp-small wp-muted mb-1">{label}</div>
+            {file ? (
+              <button type="button" className={tile} onClick={() => onOpen(getUrl(file))} aria-label={`Open ${label.toLowerCase()}`}>
+                {isPdf ? (
+                  <span className="flex flex-col items-center justify-center h-full p-2">
+                    <FileText className="w-8 h-8 text-[#a7aaad] mb-1" aria-hidden="true" />
+                    <span className="font-mono wp-small truncate w-full">{file}</span>
+                  </span>
+                ) : (
+                  <img src={getUrl(file)} alt={alt} className="w-full h-full object-cover" />
+                )}
+              </button>
+            ) : (
+              <div className={empty}>{missing}</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

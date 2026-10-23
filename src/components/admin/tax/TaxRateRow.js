@@ -8,12 +8,13 @@ import { inp } from "./taxStyles";
 // mean "matches any value" — see TaxSettings model for the full contract.
 export default function TaxRateRow({ row, onChange, onDelete }) {
   return (
-    <tr className="hover:bg-[#f0f6fb] border-b border-[#f0f0f1] last:border-0">
-      <td className="px-2 py-2 align-top">
+    <tr>
+      <td style={{ minWidth: 170 }}>
         <select
-          className={`${inp} cursor-pointer`}
+          className="wp-select wp-full"
           value={row.country}
           onChange={(e) => onChange({ country: e.target.value })}
+          aria-label="Country"
         >
           <option value="">* Any country</option>
           {COUNTRIES.map((c) => (
@@ -21,93 +22,101 @@ export default function TaxRateRow({ row, onChange, onDelete }) {
           ))}
         </select>
       </td>
-      <td className="px-2 py-2 align-top">
+      <td style={{ minWidth: 130 }}>
         <input
           type="text"
           className={inp}
           value={row.state}
           onChange={(e) => onChange({ state: e.target.value })}
           placeholder="e.g. CA — blank = any state"
+          aria-label="State code"
         />
       </td>
-      <td className="px-2 py-2 align-top">
+      <td style={{ minWidth: 170 }}>
         <input
           type="text"
           className={inp}
           value={row.postcode}
           onChange={(e) => onChange({ postcode: e.target.value })}
           placeholder="94103, 9410*, or 10000...19999 — blank = any"
+          aria-label="Postcode / ZIP"
         />
       </td>
-      <td className="px-2 py-2 align-top">
+      <td style={{ minWidth: 130 }}>
         <input
           type="text"
           className={inp}
           value={row.city}
           onChange={(e) => onChange({ city: e.target.value })}
           placeholder="blank = any city"
+          aria-label="City"
         />
       </td>
-      <td className="px-2 py-2 align-top">
-        <div className="relative w-[95px]">
+      <td style={{ minWidth: 100 }}>
+        <div className="relative" style={{ width: 96 }}>
           <input
             type="number"
             min="0"
             max="100"
             step="0.01"
-            className={`${inp} pr-5 text-center font-semibold`}
+            className={`${inp} wp-num`}
+            style={{ paddingRight: 22 }}
             value={row.rate}
             onChange={(e) => onChange({ rate: Number(e.target.value) })}
+            aria-label="Rate %"
           />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#646970]">%</span>
+          <span className="wp-muted absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">%</span>
         </div>
       </td>
-      <td className="px-2 py-2 align-top">
+      <td style={{ minWidth: 120 }}>
         <input
           type="text"
           className={inp}
           value={row.name}
           onChange={(e) => onChange({ name: e.target.value })}
           placeholder="Tax"
+          aria-label="Tax name"
         />
       </td>
-      <td className="px-2 py-2 align-top">
+      <td style={{ minWidth: 80 }}>
         <input
           type="number"
           min="0"
           title="Rows sharing a priority are summed together; a higher-priority compound row stacks on top."
-          className={`${inp} w-[70px] text-center`}
+          className={`${inp} wp-num`}
+          style={{ width: 70 }}
           value={row.priority}
           onChange={(e) => onChange({ priority: Number(e.target.value) })}
+          aria-label="Priority"
         />
       </td>
-      <td className="px-2 py-2 align-top text-center">
+      <td className="text-center" style={{ verticalAlign: "middle" }}>
         <input
           type="checkbox"
-          className="w-4 h-4 accent-[#2271b1]"
           checked={!!row.compound}
           onChange={(e) => onChange({ compound: e.target.checked })}
           title="Calculate this rate on top of the subtotal plus already-applied simple taxes"
+          aria-label="Compound"
         />
       </td>
-      <td className="px-2 py-2 align-top text-center">
+      <td className="text-center" style={{ verticalAlign: "middle" }}>
         <input
           type="checkbox"
-          className="w-4 h-4 accent-[#2271b1]"
           checked={!!row.shipping}
           onChange={(e) => onChange({ shipping: e.target.checked })}
           title="Applies this rate to the shipping cost too"
+          aria-label="Apply to shipping"
         />
       </td>
-      <td className="px-2 py-2 align-top text-center">
+      <td className="text-center" style={{ verticalAlign: "middle" }}>
         <button
           type="button"
           onClick={onDelete}
-          className="text-[#b32d2e] hover:text-[#d63638] p-1.5 md:p-1 rounded-[3px] hover:bg-[#fcf0f1] transition-colors cursor-pointer"
-          aria-label="Delete rate row"
-          title="Delete row"
+          className="inline-flex items-center justify-center min-w-[30px] min-h-[30px] max-[782px]:min-w-[40px] max-[782px]:min-h-[40px] rounded-[3px] bg-transparent border-0 text-[#b32d2e] hover:bg-[#fcf0f1] cursor-pointer"
+          aria-label="Remove rate row"
+          title="Remove row"
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-4 h-4" aria-hidden="true" />
         </button>
       </td>
     </tr>

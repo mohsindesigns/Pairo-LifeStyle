@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
+import Product from "@/models/Product";
 import { getContextLogger, LogCategory } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { createOrderFromCheckoutPayload } from "@/lib/checkoutFulfillment";
@@ -56,6 +57,16 @@ export async function POST(req) {
         if (existingOrder) {
           log.warn({ idempotencyKey, orderNumber: existingOrder.orderNumber }, "Idempotency hit");
           return NextResponse.json({ success: true, orderNumber: existingOrder.orderNumber });
+        }
+      }
+
+      // A product the admin moved to the Trash can't be ordered, even from a stale cart.
+      // (Checked here, before any payment, not in the shared fulfilment used after Stripe pays.)
+      const cartIds = (Array.isArray(body.items) ? body.items : []).map((i) => i?.id || i?._id).filter(Boolean);
+      if (cartIds.length) {
+        const trashed = await Product.findOne({ _id: { $in: cartIds }, isDeleted: true }).select("name").lean().catch(() => null);
+        if (trashed) {
+          return NextResponse.json({ error: `${trashed.name || "A product in your cart"} is no longer available.` }, { status: 400 });
         }
       }
 

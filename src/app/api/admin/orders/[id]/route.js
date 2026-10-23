@@ -12,6 +12,7 @@ import { reconcilePromotionUsage, isUsageReleasingTransition, isUsageRestoringTr
 import pairoEvents from "@/lib/events";
 import { resolveIpLocation } from "@/lib/geoIp";
 import { orderLookupQuery } from "@/lib/orderLookup";
+import { orderStatusChangeError } from "@/lib/order-status-flow";
 
 export async function GET(req, { params }) {
   try {
@@ -76,9 +77,9 @@ export async function PATCH(req, { params }) {
 
     const oldStatus = order.status;
     
-    // Prevent invalid transitions if order is already delivered/cancelled (Optional strict check)
-    if (oldStatus === "Cancelled" && status !== "Cancelled") {
-      // Logic for re-activating a cancelled order if needed, but for now we keep it strict
+    const transitionError = orderStatusChangeError(oldStatus, status);
+    if (transitionError) {
+      return NextResponse.json({ error: transitionError }, { status: 409 });
     }
 
     // 1. If status is changing to Cancelled, revert stock ONLY if it wasn't already cancelled

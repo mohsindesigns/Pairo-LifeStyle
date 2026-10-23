@@ -257,7 +257,8 @@ export async function computeAuthoritativeCheckout({
         { referralCode: promoCodeToResolve },
         { couponCode: promoCodeToResolve }
       ],
-      status: 'Active'
+      status: 'Active',
+      isDeleted: { $ne: true }
     }), mongoSession);
   }
 
@@ -269,7 +270,8 @@ export async function computeAuthoritativeCheckout({
           { referralCode: cookieCodeToResolve },
           { couponCode: cookieCodeToResolve }
         ],
-        status: 'Active'
+        status: 'Active',
+        isDeleted: { $ne: true }
       }), mongoSession);
     }
   }

@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import Media from "@/models/Media";
 import { deleteFromStorage } from "@/lib/storage";
 import { can } from "@/lib/rbac";
+import mongoose from "mongoose";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET(req, { params }) {
 
   await dbConnect();
   const { id } = await params;
+  if (!mongoose.isValidObjectId(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const media = await Media.findById(id).lean();
   if (!media) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ success: true, media });
@@ -29,7 +31,8 @@ export async function PATCH(req, { params }) {
 
   await dbConnect();
   const { id } = await params;
-  const body = await req.json();
+  if (!mongoose.isValidObjectId(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const body = await req.json().catch(() => ({}));
 
   const allowed = ['title', 'altText', 'caption', 'tags', 'folder'];
   const updates = {};
@@ -41,6 +44,10 @@ export async function PATCH(req, { params }) {
   if (body.restore) {
     updates.isDeleted = false;
     updates.deletedAt = null;
+  }
+  if (updates.tags !== undefined) {
+    const raw = Array.isArray(updates.tags) ? updates.tags : String(updates.tags).split(',');
+    updates.tags = [...new Set(raw.map(t => String(t).trim()).filter(Boolean))];
   }
 
   const media = await Media.findByIdAndUpdate(id, updates, { new: true });
@@ -171,10 +178,15 @@ export async function DELETE(req, { params }) {
   const { searchParams } = new URL(req.url);
   const permanent = searchParams.get('permanent') === 'true';
 
+  if (!mongoose.isValidObjectId(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const media = await Media.findById(id);
   if (!media) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (permanent) {
+    // Permanent delete only from the Trash, never a live file in one step
+    if (!media.isDeleted) {
+      return NextResponse.json({ error: "Move the file to Trash before deleting it permanently." }, { status: 400 });
+    }
     // Perform references cleanup so pages referencing it do not break
     await cleanMediaReferences(media);
 
@@ -186,7 +198,8 @@ export async function DELETE(req, { params }) {
     return NextResponse.json({ success: true, deleted: true });
   }
 
-  // Soft delete
+  // Soft delete (the file itself stays in storage, so pages still using its URL keep working)
+  if (media.isDeleted) return NextResponse.json({ success: true, trashed: true });
   await Media.findByIdAndUpdate(id, {
     isDeleted: true,
     deletedAt: new Date(),

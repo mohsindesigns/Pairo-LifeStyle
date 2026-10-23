@@ -56,7 +56,7 @@ export async function POST(req) {
     const ipAddress = getClientIp(req);
 
     const itemProductIds = items.map(item => item.id || item._id);
-    const foundProducts = await Product.find({ _id: { $in: itemProductIds } });
+    const foundProducts = await Product.find({ _id: { $in: itemProductIds }, isDeleted: { $ne: true } });
     const productById = new Map(foundProducts.map(p => [p._id.toString(), p]));
 
     for (const item of items) {

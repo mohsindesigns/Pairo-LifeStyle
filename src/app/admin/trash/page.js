@@ -1,345 +1,449 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { 
-  Trash2, 
-  RefreshCw, 
-  X, 
-  Package, 
-  Layers, 
-  FileText,
-  AlertTriangle,
-  ArrowLeft
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
+import { usePopup } from "@/context/PopupContext";
+import { useRBAC } from "@/hooks/useRBAC";
+import { allowed, visibleModules, groupModules, filterItems, paginate, summarize, responseResult } from "./trashModules";
+
+const PER_PAGE = 20;
+
+const countLabel = (e) => (!e || e.status === "loading" ? "…" : e.status === "error" ? "!" : e.docs.length);
+
+// Page-local layout for the grouped section tabs (admin-ui.css has no show-on-phone helper).
+const TAB_CSS = `
+.trash-tabs-sm { display: none; }
+.trash-tabs-lg { margin: 6px 0 10px; border-top: 1px solid #f0f0f1; }
+.trash-group { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; border-bottom: 1px solid #f0f0f1; }
+.trash-group-label { flex: 0 0 72px; font-size: 12px; font-weight: 600; color: #646970; text-transform: uppercase; letter-spacing: .02em; }
+.trash-group .wp-subsub { margin: 0; flex: 1; min-width: 0; }
+.trash-group .wp-subsub button.trash-empty { color: #8c8f94; }
+@media (max-width: 782px) {
+  .trash-tabs-lg { display: none; }
+  .trash-tabs-sm { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 10px; }
+  .trash-tabs-sm .wp-select { width: 100%; }
+}
+`;
+const BULK_CONCURRENCY = 4;
+
+async function getJson(url) {
+  const res = await fetch(url, { cache: "no-store" });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function send({ url, method, body }) {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => null);
+    return responseResult(res.ok, res.status, data);
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+// Runs `task` over `list` with a small concurrency limit; resolves to [{ok, error}] in order.
+async function runAll(list, task) {
+  const results = new Array(list.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < list.length) {
+      const i = next++;
+      results[i] = await task(list[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(BULK_CONCURRENCY, list.length) }, worker));
+  return results;
+}
 
 export default function AdminTrash() {
-  const [activeTab, setActiveTab] = useState("products");
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [blogs, setBlogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Modal State
-  const [confirmModal, setConfirmModal] = useState({
-    open: false,
-    type: "", // "product", "category", "blog"
-    id: null,
-    name: ""
-  });
-  
-  const [processing, setProcessing] = useState(false);
+  const { can, session } = useRBAC();
+  const { showConfirm } = usePopup();
 
-  const fetchTrash = useCallback(async () => {
-    setLoading(true);
+  // Re-evaluated only when the signed-in role changes.
+  const roleKey = JSON.stringify(session?.user?.role || null);
+  const modules = useMemo(() => visibleModules(can), [roleKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const groups = useMemo(() => groupModules(modules), [modules]);
+  const actor = useMemo(
+    () => ({ userId: session?.user?.id || null, roleSlug: session?.user?.role?.slug || null }),
+    [session?.user?.id, session?.user?.role?.slug],
+  );
+
+  const [active, setActive] = useState("");
+  const [data, setData] = useState({}); // key -> { status: "loading"|"ok"|"error", docs, error }
+  const [selected, setSelected] = useState([]);
+  const [bulkAction, setBulkAction] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [term, setTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const loadSeq = useRef({});
+
+  const current = modules.find((m) => m.key === active) || modules[0] || null;
+
+  const loadModule = useCallback(async (mod) => {
+    const seq = (loadSeq.current[mod.key] || 0) + 1;
+    loadSeq.current[mod.key] = seq;
+    setData((prev) => ({ ...prev, [mod.key]: { ...(prev[mod.key] || { docs: [] }), status: "loading" } }));
     try {
-      const [prodRes, catRes, blogRes] = await Promise.all([
-        fetch("/api/admin/products?isDeleted=true"),
-        fetch("/api/admin/categories?trash=true"),
-        fetch("/api/admin/blogs?isDeleted=true")
-      ]);
-      
-      const [prodData, catData, blogData] = await Promise.all([
-        prodRes.json(),
-        catRes.json(),
-        blogRes.json()
-      ]);
-      
-      setProducts(Array.isArray(prodData) ? prodData : []);
-      setCategories(Array.isArray(catData) ? catData : []);
-      setBlogs(Array.isArray(blogData) ? blogData : []);
-    } catch (err) {
-      console.error("Failed to fetch trash items:", err);
-    } finally {
-      setLoading(false);
+      const docs = await mod.load(getJson);
+      if (loadSeq.current[mod.key] !== seq) return;
+      setData((prev) => ({ ...prev, [mod.key]: { status: "ok", docs, error: null } }));
+    } catch (e) {
+      if (loadSeq.current[mod.key] !== seq) return;
+      setData((prev) => ({ ...prev, [mod.key]: { status: "error", docs: [], error: e.message } }));
     }
   }, []);
 
+  const loadAll = useCallback(() => {
+    modules.forEach((m) => loadModule(m));
+  }, [modules, loadModule]);
+
   useEffect(() => {
-    fetchTrash();
-  }, [fetchTrash]);
+    loadAll();
+  }, [loadAll]);
 
-  const handleRestore = async (type, id) => {
+  // ?tab= deep link (read after mount so server and client render the same first frame).
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab) setActive(tab);
+  }, []);
+
+  // Live search (debounced); submitting the form applies immediately.
+  useEffect(() => {
+    const t = setTimeout(() => setTerm(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => { setPage(1); setSelected([]); }, [term, current?.key]);
+
+  const selectTab = (key) => {
+    setActive(key);
+    setSearchInput("");
+    setTerm("");
+    setBulkAction("");
     try {
-      let url = "";
-      let payload = {};
-      
-      if (type === "product") {
-        url = "/api/admin/products";
-        payload = { id, isDeleted: false, status: 'Draft' };
-      } else if (type === "category") {
-        url = "/api/admin/categories";
-        payload = { id, isDeleted: false };
-      } else if (type === "blog") {
-        url = "/api/admin/blogs";
-        payload = { id, isDeleted: false };
-      }
-      
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      
-      if (res.ok) {
-        toast.success("Item restored successfully");
-        fetchTrash();
-      } else {
-        const err = await res.json();
-        toast.error(err.error || "Failed to restore");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to restore item");
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", key);
+      window.history.replaceState(null, "", url.toString());
+    } catch { /* ignore */ }
+  };
+
+  const entry = current ? data[current.key] : null;
+  const docs = entry?.docs;
+  const items = useMemo(() => (current && docs ? docs.map((d) => ({ ...current.item(d), doc: d })) : []), [current, docs]);
+  const filtered = useMemo(() => filterItems(items, term), [items, term]);
+  const { pages, page: curPage, slice } = paginate(filtered, page, PER_PAGE);
+  const hasThumbs = items.some((it) => "thumb" in it);
+  const hasDates = items.some((it) => it.trashedAt);
+
+  const mayRestore = current ? allowed(can, current.permissions.restore) : false;
+  const mayDelete = current ? allowed(can, current.permissions.delete) : false;
+  const blockReason = (it) => (current?.canDestroy ? current.canDestroy(it.doc, actor) || null : null);
+
+  const sliceIds = slice.map((it) => it.id);
+  const allOnPage = sliceIds.length > 0 && sliceIds.every((id) => selected.includes(id));
+  const toggleAll = () => setSelected(allOnPage ? selected.filter((id) => !sliceIds.includes(id)) : [...new Set([...selected, ...sliceIds])]);
+  const toggleOne = (id) => setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const restoreOne = async (it) => {
+    setRowBusy(it.id);
+    const r = await send(current.restore(it.doc));
+    setRowBusy(null);
+    if (r.ok) {
+      toast.success(`"${it.title}" restored`);
+      loadModule(current);
+    } else toast.error(r.error || "Failed to restore");
+  };
+
+  const deleteOne = async (it) => {
+    const reason = blockReason(it);
+    if (reason) return toast.error(reason);
+    const ok = await showConfirm(
+      `Permanently delete "${it.title}"? This cannot be undone.`,
+      "Delete permanently",
+      { confirmText: "Delete permanently", danger: true },
+    );
+    if (!ok) return;
+    setRowBusy(it.id);
+    const r = await send(current.destroy(it.doc));
+    setRowBusy(null);
+    if (r.ok) {
+      toast.success(`"${it.title}" permanently deleted`);
+      setSelected((prev) => prev.filter((id) => id !== it.id));
+      loadModule(current);
+    } else toast.error(r.error || "Failed to delete permanently");
+  };
+
+  const runBulk = async (targets, kind) => {
+    const mod = current;
+    const runnable = kind === "delete" ? targets.filter((it) => !blockReason(it)) : targets;
+    const skipped = targets.length - runnable.length;
+    setBusy(true);
+    const results = await runAll(runnable, (it) => send(kind === "delete" ? mod.destroy(it.doc) : mod.restore(it.doc)));
+    setBusy(false);
+    const ok = results.filter((r) => r.ok).length;
+    // Items the server refuses (or that are blocked up front) are skipped, never fatal:
+    // the rest of the run carries on and the toast reports both numbers.
+    const failed = results.length - ok + skipped;
+    const firstError = results.find((r) => !r.ok)?.error || (skipped ? blockReason(targets.find((it) => blockReason(it))) : "");
+    const msg = kind === "delete" ? summarize("deleted", ok, failed, "skipped") : summarize("restored", ok, failed);
+    if (failed) toast.error(`${msg}${firstError ? ` — ${firstError}` : ""}`);
+    else toast.success(msg);
+    setSelected([]);
+    setBulkAction("");
+    loadModule(mod);
+  };
+
+  const applyBulk = async () => {
+    if (!bulkAction) return toast.error("Choose a bulk action first.");
+    const targets = items.filter((it) => selected.includes(it.id));
+    if (targets.length === 0) return toast.error(`Select at least one ${current.noun}.`);
+    if (bulkAction === "delete") {
+      const ok = await showConfirm(
+        `Permanently delete ${targets.length} ${current.noun}${targets.length === 1 ? "" : "s"}? This cannot be undone.`,
+        "Delete permanently",
+        { confirmText: "Delete permanently", danger: true },
+      );
+      if (!ok) return;
     }
+    runBulk(targets, bulkAction);
   };
 
-  const handlePermanentDelete = async () => {
-    const { type, id } = confirmModal;
-    if (!id) return;
-    
-    setProcessing(true);
-    try {
-      let url = "";
-      if (type === "product") {
-        url = `/api/admin/products/${id}`;
-      } else if (type === "category") {
-        url = `/api/admin/categories?id=${id}`;
-      } else if (type === "blog") {
-        url = `/api/admin/blogs?id=${id}`;
-      }
-      
-      const res = await fetch(url, {
-        method: "DELETE"
-      });
-      
-      if (res.ok) {
-        toast.success("Item permanently deleted");
-        setConfirmModal({ open: false, type: "", id: null, name: "" });
-        fetchTrash();
-      } else {
-        const err = await res.json();
-        toast.error(err.error || "Failed to delete permanently");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error deleting item permanently");
-    } finally {
-      setProcessing(false);
-    }
+  const emptyTrash = async () => {
+    if (items.length === 0) return;
+    const blocked = items.filter((it) => blockReason(it)).length;
+    const ok = await showConfirm(
+      `Permanently delete all ${items.length} ${current.noun}${items.length === 1 ? "" : "s"} in the Trash? This cannot be undone.`
+        + `${blocked ? ` ${blocked} that can't be deleted will be skipped and stay in the Trash.` : " Any the server refuses are skipped and stay in the Trash."}`,
+      `Empty ${current.label} trash`,
+      { confirmText: "Empty trash", danger: true },
+    );
+    if (!ok) return;
+    runBulk(items, "delete");
   };
 
-  const openConfirmModal = (type, id, name) => {
-    setConfirmModal({
-      open: true,
-      type,
-      id,
-      name
-    });
-  };
+  const bulkOptions = [mayRestore && ["restore", "Restore"], mayDelete && ["delete", "Delete permanently"]].filter(Boolean);
+  const loading = !entry || entry.status === "loading";
+  const showChecks = bulkOptions.length > 0;
+  const colCount = (showChecks ? 1 : 0) + (hasDates ? 3 : 2);
 
-  const activeItemsCount = 
-    activeTab === "products" ? products.length :
-    activeTab === "categories" ? categories.length :
-    blogs.length;
+  if (modules.length === 0) {
+    return (
+      <Page>
+        <PageHeader title="Trash" />
+        <Notice type="info">There is nothing here you have permission to manage.</Notice>
+      </Page>
+    );
+  }
+
+  const pager = pages > 1 && (
+    <span className="wp-pages">
+      <button type="button" className="wp-pager" onClick={() => setPage(1)} disabled={curPage <= 1} aria-label="First page">«</button>
+      <button type="button" className="wp-pager" onClick={() => setPage(curPage - 1)} disabled={curPage <= 1} aria-label="Previous page">‹</button>
+      <span>{curPage} of {pages}</span>
+      <button type="button" className="wp-pager" onClick={() => setPage(curPage + 1)} disabled={curPage >= pages} aria-label="Next page">›</button>
+      <button type="button" className="wp-pager" onClick={() => setPage(pages)} disabled={curPage >= pages} aria-label="Last page">»</button>
+    </span>
+  );
+
+  const header = (
+    <tr>
+      {showChecks && (
+        <td className="wp-check-col">
+          <input type="checkbox" aria-label="Select all on this page" checked={allOnPage} onChange={toggleAll} disabled={sliceIds.length === 0 || busy} />
+        </td>
+      )}
+      <th scope="col">{current.key === "orders" ? "Order" : "Title"}</th>
+      <th scope="col" className="wp-hide-sm">Details</th>
+      {hasDates && <th scope="col" className="wp-hide-sm" style={{ width: 140 }}>Trashed</th>}
+    </tr>
+  );
 
   return (
-    <div className="space-y-6 sm:space-y-10">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-2">
-          <Link href="/admin" className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-black/40 hover:text-black transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-          </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-tighter text-red-500">Trash Bin</h1>
-          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-black/30">Restore or permanently purge soft-deleted resources.</p>
-        </div>
-        <button onClick={fetchTrash} className="bg-gray-100 hover:bg-gray-200 text-black px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors w-fit">
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
-        </button>
+    <Page>
+      <PageHeader
+        title="Trash"
+        actions={<button type="button" onClick={loadAll} className="wp-btn" disabled={busy}>Refresh</button>}
+      />
+      <p className="wp-desc" style={{ marginTop: 0 }}>
+        Items moved to the Trash from every section, in one place. Restore them, or delete them permanently.
+      </p>
+
+      <style>{TAB_CSS}</style>
+
+      {/* Phones: one select, grouped. */}
+      <div className="trash-tabs-sm">
+        <label htmlFor="trash-section" className="wp-muted wp-small">Section</label>
+        <select id="trash-section" className="wp-select" value={current.key} onChange={(e) => selectTab(e.target.value)}>
+          {groups.map((g) => (
+            <optgroup key={g.key} label={g.label}>
+              {g.modules.map((m) => (
+                <option key={m.key} value={m.key}>{m.label} ({countLabel(data[m.key])})</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap border-b border-black/5 gap-4 sm:gap-8">
-        <button 
-          onClick={() => setActiveTab("products")}
-          className={`pb-3 sm:pb-4 text-[11px] font-bold uppercase tracking-widest transition-all relative ${activeTab === 'products' ? 'text-black font-black' : 'text-black/30 hover:text-black/60'}`}
-        >
-          Products ({products.length})
-          {activeTab === 'products' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500" />}
-        </button>
-        <button 
-          onClick={() => setActiveTab("categories")}
-          className={`pb-3 sm:pb-4 text-[11px] font-bold uppercase tracking-widest transition-all relative ${activeTab === 'categories' ? 'text-black font-black' : 'text-black/30 hover:text-black/60'}`}
-        >
-          Categories ({categories.length})
-          {activeTab === 'categories' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500" />}
-        </button>
-        <button 
-          onClick={() => setActiveTab("blogs")}
-          className={`pb-3 sm:pb-4 text-[11px] font-bold uppercase tracking-widest transition-all relative ${activeTab === 'blogs' ? 'text-black font-black' : 'text-black/30 hover:text-black/60'}`}
-        >
-          Blogs ({blogs.length})
-          {activeTab === 'blogs' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500" />}
-        </button>
+      {/* Desktop: WP status links, one wrapping row per group. */}
+      <div className="trash-tabs-lg" role="tablist" aria-label="Trash by section">
+        {groups.map((g) => (
+          <div key={g.key} className="trash-group">
+            <span className="trash-group-label">{g.label}</span>
+            <div className="wp-subsub">
+              {g.modules.map((m, i) => {
+                const isCur = m.key === current.key;
+                const n = countLabel(data[m.key]);
+                return (
+                  <span key={m.key} style={{ display: "inline-flex", alignItems: "center" }}>
+                    {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={isCur}
+                      className={[isCur ? "is-current" : "", n === 0 && !isCur ? "trash-empty" : ""].filter(Boolean).join(" ") || undefined}
+                      onClick={() => selectTab(m.key)}
+                    >
+                      {m.label} <span className="wp-count">({n})</span>
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
-      {loading ? (
-        <div className="bg-white rounded-[24px] sm:rounded-[40px] border border-black/5 shadow-sm p-10 sm:p-20 text-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-black/20 mx-auto" />
-          <p className="text-[11px] font-bold uppercase tracking-widest text-black/30 mt-4">Retrieving deleted items...</p>
-        </div>
-      ) : activeItemsCount === 0 ? (
-        <div className="bg-white rounded-[24px] sm:rounded-[40px] border border-black/5 shadow-sm p-10 sm:p-20 text-center space-y-6">
-          <div className="w-16 h-16 bg-gray-50 border border-black/5 text-black/30 rounded-full flex items-center justify-center mx-auto">
-            <Trash2 className="w-6 h-6" />
-          </div>
-          <div className="max-w-md mx-auto space-y-2">
-            <h2 className="text-[13px] font-bold uppercase tracking-[0.2em]">Trash is empty</h2>
-            <p className="text-[10px] text-black/30 font-bold uppercase tracking-wide leading-relaxed">No soft-deleted {activeTab} exist in the database.</p>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white rounded-[20px] sm:rounded-[32px] border border-black/5 shadow-sm overflow-x-auto max-w-full">
-          <table className="w-full text-left border-collapse min-w-[650px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-black/5 text-[9px] font-black uppercase tracking-widest text-black/40">
-                <th className="px-6 py-4">Resource Info</th>
-                {activeTab === "products" && <th className="px-6 py-4">SKU / Code</th>}
-                {activeTab === "products" && <th className="px-6 py-4">Price</th>}
-                {activeTab === "categories" && <th className="px-6 py-4">Type</th>}
-                <th className="px-6 py-4 text-right">Actions</th>
+      {entry?.status === "error" && (
+        <Notice type="error">Couldn&apos;t load trashed {current.label.toLowerCase()}: {entry.error}</Notice>
+      )}
+
+      <div className="wp-toolbar">
+        {showChecks && (
+          <>
+            <label htmlFor="trash-bulk" className="sr-only">Select bulk action</label>
+            <select id="trash-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} disabled={busy}>
+              <option value="">Bulk actions</option>
+              {bulkOptions.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <button type="button" className="wp-btn" onClick={applyBulk} disabled={busy}>{busy ? "Working…" : "Apply"}</button>
+          </>
+        )}
+        {mayDelete && (
+          <button
+            type="button"
+            className="wp-btn"
+            onClick={emptyTrash}
+            disabled={busy || loading || items.length === 0}
+            style={items.length && !busy ? { borderColor: "#b32d2e", color: "#b32d2e" } : undefined}
+          >
+            Empty trash
+          </button>
+        )}
+        <span className="wp-spacer" />
+        <form className="wp-search" role="search" onSubmit={(e) => { e.preventDefault(); setTerm(searchInput.trim()); }}>
+          <label htmlFor="trash-search" className="sr-only">Search {current.label}</label>
+          <input id="trash-search" type="search" className="wp-input" placeholder={`Search trashed ${current.label.toLowerCase()}`} value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+          <button type="submit" className="wp-btn">Search</button>
+        </form>
+      </div>
+
+      <div className="wp-toolbar">
+        <span className="wp-muted">{filtered.length} item{filtered.length === 1 ? "" : "s"}{selected.length ? ` · ${selected.length} selected` : ""}</span>
+        <span className="wp-spacer" />
+        {pager}
+      </div>
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{header}</thead>
+          <tbody>
+            {loading ? (
+              [0, 1, 2].map((i) => (
+                <tr key={i}><td colSpan={colCount}><Skeleton height={18} width={i === 1 ? "60%" : "80%"} /></td></tr>
+              ))
+            ) : slice.length === 0 ? (
+              <tr>
+                <td colSpan={colCount} className="wp-muted">
+                  {term ? `No trashed ${current.label.toLowerCase()} match “${term}”.` : `No ${current.label.toLowerCase()} in the Trash.`}
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-black/5 text-xs">
-              {activeTab === "products" && products.map(p => (
-                <tr key={p._id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-12 bg-gray-100 rounded-lg overflow-hidden border border-black/5 shrink-0">
-                        {p.images?.[0] && <img src={p.images[0]} className="w-full h-full object-cover" />}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-black text-[13px]">{p.name}</h4>
-                        <p className="text-[9px] text-black/30 uppercase tracking-widest font-mono mt-1">ID: {p._id}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 font-mono text-[11px] text-black/50">{p.sku || "—"}</td>
-                  <td className="px-6 py-5 font-bold">${p.price?.toFixed(2)}</td>
-                  <td className="px-6 py-5 text-right space-x-2">
-                    <button onClick={() => handleRestore("product", p._id)} className="bg-black text-white hover:bg-black/80 px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Restore
-                    </button>
-                    <button onClick={() => openConfirmModal("product", p._id, p.name)} className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Delete Permanently
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              
-              {activeTab === "categories" && categories.map(c => (
-                <tr key={c._id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-5">
-                    <div>
-                      <h4 className="font-bold text-black text-[13px]">{c.name}</h4>
-                      <p className="text-[10px] text-black/40 mt-0.5">slug: {c.slug}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 font-bold uppercase tracking-widest text-[9px] text-black/40">{c.type || "product"}</td>
-                  <td className="px-6 py-5 text-right space-x-2">
-                    <button onClick={() => handleRestore("category", c._id)} className="bg-black text-white hover:bg-black/80 px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Restore
-                    </button>
-                    <button onClick={() => openConfirmModal("category", c._id, c.name)} className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Delete Permanently
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {activeTab === "blogs" && blogs.map(b => (
-                <tr key={b._id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-4">
-                      {b.image && (
-                        <div className="w-12 h-10 bg-gray-100 rounded-lg overflow-hidden border border-black/5 shrink-0">
-                          <img src={b.image} className="w-full h-full object-cover" />
+            ) : (
+              slice.map((it) => {
+                const reason = blockReason(it);
+                const rowDisabled = busy || rowBusy === it.id;
+                return (
+                  <tr key={it.id} className={selected.includes(it.id) ? "is-selected" : undefined}>
+                    {showChecks && (
+                      <td className="wp-check-col">
+                        <input type="checkbox" aria-label={`Select ${it.title}`} checked={selected.includes(it.id)} onChange={() => toggleOne(it.id)} disabled={busy} />
+                      </td>
+                    )}
+                    <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        {hasThumbs && (
+                          <div className="wp-thumb" aria-hidden="true">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {it.thumb ? <img src={it.thumb} alt="" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} /> : (it.title || "?").charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <span className="wp-row-title">{it.title}</span>
+                          {it.subtitle && <div className="wp-muted wp-small">{it.subtitle}</div>}
+                          <div className="wp-mobile-meta">
+                            {[it.details, it.trashedAt && `Trashed ${formatDate(it.trashedAt)}`].filter(Boolean).join(" · ")}
+                          </div>
+                          {(mayRestore || mayDelete) && (
+                            <div className="wp-row-actions">
+                              {mayRestore && (
+                                <span><button type="button" onClick={() => restoreOne(it)} disabled={rowDisabled}>Restore</button></span>
+                              )}
+                              {mayDelete && (
+                                reason ? (
+                                  <span className="is-muted" title={reason}>Delete permanently</span>
+                                ) : (
+                                  <span><button type="button" className="is-danger" onClick={() => deleteOne(it)} disabled={rowDisabled}>Delete permanently</button></span>
+                                )
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div>
-                        <h4 className="font-bold text-black text-[13px]">{b.title}</h4>
-                        <p className="text-[10px] text-black/40 mt-0.5">Author: {b.author || "Pairo Studio"}</p>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 text-right space-x-2">
-                    <button onClick={() => handleRestore("blog", b._id)} className="bg-black text-white hover:bg-black/80 px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Restore
-                    </button>
-                    <button onClick={() => openConfirmModal("blog", b._id, b.title)} className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Delete Permanently
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Safety Alert */}
-      <div className="bg-red-50 border border-red-100 p-6 rounded-[24px] flex items-start gap-4">
-        <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <h4 className="text-[11px] font-bold uppercase tracking-widest text-red-900">Safety Notice</h4>
-          <p className="text-[10px] text-red-700/60 uppercase leading-relaxed font-bold tracking-tight">
-            Permanent purging removes documents from collections and cleans references across products, categories, blogs, and media usage indexes. This action is final and cannot be undone.
-          </p>
-        </div>
+                    </td>
+                    <td className="wp-hide-sm">{it.details || <span className="wp-muted">—</span>}</td>
+                    {hasDates && <td className="wp-hide-sm wp-muted">{it.trashedAt ? formatDate(it.trashedAt) : "—"}</td>}
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+          <tfoot>{header}</tfoot>
+        </table>
       </div>
 
-      {/* Confirmation Modal */}
-      {confirmModal.open && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[999] p-2 sm:p-4">
-          <div className="bg-white rounded-[20px] sm:rounded-[32px] max-w-md w-full border border-black/5 shadow-2xl p-4 sm:p-8 space-y-4 sm:space-y-6">
-            <div className="flex items-center justify-between border-b border-black/5 pb-3 sm:pb-4">
-              <div className="flex items-center gap-2.5 text-red-500">
-                <AlertTriangle className="w-5 h-5" />
-                <h3 className="text-[12px] font-black uppercase tracking-widest">Confirm Purge</h3>
-              </div>
-              <button onClick={() => setConfirmModal({ open: false, type: "", id: null, name: "" })} className="p-1 text-black/30 hover:text-black">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              <p className="text-[11px] text-black/50 font-bold uppercase tracking-wider">Are you sure you want to permanently delete this {confirmModal.type}?</p>
-              <p className="text-sm font-black text-black bg-gray-50 border border-black/[0.03] p-3 sm:p-4 rounded-xl font-mono truncate">{confirmModal.name}</p>
-              <p className="text-[10px] text-red-500 font-bold uppercase tracking-wide leading-relaxed">
-                * All references, media links, and relations will be severed. This operation is IRREVERSIBLE.
-              </p>
-            </div>
-
-            <div className="flex flex-col xs:flex-row gap-2 sm:gap-3 pt-2">
-              <button 
-                onClick={() => setConfirmModal({ open: false, type: "", id: null, name: "" })}
-                disabled={processing}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-3 sm:py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handlePermanentDelete}
-                disabled={processing}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 sm:py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-              >
-                {processing ? "Purging..." : "Purge Document"}
-              </button>
-            </div>
-          </div>
+      {pages > 1 && (
+        <div className="wp-toolbar">
+          <span className="wp-spacer" />
+          {pager}
         </div>
       )}
-    </div>
+
+      <div style={{ marginTop: 16 }}>
+        <Notice type="warning">
+          <strong>Deleting permanently</strong> removes the item and cleans up its references. This cannot be undone.
+          {" "}{current.label} in the Trash are also listed in the Trash view of{" "}
+          <Link href={current.href || "/admin/products"} className="wp-link">{current.href ? `the ${current.label} screen` : "their own screen"}</Link>.
+        </Notice>
+      </div>
+    </Page>
   );
 }

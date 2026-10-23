@@ -18,6 +18,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import * as LucideIcons from "lucide-react";
+import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange, normalizePageSlug } from "@/components/admin/slugChange";
 import dynamic from "next/dynamic";
 
 const QuillEditor = dynamic(() => import("@/components/admin/QuillEditor"), { ssr: false });
@@ -31,6 +33,8 @@ import {
   Plus, 
   Save, 
   ArrowLeft, 
+  ArrowUp,
+  ArrowDown,
   Settings, 
   Globe, 
   GripVertical,
@@ -42,7 +46,8 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  LayoutGrid
+  LayoutGrid,
+  X
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { SECTION_SCHEMAS } from "@/lib/section-schemas";
@@ -92,22 +97,21 @@ const IconPicker = ({ value, onChange }) => {
   }, [search, allIconNames]);
 
   return (
-    <div className="flex flex-col gap-2 border border-[#ccd0d4] bg-[#f6f7f7] p-2 rounded-sm">
-      <div className="flex items-center gap-3 p-2 bg-white border border-[#ccd0d4] rounded-sm">
-        <div className="w-10 h-10 bg-gray-50 border border-gray-100 flex items-center justify-center text-[#2271b1]">
-          <Icon className="w-6 h-6" />
+    <div className="flex flex-col gap-2 border border-[#dcdcde] bg-[#f6f7f7] p-2">
+      <div className="flex items-center gap-2">
+        <div className="w-10 h-10 shrink-0 bg-white border border-[#dcdcde] flex items-center justify-center text-[#2271b1]" title={value || "No icon selected"}>
+          <Icon className="w-5 h-5" aria-hidden="true" />
         </div>
-        <div className="flex-1">
-          <input 
-            type="text" 
-            placeholder="Search icons..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-[13px] border-none p-0 focus:ring-0 placeholder:text-[#646970] font-medium"
-          />
-        </div>
+        <input
+          type="search"
+          aria-label="Search icons"
+          placeholder="Search icons..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="wp-input flex-1 min-w-0"
+        />
       </div>
-      <div className="grid grid-cols-5 xs:grid-cols-6 sm:grid-cols-7 gap-1 p-1 max-h-[140px] overflow-y-auto bg-white border border-[#ccd0d4]">
+      <div className="grid grid-cols-6 sm:grid-cols-7 gap-1 p-1 max-h-[160px] overflow-y-auto bg-white border border-[#dcdcde]">
         {filteredIcons.map(iconName => {
           const ItemIcon = LucideIcons[iconName];
           if (!ItemIcon) return null;
@@ -116,9 +120,12 @@ const IconPicker = ({ value, onChange }) => {
               key={iconName}
               type="button"
               onClick={() => onChange(iconName)}
-              className={`p-2 flex items-center justify-center rounded-sm transition-all ${value === iconName ? 'bg-[#2271b1] text-white' : 'bg-white hover:bg-gray-100 text-[#646970]'}`}
+              aria-label={iconName}
+              aria-pressed={value === iconName}
+              title={iconName}
+              className={`min-h-[40px] flex items-center justify-center ${value === iconName ? 'bg-[#2271b1] text-white' : 'bg-white hover:bg-[#f0f0f1] text-[#3c434a]'}`}
             >
-              <ItemIcon className="w-4 h-4" />
+              <ItemIcon className="w-4 h-4" aria-hidden="true" />
             </button>
           );
         })}
@@ -135,6 +142,9 @@ const SortableSection = ({
   onUpdate,
   onDelete,
   onDuplicate,
+  onMove,
+  isFirst,
+  isLast,
   onOpenMediaPicker,
   renderField
 }) => {
@@ -150,37 +160,43 @@ const SortableSection = ({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={`bg-white border border-[#ccd0d4] mb-2 shadow-sm ${!section.enabled ? 'opacity-60' : ''}`}>
-      <div className="px-2 sm:px-3 py-2 border-b border-[#ccd0d4] flex items-center justify-between gap-2 bg-[#f6f7f7] hover:bg-white transition-colors">
-        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-[#646970] hover:text-[#2271b1] shrink-0">
-            <GripVertical className="w-4 h-4" />
+    <div ref={setNodeRef} style={style} className={`bg-white border border-[#c3c4c7] mb-2 ${!section.enabled ? 'opacity-60' : ''}`}>
+      <div className={`flex flex-wrap items-center justify-between gap-x-1 px-1 sm:px-2 bg-white ${isExpanded ? 'border-b border-[#dcdcde]' : ''}`}>
+        <div className="flex items-center gap-1 flex-1 min-w-[150px]">
+          <div {...attributes} {...listeners} style={{ touchAction: "none" }} aria-label={`Drag to reorder ${schema.name} section`} className="cursor-grab active:cursor-grabbing min-w-[36px] min-h-[40px] flex items-center justify-center text-[#8c8f94] hover:text-[#2271b1] shrink-0" title="Drag to reorder">
+            <GripVertical className="w-4 h-4" aria-hidden="true" />
           </div>
-          <div className="flex flex-wrap items-center gap-2 select-none min-w-0" onClick={() => onToggleExpand(section.id)}>
-            <h3 className="text-[13px] font-bold text-[#1d2327] break-words min-w-0">{schema.name}</h3>
-            {!section.enabled && <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded uppercase font-black tracking-tighter">Hidden</span>}
+          <div className="flex flex-wrap items-center gap-2 select-none cursor-pointer min-w-0 py-2" onClick={() => onToggleExpand(section.id)}>
+            <h3 className="text-[14px] font-semibold text-[#1d2327] break-words min-w-0 m-0">{schema.name}</h3>
+            {!section.enabled && <span className="wp-pill wp-pill-sm wp-st-draft">Hidden</span>}
           </div>
         </div>
 
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-           <button onClick={() => onUpdate(section.id, null, !section.enabled)} className={`p-1.5 rounded hover:bg-gray-100 ${section.enabled ? 'text-green-600' : 'text-gray-400'}`} title={section.enabled ? "Disable" : "Enable"}>
-              {section.enabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+        <div className="flex items-center shrink-0 ml-auto">
+           <button type="button" onClick={() => onMove(section.id, -1)} disabled={isFirst} className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#646970] disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent" title="Move up" aria-label={`Move ${schema.name} section up`}>
+              <ArrowUp className="w-4 h-4" aria-hidden="true" />
            </button>
-           <button onClick={() => onDuplicate(section)} className="p-1.5 rounded hover:bg-gray-100 text-[#2271b1]" title="Duplicate">
-              <Copy className="w-4 h-4" />
+           <button type="button" onClick={() => onMove(section.id, 1)} disabled={isLast} className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#646970] disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent" title="Move down" aria-label={`Move ${schema.name} section down`}>
+              <ArrowDown className="w-4 h-4" aria-hidden="true" />
            </button>
-           <button onClick={() => onDelete(section.id)} className="p-1.5 rounded hover:bg-red-50 text-[#d63638]" title="Remove">
-              <Trash2 className="w-4 h-4" />
+           <button type="button" onClick={() => onUpdate(section.id, null, !section.enabled)} className={`min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] ${section.enabled ? 'text-[#00a32a]' : 'text-[#8c8f94]'}`} title={section.enabled ? "Disable" : "Enable"} aria-label={section.enabled ? `Hide ${schema.name} section` : `Show ${schema.name} section`}>
+              {section.enabled ? <Eye className="w-4 h-4" aria-hidden="true" /> : <EyeOff className="w-4 h-4" aria-hidden="true" />}
            </button>
-           <button onClick={() => onToggleExpand(section.id)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500">
-              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+           <button type="button" onClick={() => onDuplicate(section)} className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#2271b1]" title="Duplicate" aria-label={`Duplicate ${schema.name} section`}>
+              <Copy className="w-4 h-4" aria-hidden="true" />
+           </button>
+           <button type="button" onClick={() => onDelete(section.id)} className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#fcf0f1] text-[#d63638]" title="Remove" aria-label={`Remove ${schema.name} section`}>
+              <Trash2 className="w-4 h-4" aria-hidden="true" />
+           </button>
+           <button type="button" onClick={() => onToggleExpand(section.id)} className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#646970]" aria-expanded={!!isExpanded} aria-label={isExpanded ? `Collapse ${schema.name} section` : `Expand ${schema.name} section`}>
+              {isExpanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
            </button>
         </div>
       </div>
 
       {isExpanded && (
-        <div className="p-3 sm:p-4 bg-white border-t border-[#f0f0f1]">
-          <div className="grid grid-cols-1 gap-4 sm:gap-6">
+        <div className="p-3 sm:p-4 bg-white">
+          <div>
             {schema.fields.filter(field => {
               // New showWhen system
               if (field.showWhen) {
@@ -195,15 +211,15 @@ const SortableSection = ({
               }
               return true;
             }).map((field) => (
-              <div key={field.name} className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-gray-500">{field.label}</label>
+              <div key={field.name} className="wp-field">
+                <label className="wp-label">{field.label}</label>
                 {renderField(field, config[field.name], (val) => onUpdate(section.id, { [field.name]: val }), onOpenMediaPicker)}
               </div>
             ))}
           </div>
-          <div className="mt-6 pt-3 border-t border-gray-100 flex flex-wrap justify-between items-center gap-x-3 gap-y-1 opacity-40">
-             <span className="text-[9px] font-mono tracking-tighter break-all">TYPE: {section.type}</span>
-             <span className="text-[9px] font-mono tracking-tighter uppercase break-all">ID: {section.id.slice(0, 8)}...</span>
+          <div className="mt-2 pt-2 border-t border-[#f0f0f1] flex flex-wrap justify-between items-center gap-x-3 gap-y-1 wp-muted wp-small">
+             <span className="break-all">Type: <code>{section.type}</code></span>
+             <span className="break-all">ID: <code>{section.id.slice(0, 8)}…</code></span>
           </div>
         </div>
       )}
@@ -212,6 +228,7 @@ const SortableSection = ({
 };
 
 export default function PageBuilder({ initialPage }) {
+  const { showConfirm } = usePopup();
   // Fill fields the page never stored with the section's built-in content so the admin can see and edit it.
   const [hydratedInitial] = useState(() => hydratePageDefaults(initialPage));
   const [page, setPage] = useState(hydratedInitial);
@@ -222,22 +239,24 @@ export default function PageBuilder({ initialPage }) {
   const [previewMode, setPreviewMode] = useState("desktop");
   const [mediaPicker, setMediaPicker] = useState({ open: false, onSelect: null });
   const [dynamicOptions, setDynamicOptions] = useState({ categories: [], products: [], blogs: [] });
+  // UI only: whether the "Add section" picker dialog is open.
+  const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
   
   // PRODUCTION TRACKING: Avoid redundant autosaves
   const lastSavedRef = useRef(JSON.stringify(hydratedInitial));
+  // Slug the page was loaded / last saved with. Autosave always sends this one, so a URL
+  // change only goes live through a manual save after the "Change URL?" confirm.
+  const savedSlugRef = useRef(hydratedInitial?.slug ?? null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("[PageBuilder] Fetching dynamic options...");
         const [catsRes, prodsRes, blogsRes] = await Promise.all([
           fetch("/api/admin/categories", { cache: "no-store" }),
           fetch("/api/admin/products", { cache: "no-store" }),
           fetch("/api/admin/blogs", { cache: "no-store" })
         ]);
-        console.log("[PageBuilder] Responses received status:", catsRes.status, prodsRes.status, blogsRes.status);
         const [cats, prods, blogs] = await Promise.all([catsRes.json(), prodsRes.json(), blogsRes.json()]);
-        console.log("[PageBuilder] Data parsed:", Array.isArray(cats) ? cats.length : typeof cats, Array.isArray(prods) ? prods.length : typeof prods, Array.isArray(blogs) ? blogs.length : typeof blogs);
         setDynamicOptions({
           categories: Array.isArray(cats) ? cats.map(c => ({ label: c.name, value: c._id })) : [],
           products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p._id })) : [],
@@ -248,9 +267,22 @@ export default function PageBuilder({ initialPage }) {
     fetchData();
   }, []);
 
-  const savePage = useCallback(async (data = page) => {
-    const currentDataStr = JSON.stringify(data);
-    if (currentDataStr === lastSavedRef.current) return; // SKIP: Already saved this state
+  // Manual saves toast "Page saved"; autosaves only update the quiet "Synced" indicator. Errors are always toasted.
+  const savePage = useCallback(async (data = page, { manual = false } = {}) => {
+    // Autosave never applies a slug edit: it keeps the saved slug in the payload
+    const payload = manual || savedSlugRef.current == null ? data : { ...data, slug: savedSlugRef.current };
+    const currentDataStr = JSON.stringify(payload);
+    if (currentDataStr === lastSavedRef.current) { // SKIP: Already saved this state
+      if (manual) toast.success("No changes to save", { id: 'save-toast' });
+      return;
+    }
+    // Manual save of a changed URL (system page slugs are locked): confirm first; cancel saves nothing
+    if (manual && !data.isSystem && !(await confirmSlugChange(showConfirm, {
+      savedSlug: savedSlugRef.current,
+      nextSlug: data.slug,
+      normalize: normalizePageSlug,
+      toPath: (slug) => `/${slug}`,
+    }))) return;
 
     setIsSaving(true);
     try {
@@ -261,22 +293,29 @@ export default function PageBuilder({ initialPage }) {
       });
       if (res.ok) {
         const savedData = await res.json();
-        setPage(savedData);
-        lastSavedRef.current = JSON.stringify(savedData);
-        setLastSaved(new Date());
-        toast.success("Changes Saved Automatically", { id: 'save-toast' });
+        const savedAt = new Date();
+        const nextPage = { ...savedData, updatedAt: savedData?.updatedAt || savedAt.toISOString() };
+        if (nextPage.slug) savedSlugRef.current = nextPage.slug;
+        // An autosave keeps the admin's unsaved slug edit in the form (it wasn't sent)
+        setPage(manual ? nextPage : (prev) => ({ ...nextPage, slug: prev?.slug ?? nextPage.slug }));
+        lastSavedRef.current = JSON.stringify(nextPage);
+        setLastSaved(savedAt);
+        if (manual) toast.success("Page saved", { id: 'save-toast' });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(`${manual ? "Save" : "Auto-save"} failed: ${errData.error || res.statusText || "Unknown error"}`, { id: 'save-toast' });
       }
     } catch (err) { 
-        toast.error("Auto-save sync failed. Check your connection."); 
+        toast.error(`${manual ? "Save" : "Auto-save"} failed. Check your connection.`, { id: 'save-toast' }); 
     } finally { 
         setIsSaving(false); 
     }
-  }, [page]);
+  }, [page, showConfirm]);
 
   // Optimized Debounced Auto-save
   useEffect(() => {
     const timer = setTimeout(() => {
-      savePage();
+      savePage(undefined, { manual: false });
     }, 4000); // 4s debounce for production stability
     return () => clearTimeout(timer);
   }, [page, savePage]);
@@ -299,13 +338,13 @@ export default function PageBuilder({ initialPage }) {
   };
 
   const renderField = (field, value, onChange, onOpenMediaPicker) => {
-    const inputClass = "w-full border border-[#8c8f94] px-2 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white transition-all rounded-sm";
+    const inputClass = "wp-input wp-full";
 
     switch (field.type) {
       case "text":
         return <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} />;
       case "textarea":
-        return <textarea rows={3} value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} resize-none`} />;
+        return <textarea rows={3} value={value || ""} onChange={(e) => onChange(e.target.value)} className="wp-textarea wp-full" />;
       case "number":
         return (
           <input
@@ -325,18 +364,18 @@ export default function PageBuilder({ initialPage }) {
       case "image":
         return (
           <div className="flex flex-col gap-2">
-            <div className="flex flex-col xs:flex-row gap-2">
-              <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} min-w-0`} placeholder="External URL or Pick Asset..." />
-              <button onClick={() => onOpenMediaPicker(onChange)} className="px-4 py-2 xs:py-0 w-full xs:w-auto bg-white border border-[#2271b1] text-[#2271b1] text-[11px] font-bold uppercase hover:bg-[#f0f6fa] shrink-0 rounded-sm">Pick Asset</button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className="wp-input flex-1 min-w-0" placeholder="Image URL" aria-label="Image URL" />
+              <button type="button" onClick={() => onOpenMediaPicker(onChange)} className="wp-btn shrink-0">Select Image</button>
             </div>
-            {value && <div className="w-full aspect-video border border-gray-100 rounded bg-gray-50 overflow-hidden"><img src={value} className="w-full h-full object-cover" /></div>}
+            {value && <div className="w-full aspect-video border border-[#dcdcde] bg-[#f6f7f7] overflow-hidden"><img src={value} alt="" className="w-full h-full object-cover" /></div>}
           </div>
         );
       case "icon":
         return <IconPicker value={value} onChange={onChange} />;
       case "select":
         return (
-          <select value={value || field.default || ""} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+          <select value={value || field.default || ""} onChange={(e) => onChange(e.target.value)} className="wp-select wp-full">
             <option value="">— Select —</option>
             {(field.options === 'categories' ? dynamicOptions.categories : 
               field.options === 'products' ? dynamicOptions.products :
@@ -349,15 +388,13 @@ export default function PageBuilder({ initialPage }) {
       case "multiselect":
         const selected = Array.isArray(value) ? value : [];
         const opts = field.options === 'categories' ? dynamicOptions.categories : field.options === 'products' ? dynamicOptions.products : field.options === 'blogs' ? dynamicOptions.blogs : field.options || [];
-        console.log("[PageBuilder] RENDER MULTISELECT:", field.name, "selected:", selected, "options count:", opts.length, "options:", opts);
         return (
-          <div className="flex flex-col gap-1 max-h-[160px] overflow-y-auto p-2 border border-[#8c8f94] bg-white rounded-sm">
-            {opts.length === 0 && <span className="text-[11px] text-gray-400 italic p-2">No options available</span>}
+          <div className="wp-checklist" style={{ maxHeight: 180, overflowY: "auto" }}>
+            {opts.length === 0 && <span className="wp-muted">No options available</span>}
             {opts.map(opt => (
-              <label key={opt.value} className="flex items-center gap-2 text-[13px] hover:bg-gray-50 px-2 py-1 cursor-pointer transition-colors rounded">
+              <label key={opt.value} className="wp-check">
                 <input
                   type="checkbox"
-                  className="rounded-sm border-gray-300 text-[#2271b1] focus:ring-[#2271b1]"
                   checked={selected.some(v => String(v) === String(opt.value))}
                   onChange={(e) => onChange(e.target.checked ? [...selected, opt.value] : selected.filter(v => String(v) !== String(opt.value)))}
                 />
@@ -369,24 +406,24 @@ export default function PageBuilder({ initialPage }) {
       case "repeater":
         const items = value || [];
         return (
-          <div className="space-y-3 bg-[#f0f0f1] p-3 border border-[#ccd0d4] rounded-sm">
+          <div className="flex flex-col gap-2 bg-[#f6f7f7] p-2 sm:p-3 border border-[#dcdcde]">
             {items.map((item, index) => (
-              <div key={index} className="bg-white border border-[#ccd0d4] p-3 relative shadow-sm rounded-sm">
-                <div className="flex items-center justify-between border-b border-[#f0f0f1] pb-2 mb-3">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">SUB-ITEM {index + 1}</span>
-                  <button onClick={() => { const n = [...items]; n.splice(index, 1); onChange(n); }} className="text-[#d63638] text-[10px] font-bold hover:underline">REMOVE</button>
+              <div key={index} className="bg-white border border-[#dcdcde]">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f0f0f1] px-3 py-1 bg-[#f6f7f7]">
+                  <span className="wp-strong">Item {index + 1}</span>
+                  <button type="button" onClick={() => { const n = [...items]; n.splice(index, 1); onChange(n); }} className="text-[#d63638] underline min-h-[32px]" style={{ background: "none", border: 0, cursor: "pointer" }}>Remove</button>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="p-3">
                   {field.fields.map(sf => (
-                    <div key={sf.name} className="space-y-1">
-                      <label className="text-[11px] font-bold text-gray-600">{sf.label}</label>
+                    <div key={sf.name} className="wp-field">
+                      <label className="wp-label">{sf.label}</label>
                       {renderField(sf, item[sf.name], (v) => { const n = [...items]; n[index] = { ...item, [sf.name]: v }; onChange(n); }, onOpenMediaPicker)}
                     </div>
                   ))}
                 </div>
               </div>
             ))}
-            <button onClick={() => onChange([...items, {}])} className="w-full py-2 bg-white border border-[#2271b1] text-[#2271b1] text-[10px] font-black uppercase tracking-widest hover:bg-[#2271b1] hover:text-white transition-all rounded-sm">+ Add Item</button>
+            <button type="button" onClick={() => onChange([...items, {}])} className="wp-btn self-start"><Plus className="w-4 h-4" aria-hidden="true" /> Add Item</button>
           </div>
         );
       case "quill":
@@ -412,194 +449,237 @@ export default function PageBuilder({ initialPage }) {
 
   const duplicateSection = (section) => {
     const id = generateId();
-    const newSec = { ...JSON.parse(JSON.stringify(section)), id, order: page.sections.length };
-    setPage(prev => ({ ...prev, sections: [...prev.sections, newSec] }));
+    // The copy goes right below the original.
+    setPage(prev => {
+      const at = prev.sections.findIndex(x => x.id === section.id);
+      const next = [...prev.sections];
+      next.splice(at + 1, 0, { ...JSON.parse(JSON.stringify(section)), id });
+      return { ...prev, sections: next.map((x, i) => ({ ...x, order: i })) };
+    });
     setExpandedSections(prev => ({ ...prev, [id]: true }));
     toast.success("Section duplicated");
   };
 
+  // Move a section one place up (-1) or down (+1); the touch-friendly alternative to dragging.
+  const moveSection = (id, dir) => {
+    setPage(prev => {
+      const from = prev.sections.findIndex(s => s.id === id);
+      const to = from + dir;
+      if (from < 0 || to < 0 || to >= prev.sections.length) return prev;
+      return { ...prev, sections: arrayMove(prev.sections, from, to).map((s, i) => ({ ...s, order: i })) };
+    });
+  };
+
   const toggleExpand = (id) => setExpandedSections(prev => ({ ...prev, [id]: !prev[id] }));
 
+  const availableSections = Object.entries(SECTION_SCHEMAS)
+    .filter(([type]) => {
+      const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
+      return !templateConfig || !templateConfig.allowedSections || templateConfig.allowedSections.includes(type);
+    });
+
   return (
-    <div className="min-h-screen bg-[#f0f0f1] text-[#1d2327] font-sans pb-40">
-      {/* ── Admin Bar ── */}
-      <div className="bg-[#1d2327] min-h-8 sm:h-8 flex flex-wrap sm:flex-nowrap items-center px-3 sm:px-4 py-1 sm:py-0 gap-x-3 gap-y-1 justify-between sticky top-0 z-[100]">
-        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <Link href="/admin/pages" className="text-[#c3c4c7] hover:text-[#72aee6] text-[11px] font-medium flex items-center gap-1.5 transition-colors shrink-0 whitespace-nowrap">
-            <ArrowLeft className="w-3 h-3" /> Back to List
-          </Link>
-          <div className="w-px h-3 bg-white/10 shrink-0" />
-          <span className="text-[#72aee6] text-[11px] font-bold uppercase tracking-wider truncate min-w-0">{page.title}</span>
+    <div className="min-h-screen bg-[#f0f0f1] text-[#1d2327] pb-10">
+      {/* ── Builder toolbar ── */}
+      <div className="bg-white border border-[#c3c4c7] sticky top-11 md:top-8 z-[90] flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 mb-4">
+        <Link href="/admin/pages" className="wp-btn shrink-0">
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to Pages
+        </Link>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[18px] font-normal text-[#1d2327] m-0 truncate" title={page.title}>
+            {page.title || "(no title)"}
+          </h1>
+          <p className="wp-muted wp-small m-0 flex items-center gap-1.5" role="status" aria-live="polite">
+            {isSaving ? <Clock className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="w-3.5 h-3.5 text-[#00a32a]" aria-hidden="true" />}
+            <span className="whitespace-nowrap">{isSaving ? "Syncing..." : `Synced: ${lastSaved.toLocaleTimeString()}`}</span>
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:gap-6 shrink-0">
-          <div className="flex items-center gap-2 text-[#c3c4c7]">
-             {isSaving ? <Clock className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3 text-green-500" />}
-             <span className="text-[10px] font-black uppercase tracking-tighter whitespace-nowrap">{isSaving ? "Syncing..." : `Synced: ${lastSaved.toLocaleTimeString()}`}</span>
-          </div>
-          <a href={`/${page.slug}`} target="_blank" className="text-[#c3c4c7] hover:text-[#72aee6] text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-white/10 px-2 py-0.5 rounded transition-all whitespace-nowrap">
-            <ExternalLink className="w-3 h-3" /> Live Page
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <a href={page.slug === 'home' ? '/' : `/${page.slug}`} target="_blank" rel="noopener noreferrer" className="wp-btn">
+            <ExternalLink className="w-4 h-4" aria-hidden="true" /> Live Page
           </a>
+          <button type="button" onClick={() => savePage(undefined, { manual: true })} disabled={isSaving} className="wp-btn wp-btn-primary">
+            <Save className="w-4 h-4" aria-hidden="true" /> {isSaving ? "Saving..." : "Save"}
+          </button>
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-2 sm:px-4 md:px-6 py-4 md:py-8">
-        <div className="flex flex-col lg:grid lg:grid-cols-[420px,1fr,300px] gap-4 md:gap-8">
+      <div className="flex flex-col xl:grid xl:grid-cols-[minmax(340px,400px)_minmax(0,1fr)_260px] gap-4 xl:gap-5 items-start min-w-0">
 
-          {/* ── LEFT COLUMN: ARCHITECTURAL EDITOR ── */}
-          <div className="flex flex-col gap-4 md:gap-6 min-w-0">
-             <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-sm">
-                <div className="px-4 py-2 border-b border-[#ccd0d4] bg-[#f6f7f7] font-black text-[10px] uppercase tracking-[0.2em] text-gray-500">Core Page Settings</div>
-                <div className="p-4 space-y-4">
-                   <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">Internal Name</label>
-                      <input type="text" value={page.title} onChange={(e) => setPage({ ...page, title: e.target.value })} className="w-full text-lg font-bold border-none p-0 focus:ring-0 placeholder:text-gray-200" placeholder="e.g., About Us Page" />
+          {/* ── LEFT COLUMN: EDITOR ── */}
+          <div className="flex flex-col gap-4 min-w-0 w-full">
+             <section className="wp-postbox" aria-labelledby="builder-settings-title" style={{ marginBottom: 0 }}>
+                <div className="wp-postbox-head"><h2 id="builder-settings-title">Page settings</h2></div>
+                <div className="wp-inside">
+                   <div className="wp-field">
+                      <label htmlFor="builder-title" className="wp-label">Internal name</label>
+                      <input id="builder-title" type="text" value={page.title} onChange={(e) => setPage({ ...page, title: e.target.value })} className="wp-input wp-full" placeholder="e.g., About Us Page" />
                    </div>
-                   <div className="flex flex-col xs:flex-row gap-2">
-                      <div className="flex-1 min-w-0 space-y-1">
-                         <label className="text-[10px] font-bold text-gray-400 uppercase">URL Slug</label>
-                         <div className="flex items-center border border-gray-300 rounded-sm bg-gray-50 px-2">
-                            <span className="text-gray-400 text-[11px]">/</span>
-                            <input type="text" value={page.slug} onChange={(e) => setPage({ ...page, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} className="w-full min-w-0 border-none bg-transparent py-1.5 text-[12px] font-medium focus:ring-0" />
+                   <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="wp-field flex-1 min-w-0" style={{ marginBottom: 0 }}>
+                         <label htmlFor="builder-slug" className="wp-label">URL slug</label>
+                         <div className="flex items-center gap-1">
+                            <span className="wp-muted" aria-hidden="true">/</span>
+                            <input id="builder-slug" type="text" value={page.slug} readOnly={!!page.isSystem} aria-describedby={page.isSystem ? "builder-slug-locked" : undefined} onChange={(e) => setPage({ ...page, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} className="wp-input flex-1 min-w-0" style={{ fontFamily: "monospace" }} />
                          </div>
+                         {page.isSystem && <p id="builder-slug-locked" className="wp-desc">System page: the slug is locked.</p>}
                       </div>
-                      <div className="w-full xs:w-24 space-y-1">
-                         <label className="text-[10px] font-bold text-gray-400 uppercase">Status</label>
-                         <select value={page.status} onChange={(e) => setPage({ ...page, status: e.target.value })} className="w-full border border-gray-300 py-1.5 text-[12px] font-bold rounded-sm focus:ring-0 cursor-pointer">
+                      <div className="wp-field sm:w-32" style={{ marginBottom: 0 }}>
+                         <label htmlFor="builder-status" className="wp-label">Status</label>
+                         <select id="builder-status" value={page.status} onChange={(e) => setPage({ ...page, status: e.target.value })} className="wp-select wp-full">
                             <option value="Draft">Draft</option>
                             <option value="Published">Published</option>
                          </select>
                       </div>
                    </div>
                 </div>
-             </div>
+             </section>
 
-             <div className="flex border border-[#ccd0d4] bg-white shadow-sm rounded-sm overflow-hidden">
-                <button onClick={() => setActiveTab("content")} className={`flex-1 min-w-0 px-1 py-3 text-[10px] font-black uppercase tracking-widest sm:tracking-[0.2em] border-b-2 transition-all ${activeTab === 'content' ? 'border-[#2271b1] text-[#2271b1] bg-white' : 'border-transparent text-gray-400 bg-[#f6f7f7]'}`}>Section Manager</button>
-                <button onClick={() => setActiveTab("seo")} className={`flex-1 min-w-0 px-1 py-3 text-[10px] font-black uppercase tracking-widest sm:tracking-[0.2em] border-b-2 transition-all ${activeTab === 'seo' ? 'border-[#2271b1] text-[#2271b1] bg-white' : 'border-transparent text-gray-400 bg-[#f6f7f7]'}`}>SEO & Social</button>
-             </div>
+             <div>
+               <div className="wp-tabs" role="tablist" aria-label="Builder panels" style={{ marginBottom: 12 }}>
+                  <button type="button" role="tab" id="builder-tab-content" aria-selected={activeTab === 'content'} aria-controls="builder-panel" onClick={() => setActiveTab("content")} className="wp-tab">Sections</button>
+                  <button type="button" role="tab" id="builder-tab-seo" aria-selected={activeTab === 'seo'} aria-controls="builder-panel" onClick={() => setActiveTab("seo")} className="wp-tab">SEO &amp; Social</button>
+               </div>
 
-             {activeTab === 'content' ? (
-                <div className="space-y-4">
-                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                      <SortableContext items={page.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                         <div className="space-y-2">
-                            {page.sections.length === 0 && (
-                               <div className="p-6 sm:p-12 border-2 border-dashed border-gray-200 rounded text-center space-y-2 bg-white">
-                                  <LayoutGrid className="w-8 h-8 text-gray-200 mx-auto" />
-                                  <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">No Sections Added Yet</p>
-                               </div>
-                            )}
-                            {page.sections.map((s) => (
-                               <SortableSection key={s.id} section={s} isExpanded={expandedSections[s.id]} onToggleExpand={toggleExpand} onUpdate={updateSection} onDelete={(id) => { if(confirm("Are you sure you want to remove this section? This cannot be undone.")) setPage(p => ({ ...p, sections: p.sections.filter(x => x.id !== id) })); }} onDuplicate={duplicateSection} onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })} renderField={renderField} />
-                            ))}
-                         </div>
-                      </SortableContext>
-                   </DndContext>
-                   <div className="bg-white border border-[#ccd0d4] p-4 rounded-sm shadow-sm">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-4 border-b border-gray-100 pb-2">Add Content Module</h4>
-                      <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                         {Object.entries(SECTION_SCHEMAS)
-                           .filter(([type]) => {
-                             const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
-                             return !templateConfig || !templateConfig.allowedSections || templateConfig.allowedSections.includes(type);
-                           })
-                           .map(([type, s]) => (
-                            <button key={type} onClick={() => addSection(type)} className="text-left px-3 py-2.5 bg-[#f6f7f7] border border-[#ccd0d4] text-[10px] font-bold uppercase tracking-wider hover:bg-white hover:border-[#2271b1] hover:text-[#2271b1] transition-all rounded-sm flex items-center gap-2 min-w-0"><Plus className="w-3 h-3 shrink-0" /> {s.name}</button>
-                         ))}
-                      </div>
-                   </div>
-                </div>
-             ) : (
-                <div className="space-y-4">
-                   <div className="bg-white border border-[#ccd0d4] p-4 space-y-6 rounded-sm shadow-sm">
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-black uppercase tracking-widest text-[#646970]">Meta Title</label>
-                         <input type="text" value={page.seo?.title || ""} onChange={(e) => setPage({ ...page, seo: { ...page.seo, title: e.target.value } })} className="w-full border border-[#ccd0d4] p-2 text-[13px] font-medium outline-none focus:border-[#2271b1]" placeholder="Recommended: 50-60 characters" />
-                      </div>
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-black uppercase tracking-widest text-[#646970]">Meta Description</label>
-                         <textarea value={page.seo?.description || ""} onChange={(e) => setPage({ ...page, seo: { ...page.seo, description: e.target.value } })} className="w-full border border-[#ccd0d4] p-2 text-[13px] resize-none outline-none focus:border-[#2271b1]" rows={4} placeholder="Recommended: 150-160 characters" />
-                      </div>
-                      <div className="space-y-2">
-                         <label className="text-[10px] font-black uppercase tracking-widest text-[#646970]">Open Graph Image</label>
-                         <div onClick={() => setMediaPicker({ open: true, onSelect: (url) => setPage({ ...page, seo: { ...page.seo, ogImage: url } }) })} className="aspect-video bg-[#f6f7f7] border-2 border-dashed border-[#ccd0d4] flex flex-col items-center justify-center cursor-pointer hover:bg-white transition-all overflow-hidden relative rounded-sm">
-                            {page.seo?.ogImage ? <img src={page.seo.ogImage} className="w-full h-full object-cover" /> : <span className="text-[10px] font-bold text-[#2271b1] uppercase tracking-widest">Select Preview Image</span>}
-                         </div>
-                      </div>
-                   </div>
-                </div>
-             )}
+               <div id="builder-panel" role="tabpanel" aria-labelledby={activeTab === 'content' ? "builder-tab-content" : "builder-tab-seo"}>
+               {activeTab === 'content' ? (
+                  <div className="flex flex-col gap-3">
+                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={page.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                           <div>
+                              {page.sections.length === 0 && (
+                                 <div className="wp-empty border border-dashed border-[#c3c4c7] bg-white p-6 text-center">
+                                    <LayoutGrid className="w-8 h-8 text-[#c3c4c7] mx-auto mb-2" aria-hidden="true" />
+                                    <p className="wp-muted m-0">No sections added yet.</p>
+                                 </div>
+                              )}
+                              {page.sections.map((s, idx) => (
+                                 <SortableSection key={s.id} section={s} isFirst={idx === 0} isLast={idx === page.sections.length - 1} onMove={moveSection} isExpanded={expandedSections[s.id]} onToggleExpand={toggleExpand} onUpdate={updateSection} onDelete={async (id) => { if (await showConfirm("Are you sure you want to remove this section? This cannot be undone.", "Remove section", { confirmText: "Remove", danger: true })) setPage(p => ({ ...p, sections: p.sections.filter(x => x.id !== id) })); }} onDuplicate={duplicateSection} onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })} renderField={renderField} />
+                              ))}
+                           </div>
+                        </SortableContext>
+                     </DndContext>
+                     <button type="button" onClick={() => setSectionPickerOpen(true)} className="wp-btn self-start" aria-haspopup="dialog">
+                        <Plus className="w-4 h-4" aria-hidden="true" /> Add section
+                     </button>
+                  </div>
+               ) : (
+                  <section className="wp-postbox" aria-label="SEO and social settings" style={{ marginBottom: 0 }}>
+                     <div className="wp-inside">
+                        <div className="wp-field">
+                           <label htmlFor="builder-seo-title" className="wp-label">Meta title</label>
+                           <input id="builder-seo-title" type="text" value={page.seo?.title || ""} onChange={(e) => setPage({ ...page, seo: { ...page.seo, title: e.target.value } })} className="wp-input wp-full" />
+                           <p className="wp-desc">Recommended: 50–60 characters.</p>
+                        </div>
+                        <div className="wp-field">
+                           <label htmlFor="builder-seo-desc" className="wp-label">Meta description</label>
+                           <textarea id="builder-seo-desc" value={page.seo?.description || ""} onChange={(e) => setPage({ ...page, seo: { ...page.seo, description: e.target.value } })} className="wp-textarea wp-full" rows={4} />
+                           <p className="wp-desc">Recommended: 150–160 characters.</p>
+                        </div>
+                        <div className="wp-field" style={{ marginBottom: 0 }}>
+                           <span className="wp-label" id="builder-og-label">Open Graph image</span>
+                           <button type="button" aria-labelledby="builder-og-label" onClick={() => setMediaPicker({ open: true, onSelect: (url) => setPage(prev => ({ ...prev, seo: { ...(prev.seo || {}), ogImage: url } })) })} className="w-full aspect-video bg-[#f6f7f7] border border-dashed border-[#c3c4c7] flex flex-col items-center justify-center cursor-pointer hover:border-[#2271b1] overflow-hidden relative p-0">
+                              {page.seo?.ogImage ? <img src={page.seo.ogImage} alt="" className="w-full h-full object-cover" /> : <span className="wp-link">Select preview image</span>}
+                           </button>
+                        </div>
+                     </div>
+                  </section>
+               )}
+               </div>
+             </div>
           </div>
 
-          {/* ── CENTER COLUMN: PRODUCTION PREVIEW ── */}
-          <div className="flex flex-col h-full min-w-0 bg-gray-200 border border-[#ccd0d4] overflow-hidden rounded-xl shadow-2xl relative min-h-[500px] lg:min-h-[800px]">
-             <div className="bg-white border-b border-[#ccd0d4] px-3 sm:px-5 py-2 sm:py-3.5 flex flex-wrap items-center justify-between gap-2 shrink-0 z-20">
-                <div className="flex items-center gap-4 min-w-0">
-                   <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[9px] uppercase font-black border border-green-200 whitespace-nowrap">
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shrink-0" />
-                      Production Sync Active
-                   </div>
-                </div>
-
-                <div className="flex items-center bg-[#f0f0f1] p-1 rounded-lg border border-[#ccd0d4] max-w-full">
+          {/* ── CENTER COLUMN: PREVIEW CANVAS ── */}
+          <div className="flex flex-col min-w-0 w-full bg-white border border-[#c3c4c7] overflow-hidden relative min-h-[500px] xl:min-h-[800px]">
+             <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 z-20">
+                <span className="wp-muted wp-small flex items-center gap-1.5">
+                   <span className="w-2 h-2 bg-[#00a32a] rounded-full shrink-0" aria-hidden="true" />
+                   Live preview
+                </span>
+                <div className="wp-seg" role="group" aria-label="Preview device">
                    {[ 
                        {id:'desktop', icon: Monitor, label: 'Desktop'}, 
                        {id:'tablet', icon: Tablet, label: 'Tablet'}, 
                        {id:'mobile', icon: Smartphone, label: 'Mobile'}
                    ].map(m => (
-                      <button key={m.id} onClick={() => setPreviewMode(m.id)} className={`flex items-center gap-2 px-3 py-1.5 rounded transition-all ${previewMode === m.id ? 'bg-white shadow-sm text-[#2271b1]' : 'text-gray-400 hover:text-black'}`}>
-                         <m.icon className="w-4 h-4 shrink-0" />
-                         <span className="hidden xs:inline text-[10px] font-bold uppercase tracking-tighter">{m.label}</span>
+                      <button key={m.id} type="button" onClick={() => setPreviewMode(m.id)} aria-pressed={previewMode === m.id} aria-label={m.label} className="flex items-center gap-1.5">
+                         <m.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                         <span className="hidden sm:inline">{m.label}</span>
                       </button>
                    ))}
                 </div>
              </div>
 
-             <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f0f0f1] p-2 sm:p-4 md:p-8 flex justify-center items-start scrollbar-hide">
-                <div className={`bg-white shadow-2xl transition-all duration-700 ease-[0.22, 1, 0.36, 1] origin-top max-w-full ${previewMode === 'desktop' ? 'w-full' : previewMode === 'tablet' ? 'w-[768px]' : 'w-[375px]'} min-h-full rounded-2xl overflow-hidden ring-1 ring-black/5`}>
+             <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f0f0f1] p-2 sm:p-4 flex justify-center items-start">
+                <div className={`bg-white transition-all duration-500 origin-top max-w-full ${previewMode === 'desktop' ? 'w-full' : previewMode === 'tablet' ? 'w-[768px]' : 'w-[375px]'} min-h-full border border-[#dcdcde] overflow-hidden`}>
                    <SectionRenderer sections={page.sections} />
                 </div>
              </div>
           </div>
 
-          {/* ── RIGHT COLUMN: SYSTEM METADATA ── */}
-          <div className="flex flex-col gap-4 min-w-0">
-             <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-sm">
-                <div className="px-3 py-2 border-b border-[#ccd0d4] bg-[#f6f7f7] font-black text-[10px] uppercase tracking-widest text-gray-500">Publication Information</div>
-                <div className="p-4 space-y-4">
-                   <div className="space-y-3">
-                      <div className="flex items-center justify-between text-[11px]">
-                         <span className="text-gray-400 font-medium">Auto-Save:</span>
-                         <span className="text-green-600 font-black">ENABLED</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                         <span className="text-gray-400 font-medium">Revisions:</span>
-                         <span className="text-gray-600 font-bold">14 Active</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                         <span className="text-gray-400 font-medium">Last Modified:</span>
-                         <span className="text-gray-600 font-bold">{new Date(page.updatedAt).toLocaleDateString()}</span>
-                      </div>
+          {/* ── RIGHT COLUMN: PUBLICATION INFO ── */}
+          <div className="flex flex-col gap-4 min-w-0 w-full">
+             <section className="wp-postbox" aria-labelledby="builder-pub-title" style={{ marginBottom: 0 }}>
+                <div className="wp-postbox-head"><h2 id="builder-pub-title">Publish</h2></div>
+                <div className="wp-misc">
+                   <div className="wp-misc-row">
+                      <span className="wp-muted">Auto-save:</span>
+                      <strong className="wp-strong" style={{ color: "#00a32a" }}>Enabled</strong>
                    </div>
-                   <button onClick={() => savePage()} disabled={isSaving} className="w-full bg-[#2271b1] text-white py-2.5 rounded-sm text-[11px] font-black uppercase tracking-[0.2em] hover:bg-[#135e96] shadow-[0_1px_0_#135e96] active:translate-y-px transition-all disabled:opacity-50">
-                      {isSaving ? "Syncing Logic..." : "Force Commit"}
-                   </button>
+                   <div className="wp-misc-row">
+                      <span className="wp-muted">Last modified:</span>
+                      <strong className="wp-strong">{page.updatedAt ? new Date(page.updatedAt).toLocaleString() : "—"}</strong>
+                   </div>
                 </div>
-             </div>
+             </section>
 
-             <div className="bg-orange-50 border border-orange-200 p-4 rounded-sm flex gap-3">
-                <AlertTriangle className="w-5 h-5 text-orange-400 shrink-0" />
-                <div className="space-y-1 min-w-0">
-                   <p className="text-[10px] font-black text-orange-800 uppercase tracking-widest">Enterprise Note</p>
-                   <p className="text-[11px] text-orange-700/80 leading-relaxed font-medium">Changes made in the builder are live in the preview but only affect the production site after status is set to <strong>PUBLISHED</strong>.</p>
-                </div>
+             <div className="wp-notice wp-notice-warning" style={{ margin: 0 }}>
+                <p>Changes made in the builder are live in the preview but only affect the production site after status is set to <strong>Published</strong>.</p>
              </div>
           </div>
-        </div>
       </div>
 
+      {/* ── Add section picker ── */}
+      {sectionPickerOpen && (
+        <div className="wp-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setSectionPickerOpen(false); }}>
+          <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="builder-add-section-title">
+            <div className="wp-modal-head">
+              <h2 id="builder-add-section-title">Add section</h2>
+              <button type="button" onClick={() => setSectionPickerOpen(false)} className="wp-notice-dismiss" aria-label="Close add section dialog"><X className="w-5 h-5" aria-hidden="true" /></button>
+            </div>
+            <div className="wp-modal-body">
+              {availableSections.length === 0 ? (
+                <p className="wp-muted m-0">No sections are available for this template.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {availableSections.map(([type, s]) => (
+                    <button key={type} type="button" onClick={() => { addSection(type); setSectionPickerOpen(false); }} className="wp-btn justify-start text-left" style={{ minHeight: 40 }}>
+                      <Plus className="w-4 h-4 shrink-0" aria-hidden="true" /> <span className="min-w-0 break-words">{s.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="wp-modal-foot">
+              <button type="button" onClick={() => setSectionPickerOpen(false)} className="wp-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {mediaPicker.open && (
-        <MediaPickerModal onClose={() => setMediaPicker({ open: false, onSelect: null })} onSelect={(url) => { mediaPicker.onSelect(url); setMediaPicker({ open: false, onSelect: null }); }} title="Enterprise Asset Library" />
+        <MediaPickerModal
+          open={mediaPicker.open}
+          onClose={() => setMediaPicker({ open: false, onSelect: null })}
+          onSelect={(item) => {
+            // The picker returns a media object (or an array when multiple); fields store its URL.
+            const media = Array.isArray(item) ? item[0] : item;
+            const url = typeof media === "string" ? media : media?.url;
+            if (url && mediaPicker.onSelect) mediaPicker.onSelect(url);
+            setMediaPicker({ open: false, onSelect: null });
+          }}
+          title="Enterprise Asset Library"
+        />
       )}
     </div>
   );

@@ -41,7 +41,8 @@ export async function POST(req) {
 
     const order = await Order.findOne({ 
       orderNumber: cleanOrderNumber, 
-      "customer.email": cleanEmail 
+      "customer.email": cleanEmail,
+      isDeleted: { $ne: true }
     });
 
     if (!order) {
@@ -86,7 +87,8 @@ export async function GET(req) {
 
     const order = await Order.findOne({ 
       orderNumber: cleanOrderNumber, 
-      "customer.email": cleanEmail 
+      "customer.email": cleanEmail,
+      isDeleted: { $ne: true }
     });
 
     if (!order) {

@@ -21,7 +21,7 @@ export async function generateMetadata({ searchParams }) {
   }
 
   await dbConnect();
-  const shopPage = await Page.findOne({ slug: "shop" }).lean();
+  const shopPage = await Page.findOne({ slug: "shop", isDeleted: { $ne: true } }).lean();
   const { metadata } = await resolveSEOMetadata({
     entity: shopPage || {},
     type: "page",
@@ -52,7 +52,7 @@ export default async function ShopPage({ searchParams }) {
   const { getProductsForShop } = await import("@/lib/products-server");
   const products = await getProductsForShop();
 
-  const shopPage = await Page.findOne({ slug: "shop" }).lean();
+  const shopPage = await Page.findOne({ slug: "shop", isDeleted: { $ne: true } }).lean();
   const { structuredData } = await resolveSEOMetadata({
     entity: shopPage || {},
     type: "shop",

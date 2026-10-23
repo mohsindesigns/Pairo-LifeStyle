@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { Search, X, Check, Package, CheckSquare, Square, ChevronRight } from "lucide-react";
+import React, { useState, useMemo, useId } from "react";
+import { X, Check, Package } from "lucide-react";
+import { formatMoney } from "@/components/admin/ui";
 
 export default function ProductSelector({
   selectedIds = [],
@@ -74,18 +75,23 @@ export default function ProductSelector({
     onChange(normalizedSelected.filter((id) => id !== sId));
   };
 
+  const uid = useId();
+  const headingId = `${uid}-products`;
+  const modalTitleId = `${uid}-modal-title`;
+  const searchId = `${uid}-search`;
+
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <label className="text-[13px] font-bold text-[#1d2327]">
-          Applicable Products (Optional)
-        </label>
+    <div role="group" aria-labelledby={headingId} className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2" style={{ marginBottom: 6 }}>
+        <span id={headingId} className="wp-strong">
+          Products
+        </span>
         <button
           type="button"
           onClick={openModal}
-          className="text-[12px] font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline flex items-center gap-1 cursor-pointer"
+          className="wp-btn"
         >
-          <Package className="w-3.5 h-3.5" />
+          <Package className="w-4 h-4" aria-hidden="true" />
           {normalizedSelected.length === 0
             ? "Choose Products"
             : `Manage Products (${normalizedSelected.length})`}
@@ -94,68 +100,66 @@ export default function ProductSelector({
 
       {/* Selected Products Chips Preview */}
       {normalizedSelected.length === 0 ? (
-        <div
+        <button
+          type="button"
           onClick={openModal}
-          className="border border-dashed border-[#ccd0d4] rounded-[3px] p-3 text-center bg-[#fafafa] hover:bg-[#f6f7f7] cursor-pointer transition-colors"
+          className="wp-muted w-full text-left"
+          style={{ border: "1px dashed #c3c4c7", background: "#fff", padding: "10px 12px", minHeight: 40, cursor: "pointer" }}
         >
-          <p className="text-[12px] text-[#646970]">
-            No products restricted. This coupon will apply to <strong>all products</strong> storewide.
-          </p>
-          <span className="inline-block mt-1 text-[11px] font-bold text-[#2271b1]">
-            + Click to restrict to specific products
-          </span>
-        </div>
+          No products restricted. This coupon will apply to <strong>all products</strong> storewide.{" "}
+          <span className="wp-link">Restrict to specific products</span>
+        </button>
       ) : (
-        <div className="space-y-2">
-          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-[#fafafa] border border-[#ccd0d4] rounded-[3px]">
+        <div>
+          <div className="flex flex-wrap gap-1.5 overflow-y-auto" style={{ maxHeight: 160, border: "1px solid #dcdcde", background: "#fff", padding: 8 }}>
             {normalizedSelected.map((id) => {
               const prod = productMap.get(id);
               const name = prod?.name || `Product ID: ${id.slice(-6)}`;
               const img = prod?.image || (prod?.images && prod.images[0]) || null;
-              const price = prod?.price !== undefined ? `$${Number(prod.price).toFixed(2)}` : "";
+              const price = prod?.price !== undefined ? formatMoney(Number(prod.price)) : "";
 
               return (
-                <span
-                  key={id}
-                  className="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-1 bg-white border border-[#c3c4c7] rounded-[3px] text-[11px] font-medium text-[#1d2327] shadow-xs"
-                >
+                <span key={id} className="wp-chip" style={{ maxWidth: "100%" }}>
                   {img ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={img}
                       alt=""
-                      className="w-4 h-4 rounded object-cover shrink-0"
+                      className="w-5 h-5 object-cover shrink-0"
+                      style={{ borderRadius: 2 }}
                     />
                   ) : (
-                    <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <Package className="w-4 h-4 shrink-0" aria-hidden="true" style={{ color: "#a7aaad" }} />
                   )}
-                  <span className="truncate max-w-[140px] sm:max-w-[200px]" title={name}>
+                  <span className="truncate max-w-[160px] sm:max-w-[220px]" title={name}>
                     {name}
                   </span>
-                  {price && <span className="text-gray-400 text-[10px]">{price}</span>}
+                  {price && <span className="wp-muted wp-small">{price}</span>}
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       removeSingle(id);
                     }}
-                    className="text-gray-400 hover:text-red-600 ml-0.5"
+                    aria-label={`Remove ${name}`}
                     title="Remove product"
+                    className="max-[782px]:min-h-8 max-[782px]:min-w-8 items-center justify-center"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-3.5 h-3.5" aria-hidden="true" />
                   </button>
                 </span>
               );
             })}
           </div>
-          <div className="flex items-center justify-between text-[11px] text-[#646970]">
-            <span>
+          <div className="flex flex-wrap items-center justify-between gap-2" style={{ marginTop: 6 }}>
+            <span className="wp-muted">
               {normalizedSelected.length} product{normalizedSelected.length === 1 ? "" : "s"} selected
             </span>
             <button
               type="button"
               onClick={() => onChange([])}
-              className="text-red-600 hover:text-red-800 hover:underline"
+              className="wp-link max-[782px]:min-h-10"
+              style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "#b32d2e" }}
             >
               Clear all products
             </button>
@@ -165,167 +169,166 @@ export default function ProductSelector({
 
       {/* ── Product Selection Modal ── */}
       {modalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs"
-        >
+        <div className="wp-modal-backdrop" style={{ zIndex: 99999 }}>
           <div
-            className="bg-white rounded-[4px] border border-[#c3c4c7] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={modalTitleId}
+            className="wp-modal flex flex-col"
+            style={{ maxWidth: 680 }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-[#f6f7f7] border-b border-[#ccd0d4]">
-              <div>
-                <h3 className="text-[14px] font-bold text-[#1d2327]">
-                  Select Products For Coupon
-                </h3>
-                <p className="text-[11px] text-[#646970]">
+            <div className="wp-modal-head" style={{ gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <h2 id={modalTitleId}>
+                  Select products for coupon
+                </h2>
+                <p className="wp-desc" style={{ marginTop: 2 }}>
                   Only the checked products will be eligible for this discount.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 p-1"
+                className="wp-notice-dismiss shrink-0 min-h-10 min-w-10 items-center justify-center"
                 aria-label="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
 
             {/* Modal Search & Batch Bar */}
-            <div className="p-3 border-b border-[#ccd0d4] bg-white space-y-2">
-              <div className="relative">
-                <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #dcdcde" }}>
+              <label htmlFor={searchId} className="sr-only">Search products by title or SKU</label>
+              <div className="flex gap-1.5">
                 <input
+                  id={searchId}
                   type="text"
                   placeholder="Search products by title or SKU..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-8 pr-8 py-1.5 text-[12px] border border-[#ccd0d4] rounded-[3px] outline-none focus:border-[#2271b1]"
+                  // Filtering is live; Enter must not submit the surrounding coupon form.
+                  onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+                  className="wp-input flex-1 min-w-0"
                   autoFocus
                 />
                 {search && (
                   <button
                     type="button"
                     onClick={() => setSearch("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="wp-btn"
+                    aria-label="Clear search"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-4 h-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
 
-              <div className="flex items-center justify-between text-[11px] pt-1">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2" style={{ marginTop: 8 }}>
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={selectAllFiltered}
-                    className="text-[#2271b1] hover:underline font-semibold flex items-center gap-1"
+                    className="wp-btn"
                   >
-                    <CheckSquare className="w-3 h-3" /> Select All ({filteredProducts.length})
+                    Select all ({filteredProducts.length})
                   </button>
                   <button
                     type="button"
                     onClick={clearAllFiltered}
-                    className="text-gray-500 hover:underline flex items-center gap-1"
+                    className="wp-btn"
                   >
-                    <Square className="w-3 h-3" /> Deselect All
+                    Deselect all
                   </button>
                 </div>
-                <span className="text-[#1d2327] font-bold">
+                <span className="wp-strong">
                   {localSelected.length} selected
                 </span>
               </div>
             </div>
 
             {/* Products List */}
-            <div className="flex-1 overflow-y-auto divide-y divide-[#f0f0f1] min-h-[260px] max-h-[420px]">
+            <div className="overflow-y-auto" style={{ minHeight: 160, maxHeight: "min(420px, 50dvh)" }}>
               {loading ? (
-                <div className="p-10 text-center text-xs text-gray-400 italic">
+                <p className="wp-muted" style={{ padding: 16, margin: 0 }}>
                   Loading product catalog...
-                </div>
+                </p>
               ) : filteredProducts.length === 0 ? (
-                <div className="p-10 text-center text-xs text-gray-500">
+                <p className="wp-muted" style={{ padding: 16, margin: 0 }}>
                   {search ? `No products match "${search}".` : "No products available in store."}
-                </div>
+                </p>
               ) : (
-                filteredProducts.map((p) => {
+                filteredProducts.map((p, idx) => {
                   const sId = String(p._id);
                   const isChecked = localSelected.includes(sId);
                   const img = p.image || (p.images && p.images[0]) || null;
 
                   return (
-                    <div
+                    <label
                       key={sId}
-                      onClick={() => toggleProduct(sId)}
-                      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-[#f6f7f7] cursor-pointer transition-colors ${
-                        isChecked ? "bg-[#f0f6fa]" : ""
-                      }`}
+                      className="flex items-center gap-3 cursor-pointer"
+                      style={{
+                        padding: "8px 16px",
+                        minHeight: 48,
+                        borderBottom: "1px solid #f0f0f1",
+                        background: isChecked ? "#f0f6fc" : idx % 2 ? "#f6f7f7" : "#fff",
+                      }}
                     >
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={() => {}} // Handled by parent div
-                        className="rounded-sm border-gray-300 text-[#2271b1] pointer-events-none"
+                        onChange={() => toggleProduct(sId)}
+                        style={{ width: 16, height: 16, margin: 0, accentColor: "#2271b1", flex: "none" }}
                       />
 
-                      <div className="w-9 h-9 rounded bg-[#f0f0f1] border border-[#ccd0d4] overflow-hidden shrink-0 flex items-center justify-center">
+                      <span className="wp-thumb" style={{ width: 36, height: 36 }}>
                         {img ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={img}
                             alt=""
-                            className="w-full h-full object-cover"
                           />
                         ) : (
-                          <Package className="w-4 h-4 text-gray-400" />
+                          <Package className="w-4 h-4" aria-hidden="true" style={{ color: "#a7aaad" }} />
                         )}
-                      </div>
+                      </span>
 
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-[#1d2327] truncate">
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate" style={{ color: "#2271b1", fontWeight: 600 }}>
                           {p.name}
-                        </p>
-                        <div className="flex items-center gap-2 text-[11px] text-[#646970]">
-                          {p.sku && <span>SKU: {p.sku}</span>}
-                          {p.sku && <span>•</span>}
-                          <span>${Number(p.price || 0).toFixed(2)}</span>
-                        </div>
-                      </div>
-
-                      {isChecked && (
-                        <span className="text-[11px] font-bold text-[#2271b1] px-2 py-0.5 bg-blue-50 border border-blue-200 rounded">
-                          Selected
                         </span>
-                      )}
-                    </div>
+                        <span className="block wp-muted wp-small">
+                          {p.sku && <>SKU: {p.sku} · </>}
+                          {formatMoney(Number(p.price || 0))}
+                        </span>
+                      </span>
+                    </label>
                   );
                 })
               )}
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between px-4 py-3 bg-[#f6f7f7] border-t border-[#ccd0d4]">
-              <span className="text-[12px] text-[#646970]">
+            <div className="wp-modal-foot flex-wrap items-center" style={{ justifyContent: "space-between" }}>
+              <span className="wp-muted">
                 {localSelected.length} product{localSelected.length === 1 ? "" : "s"} will be assigned
               </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="bg-[#f6f7f7] border border-[#ccd0d4] hover:bg-[#f0f0f1] text-[#2c3338] text-xs font-semibold px-3 py-1.5 rounded-[3px]"
+                  className="wp-btn"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleApply}
-                  className="bg-[#2271b1] border border-[#135e96] hover:bg-[#135e96] text-white text-xs font-semibold px-4 py-1.5 rounded-[3px] shadow-sm flex items-center gap-1.5"
+                  className="wp-btn wp-btn-primary"
                 >
-                  <Check className="w-3.5 h-3.5" />
-                  Apply Selection
+                  <Check className="w-4 h-4" aria-hidden="true" />
+                  Apply selection
                 </button>
               </div>
             </div>

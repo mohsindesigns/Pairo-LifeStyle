@@ -1,23 +1,33 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { 
-  Search, 
-  Eye, 
-  ChevronLeft, 
-  ChevronRight,
-  ExternalLink
-} from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
-import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { BADGE_COLORS, DEFAULT_BADGE_COLOR } from "@/lib/statusBadgeColors";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Page, PageHeader, Notice, Skeleton, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
+// "Completed" = Delivered (an order that reached its final, successful status).
+const STATUS_TABS = [
+  { value: "all", label: "All" },
+  { value: "Processing", label: "Processing" },
+  { value: "Delivered", label: "Completed" },
+  { value: "Cancelled", label: "Cancelled" },
+  { value: "affiliate", label: "Affiliate Orders" },
+  { value: "trash", label: "Trash" },
+];
+
+async function readError(res, fallback) {
+  try {
+    const data = await res.json();
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function AdminOrdersPage() {
-  const router = useRouter();
   const { showConfirm } = usePopup();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,97 +35,184 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [referralFilter, setReferralFilter] = useState("all");
   const [pagination, setPagination] = useState({ total: 0, pages: 1, currentPage: 1 });
-  
+  const [counts, setCounts] = useState(null);
+  const [loadError, setLoadError] = useState("");
+
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
+  const searchTimer = useRef(null);
+
+  const isTrash = statusFilter === "trash";
 
   const fetchOrders = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/orders?page=${page}&status=${statusFilter}&search=${search}`);
-      const data = await res.json();
-      if (data.success) {
-        setOrders(data.orders);
-        setPagination(data.pagination);
-      }
+      const params = new URLSearchParams({ page: String(page), search });
+      if (statusFilter === "trash") params.set("trash", "true");
+      else if (statusFilter === "affiliate") params.set("affiliateOnly", "true");
+      else params.set("status", statusFilter);
+      if (referralFilter !== "all") params.set("referral", referralFilter);
+
+      const res = await fetch(`/api/admin/orders?${params.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to load orders.");
+      setOrders(data.orders);
+      setSelectedIds([]); // selection only ever refers to the rows currently shown
+      setPagination(data.pagination);
+      setCounts(data.counts || null);
+      setLoadError("");
     } catch (error) {
       console.error(error);
+      setLoadError(error.message || "Failed to load orders.");
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, referralFilter]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    searchTimer.current = setTimeout(() => {
       fetchOrders(1);
     }, 500);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(searchTimer.current);
   }, [fetchOrders]);
 
-  const handleDelete = async (id) => {
-    const ok = await showConfirm("Are you sure you want to delete this order permanently?");
-    if (!ok) return;
-    const previousOrders = orders;
-    setOrders(prev => prev.filter(o => o._id !== id));
-    
-    const deletePromise = fetch(`/api/admin/orders?id=${id}`, { method: "DELETE" })
-      .then(async (res) => {
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to delete order.");
-        }
-        fetchOrders(pagination.currentPage);
-      });
+  const runSearchNow = (e) => {
+    e?.preventDefault();
+    clearTimeout(searchTimer.current);
+    fetchOrders(1);
+  };
 
-    toast.promise(deletePromise, {
-      loading: 'Deleting order...',
-      success: 'Order deleted successfully.',
-      error: (err) => {
-        setOrders(previousOrders);
-        return err.message || 'Failed to delete order.';
-      }
+  const reloadCurrentPage = () => {
+    // If the last item on a page was removed, step back a page.
+    const page = orders.length <= 1 && pagination.currentPage > 1 ? pagination.currentPage - 1 : pagination.currentPage;
+    fetchOrders(page);
+  };
+
+  // --- single-order requests (throw on failure) ---
+  const trashOrder = async (id) => {
+    const res = await fetch(`/api/admin/orders?id=${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to move order to trash."));
+  };
+
+  const deleteOrderPermanently = async (id) => {
+    const res = await fetch(`/api/admin/orders?id=${id}&permanent=true`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to delete order."));
+  };
+
+  const restoreOrder = async (id) => {
+    const res = await fetch("/api/admin/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, isDeleted: false }),
+    });
+    if (!res.ok) throw new Error(await readError(res, "Failed to restore order."));
+  };
+
+  // Server-side copy: keeps the original prices, no stock deduction, no emails or
+  // commissions; the copy is a Pending draft noted "Duplicated from #<n>".
+  const duplicateOrder = async (order) => {
+    const res = await fetch(`/api/admin/orders/${order._id}/duplicate`, { method: "POST" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to duplicate order."));
+  };
+
+  // --- row actions ---
+  const runRowAction = async (action, messages) => {
+    const p = action().then(() => reloadCurrentPage());
+    toast.promise(p, {
+      loading: messages.loading,
+      success: messages.success,
+      error: (err) => err.message || messages.error,
+    });
+    try { await p; } catch { /* surfaced via toast */ }
+  };
+
+  const handleTrash = (order) => runRowAction(() => trashOrder(order._id), {
+    loading: "Moving order to trash...",
+    success: `Order #${order.orderNumber} moved to the Trash.`,
+    error: "Failed to move order to trash.",
+  });
+
+  const handleRestore = (order) => runRowAction(() => restoreOrder(order._id), {
+    loading: "Restoring order...",
+    success: `Order #${order.orderNumber} restored.`,
+    error: "Failed to restore order.",
+  });
+
+  const handleDeletePermanently = async (order) => {
+    const ok = await showConfirm(
+      `Order #${order.orderNumber} will be deleted permanently. This cannot be undone.`,
+      "Delete permanently?",
+      { confirmText: "Delete Permanently", danger: true }
+    );
+    if (!ok) return;
+    runRowAction(() => deleteOrderPermanently(order._id), {
+      loading: "Deleting order...",
+      success: "Order deleted permanently.",
+      error: "Failed to delete order.",
     });
   };
 
+  const handleDuplicate = (order) => runRowAction(() => duplicateOrder(order), {
+    loading: "Duplicating order...",
+    success: `Order #${order.orderNumber} duplicated as a Pending draft.`,
+    error: "Failed to duplicate order.",
+  });
 
-  const handleDuplicate = async (order) => {
-    try {
-      const { _id, createdAt, updatedAt, orderNumber, ...rest } = order;
-      const copy = {
-        ...rest,
-        orderNumber: `COPY-${orderNumber || Math.floor(Math.random() * 1000)}`,
-        status: "Pending"
-      };
-      const res = await fetch("/api/admin/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(copy)
-      });
-      if (res.ok) fetchOrders(pagination.currentPage);
-    } catch (err) {
-      console.error("Duplicate failed:", err);
-    }
+  // --- bulk actions ---
+  const BULK_LABELS = {
+    Duplicate: { verb: "duplicated", run: (id) => duplicateOrder(orders.find(o => o._id === id)) },
+    "Move to Trash": { verb: "moved to the Trash", run: trashOrder },
+    Restore: { verb: "restored", run: restoreOrder },
+    "Delete Permanently": { verb: "deleted permanently", run: deleteOrderPermanently },
   };
 
   const handleBulkAction = async () => {
-     if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} orders?`);
-     if (ok) {
-        try {
-           for (const id of selectedIds) {
-              if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
-                  await fetch(`/api/admin/orders?id=${id}`, { method: "DELETE" });
-              } else if (bulkAction === "Duplicate") {
-                  const order = orders.find(o => o._id === id);
-                  if (order) await handleDuplicate(order);
-              }
-           }
-           setSelectedIds([]);
-           fetchOrders(pagination.currentPage);
-        } catch (err) {
-           console.error("Bulk action failed:", err);
-        }
-     }
+    const def = BULK_LABELS[bulkAction];
+    if (!def) {
+      toast.error("Choose a bulk action first.");
+      return;
+    }
+    if (selectedIds.length === 0) {
+      toast.error("Select at least one order.");
+      return;
+    }
+
+    const n = selectedIds.length;
+    const ok = bulkAction === "Delete Permanently"
+      ? await showConfirm(
+          `${n} order${n === 1 ? "" : "s"} will be deleted permanently. This cannot be undone.`,
+          "Delete permanently?",
+          { confirmText: "Delete Permanently", danger: true }
+        )
+      : await showConfirm(`Apply "${bulkAction}" to ${n} order${n === 1 ? "" : "s"}?`);
+    if (!ok) return;
+
+    let succeeded = 0;
+    const failures = [];
+    for (const id of selectedIds) {
+      const order = orders.find(o => o._id === id);
+      try {
+        if (!order) throw new Error("Order is no longer in the list.");
+        await def.run(id);
+        succeeded++;
+      } catch (err) {
+        failures.push(`#${order?.orderNumber || id}: ${err.message}`);
+      }
+    }
+
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    // Removing every row on the last page steps back one page.
+    const removesRows = bulkAction !== "Duplicate";
+    const page = removesRows && succeeded >= orders.length && pagination.currentPage > 1
+      ? pagination.currentPage - 1
+      : pagination.currentPage;
+    fetchOrders(page);
+
+    if (succeeded > 0) toast.success(`${succeeded} order${succeeded === 1 ? "" : "s"} ${def.verb}.`);
+    if (failures.length > 0) {
+      toast.error(`${failures.length} failed — ${failures.slice(0, 5).join("; ")}${failures.length > 5 ? "; …" : ""}`, { duration: 8000 });
+    }
   };
 
   const toggleSelect = (id) => {
@@ -127,192 +224,259 @@ export default function AdminOrdersPage() {
      else setSelectedIds(displayedOrders.map(o => o._id));
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      'Pending': BADGE_COLORS.amber,
-      'Confirmed': BADGE_COLORS.blue,
-      'Processing': BADGE_COLORS.gray,
-      'Shipped': BADGE_COLORS.green,
-      'Delivered': BADGE_COLORS.green,
-      'Cancelled': BADGE_COLORS.red,
-    };
-    return styles[status] || DEFAULT_BADGE_COLOR;
+  // Referral filtering happens server-side so the item count and pagination stay correct.
+  const displayedOrders = orders;
+
+  const PAYMENT_CLASS = {
+    Paid: "wp-st-paid",
+    Pending: "wp-st-unpaid",
+    Failed: "wp-st-failed",
+    Refunded: "wp-st-refunded",
+    "Partially Refunded": "wp-st-refunded",
   };
 
-  const displayedOrders = orders.filter(order => {
-    if (referralFilter === "referred") return !!order.affiliateReferralCode;
-    if (referralFilter === "non-referred") return !order.affiliateReferralCode;
-    return true;
-  });
+  const allSelected = selectedIds.length > 0 && selectedIds.length === displayedOrders.length;
+
+  const pager = (
+    <div className="wp-pages">
+      <span>{pagination.total} {pagination.total === 1 ? "item" : "items"}</span>
+      <button
+        type="button"
+        className="wp-pager"
+        aria-label="Previous page"
+        disabled={loading || pagination.currentPage <= 1}
+        onClick={() => fetchOrders(pagination.currentPage - 1)}
+      >
+        <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+      </button>
+      <span>{pagination.currentPage} of {pagination.pages}</span>
+      <button
+        type="button"
+        className="wp-pager"
+        aria-label="Next page"
+        disabled={loading || pagination.currentPage >= pagination.pages}
+        onClick={() => fetchOrders(pagination.currentPage + 1)}
+      >
+        <ChevronRight className="w-4 h-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+
+  const headRow = (
+    <tr>
+      <th scope="col" className="wp-check-col">
+        <input type="checkbox" aria-label="Select all orders" checked={allSelected} onChange={toggleSelectAll} />
+      </th>
+      <th scope="col">Order</th>
+      <th scope="col" className="wp-hide-sm">Date</th>
+      <th scope="col" className="wp-hide-sm">Status</th>
+      <th scope="col" className="wp-hide-sm">Ship to</th>
+      <th scope="col" className="wp-hide-sm">Payment</th>
+      <th scope="col" className="wp-num" style={{ textAlign: "right" }}>Total</th>
+    </tr>
+  );
 
   return (
     <RequirePermission permission="orders.view">
-    <AdminPageLayout
-      title="Orders"
-      addNewLink="/admin/orders/new"
-      addNewLabel="Add New"
-      breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Orders" }]}
-    >
-      <div className="space-y-4">
-        {/* View Tabs */}
-        <ul className="flex flex-wrap items-center gap-1.5 text-[13px] text-[#2271b1] select-none font-sans">
-          <li className={`${statusFilter === 'all' ? 'text-[#1d2327] font-semibold' : 'cursor-pointer hover:text-[#135e96]'}`} onClick={() => setStatusFilter('all')}>
-            All <span className="text-[#646970] font-normal">({statusFilter === 'all' ? pagination.total : '-'})</span>
-          </li>
-          <span className="text-[#c3c4c7] font-normal">|</span>
-          <li className={`${statusFilter === 'Processing' ? 'text-[#1d2327] font-semibold' : 'cursor-pointer hover:text-[#135e96]'}`} onClick={() => setStatusFilter('Processing')}>
-            Processing <span className="text-[#646970] font-normal">({statusFilter === 'Processing' ? pagination.total : '-'})</span>
-          </li>
-          <span className="text-[#c3c4c7] font-normal">|</span>
-          <li className={`${statusFilter === 'Completed' ? 'text-[#1d2327] font-semibold' : 'cursor-pointer hover:text-[#135e96]'}`} onClick={() => setStatusFilter('Completed')}>
-            Completed <span className="text-[#646970] font-normal">({statusFilter === 'Completed' ? pagination.total : '-'})</span>
-          </li>
-          <span className="text-[#c3c4c7] font-normal">|</span>
-          <li className={`${statusFilter === 'Cancelled' ? 'text-[#1d2327] font-semibold' : 'cursor-pointer hover:text-[#135e96]'}`} onClick={() => setStatusFilter('Cancelled')}>
-            Cancelled <span className="text-[#646970] font-normal">({statusFilter === 'Cancelled' ? pagination.total : '-'})</span>
-          </li>
-          <span className="text-[#c3c4c7] font-normal">|</span>
-          <li className={`${statusFilter === 'Affiliate' ? 'text-[#1d2327] font-semibold' : 'cursor-pointer hover:text-[#135e96]'}`} onClick={() => setStatusFilter('Affiliate')}>
-            Affiliate Orders <span className="text-[#646970] font-normal">({statusFilter === 'Affiliate' ? pagination.total : '-'})</span>
-          </li>
-        </ul>
+    <Page>
+      <PageHeader
+        title="Orders"
+        actions={<Link href="/admin/orders/new" className="wp-btn">Add New</Link>}
+      />
 
-        {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-2.5 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 shadow-sm font-sans">
-          <div className="flex flex-wrap items-center gap-1.5 xs:gap-2">
-            <select 
-              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
-              value={bulkAction} 
-              onChange={(e) => setBulkAction(e.target.value)}
+      <nav className="wp-subsub" aria-label="Filter orders by status">
+        {STATUS_TABS.map((tab, i) => (
+          <span key={tab.value}>
+            {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+            <button
+              type="button"
+              className={statusFilter === tab.value ? "is-current" : undefined}
+              aria-current={statusFilter === tab.value ? "page" : undefined}
+              onClick={() => { setStatusFilter(tab.value); setBulkAction("Bulk actions"); }}
             >
-              <option>Bulk actions</option>
+              {tab.label}{" "}
+              <span className="wp-count">({counts ? (counts[tab.value] ?? 0) : "-"})</span>
+            </button>
+          </span>
+        ))}
+      </nav>
+
+      <div className="wp-toolbar">
+        <label htmlFor="orders-bulk-action" className="sr-only">Bulk actions</label>
+        <select
+          id="orders-bulk-action"
+          className="wp-select"
+          value={bulkAction}
+          onChange={(e) => setBulkAction(e.target.value)}
+        >
+          <option>Bulk actions</option>
+          {isTrash ? (
+            <>
+              <option>Restore</option>
+              <option>Delete Permanently</option>
+            </>
+          ) : (
+            <>
               <option>Duplicate</option>
               <option>Move to Trash</option>
-              <option>Delete Permanently</option>
-            </select>
-            <button 
-              type="button"
-              onClick={handleBulkAction} 
-              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000]"
-            >
-              Apply
-            </button>
-            <select 
-              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
-              value={referralFilter} 
-              onChange={(e) => setReferralFilter(e.target.value)}
-            >
-              <option value="all">All referral states</option>
-              <option value="referred">Referred only</option>
-              <option value="non-referred">Non-referred</option>
-            </select>
-          </div>
-           
-          <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto min-w-0">
-            <input 
-              type="text" 
-              placeholder="Search orders..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 xs:py-1.5 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-56 bg-white focus:border-[#2271b1] rounded-[3px]"
-            />
-            <button 
-              type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer shrink-0 whitespace-nowrap"
-            >
-              Search <span className="hidden xs:inline">Orders</span>
-            </button>
-          </div>
-        </div>
+            </>
+          )}
+        </select>
+        <button type="button" onClick={handleBulkAction} className="wp-btn">
+          Apply
+        </button>
+        <label htmlFor="orders-referral-filter" className="sr-only">Filter by referral</label>
+        <select
+          id="orders-referral-filter"
+          className="wp-select"
+          value={referralFilter}
+          onChange={(e) => setReferralFilter(e.target.value)}
+        >
+          <option value="all">All referral states</option>
+          <option value="referred">Referred only</option>
+          <option value="non-referred">Non-referred</option>
+        </select>
+        <span className="wp-spacer" />
+        <form className="wp-search" role="search" onSubmit={runSearchNow}>
+          <label htmlFor="orders-search" className="sr-only">Search orders</label>
+          <input
+            id="orders-search"
+            type="search"
+            className="wp-input"
+            placeholder="Search orders..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <button type="submit" className="wp-btn">
+            Search Orders
+          </button>
+        </form>
+      </div>
 
-        {/* WP Data Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[480px] md:min-w-[800px] font-sans">
-            <thead>
-              <tr className="border-b border-[#ccd0d4] bg-[#f6f7f7] text-[#2c3539]">
-                <th className="px-3 py-2.5 w-9 text-center align-middle"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === displayedOrders.length} onChange={toggleSelectAll} className="rounded-[2px] border-gray-300" /></th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-auto">Order</th>
-                <th className="hidden md:table-cell px-3 py-2.5 font-bold text-[#1d2327] w-36">Date</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-32">Status</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-28">Total</th>
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pager}
+      </div>
+
+      {loadError && (
+        <Notice type="error" onDismiss={() => setLoadError("")}>
+          {loadError}{" "}
+          <button type="button" className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={() => fetchOrders(pagination.currentPage)}>
+            Try again
+          </button>
+        </Notice>
+      )}
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headRow}</thead>
+          <tbody>
+            {loading && displayedOrders.length === 0 ? (
+              [0, 1, 2, 3, 4].map((i) => (
+                <tr key={`sk-${i}`} aria-hidden="true">
+                  <td className="wp-check-col"><Skeleton height={16} width={16} /></td>
+                  <td><Skeleton height={16} width="70%" /><Skeleton height={12} width="40%" style={{ marginTop: 8 }} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width={80} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={22} width={84} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width="80%" /></td>
+                  <td className="wp-hide-sm"><Skeleton height={22} width={70} /></td>
+                  <td className="wp-num"><Skeleton height={14} width={64} style={{ marginLeft: "auto" }} /></td>
+                </tr>
+              ))
+            ) : displayedOrders.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="wp-muted">
+                  {search
+                    ? <>No orders match &ldquo;{search}&rdquo;.</>
+                    : isTrash
+                      ? "No orders in the Trash."
+                      : "No orders found."}
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1] text-[#2c3539]">
-              {loading ? (
-                <tr><td colSpan={5} className="p-8 text-center italic text-gray-400">Loading orders...</td></tr>
-              ) : displayedOrders.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center italic text-gray-400">No orders found.</td></tr>
-              ) : (
-                displayedOrders.map((order) => (
-                  <tr key={order._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(order._id) ? "bg-[#f0f6fa]" : ""}`}>
-                    <td className="px-3 py-3.5 text-center align-top pt-4"><input type="checkbox" checked={selectedIds.includes(order._id)} onChange={() => toggleSelect(order._id)} className="rounded-[2px] border-gray-300" /></td>
-                    <td className="px-3 py-3.5 align-top pt-4">
-                      <Link href={`/admin/orders/${order._id}`} className="text-[#2271b1] font-bold hover:text-[#135e96] text-[14px] block mb-0.5 leading-tight break-words">
-                        #{order.orderNumber} {order.shippingAddress?.fullName ? `by ${order.shippingAddress.fullName}` : (order.customer?.email ? `by ${order.customer.email}` : "by Guest")}
+            ) : (
+              displayedOrders.map((order) => {
+                const customerName = order.shippingAddress?.fullName || order.customer?.email || "Guest";
+                const itemCount = (order.items || []).reduce((n, item) => n + (Number(item.quantity) || 1), 0);
+                const paymentStatus = order.payment?.status;
+                const shipTo = [order.shippingAddress?.city, order.shippingAddress?.state, order.shippingAddress?.country]
+                  .filter(Boolean)
+                  .join(", ");
+                return (
+                  <tr key={order._id} className={selectedIds.includes(order._id) ? "is-selected" : undefined}>
+                    <td className="wp-check-col">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select order #${order.orderNumber}`}
+                        checked={selectedIds.includes(order._id)}
+                        onChange={() => toggleSelect(order._id)}
+                      />
+                    </td>
+                    <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                      <Link href={`/admin/orders/${order._id}`} className="wp-row-title">
+                        #{order.orderNumber} {customerName}
                       </Link>
-                      
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1 mb-1">
-                        {order.affiliateReferralCode && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-800 border border-blue-200">
-                            Referred: {order.affiliateReferralCode}
-                          </span>
-                        )}
-                        {order.items?.some(item => item.customization?.enabled) && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-800 border border-purple-200 animate-pulse">
-                            Custom Order
-                          </span>
+                      {(order.affiliateReferralCode || order.items?.some(item => item.customization?.enabled)) && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                          {order.affiliateReferralCode && (
+                            <span className="wp-pill wp-pill-sm wp-st-shipped">Referred: {order.affiliateReferralCode}</span>
+                          )}
+                          {order.items?.some(item => item.customization?.enabled) && (
+                            <span className="wp-pill wp-pill-sm wp-st-packed">Custom order</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="wp-mobile-meta">
+                        <StatusPill status={order.status} small /> · {formatDate(order.createdAt)}
+                      </div>
+                      <div className="wp-row-actions">
+                        {isTrash ? (
+                          <>
+                            <span><button type="button" onClick={() => handleRestore(order)}>Restore</button></span>
+                            <span><button type="button" className="is-danger" onClick={() => handleDeletePermanently(order)}>Delete Permanently</button></span>
+                          </>
+                        ) : (
+                          <>
+                            <span><Link href={`/admin/orders/${order._id}`}>Edit</Link></span>
+                            <span><button type="button" onClick={() => handleDuplicate(order)}>Duplicate</button></span>
+                            <span><button type="button" className="is-danger" onClick={() => handleTrash(order)}>Trash</button></span>
+                          </>
                         )}
                       </div>
-
-                      <div className="flex flex-wrap items-center gap-x-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium mt-1">
-                        <Link href={`/admin/orders/${order._id}`} className="hover:text-[#135e96]">View</Link>
-                        <span className="text-[#c3c4c7] font-normal">|</span>
-                        <button onClick={() => handleDuplicate(order)} className="hover:text-[#135e96] cursor-pointer">Duplicate</button>
-                        <span className="text-[#c3c4c7] font-normal">|</span>
-                        <button onClick={() => handleDelete(order._id)} className="text-[#bc0b0d] cursor-pointer">Trash</button>
-                      </div>
                     </td>
-                    <td className="hidden md:table-cell px-3 py-3.5 align-top pt-4 text-[#646970] leading-normal">
-                      {new Date(order.createdAt).toLocaleDateString()}
+                    <td className="wp-hide-sm">
+                      <time dateTime={order.createdAt}>{formatDate(order.createdAt)}</time>
                     </td>
-                    <td className="px-3 py-3.5 align-top pt-3.5">
-                      <span className={`inline-block px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider border ${getStatusBadge(order.status)}`}>
-                        {order.status}
-                      </span>
+                    <td className="wp-hide-sm">
+                      <StatusPill status={order.status} />
                     </td>
-                    <td className="px-3 py-3.5 align-top pt-4 font-bold text-neutral-800">
-                      ${order.financials?.total?.toLocaleString() || "0"}
+                    <td className="wp-hide-sm">
+                      <div className="wp-strong">{order.shippingAddress?.fullName || order.customer?.email || "Guest"}</div>
+                      {shipTo && <div className="wp-muted wp-small">{shipTo}</div>}
+                    </td>
+                    <td className="wp-hide-sm">
+                      {paymentStatus && (
+                        <span className={`wp-pill wp-pill-sm ${PAYMENT_CLASS[paymentStatus] || ""}`}>{paymentStatus}</span>
+                      )}
+                      {order.payment?.method && <div className="wp-muted wp-small" style={{ marginTop: 4 }}>{order.payment.method}</div>}
+                    </td>
+                    <td className="wp-num" style={{ whiteSpace: "nowrap" }}>
+                      <span className="wp-strong">{formatMoney(order.financials?.total, order.financials?.currency || "USD")}</span>
+                      <div className="wp-muted wp-small">{itemCount} item{itemCount === 1 ? "" : "s"}</div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* WP Pagination Bar */}
-        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 text-[13px] text-[#646970] font-sans">
-           <p>{pagination.total} items</p>
-           <div className="flex items-center gap-1">
-              <button 
-                disabled={pagination.currentPage === 1}
-                onClick={() => fetchOrders(pagination.currentPage - 1)}
-                className="p-1 border border-[#ccd0d4] bg-[#f6f7f7] hover:bg-[#f0f0f1] rounded disabled:opacity-50 cursor-pointer"
-              >
-                 <ChevronLeft className="w-4 h-4 text-gray-600" />
-              </button>
-              <span className="px-2">{pagination.currentPage} of {pagination.pages}</span>
-              <button 
-                disabled={pagination.currentPage === pagination.pages}
-                onClick={() => fetchOrders(pagination.currentPage + 1)}
-                className="p-1 border border-[#ccd0d4] bg-[#f6f7f7] hover:bg-[#f0f0f1] rounded disabled:opacity-50 cursor-pointer"
-              >
-                 <ChevronRight className="w-4 h-4 text-gray-600" />
-              </button>
-           </div>
-        </div>
+                );
+              })
+            )}
+          </tbody>
+          <tfoot>{headRow}</tfoot>
+        </table>
       </div>
-    </AdminPageLayout>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pager}
+      </div>
+    </Page>
     </RequirePermission>
   );
 }

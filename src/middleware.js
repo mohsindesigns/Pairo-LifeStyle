@@ -1,6 +1,9 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 
+// The jwt callback ends expired staff sessions, but middleware reads the raw cookie, so check here too.
+const staffSessionExpired = (token) => Boolean(token?.staffExpiresAt && Date.now() > token.staffExpiresAt);
+
 export async function middleware(req) {
     // 1. Try default getToken (infers from req.url / NEXTAUTH_URL)
     let token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -61,7 +64,7 @@ export async function middleware(req) {
                 res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
                 return res;
             }
-        } else if (!token || !token?.isStaff) {
+        } else if (!token || !token?.isStaff || staffSessionExpired(token)) {
             const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
             res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
             return res;
@@ -95,8 +98,8 @@ export async function middleware(req) {
             return redirectRes;
         }
         // Must be staff to access any /admin route
-        if (!token?.isStaff) {
-            console.log(`[Middleware] Token found but isStaff is false, redirecting to /admin-login`);
+        if (!token?.isStaff || staffSessionExpired(token)) {
+            console.log(`[Middleware] Token found but isStaff is false or the staff session expired, redirecting to /admin-login`);
             const redirectRes = NextResponse.redirect(new URL("/admin-login?error=Unauthorized", req.url));
             redirectRes.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
             return redirectRes;

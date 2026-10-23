@@ -22,7 +22,8 @@ const RedirectSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Ensure clean format on retrieval
-RedirectSchema.pre('save', function (next) {
+// Mongoose 9: pre hooks no longer receive `next` (calling it would throw).
+RedirectSchema.pre('save', function () {
   if (this.oldPath) {
     let clean = this.oldPath.trim();
     if (clean.startsWith("http://") || clean.startsWith("https://")) {
@@ -51,7 +52,6 @@ RedirectSchema.pre('save', function (next) {
       }
     }
   }
-  next();
 });
 
 delete mongoose.models.Redirect;

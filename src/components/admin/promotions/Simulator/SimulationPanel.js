@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Play, ShoppingCart, Info, CheckCircle2, XCircle, Calculator, AlertTriangle, Trash2, Plus } from 'lucide-react';
+import { Play, CheckCircle2, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { formatMoney } from '@/components/admin/ui';
 
 export default function SimulationPanel({ promotionData }) {
   const [cart, setCart] = useState({
@@ -80,234 +81,216 @@ export default function SimulationPanel({ promotionData }) {
   };
 
   return (
-    <div className="bg-[#1e293b] text-slate-200 rounded-sm shadow-xl overflow-hidden flex flex-col h-full border border-slate-700 font-sans">
-      {/* Header */}
-      <div className="bg-[#0f172a] px-4 py-3 flex items-center justify-between border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <Calculator className="w-4 h-4 text-[#2271b1]" />
-          <span className="text-[12px] font-bold uppercase tracking-widest text-slate-400">Live Simulator</span>
-        </div>
-        <button 
+    <section className="wp-postbox" aria-labelledby="promo-simulator-title">
+      <div className="wp-postbox-head">
+        <h2 id="promo-simulator-title">Simulator</h2>
+        <button
+          type="button"
           onClick={runSimulation}
           disabled={isSimulating}
-          className="flex items-center gap-2 bg-[#2271b1] hover:bg-[#135e96] text-white px-4 py-1.5 rounded-sm text-[12px] font-bold transition-all disabled:opacity-50"
+          className="wp-btn wp-btn-primary"
         >
-          {isSimulating ? "Processing..." : <><Play className="w-3.5 h-3.5" /> Run Simulation</>}
+          {isSimulating ? "Processing..." : <><Play className="w-4 h-4" aria-hidden="true" /> Run simulation</>}
         </button>
       </div>
 
-      <div className="flex flex-1 overflow-hidden h-[500px]">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         {/* Mock Cart Editor */}
-        <div className="w-2/5 border-r border-slate-800 p-4 overflow-y-auto space-y-4">
+        <div className="flex flex-col gap-4 min-w-0 border-b lg:border-b-0" style={{ padding: 12, borderColor: 'var(--wp-border-2)' }}>
           {/* Customer settings */}
-          <div className="bg-slate-900/50 p-3 rounded-sm border border-slate-800 space-y-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Customer Context</span>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[9px] text-slate-500 uppercase block">Customer Type</label>
+          <div className="min-w-0">
+            <h3 className="wp-strong" style={{ fontSize: 13, margin: '0 0 8px' }}>Customer</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="block min-w-0">
+                <span className="wp-label">Customer type</span>
                 <select
                   value={cart.customerType}
                   onChange={(e) => setCart({...cart, customerType: e.target.value})}
-                  className="bg-[#0f172a] border border-slate-700 rounded-sm p-1 text-[11px] text-slate-200 outline-none w-full"
+                  className="wp-select wp-full"
                 >
                   <option value="guest">Guest</option>
                   <option value="logged_in">Logged In</option>
                   <option value="new">New Customer</option>
                   <option value="returning">Returning Customer</option>
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] text-slate-500 uppercase block">Email Address</label>
-                <input 
+              </label>
+              <label className="block min-w-0">
+                <span className="wp-label">Email address</span>
+                <input
                   type="text"
                   value={cart.email}
                   onChange={(e) => setCart({...cart, email: e.target.value})}
-                  className="bg-[#0f172a] border border-slate-700 rounded-sm p-1 text-[11px] text-slate-200 outline-none w-full font-mono"
+                  className="wp-input wp-full"
                 />
-              </div>
+              </label>
             </div>
           </div>
 
           {/* Add Mock Product Section */}
-          <div className="bg-slate-900/50 p-3 rounded-sm border border-slate-800 space-y-3">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Add Mock Item</span>
+          <div className="min-w-0" style={{ borderTop: '1px solid var(--wp-border-2)', paddingTop: 12 }}>
+            <h3 className="wp-strong" style={{ fontSize: 13, margin: '0 0 8px' }}>Add a test item</h3>
             <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1 col-span-2">
-                <label className="text-[9px] text-slate-500 uppercase block">Product ID</label>
-                <input 
+              <label className="block min-w-0 col-span-2">
+                <span className="wp-label">Product ID</span>
+                <input
                   type="text"
                   value={newItem.id}
                   onChange={(e) => setNewItem({...newItem, id: e.target.value})}
-                  className="bg-[#0f172a] border border-slate-700 rounded-sm p-1 text-[11px] text-slate-200 outline-none w-full font-mono"
+                  className="wp-input wp-full"
+                  style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] text-slate-500 uppercase block">Qty</label>
-                <input 
+              </label>
+              <label className="block min-w-0">
+                <span className="wp-label">Qty</span>
+                <input
                   type="number"
                   value={newItem.quantity}
                   onChange={(e) => setNewItem({...newItem, quantity: e.target.value})}
-                  className="bg-[#0f172a] border border-slate-700 rounded-sm p-1 text-[11px] text-slate-200 outline-none w-full text-center"
+                  className="wp-input wp-full"
                 />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-[9px] text-slate-500 uppercase block">Category IDs</label>
-                <input 
+              </label>
+              <label className="block min-w-0 col-span-3 sm:col-span-1 lg:col-span-3 xl:col-span-1">
+                <span className="wp-label">Category IDs</span>
+                <input
                   type="text"
                   placeholder="cat-1, cat-2"
                   value={newItem.categories}
                   onChange={(e) => setNewItem({...newItem, categories: e.target.value})}
-                  className="bg-[#0f172a] border border-slate-700 rounded-sm p-1 text-[11px] text-slate-200 outline-none w-full"
+                  className="wp-input wp-full"
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] text-slate-500 uppercase block">Collection IDs</label>
-                <input 
+              </label>
+              <label className="block min-w-0 col-span-3 sm:col-span-1 lg:col-span-3 xl:col-span-1">
+                <span className="wp-label">Collection IDs</span>
+                <input
                   type="text"
                   placeholder="col-1, col-2"
                   value={newItem.collections}
                   onChange={(e) => setNewItem({...newItem, collections: e.target.value})}
-                  className="bg-[#0f172a] border border-slate-700 rounded-sm p-1 text-[11px] text-slate-200 outline-none w-full"
+                  className="wp-input wp-full"
                 />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 items-end">
-              <div className="space-y-1 col-span-2">
-                <label className="text-[9px] text-slate-500 uppercase block">Price ($)</label>
-                <input 
+              </label>
+              <label className="block min-w-0 col-span-3 sm:col-span-1 lg:col-span-3 xl:col-span-1">
+                <span className="wp-label">Price ($)</span>
+                <input
                   type="number"
                   value={newItem.price}
                   onChange={(e) => setNewItem({...newItem, price: e.target.value})}
-                  className="bg-[#0f172a] border border-slate-700 rounded-sm p-1 text-[11px] text-slate-200 outline-none w-full text-center font-mono"
+                  className="wp-input wp-full"
                 />
-              </div>
-              <button
-                type="button"
-                onClick={addCustomItem}
-                className="bg-[#2271b1] hover:bg-[#135e96] text-white p-1 rounded-sm text-[11px] font-bold h-[28px] flex items-center justify-center gap-1"
-              >
-                <Plus className="w-3 h-3" /> ADD
+              </label>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <button type="button" onClick={addCustomItem} className="wp-btn">
+                Add item to cart
               </button>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">Cart Subtotal: <span className="font-mono text-white ml-1">${cart.subtotal.toFixed(2)}</span></label>
+          <div className="min-w-0" style={{ borderTop: '1px solid var(--wp-border-2)', paddingTop: 12 }}>
+            <div className="wp-kv" style={{ paddingTop: 0 }}>
+              <span className="wp-kv-k wp-strong">Test cart</span>
+              <span>Subtotal: <span className="wp-kv-v">{formatMoney(cart.subtotal)}</span></span>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1.5">
               {cart.items.map((item, idx) => (
-                <div key={idx} className="bg-[#0f172a] p-2.5 rounded-sm border border-slate-800 text-[11px] space-y-1.5 relative group">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold font-mono text-slate-300">{item.id} (x{item.quantity})</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-mono">${(item.price * item.quantity).toFixed(2)}</span>
-                      <button 
-                        onClick={() => removeItem(idx)}
-                        className="text-slate-500 hover:text-rose-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                <div key={idx} className="min-w-0" style={{ border: '1px solid var(--wp-border-2)', background: 'var(--wp-alt)', padding: '6px 8px' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="wp-strong flex-1 min-w-0" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>{item.id} (x{item.quantity})</span>
+                    <span>{formatMoney(item.price * item.quantity)}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(idx)}
+                      className="wp-btn"
+                      style={{ borderColor: 'var(--wp-danger)', color: 'var(--wp-danger)', padding: 0, minWidth: 40 }}
+                      aria-label={`Remove ${item.id} from test cart`}
+                    >
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                    </button>
                   </div>
                   {(item.categories?.length > 0 || item.collections?.length > 0) && (
-                    <div className="flex flex-wrap gap-1 text-[9px]">
+                    <div className="flex flex-wrap gap-1 wp-small" style={{ marginTop: 4 }}>
                       {item.categories?.map((cat, cIdx) => (
-                        <span key={cIdx} className="bg-blue-900/30 text-blue-300 border border-blue-800/40 px-1 py-0.5 rounded-sm">Category: {cat}</span>
+                        <span key={cIdx} className="wp-pill wp-pill-sm wp-st-shipped">Category: {cat}</span>
                       ))}
                       {item.collections?.map((col, cIdx) => (
-                        <span key={cIdx} className="bg-purple-900/30 text-purple-300 border border-purple-800/40 px-1 py-0.5 rounded-sm">Collection: {col}</span>
+                        <span key={cIdx} className="wp-pill wp-pill-sm wp-st-packed">Collection: {col}</span>
                       ))}
                     </div>
                   )}
                 </div>
               ))}
-              {cart.items.length === 0 && <div className="text-[11px] text-slate-600 italic text-center py-6 border border-dashed border-slate-800">Cart is empty</div>}
+              {cart.items.length === 0 && <p className="wp-empty" style={{ textAlign: 'center' }}>Cart is empty</p>}
             </div>
           </div>
         </div>
 
         {/* Results / Trace */}
-        <div className="flex-1 bg-[#0f172a] p-4 overflow-y-auto">
+        <div className="min-w-0 lg:border-l" style={{ padding: 12, borderColor: 'var(--wp-border-2)' }} aria-live="polite">
           {results ? (
-            <div className="space-y-6">
-              <div className="flex items-center justify-around bg-[#1e293b] p-4 rounded-sm border border-slate-700">
-                <div className="text-center">
-                    <div className="text-[10px] text-slate-500 uppercase mb-1">Status</div>
-                    <div className={`text-sm font-bold ${results.isEligible ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {results.isEligible ? 'ELIGIBLE' : 'REJECTED'}
-                    </div>
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-3" style={{ border: '1px solid var(--wp-border-2)' }}>
+                <div className="min-w-0" style={{ padding: '10px 12px', borderRight: '1px solid var(--wp-border-2)' }}>
+                  <div className="wp-muted wp-small">Status</div>
+                  <div className="wp-strong" style={{ color: results.isEligible ? 'var(--wp-ok)' : 'var(--wp-danger)' }}>
+                    {results.isEligible ? 'Eligible' : 'Rejected'}
+                  </div>
                 </div>
-                <div className="w-[1px] h-8 bg-slate-700"></div>
-                <div className="text-center">
-                    <div className="text-[10px] text-slate-500 uppercase mb-1">Discount</div>
-                    <div className="text-sm font-bold text-white">${results.discountTotal?.toFixed(2) || '0.00'}</div>
+                <div className="min-w-0" style={{ padding: '10px 12px', borderRight: '1px solid var(--wp-border-2)' }}>
+                  <div className="wp-muted wp-small">Discount</div>
+                  <div className="wp-strong">{formatMoney(results.discountTotal || 0)}</div>
                 </div>
-                <div className="w-[1px] h-8 bg-slate-700"></div>
-                <div className="text-center">
-                    <div className="text-[10px] text-slate-500 uppercase mb-1">Final Total</div>
-                    <div className="text-sm font-bold text-[#2271b1]">${(cart.subtotal - (results.discountTotal || 0)).toFixed(2)}</div>
+                <div className="min-w-0" style={{ padding: '10px 12px' }}>
+                  <div className="wp-muted wp-small">Final total</div>
+                  <div className="wp-strong">{formatMoney(cart.subtotal - (results.discountTotal || 0))}</div>
                 </div>
               </div>
 
               {!results.isEligible && results.appliedPromotions?.length > 0 && (
-                <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-sm flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5" />
-                    <div className="text-[11px] text-amber-200">
-                        <span className="font-bold block">CONFLICT BLOCKED</span>
-                        This promotion met all conditions but was blocked by: 
-                        <span className="text-white ml-1">
-                          {results.appliedPromotions.map(p => p.title).join(', ')}
-                        </span>
-                    </div>
+                <div className="wp-notice wp-notice-warning" style={{ margin: 0, boxShadow: 'none' }}>
+                  <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden="true" style={{ color: '#996800' }} />
+                  <p>
+                    <strong>Conflict blocked.</strong> This promotion met all conditions but was blocked by:{' '}
+                    <span className="wp-strong">{results.appliedPromotions.map(p => p.title).join(', ')}</span>
+                  </p>
                 </div>
               )}
 
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-2">
-                   <Info className="w-3.5 h-3.5" /> Execution Trace
-                </h4>
-                <div className="space-y-2 border-l border-slate-800 ml-2 pl-4">
-                   {results.debugMetadata ? (
-                      <TraceNode node={results.debugMetadata} />
-                   ) : (
-                      <div className="text-[11px] text-slate-500 italic">No trace metadata available.</div>
-                   )}
+              <div className="min-w-0">
+                <h3 className="wp-strong" style={{ fontSize: 13, margin: '0 0 8px' }}>Execution trace</h3>
+                <div className="flex flex-col gap-2" style={{ borderLeft: '1px solid var(--wp-border-2)', marginLeft: 6, paddingLeft: 12 }}>
+                  {results.debugMetadata ? (
+                    <TraceNode node={results.debugMetadata} />
+                  ) : (
+                    <p className="wp-muted" style={{ margin: 0 }}>No trace metadata available.</p>
+                  )}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4">
-                <div className="p-4 bg-slate-900 rounded-full border border-slate-800">
-                  <Play className="w-8 h-8 opacity-20" />
-                </div>
-                <div className="text-center">
-                  <div className="text-sm font-medium">Ready for simulation</div>
-                  <div className="text-[11px] opacity-60">Configure your rules and mock cart, then hit &quot;Run Simulation&quot;</div>
-                </div>
+            <div className="wp-empty" style={{ textAlign: 'center', padding: '32px 8px' }}>
+              <p className="wp-strong" style={{ margin: '0 0 4px' }}>Ready for simulation</p>
+              <p style={{ margin: 0 }}>Configure your rules and test cart, then click &quot;Run simulation&quot;.</p>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
 function TraceNode({ node }) {
   if (node.operator) {
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2 min-w-0">
         <div className="flex items-center gap-2">
-          {node.passed ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <XCircle className="w-3 h-3 text-rose-500" />}
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${node.passed ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+          {node.passed
+            ? <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: 'var(--wp-ok)' }} aria-label="Passed" />
+            : <XCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--wp-danger)' }} aria-label="Failed" />}
+          <span className={`wp-pill wp-pill-sm ${node.passed ? 'wp-st-published' : 'wp-st-cancelled'}`}>
             {node.operator} Group
           </span>
         </div>
-        <div className="border-l border-slate-800 ml-2 pl-4 space-y-2">
+        <div className="flex flex-col gap-2" style={{ borderLeft: '1px solid var(--wp-border-2)', marginLeft: 6, paddingLeft: 12 }}>
           {node.results?.map((child, i) => <TraceNode key={i} node={child} />)}
         </div>
       </div>
@@ -315,15 +298,24 @@ function TraceNode({ node }) {
   }
 
   return (
-    <div className="flex items-center gap-2 group">
-      {node.passed ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <XCircle className="w-3 h-3 text-rose-500" />}
-      <div className={`text-[11px] font-mono p-1 rounded-sm border ${node.passed ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300' : 'border-rose-500/20 bg-rose-500/5 text-rose-300'}`}>
+    <div className="flex flex-wrap items-center gap-2 min-w-0">
+      {node.passed
+        ? <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: 'var(--wp-ok)' }} aria-label="Passed" />
+        : <XCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--wp-danger)' }} aria-label="Failed" />}
+      <code
+        className="wp-small min-w-0"
+        style={{
+          padding: '2px 6px',
+          border: `1px solid ${node.passed ? '#c6e1c6' : '#eba3a3'}`,
+          background: node.passed ? '#f0f8ee' : '#fcf0f1',
+          color: 'var(--wp-text)',
+          wordBreak: 'break-word',
+        }}
+      >
         {node.field} {node.op} {Array.isArray(node.value) ? `[${node.value.join(', ')}]` : node.value}
-      </div>
+      </code>
       {!node.passed && node.explanation && (
-        <span className="text-[10px] text-slate-500 italic opacity-0 group-hover:opacity-100 transition-opacity">
-          &larr; {node.explanation}
-        </span>
+        <span className="wp-muted wp-small">&larr; {node.explanation}</span>
       )}
     </div>
   );

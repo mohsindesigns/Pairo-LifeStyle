@@ -1,91 +1,241 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { UserPlus, Search, Shield, Mail, Key, UserCheck, UserX, MoreVertical, Lock, Eye, EyeOff, Trash2, X } from "lucide-react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, X } from "lucide-react";
+import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
 import { useRBAC } from "@/hooks/useRBAC";
+import { usePopup } from "@/context/PopupContext";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
 
+const PAGE_SIZE = 20;
+
+async function readError(res, fallback) {
+  try {
+    const data = await res.json();
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const EMPTY_PASSWORD = { open: false, id: null, name: "", password: "", showPass: false, loading: false };
+
 export default function StaffManagement() {
-  const router = useRouter();
-  const { session } = useRBAC();
+  return (
+    <RequirePermission permission="staff.view">
+      <StaffList />
+    </RequirePermission>
+  );
+}
+
+function StaffList() {
+  const { session, can } = useRBAC();
+  const { showConfirm } = usePopup();
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState({ open: false, id: null, name: "", loading: false });
-  const [passwordTarget, setPasswordTarget] = useState({ open: false, id: null, name: "", password: "", showPass: false, loading: false });
+  const [view, setView] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkAction, setBulkAction] = useState("Bulk actions");
+  const [passwordTarget, setPasswordTarget] = useState(EMPTY_PASSWORD);
 
-  const fetchStaff = async () => {
+  const fetchStaff = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/staff");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setStaff(data);
-        } else if (Array.isArray(data?.staff)) {
-          setStaff(data.staff);
-        } else {
-          setStaff([]);
-        }
-      } else {
-        setStaff([]);
-      }
+      const res = await fetch("/api/admin/staff?withTrashed=1");
+      if (!res.ok) throw new Error(await readError(res, "Failed to load users."));
+      const data = await res.json();
+      setStaff(Array.isArray(data) ? data : Array.isArray(data?.staff) ? data.staff : []);
+      setLoadError("");
     } catch (err) {
-      console.error(err);
-      setStaff([]);
+      setLoadError(err.message || "Failed to load users.");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    let active = true;
-    Promise.resolve().then(() => {
-      if (active) fetchStaff();
-    });
-    return () => {
-      active = false;
-    };
   }, []);
 
-  const toggleStatus = async (id, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';
-    try {
-      const res = await fetch(`/api/admin/staff/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
-        setStaff(prev => (Array.isArray(prev) ? prev : []).map(s => s._id === id ? { ...s, status: newStatus } : s));
-      }
-    } catch (err) {
-      console.error(err);
-    }
+  useEffect(() => {
+    Promise.resolve().then(() => fetchStaff());
+  }, [fetchStaff]);
+
+  // Live search after a short pause; the Search button / Enter applies immediately.
+  useEffect(() => {
+    const term = searchInput.trim();
+    if (term === searchTerm) return;
+    const t = setTimeout(() => {
+      setPage(1);
+      setSearchTerm(term);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, searchTerm]);
+
+  const runSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    setSearchTerm(searchInput.trim());
   };
 
-  const confirmDeleteStaff = async () => {
-    if (!deleteTarget.id) return;
-    setDeleteTarget(prev => ({ ...prev, loading: true }));
-    try {
-      const res = await fetch(`/api/admin/staff/${deleteTarget.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setStaff(prev => (Array.isArray(prev) ? prev : []).filter(s => s._id !== deleteTarget.id));
-        toast.success(`Staff member "${deleteTarget.name}" deleted successfully.`);
-        setDeleteTarget({ open: false, id: null, name: "", loading: false });
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Failed to delete staff member.");
-        setDeleteTarget(prev => ({ ...prev, loading: false }));
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error deleting staff member.");
-      setDeleteTarget(prev => ({ ...prev, loading: false }));
-    }
+  const currentUserId = session?.user?.id || session?.user?._id;
+  const currentIsSuperAdmin = (session?.user?.role?.slug || session?.user?.roleId?.slug) === "super-admin";
+  const canEdit = can("staff.edit");
+  const canDelete = can("staff.delete");
+  const canCreate = can("staff.create");
+
+  const list = Array.isArray(staff) ? staff : [];
+  const live = list.filter((s) => !s.isDeleted);
+  const trashed = list.filter((s) => s.isDeleted);
+  const isTrash = view === "trash";
+  const counts = {
+    all: live.length,
+    active: live.filter((s) => (s.status || "Active") === "Active").length,
+    suspended: live.filter((s) => s.status && s.status !== "Active").length,
+    trash: trashed.length,
   };
+
+  const roleKey = (s) => s?.roleId?.slug || s?.roleId?.name || "";
+  const roleOptions = Array.from(
+    new Map(list.filter((s) => s?.roleId?.name).map((s) => [roleKey(s), s.roleId.name])).entries()
+  );
+
+  const search = searchTerm.toLowerCase();
+  const filtered = (isTrash ? trashed : live).filter((s) => {
+    if (view === "active" && (s.status || "Active") !== "Active") return false;
+    if (view === "suspended" && (!s.status || s.status === "Active")) return false;
+    if (roleFilter && roleKey(s) !== roleFilter) return false;
+    if (!search) return true;
+    return String(s.name || "").toLowerCase().includes(search) || String(s.email || "").toLowerCase().includes(search);
+  });
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const rows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const changeView = (next) => {
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    setPage(1);
+    setView(next);
+  };
+
+  // What the signed-in user may do with this row (the server re-checks everything).
+  const rowRules = (s) => {
+    const isSuperAdmin = s?.roleId?.slug === "super-admin";
+    const isSelf = Boolean(currentUserId) && String(s?._id) === String(currentUserId);
+    return {
+      isSuperAdmin,
+      isSelf,
+      canToggle: canEdit && !isSuperAdmin && !isSelf,
+      canTrash: canDelete && !isSelf && (!isSuperAdmin || currentIsSuperAdmin),
+      canResetPassword: canEdit && (!isSuperAdmin || currentIsSuperAdmin),
+    };
+  };
+
+  const nameOf = (s) => s?.name || s?.email || "this user";
+
+  // --- requests (throw on failure) ---
+  const trashStaff = async (id) => {
+    const res = await fetch(`/api/admin/staff/${id}?mode=trash`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to move user to the Trash."));
+  };
+  const restoreStaff = async (id) => {
+    const res = await fetch(`/api/admin/staff/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isDeleted: false }),
+    });
+    if (!res.ok) throw new Error(await readError(res, "Failed to restore user."));
+  };
+  const deleteStaffPermanently = async (id) => {
+    const res = await fetch(`/api/admin/staff/${id}?mode=permanent`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to delete user."));
+  };
+
+  const runRow = async (fn, success) => {
+    try {
+      await fn();
+      toast.success(success);
+    } catch (err) {
+      toast.error(err.message);
+    }
+    fetchStaff();
+  };
+
+  const toggleStatus = async (s) => {
+    const newStatus = s.status === "Active" ? "Suspended" : "Active";
+    if (newStatus === "Suspended") {
+      const ok = await showConfirm(`${nameOf(s)} will be signed out and won't be able to sign in until reactivated.`, "Suspend user?", { confirmText: "Suspend", danger: true });
+      if (!ok) return;
+    }
+    runRow(async () => {
+      const res = await fetch(`/api/admin/staff/${s._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Failed to update status."));
+    }, newStatus === "Active" ? `${nameOf(s)} activated.` : `${nameOf(s)} suspended.`);
+  };
+
+  const handleTrash = async (s) => {
+    const ok = await showConfirm(
+      `${nameOf(s)} will be moved to the Trash. They are signed out right away and can't sign in until restored.`,
+      "Move to Trash?",
+      { confirmText: "Move to Trash", danger: true }
+    );
+    if (ok) runRow(() => trashStaff(s._id), `${nameOf(s)} moved to the Trash.`);
+  };
+
+  const handleRestore = (s) => runRow(() => restoreStaff(s._id), `${nameOf(s)} restored.`);
+
+  const handleDeletePermanently = async (s) => {
+    const ok = await showConfirm(`${nameOf(s)} will be deleted permanently. This cannot be undone.`, "Delete permanently?", { confirmText: "Delete Permanently", danger: true });
+    if (ok) runRow(() => deleteStaffPermanently(s._id), "User deleted permanently.");
+  };
+
+  const BULK = {
+    "Move to Trash": { verb: "moved to the Trash", run: trashStaff },
+    Restore: { verb: "restored", run: restoreStaff },
+    "Delete Permanently": { verb: "deleted permanently", run: deleteStaffPermanently },
+  };
+
+  const handleBulk = async () => {
+    const def = BULK[bulkAction];
+    if (!def || selectedIds.length === 0) return;
+    const n = selectedIds.length;
+    const label = `${n} user${n === 1 ? "" : "s"}`;
+    const ok = bulkAction === "Restore"
+      ? await showConfirm(`Restore ${label}?`)
+      : bulkAction === "Delete Permanently"
+        ? await showConfirm(`${label} will be deleted permanently. This cannot be undone.`, "Delete permanently?", { confirmText: "Delete Permanently", danger: true })
+        : await showConfirm(`${label} will be moved to the Trash and signed out.`, "Move to Trash?", { confirmText: "Move to Trash", danger: true });
+    if (!ok) return;
+
+    let done = 0;
+    const failures = [];
+    for (const id of selectedIds) {
+      const s = list.find((x) => x._id === id);
+      try {
+        await def.run(id);
+        done++;
+      } catch (err) {
+        failures.push(`${nameOf(s)}: ${err.message}`);
+      }
+    }
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    fetchStaff();
+    if (done) toast.success(`${done} user${done === 1 ? "" : "s"} ${def.verb}.`);
+    if (failures.length) toast.error(`${failures.length} failed — ${failures.slice(0, 5).join("; ")}${failures.length > 5 ? "; …" : ""}`, { duration: 8000 });
+  };
+
+  const selectable = rows.filter((s) => isTrash || rowRules(s).canTrash);
+  const allSelected = selectable.length > 0 && selectable.every((s) => selectedIds.includes(s._id));
+  const toggleAll = () => setSelectedIds(allSelected ? [] : selectable.map((s) => s._id));
+  const toggleOne = (id) => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const submitResetPassword = async (e) => {
     e?.preventDefault();
@@ -93,317 +243,265 @@ export default function StaffManagement() {
       toast.error("Password must be at least 6 characters long.");
       return;
     }
-
-    setPasswordTarget(prev => ({ ...prev, loading: true }));
+    setPasswordTarget((prev) => ({ ...prev, loading: true }));
     try {
       const res = await fetch(`/api/admin/staff/${passwordTarget.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passwordTarget.password })
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordTarget.password }),
       });
-      if (res.ok) {
-        toast.success(`Password for "${passwordTarget.name}" updated successfully!`);
-        setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false });
-      } else {
-        const data = await res.json();
-        toast.error(data.error || "Failed to reset password");
-        setPasswordTarget(prev => ({ ...prev, loading: false }));
-      }
+      if (!res.ok) throw new Error(await readError(res, "Failed to reset password"));
+      toast.success(`Password for "${passwordTarget.name}" updated.`);
+      setPasswordTarget(EMPTY_PASSWORD);
     } catch (err) {
-      console.error(err);
-      toast.error("Error resetting password");
-      setPasswordTarget(prev => ({ ...prev, loading: false }));
+      toast.error(err.message);
+      setPasswordTarget((prev) => ({ ...prev, loading: false }));
     }
   };
 
-  const staffList = Array.isArray(staff) ? staff : [];
-  const currentUserId = session?.user?.id || session?.user?._id;
+  const viewLink = (key, label, count) => (
+    view === key ? (
+      <span className="is-current" aria-current="page">{label} <span className="wp-count">({count})</span></span>
+    ) : (
+      <button type="button" onClick={() => changeView(key)}>{label} <span className="wp-count">({count})</span></button>
+    )
+  );
 
-  const filteredStaff = staffList.filter(s => {
-    if (!s) return false;
-    const nameStr = s.name ? String(s.name).toLowerCase() : "";
-    const emailStr = s.email ? String(s.email).toLowerCase() : "";
-    const search = searchTerm.toLowerCase();
-    return nameStr.includes(search) || emailStr.includes(search);
-  });
-
-  const formatDate = (dateVal) => {
-    if (!dateVal) return "Never";
-    try {
-      const d = new Date(dateVal);
-      return isNaN(d.getTime()) ? "Never" : d.toLocaleDateString();
-    } catch {
-      return "Never";
-    }
-  };
+  const headerRow = (
+    <tr>
+      {canDelete && (
+        <th className="wp-check-col">
+          <input type="checkbox" aria-label="Select all users" checked={allSelected} disabled={selectable.length === 0} onChange={toggleAll} />
+        </th>
+      )}
+      <th scope="col">Username</th>
+      <th scope="col" className="wp-hide-sm">Email</th>
+      <th scope="col">Role</th>
+      <th scope="col">Status</th>
+      <th scope="col" className="wp-hide-sm">{isTrash ? "Trashed" : "Last login"}</th>
+    </tr>
+  );
+  const colCount = canDelete ? 6 : 5;
+  const itemsLabel = `${filtered.length} item${filtered.length === 1 ? "" : "s"}`;
 
   return (
-    <RequirePermission permission="staff.view">
-    <AdminPageLayout
-      title="Team Management"
-      addNewLink="/admin/settings/team/new"
-      addNewLabel="Invite Staff Member"
-      breadcrumbs={[{ label: "Settings", href: "/admin/settings" }, { label: "Team" }]}
-    >
-      <div className="space-y-4">
-        {/* Statistics Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
-            <div className="p-3 bg-[#f0f6fb] text-[#2271b1] rounded-full"><Shield className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Total Admins</p><p className="text-xl font-bold">{staffList.length}</p></div>
-          </div>
-          <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
-            <div className="p-3 bg-[#f6f7f7] text-[#1d2327] rounded-full"><UserCheck className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Active Sessions</p><p className="text-xl font-bold">{staffList.filter(s => s?.status === 'Active').length}</p></div>
-          </div>
-          <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
-            <div className="p-3 bg-red-50 text-red-600 rounded-full"><UserX className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Suspended</p><p className="text-xl font-bold text-red-600">{staffList.filter(s => s?.status && s.status !== 'Active').length}</p></div>
-          </div>
-        </div>
-
-        {/* Toolbar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-4 shadow-sm">
-           <div className="relative w-full min-w-0 md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8c8f94]" />
-              <input 
-                type="text" 
-                placeholder="Search staff by name or email..."
-                className="w-full pl-10 pr-4 py-1.5 bg-white border border-[#8c8f94] text-[13px] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-           </div>
-           <div className="flex flex-wrap items-center gap-2">
-              <select className="min-w-0 border border-[#8c8f94] text-[13px] px-3 py-1.5 outline-none focus:border-[#2271b1]">
-                 <option>All Roles</option>
-                 <option>Super Admin</option>
-                 <option>Admin</option>
-                 <option>Editor</option>
-              </select>
-              <button className="bg-white border border-[#2271b1] text-[#2271b1] px-4 py-1.5 font-bold text-[13px] hover:bg-[#f0f6fb]">Filter</button>
-           </div>
-        </div>
-
-        {/* Staff Table */}
-        <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden">
-          <div className="overflow-x-auto max-w-full">
-          <table className="w-full min-w-[560px] text-left border-collapse text-[13px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                <th className="px-4 py-3 font-bold uppercase text-[11px]">Staff Member</th>
-                <th className="px-4 py-3 font-bold uppercase text-[11px]">Role</th>
-                <th className="px-4 py-3 font-bold uppercase text-[11px]">Status</th>
-                <th className="hidden md:table-cell px-4 py-3 font-bold uppercase text-[11px]">Last Login</th>
-                <th className="px-4 py-3 w-10"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={5} className="p-10 text-center italic text-gray-400">Loading team members...</td></tr>
-              ) : filteredStaff.length === 0 ? (
-                <tr><td colSpan={5} className="p-10 text-center italic text-gray-400">No staff members found.</td></tr>
-              ) : (
-                filteredStaff.map((s, index) => {
-                  const isSuperAdmin = s?.roleId?.slug === 'super-admin';
-                  const isSelf = currentUserId && s?._id === currentUserId;
-                  const roleName = s?.roleId?.name || (typeof s?.roleId === 'string' ? 'Assigned' : 'No Role');
-
-                  return (
-                    <tr key={s?._id || index} className="hover:bg-[#fbfbfb] group transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 bg-[#f0f6fb] border border-[#2271b1]/10 rounded-full flex items-center justify-center text-[#2271b1] font-bold">
-                              {(s?.name || "U").charAt(0).toUpperCase()}
-                           </div>
-                           <div className="flex flex-col min-w-0">
-                              <span className="font-bold text-[#1d2327]">{s?.name || "Unnamed"}</span>
-                              <div className="flex items-center gap-2 text-[11px] text-[#646970]">
-                                 <Mail className="w-3 h-3" /> {s?.email || "No email"}
-                              </div>
-                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
-                          isSuperAdmin ? 'bg-[#2271b1] text-white' : 'bg-[#d9ebf5] text-[#1a4a6e]'
-                        }`}>
-                          {roleName}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                         {isSuperAdmin || isSelf ? (
-                            <div className="flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 text-gray-400 cursor-default">
-                               <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                               {s?.status || "Active"}
-                            </div>
-                         ) : (
-                            <button 
-                              onClick={() => toggleStatus(s._id, s.status)}
-                              className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded transition-colors ${
-                                s?.status === 'Active' ? 'text-green-600 hover:bg-green-50' : 'text-red-600 hover:bg-red-50'
-                              }`}
-                            >
-                               <div className={`w-1.5 h-1.5 rounded-full ${s?.status === 'Active' ? 'bg-green-600' : 'bg-red-600'}`} />
-                               {s?.status || "Active"}
-                            </button>
-                         )}
-                      </td>
-                      <td className="hidden md:table-cell px-4 py-4 text-[#646970]" suppressHydrationWarning>
-                         {formatDate(s?.security?.lastLogin)}
-                      </td>
-                       <td className="px-4 py-4 text-center">
-                          <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
-                              {!isSuperAdmin && !isSelf && (
-                                 <button 
-                                   title="Delete Staff Member" 
-                                   onClick={() => setDeleteTarget({ open: true, id: s._id, name: s.name, loading: false })}
-                                   className="p-1.5 text-[#646970] hover:text-red-600 hover:bg-red-50 rounded"
-                                 >
-                                   <UserX className="w-4 h-4" />
-                                 </button>
-                              )}
-                              {isSuperAdmin && (
-                                 <div title="System Protected" className="p-1.5 text-gray-300">
-                                    <Lock className="w-4 h-4" />
-                                 </div>
-                              )}
-                              <button 
-                                title="Reset Password" 
-                                onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
-                                className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
-                              >
-                                <Key className="w-4 h-4" />
-                              </button>
-                              <button 
-                                title="Edit Member" 
-                                onClick={() => router.push(`/admin/settings/team/${s._id}`)}
-                                className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                           </div>
-                        </td>
-                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-          </div>
-        </div>
-
-        {/* Delete Confirmation Modal */}
-        {deleteTarget.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
-              onClick={() => !deleteTarget.loading && setDeleteTarget({ open: false, id: null, name: "", loading: false })} 
+    <Page>
+      <PageHeader
+        title="Users"
+        actions={canCreate ? <Link href="/admin/settings/team/new" className="wp-btn">Add new user</Link> : null}
+        aside={
+          <form className="wp-search" role="search" onSubmit={runSearch}>
+            <label htmlFor="team-search" className="sr-only">Search users</label>
+            <input
+              id="team-search"
+              type="search"
+              className="wp-input"
+              placeholder="Search by name or email"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
             />
-            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 max-h-[calc(100dvh-1rem)] overflow-y-auto z-10 animate-in zoom-in-95">
-              <div className="h-1 bg-red-500 w-full" />
-              <div className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 shrink-0 rounded-full bg-red-50 flex items-center justify-center text-red-600">
-                    <Trash2 className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-bold text-neutral-900">Delete Staff Member</h3>
-                    <p className="text-xs text-neutral-500">Revoke administrative access</p>
-                  </div>
-                </div>
-                <p className="text-sm text-neutral-600 mb-6">
-                  Are you sure you want to delete <span className="font-semibold text-neutral-900">{deleteTarget.name}</span>? This action cannot be undone and will revoke their access immediately.
-                </p>
-                <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5">
-                  <button
-                    type="button"
-                    disabled={deleteTarget.loading}
-                    onClick={() => setDeleteTarget({ open: false, id: null, name: "", loading: false })}
-                    className="w-full xs:w-auto px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={deleteTarget.loading}
-                    onClick={confirmDeleteStaff}
-                    className="w-full xs:w-auto justify-center px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 active:scale-[0.98] transition-all flex items-center gap-2"
-                  >
-                    {deleteTarget.loading ? "Deleting..." : "Delete Member"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+            <button type="submit" className="wp-btn">Search Users</button>
+          </form>
+        }
+      />
 
-        {/* Reset Password Modal */}
-        {passwordTarget.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
-              onClick={() => !passwordTarget.loading && setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })} 
-            />
-            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 max-h-[calc(100dvh-1rem)] overflow-y-auto z-10 animate-in zoom-in-95">
-              <div className="h-1 bg-[#2271b1] w-full" />
-              <form onSubmit={submitResetPassword} className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 shrink-0 rounded-full bg-[#f0f6fb] flex items-center justify-center text-[#2271b1]">
-                    <Key className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-bold text-neutral-900">Update Password</h3>
-                    <p className="text-xs text-neutral-500">For {passwordTarget.name}</p>
-                  </div>
-                </div>
-                <div className="space-y-3 mb-6">
-                  <label className="block text-xs font-semibold text-neutral-700">
-                    New Password <span className="text-neutral-400 font-normal">(min. 6 characters)</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={passwordTarget.showPass ? "text" : "password"}
-                      autoFocus
-                      required
-                      minLength={6}
-                      placeholder="Enter new password..."
-                      value={passwordTarget.password}
-                      onChange={(e) => setPasswordTarget(prev => ({ ...prev, password: e.target.value }))}
-                      className="w-full pl-3 pr-10 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setPasswordTarget(prev => ({ ...prev, showPass: !prev.showPass }))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
-                    >
-                      {passwordTarget.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5">
-                  <button
-                    type="button"
-                    disabled={passwordTarget.loading}
-                    onClick={() => setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })}
-                    className="w-full xs:w-auto px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={passwordTarget.loading}
-                    className="w-full xs:w-auto justify-center px-4 py-2 rounded-lg bg-[#2271b1] text-white text-xs font-semibold hover:bg-[#135e96] active:scale-[0.98] transition-all flex items-center gap-2"
-                  >
-                    {passwordTarget.loading ? "Saving..." : "Update Password"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+      {loadError && <Notice type="error" onDismiss={() => setLoadError("")}>{loadError}</Notice>}
+
+      <div className="wp-subsub">
+        {viewLink("all", "All", counts.all)}
+        <span className="wp-sep" aria-hidden="true">|</span>
+        {viewLink("active", "Active", counts.active)}
+        <span className="wp-sep" aria-hidden="true">|</span>
+        {viewLink("suspended", "Suspended", counts.suspended)}
+        <span className="wp-sep" aria-hidden="true">|</span>
+        {viewLink("trash", "Trash", counts.trash)}
       </div>
-    </AdminPageLayout>
-    </RequirePermission>
+
+      <div className="wp-toolbar">
+        {canDelete && (
+          <>
+            <label htmlFor="team-bulk" className="sr-only">Select bulk action</label>
+            <select id="team-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+              <option>Bulk actions</option>
+              {isTrash ? (
+                <>
+                  <option>Restore</option>
+                  <option>Delete Permanently</option>
+                </>
+              ) : (
+                <option>Move to Trash</option>
+              )}
+            </select>
+            <button type="button" className="wp-btn" onClick={handleBulk}>Apply</button>
+          </>
+        )}
+        <label htmlFor="team-role-filter" className="sr-only">Filter by role</label>
+        <select
+          id="team-role-filter"
+          className="wp-select"
+          value={roleFilter}
+          onChange={(e) => { setRoleFilter(e.target.value); setPage(1); setSelectedIds([]); }}
+        >
+          <option value="">All roles</option>
+          {roleOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+        <span className="wp-spacer" />
+        <span className="wp-pages">{itemsLabel}</span>
+      </div>
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {loading ? (
+              [0, 1, 2].map((i) => <tr key={i}><td colSpan={colCount}><Skeleton height={18} /></td></tr>)
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={colCount} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>{isTrash ? "No users found in Trash." : "No users found."}</td></tr>
+            ) : rows.map((s) => {
+              const rules = rowRules(s);
+              const roleName = s?.roleId?.name || "No role";
+              const status = s?.status || "Active";
+              const isActive = status === "Active";
+              return (
+                <tr key={s._id} className={selectedIds.includes(s._id) ? "is-selected" : undefined}>
+                  {canDelete && (
+                    <td className="wp-check-col">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${nameOf(s)}`}
+                        checked={selectedIds.includes(s._id)}
+                        disabled={!isTrash && !rules.canTrash}
+                        onChange={() => toggleOne(s._id)}
+                      />
+                    </td>
+                  )}
+                  <td>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="wp-avatar" aria-hidden="true">{(s?.name || "U").charAt(0).toUpperCase()}</div>
+                      <div className="min-w-0">
+                        {isTrash ? (
+                          <span className="wp-row-title" style={{ color: "inherit", overflowWrap: "anywhere" }}>{s?.name || "Unnamed"}</span>
+                        ) : (
+                          <Link href={`/admin/settings/team/${s._id}`} className="wp-row-title" style={{ overflowWrap: "anywhere" }}>
+                            {s?.name || "Unnamed"}
+                          </Link>
+                        )}
+                        {rules.isSelf && <span className="wp-muted"> — You</span>}
+                        <div className="wp-mobile-meta" style={{ overflowWrap: "anywhere" }}>{s?.email || "No email"}</div>
+                        <div className="wp-row-actions">
+                          {isTrash ? (
+                            <>
+                              <button type="button" onClick={() => handleRestore(s)}>Restore</button>
+                              <button type="button" className="is-danger" onClick={() => handleDeletePermanently(s)}>Delete Permanently</button>
+                            </>
+                          ) : (
+                            <>
+                              <Link href={`/admin/settings/team/${s._id}`}>{canEdit ? "Edit" : "View"}</Link>
+                              {rules.canToggle && (
+                                <button type="button" onClick={() => toggleStatus(s)}>{isActive ? "Suspend" : "Activate"}</button>
+                              )}
+                              {rules.canResetPassword && (
+                                <button type="button" onClick={() => setPasswordTarget({ ...EMPTY_PASSWORD, open: true, id: s._id, name: s.name })}>
+                                  Reset password
+                                </button>
+                              )}
+                              {rules.canTrash && (
+                                <button type="button" className="is-danger" onClick={() => handleTrash(s)}>Trash</button>
+                              )}
+                              {rules.isSuperAdmin && !rules.canTrash && !rules.isSelf && <span className="is-muted">Protected</span>}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm" style={{ overflowWrap: "anywhere" }}>
+                    {s?.email ? <a href={`mailto:${s.email}`} className="wp-link">{s.email}</a> : <span className="wp-muted">No email</span>}
+                  </td>
+                  <td>{roleName}</td>
+                  <td>
+                    <span className={`wp-pill wp-pill-sm ${isTrash ? "wp-st-draft" : isActive ? "wp-st-published" : "wp-st-cancelled"}`}>
+                      {isTrash ? "Trashed" : status}
+                    </span>
+                  </td>
+                  <td className="wp-hide-sm wp-muted" suppressHydrationWarning>
+                    {isTrash
+                      ? (s.deletedAt ? formatDate(s.deletedAt) : "—")
+                      : (s?.security?.lastLogin ? formatDate(s.security.lastLogin) : "Never")}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>{headerRow}</tfoot>
+        </table>
+      </div>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <span className="wp-pages">
+          {itemsLabel}
+          {pages > 1 && (
+            <>
+              <button type="button" className="wp-pager" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => { setSelectedIds([]); setPage(currentPage - 1); }}><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
+              <span>{currentPage} of {pages}</span>
+              <button type="button" className="wp-pager" aria-label="Next page" disabled={currentPage >= pages} onClick={() => { setSelectedIds([]); setPage(currentPage + 1); }}><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
+            </>
+          )}
+        </span>
+      </div>
+
+      {passwordTarget.open && (
+        <div
+          className="wp-modal-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget && !passwordTarget.loading) setPasswordTarget(EMPTY_PASSWORD); }}
+        >
+          <div className="wp-modal" style={{ maxWidth: 460 }} role="dialog" aria-modal="true" aria-labelledby="reset-pass-title">
+            <form onSubmit={submitResetPassword}>
+              <div className="wp-modal-head">
+                <h2 id="reset-pass-title" style={{ minWidth: 0, overflowWrap: "anywhere" }}>Set new password — {passwordTarget.name}</h2>
+                <button type="button" className="wp-notice-dismiss" aria-label="Close" disabled={passwordTarget.loading} onClick={() => setPasswordTarget(EMPTY_PASSWORD)}>
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="wp-modal-body">
+                <label htmlFor="reset-pass-input" className="wp-label">New password</label>
+                <div className="flex gap-2">
+                  <input
+                    id="reset-pass-input"
+                    type={passwordTarget.showPass ? "text" : "password"}
+                    autoFocus
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    placeholder="Enter new password"
+                    value={passwordTarget.password}
+                    onChange={(e) => setPasswordTarget((prev) => ({ ...prev, password: e.target.value }))}
+                    className="wp-input"
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  <button
+                    type="button"
+                    className="wp-btn"
+                    aria-label={passwordTarget.showPass ? "Hide password" : "Show password"}
+                    onClick={() => setPasswordTarget((prev) => ({ ...prev, showPass: !prev.showPass }))}
+                  >
+                    {passwordTarget.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {passwordTarget.showPass ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <p className="wp-desc">Minimum 6 characters.</p>
+              </div>
+              <div className="wp-modal-foot">
+                <button type="button" className="wp-btn" disabled={passwordTarget.loading} onClick={() => setPasswordTarget(EMPTY_PASSWORD)}>Cancel</button>
+                <button type="submit" className="wp-btn wp-btn-primary" disabled={passwordTarget.loading}>
+                  {passwordTarget.loading ? "Saving…" : "Update password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </Page>
   );
 }

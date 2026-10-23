@@ -14,23 +14,30 @@ export async function GET(req) {
 
   await dbConnect();
   const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "20");
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10) || 20));
   const skip = (page - 1) * limit;
   const search = searchParams.get("search") || "";
   const paymentStatus = searchParams.get("paymentStatus") || "all";
+  // Custom orders are ordinary orders, so Trash is the orders soft delete (isDeleted).
+  const trash = searchParams.get("trash") === "true";
 
-  const query = { "payment.method": { $in: CUSTOM_ORDER_PAYMENT_METHODS } };
-  if (paymentStatus !== "all") query["payment.status"] = paymentStatus;
-  if (search) {
-    query.$or = [
-      { orderNumber: { $regex: search, $options: "i" } },
-      { "customer.email": { $regex: search, $options: "i" } },
-      { "shippingAddress.fullName": { $regex: search, $options: "i" } },
-      { "customJacketSnapshot.jacketType": { $regex: search, $options: "i" } },
-      { "items.name": { $regex: search, $options: "i" } },
-    ];
-  }
+  const base = { "payment.method": { $in: CUSTOM_ORDER_PAYMENT_METHODS } };
+  const query = { ...base, isDeleted: trash ? true : { $ne: true } };
+  if (!trash && paymentStatus !== "all") query["payment.status"] = paymentStatus;
+  const searchOr = search
+    ? (() => {
+        const rx = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+        return [
+          { orderNumber: rx },
+          { "customer.email": rx },
+          { "shippingAddress.fullName": rx },
+          { "customJacketSnapshot.jacketType": rx },
+          { "items.name": rx },
+        ];
+      })()
+    : null;
+  if (searchOr) query.$or = searchOr;
 
   try {
     const [items, total] = await Promise.all([
@@ -40,7 +47,7 @@ export async function GET(req) {
 
     // Self-heal: reconcile any pending orders with an active payment link against
     // Stripe directly, in case the checkout.session.completed webhook was missed.
-    const pendingWithLink = items.filter((o) => o.payment?.status !== "Paid" && o.paymentLink?.stripePaymentLinkId);
+    const pendingWithLink = trash ? [] : items.filter((o) => o.payment?.status !== "Paid" && o.paymentLink?.stripePaymentLinkId);
     if (pendingWithLink.length > 0) {
       await Promise.all(pendingWithLink.map(async (lean) => {
         const doc = await Order.findById(lean._id);
@@ -50,9 +57,14 @@ export async function GET(req) {
       }));
     }
 
-    const counts = await Order.aggregate([
-      { $match: { "payment.method": { $in: CUSTOM_ORDER_PAYMENT_METHODS } } },
-      { $group: { _id: "$payment.status", count: { $sum: 1 } } },
+    // Tab counts respect the search term (same as the Orders list).
+    const countMatch = { ...base, ...(searchOr ? { $or: searchOr } : {}) };
+    const [counts, trashCount] = await Promise.all([
+      Order.aggregate([
+        { $match: { ...countMatch, isDeleted: { $ne: true } } },
+        { $group: { _id: "$payment.status", count: { $sum: 1 } } },
+      ]),
+      Order.countDocuments({ ...countMatch, isDeleted: true }),
     ]);
 
     const paymentStatusCounts = {
@@ -62,12 +74,13 @@ export async function GET(req) {
       Failed: counts.find((c) => c._id === "Failed")?.count || 0,
       Refunded: counts.find((c) => c._id === "Refunded")?.count || 0,
       "Partially Refunded": counts.find((c) => c._id === "Partially Refunded")?.count || 0,
+      trash: trashCount,
     };
 
     return NextResponse.json({
       success: true,
       items,
-      pagination: { total, pages: Math.ceil(total / limit), page, limit },
+      pagination: { total, pages: Math.max(1, Math.ceil(total / limit)), page, limit },
       counts: paymentStatusCounts,
     });
   } catch (err) {

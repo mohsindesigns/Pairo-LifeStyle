@@ -5,10 +5,18 @@ import Submission from "@/models/Submission";
 import AuditLog from "@/models/AuditLog";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
+import {
+  NOT_TRASHED, TRASHED, buildListQuery, buildStatusCounts, pageInfo, parsePaging,
+  validIds, trashUpdate, restoreUpdate,
+} from "./inbox-utils";
+
+const SUBMISSION_STATUSES = ["New", "Read", "Replied", "Archived", "Spam"];
+const SEARCH_FIELDS = ["name", "email", "phone", "subject", "message"];
+const SORTABLE = ["createdAt", "updatedAt", "name", "email", "status", "priority"];
 
 /**
  * GET /api/admin/submissions
- * Enterprise-grade fetch with pagination, filtering, searching, and sorting.
+ * ?status=all|New|Read|Replied|Archived|Spam|trash &search= &page= &limit= &priority= &sortBy= &sortOrder=
  */
 export async function GET(req) {
   const session = await getServerSession(authOptions);
@@ -21,66 +29,40 @@ export async function GET(req) {
   }
 
   await dbConnect();
-  
+
   const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "20");
-  const skip = (page - 1) * limit;
-  
+  const { page, limit, skip } = parsePaging(searchParams);
   const search = searchParams.get("search") || "";
   const status = searchParams.get("status") || "all";
   const priority = searchParams.get("priority") || "all";
   const assignedTo = searchParams.get("assignedTo") || "all";
-  const sortBy = searchParams.get("sortBy") || "createdAt";
-  const sortOrder = searchParams.get("sortOrder") || "desc";
+  const sortBy = SORTABLE.includes(searchParams.get("sortBy")) ? searchParams.get("sortBy") : "createdAt";
+  const sortOrder = searchParams.get("sortOrder") === "asc" ? 1 : -1;
 
-  // Build Query
-  const query = { isDeleted: false };
-  
-  if (status !== "all") query.status = status;
-  if (priority !== "all") query.priority = priority;
-  if (assignedTo !== "all") query.assignedTo = assignedTo;
-
-  if (search) {
-    // Fuzzy search using text index
-    query.$text = { $search: search };
-  }
+  const query = buildListQuery({ view: status, statuses: SUBMISSION_STATUSES, search, searchFields: SEARCH_FIELDS });
+  if (["Low", "Medium", "High"].includes(priority)) query.priority = priority;
+  if (assignedTo !== "all" && validIds([assignedTo]).length) query.assignedTo = assignedTo;
 
   try {
-    const [items, total] = await Promise.all([
+    const [items, total, counts, trash] = await Promise.all([
       Submission.find(query)
         .populate("assignedTo", "name email")
-        .sort({ [sortBy]: sortOrder === "desc" ? -1 : 1 })
+        .sort({ [sortBy]: sortOrder, _id: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      Submission.countDocuments(query)
+      Submission.countDocuments(query),
+      Submission.aggregate([
+        { $match: NOT_TRASHED },
+        { $group: { _id: "$status", count: { $sum: 1 } } }
+      ]),
+      Submission.countDocuments(TRASHED),
     ]);
-
-    // Summary counts for filter bar
-    const counts = await Submission.aggregate([
-      { $match: { isDeleted: false } },
-      { $group: { _id: "$status", count: { $sum: 1 } } }
-    ]);
-
-    const statusCounts = {
-      all: counts.reduce((acc, curr) => acc + curr.count, 0),
-      New: counts.find(c => c._id === "New")?.count || 0,
-      Read: counts.find(c => c._id === "Read")?.count || 0,
-      Replied: counts.find(c => c._id === "Replied")?.count || 0,
-      Archived: counts.find(c => c._id === "Archived")?.count || 0,
-      Spam: counts.find(c => c._id === "Spam")?.count || 0,
-    };
 
     return NextResponse.json({
       items,
-      pagination: {
-        total,
-        pages: Math.ceil(total / limit),
-        page,
-        limit
-      },
-      counts: statusCounts
+      pagination: pageInfo(total, page, limit),
+      counts: buildStatusCounts(counts, SUBMISSION_STATUSES, trash),
     });
 
   } catch (error) {
@@ -89,9 +71,22 @@ export async function GET(req) {
   }
 }
 
+// action -> [permission, filter extra, $set] ; "delete" is handled separately.
+const BULK_ACTIONS = {
+  markRead: { permission: "submissions.view", filter: { ...NOT_TRASHED, status: "New" }, set: () => ({ status: "Read", lastViewedAt: new Date() }) },
+  markUnread: { permission: "submissions.view", filter: { ...NOT_TRASHED, status: { $in: ["Read"] } }, set: () => ({ status: "New" }) },
+  archive: { permission: "submissions.assign", filter: { ...NOT_TRASHED }, set: () => ({ status: "Archived" }) },
+  markSpam: { permission: "submissions.manage_spam", filter: { ...NOT_TRASHED }, set: () => ({ status: "Spam" }) },
+  notSpam: { permission: "submissions.manage_spam", filter: { ...NOT_TRASHED, status: "Spam" }, set: () => ({ status: "Read" }) },
+  trash: { permission: "submissions.delete", filter: { ...NOT_TRASHED }, set: () => trashUpdate() },
+  restore: { permission: "submissions.delete", filter: { ...TRASHED }, set: () => restoreUpdate() },
+};
+
 /**
  * POST /api/admin/submissions
- * Bulk actions (trash, restore, mark read, etc.)
+ * Bulk actions: { action, ids } where action is markRead | markUnread | archive | markSpam |
+ * notSpam | trash | restore | delete (permanent, only for items already in the Trash).
+ * Responds with { processed, failed } so the UI can report partial results.
  */
 export async function POST(req) {
   const session = await getServerSession(authOptions);
@@ -100,56 +95,49 @@ export async function POST(req) {
   }
 
   await dbConnect();
-  
+
   try {
-    const { action, ids } = await req.json();
-    
-    if (!ids || !Array.isArray(ids)) {
+    const body = await req.json().catch(() => ({}));
+    const { action } = body;
+    if (!Array.isArray(body.ids) || body.ids.length === 0) {
       return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
     }
+    const ids = validIds(body.ids);
 
-    let update = {};
-    let permissionRequired = "submissions.delete";
-
-    switch (action) {
-      case "trash":
-        update = { isDeleted: true, status: 'Trash' };
-        permissionRequired = "submissions.delete";
-        break;
-      case "restore":
-        update = { isDeleted: false, status: 'Read' };
-        permissionRequired = "submissions.delete";
-        break;
-      case "markRead":
-        update = { status: 'Read' };
-        permissionRequired = "submissions.view";
-        break;
-      case "markSpam":
-        update = { status: 'Spam' };
-        permissionRequired = "submissions.manage_spam";
-        break;
-      default:
-        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-    }
-
-    if (!can(session.user, permissionRequired)) {
+    const def = BULK_ACTIONS[action];
+    const permission = action === "delete" ? "submissions.delete" : def?.permission;
+    if (!permission) return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    if (!can(session.user, permission)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    await Submission.updateMany(
-      { _id: { $in: ids } },
-      { $set: update }
-    );
+    let processed = 0;
+    if (ids.length > 0) {
+      if (action === "delete") {
+        const r = await Submission.deleteMany({ _id: { $in: ids }, ...TRASHED });
+        processed = r.deletedCount || 0;
+      } else {
+        const r = await Submission.updateMany({ _id: { $in: ids }, ...def.filter }, { $set: def.set() });
+        // An item already in the requested state (e.g. "mark read" on a read one) is not a failure.
+        processed = action === "markRead" || action === "markUnread"
+          ? await Submission.countDocuments({ _id: { $in: ids }, ...NOT_TRASHED })
+          : (r.matchedCount ?? r.modifiedCount ?? 0);
+      }
+      if (action === "restore") {
+        // Older records were trashed by setting status "Trash"; bring them back as "Read".
+        await Submission.updateMany({ _id: { $in: ids }, status: "Trash" }, { $set: { status: "Read" } });
+      }
+    }
 
-    // Audit Log
     await AuditLog.create({
       staffId: session.user.id,
-      action: `BULK_${action.toUpperCase()}`,
+      action: action === "delete" ? "BULK_PERMANENT_DELETE" : `BULK_${String(action).toUpperCase()}`,
       resource: 'submissions',
-      details: { count: ids.length, ids }
-    });
+      details: { count: processed, ids }
+    }).catch(() => null);
 
-    return NextResponse.json({ success: true, message: `Successfully processed ${ids.length} items` });
+    const failed = body.ids.length - processed;
+    return NextResponse.json({ success: true, processed, failed: Math.max(0, failed) });
 
   } catch (error) {
     console.error("[SUBMISSIONS_BULK_ERROR]", error);

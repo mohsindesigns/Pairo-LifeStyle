@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from 'next/dynamic';
 import { toast } from "react-hot-toast";
@@ -65,8 +65,13 @@ import MediaPicker from "./MediaPicker";
 import SEOConfigPanel from "./SEOConfigPanel";
 import MediaPickerModal from "./MediaPickerModal";
 import GallerySorter from "./GallerySorter";
-import AdminPageLayout from "./AdminPageLayout";
+import Link from "next/link";
+import { Page, PageHeader, Postbox, Notice } from "./ui";
 import { getSwatchBackground } from "@/lib/swatchRenderer";
+import { getProductUrl } from "@/lib/routes";
+import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange } from "@/components/admin/slugChange";
+import { validatePrices, priceWarning, buildVariantSku } from "@/lib/admin-products-utils";
 
 // Tiny inline image button — opens MediaPickerModal without the full MediaPicker drop-zone UI
 function InlinePick({ value, onChange, label = "+ Image", doneLabel = "✓ Change", title = "Pick image" }) {
@@ -76,11 +81,9 @@ function InlinePick({ value, onChange, label = "+ Image", doneLabel = "✓ Chang
          <button
             type="button"
             onClick={() => setOpen(true)}
-            className={`h-7 px-2.5 rounded text-[10px] font-bold border transition-colors whitespace-nowrap ${
-               value
-                  ? "border-[#2271b1] text-[#2271b1] bg-blue-50 hover:bg-blue-100"
-                  : "border-gray-200 text-gray-400 bg-white hover:border-[#2271b1] hover:text-[#2271b1]"
-            }`}
+            title={title}
+            className="wp-btn"
+            style={{ minHeight: 28, padding: "0 8px", ...(value ? { background: "#f0f6fc" } : {}) }}
          >
             {value ? doneLabel : label}
          </button>
@@ -106,6 +109,7 @@ function toSlug(str) {
 
 export default function ProductForm({ productId = null }) {
    const router = useRouter();
+   const { showConfirm } = usePopup();
    const [loading, setLoading] = useState(productId ? true : false);
    const [saving, setSaving] = useState(false);
    const [activeTab, setActiveTab] = useState("general");
@@ -119,18 +123,11 @@ export default function ProductForm({ productId = null }) {
    const [categories, setCategories] = useState([]);
    const [sizeCharts, setSizeCharts] = useState([]);
 
-   const getPreviewCategorySlug = () => {
-      const catsList = Array.isArray(categories) ? categories : [];
-      if (formData.primaryCategory) {
-         const match = catsList.find(c => c?._id === formData.primaryCategory);
-         if (match && match.slug) return match.slug;
-      }
-      if (formData.categories && Array.isArray(formData.categories) && formData.categories.length > 0) {
-         const match = catsList.find(c => c?._id === formData.categories[0]);
-         if (match && match.slug) return match.slug;
-      }
-      return "shop";
-   };
+   // Per-attribute draft text for the "Add value…" inputs (keyed by attribute index)
+   const [attrValueDrafts, setAttrValueDrafts] = useState({});
+   const focusAppliedRef = useRef(false);
+   // Slug the product was loaded / last saved with: changing it asks "Change URL?" first
+   const savedSlugRef = useRef(null);
 
    const [formData, setFormData] = useState({
       name: "",
@@ -212,6 +209,7 @@ export default function ProductForm({ productId = null }) {
                   const prodData = await prodRes.json().catch(() => null);
                   if (prodData && typeof prodData === "object" && prodData._id) {
                      setSlugManuallyEdited(!!prodData.slugManuallyEdited);
+                     savedSlugRef.current = prodData.slug || null;
                      setFormData({
                         ...prodData,
                         productType: prodData.productType || "simple",
@@ -272,12 +270,24 @@ export default function ProductForm({ productId = null }) {
       fetchData();
     }, [productId]);
 
+    // Apply ?focus= / ?tab= once, after the product data has loaded
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-           const params = new URLSearchParams(window.location.search);
-           const focus = params.get("focus");
-           const tab = params.get("tab");
-           
+        if (loading || focusAppliedRef.current || typeof window === 'undefined') return;
+        focusAppliedRef.current = true;
+        const params = new URLSearchParams(window.location.search);
+        const focus = params.get("focus");
+        const tab = params.get("tab");
+        const productType = formData.productType;
+        const focusEl = (...ids) => setTimeout(() => {
+           const el = ids.map(id => document.getElementById(id)).find(Boolean);
+           if (el) {
+              el.focus();
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+           }
+        }, 300);
+
+        // Deferred so state isn't set synchronously inside the effect body
+        Promise.resolve().then(() => {
            if (focus === "seo" || tab === "seo") {
               setActiveFormTab("seo");
            } else if (focus === "content" || tab === "content") {
@@ -286,24 +296,14 @@ export default function ProductForm({ productId = null }) {
 
            if (focus === "pricing" || focus === "price" || tab === "general") {
               setActiveTab("general");
-              setTimeout(() => {
-                 const el = document.getElementById("sale-price-input");
-                 if (el) {
-                    el.focus();
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
-                 }
-              }, 300);
+              focusEl("sale-price-input");
            } else if (focus === "stock" || focus === "inventory" || tab === "inventory") {
               setActiveTab("inventory");
-              setTimeout(() => {
-                 const el = document.getElementById("stock-input");
-                 if (el) {
-                    el.focus();
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
-                 }
-              }, 300);
+              // The quantity field only renders while stock tracking is on; else focus the toggle
+              focusEl("stock-input", "manage-stock-input");
            } else if (focus === "variants" || tab === "variants") {
-              setActiveTab("variants");
+              // The Variants tab only exists for variable products
+              setActiveTab(productType === "variable" ? "variants" : productType === "gifting" ? "gifting" : "general");
            } else if (focus === "sizeguide" || focus === "size" || tab === "sizeguide") {
               setActiveTab("sizeguide");
            } else if (focus === "faqs" || tab === "faqs") {
@@ -311,14 +311,41 @@ export default function ProductForm({ productId = null }) {
            } else if (focus === "stats" || tab === "stats") {
               setActiveTab("stats");
            }
-        }
-     }, [loading]);
+        });
+     }, [loading, formData.productType]);
 
-   const handleSubmit = async (e) => {
+   // options.asDraft: "Save Draft" always saves with status Draft
+   const handleSubmit = async (e, options = {}) => {
       if (e) e.preventDefault();
-      setSaving(true);
+      const asDraft = options.asDraft === true;
+      const priceError = validatePrices(formData.compareAtPrice, formData.price);
+      if (priceError) {
+         toast.error(priceError);
+         setActiveTab("general");
+         return;
+      }
+      const warning = priceWarning(formData.compareAtPrice, formData.price);
+      if (warning) toast(warning);
+      if (formData.productType === "variable") {
+         for (const comb of formData.variantCombinations || []) {
+            const combError = validatePrices(comb.compareAtPrice, comb.price);
+            if (combError) {
+               toast.error(`${comb.title || "Variant"}: ${combError}`);
+               setActiveTab("variants");
+               return;
+            }
+         }
+      }
       // Auto-generate slug from name if still empty
       const finalSlug = formData.slug ? formData.slug : toSlug(formData.name);
+      // Existing product whose permalink changed: confirm first; cancel saves nothing
+      if (productId && !(await confirmSlugChange(showConfirm, {
+         savedSlug: savedSlugRef.current,
+         nextSlug: finalSlug,
+         normalize: (slug) => toSlug(String(slug ?? "")),
+         toPath: (slug) => getProductUrl({ slug }),
+      }))) return;
+      setSaving(true);
       
        // Synchronize parent prices and stock to combinations for variable products only if not explicitly set
        let updatedCombinations = formData.variantCombinations || [];
@@ -359,6 +386,7 @@ export default function ProductForm({ productId = null }) {
       };
       const normalizedData = {
          ...formData,
+         ...(asDraft ? { status: "Draft" } : {}),
          corporateGifting,
          slug: finalSlug,
          slugManuallyEdited,
@@ -377,7 +405,14 @@ export default function ProductForm({ productId = null }) {
          });
           if (res.ok) {
              const savedProduct = await res.json();
-             toast.success(productId ? "Product updated successfully!" : "Product created successfully!");
+             if (asDraft) setFormData(prev => ({ ...prev, status: "Draft" }));
+             savedSlugRef.current = savedProduct?.slug || toSlug(finalSlug) || savedSlugRef.current;
+             // The server keeps slugs unique (adds -1, -2… on a clash): show the slug actually saved
+             if (savedProduct?.slug && savedProduct.slug !== finalSlug) {
+                setFormData(prev => ({ ...prev, slug: savedProduct.slug }));
+                toast(`That permalink was taken, so it was saved as "${savedProduct.slug}".`);
+             }
+             toast.success(asDraft ? "Draft saved." : productId ? "Product updated successfully!" : "Product created successfully!");
              if (!productId && savedProduct._id) {
                 router.push(`/admin/products/${savedProduct._id}`);
              }
@@ -394,31 +429,70 @@ export default function ProductForm({ productId = null }) {
       }
    };
 
+   const handleTrash = async () => {
+      if (!productId) return;
+      if (!(await showConfirm("Move this product to trash?", "Move to Trash", { confirmText: "Move to Trash", danger: true }))) return;
+      try {
+         const res = await fetch(`/api/admin/products?id=${productId}`, { method: "DELETE" });
+         if (res.ok) {
+            toast.success("Product moved to trash.");
+            router.push("/admin/products");
+         } else {
+            const errData = await res.json().catch(() => ({}));
+            toast.error(errData.error || "Failed to move product to trash");
+         }
+      } catch (err) {
+         console.error(err);
+         toast.error("Failed to move product to trash");
+      }
+   };
+
+   // Restore a trashed product straight from its edit screen (server puts back its old status)
+   const handleRestore = async () => {
+      if (!productId) return;
+      try {
+         const res = await fetch("/api/admin/products", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: productId, isDeleted: false })
+         });
+         const data = await res.json().catch(() => ({}));
+         if (!res.ok) throw new Error(data?.error || "Failed to restore product");
+         setFormData(prev => ({ ...prev, isDeleted: false, deletedAt: null, status: data.status || prev.status }));
+         toast.success("Product restored.");
+      } catch (err) {
+         toast.error(err.message || "Failed to restore product");
+      }
+   };
+
    const addAttribute = () => {
-      setFormData({
-         ...formData,
-         attributes: [...(formData.attributes || []), { name: "", type: "custom", values: [] }]
-      });
+      setFormData(prev => ({
+         ...prev,
+         attributes: [...(prev.attributes || []), { name: "", type: "custom", values: [] }]
+      }));
    };
 
    const addAttributeValue = (aIdx, label) => {
       if (!label) return;
-      const newAttrs = [...(formData.attributes || [])];
-      const type = newAttrs[aIdx].type;
-      newAttrs[aIdx].values.push({
-         label,
-         value: label,
-         hex: type === "color" ? "#000000" : "",
-         colorMode: "single",
-         hex2: "",
-         hex3: "",
-         hex4: "",
-         texture: "",
-         image: "",
-         swatchType: "color", // "color" | "image"
-         variantImage: ""
-      });
-      setFormData({ ...formData, attributes: newAttrs });
+      setFormData(prev => ({
+         ...prev,
+         attributes: (prev.attributes || []).map((attr, i) => i !== aIdx ? attr : {
+            ...attr,
+            values: [...(attr.values || []), {
+               label,
+               value: label,
+               hex: attr.type === "color" ? "#000000" : "",
+               colorMode: "single",
+               hex2: "",
+               hex3: "",
+               hex4: "",
+               texture: "",
+               image: "",
+               swatchType: "color", // "color" | "image"
+               variantImage: ""
+            }]
+         })
+      }));
    };
 
    const generateCombinations = () => {
@@ -438,16 +512,17 @@ export default function ProductForm({ productId = null }) {
       };
 
       const combos = combine(attrs);
-      const newCombos = combos.map(c => ({
-         title: c.map(v => v.label).join(" / "),
-         price: formData.price,
-         compareAtPrice: formData.compareAtPrice,
-         stock: formData.stock,
-         sku: `${formData.sku}-${c.map(v => v.label).join("-")}`.toUpperCase(),
-         image: c.find(v => v.variantImage)?.variantImage || ""
+      setFormData(prev => ({
+         ...prev,
+         variantCombinations: combos.map(c => ({
+            title: c.map(v => v.label).join(" / "),
+            price: prev.price,
+            compareAtPrice: prev.compareAtPrice,
+            stock: prev.stock,
+            sku: buildVariantSku(prev.sku, c.map(v => v.label)),
+            image: c.find(v => v.variantImage)?.variantImage || ""
+         }))
       }));
-
-      setFormData({ ...formData, variantCombinations: newCombos });
    };
 
    const addTemplate = (type) => {
@@ -475,66 +550,84 @@ export default function ProductForm({ productId = null }) {
          }
       };
       if (templates[type]) {
-         setFormData({
-            ...formData,
-            attributes: [...(formData.attributes || []), templates[type]]
-         });
+         setFormData(prev => ({
+            ...prev,
+            attributes: [...(prev.attributes || []), templates[type]]
+         }));
       }
    };
 
-   if (loading) return <div className="p-4 sm:p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
+   if (loading) return (
+      <Page>
+         <p className="wp-muted" role="status" style={{ padding: "16px 0" }}>Loading editor...</p>
+      </Page>
+   );
 
    if (productId && !formData.name) {
       return (
-         <div className="p-4 sm:p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
-            <div className="bg-white p-4 sm:p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
-               <h2 className="text-[#d63638] font-bold text-[16px] mb-2">
-                  Failed to load product data
-               </h2>
-               <p className="text-gray-600 text-[13px] mb-6 leading-relaxed">
-                  Your administrator session may have expired, or the product you are trying to edit does not exist. Please try logging back in.
-               </p>
-               <div className="flex flex-col gap-2.5">
-                  <button 
-                     type="button" 
-                     onClick={() => window.location.reload()} 
-                     className="w-full bg-[#2271b1] text-white px-4 py-2 text-[12px] font-bold hover:bg-[#135e96] transition-all text-center rounded-sm"
-                  >
-                     Retry Connection / Reload
-                  </button>
-                  <a 
-                     href="/admin-login" 
-                     className="w-full border border-[#c3c4c7] text-gray-700 px-4 py-2 text-[12px] font-bold bg-[#f6f7f7] hover:bg-[#f0f0f1] transition-all text-center block rounded-sm"
-                  >
-                     Log In to Admin Panel
-                  </a>
-                  <a 
-                     href="/admin/products" 
-                     className="w-full text-[#2271b1] text-[12px] hover:underline text-center mt-2 block"
-                  >
-                     ← Back to Products List
-                  </a>
+         <Page>
+            <PageHeader title="Edit Product" />
+            <div className="wp-notice wp-notice-error" role="alert" style={{ alignItems: "flex-start", maxWidth: 640 }}>
+               <div style={{ flex: 1, minWidth: 0 }}>
+                  <p className="wp-strong" style={{ marginBottom: 4 }}>
+                     Failed to load product data
+                  </p>
+                  <p>
+                     Your administrator session may have expired, or the product you are trying to edit does not exist. Please try logging back in.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 12 }}>
+                     <button
+                        type="button"
+                        onClick={() => window.location.reload()}
+                        className="wp-btn wp-btn-primary"
+                     >
+                        Retry Connection / Reload
+                     </button>
+                     <Link href="/admin-login" className="wp-btn">
+                        Log In to Admin Panel
+                     </Link>
+                     <Link href="/admin/products" className="wp-link">
+                        ← Back to Products List
+                     </Link>
+                  </div>
                </div>
             </div>
-         </div>
+         </Page>
       );
    }
 
+   // Presentational helper: plain-text buttons styled as WordPress links
+   const linkBtnStyle = { background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit" };
+   const dangerLinkStyle = { ...linkBtnStyle, color: "#b32d2e", textDecoration: "underline" };
+   const subBoxStyle = { border: "1px solid #dcdcde", background: "#fff", marginBottom: 16 };
+   const subHeadStyle = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid #dcdcde", background: "#f6f7f7" };
+   const iconBtnStyle = { ...linkBtnStyle, color: "#646970", display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32 };
+   // Canonical storefront URL is /product/<slug> (category-nested URLs redirect there);
+   // an unsaved slug falls back to the saved product's id route.
+   const previewUrl = productId ? getProductUrl({ slug: formData.slug, _id: productId }) : null;
+
    return (
-    <AdminPageLayout 
-      title={productId ? "Edit Product" : "Add New Product"} 
-      addNewLink="/admin/products/new"
-      addNewLabel="Add New"
-      breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Products", href: "/admin/products" }, { label: productId ? "Edit" : "New" }]}
-    >
-         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+      <Page>
+         <PageHeader
+            title={productId ? "Edit Product" : "Add New Product"}
+            actions={productId ? <Link href="/admin/products/new" className="wp-btn">Add New</Link> : null}
+         />
+         {productId && formData.isDeleted && (
+            <Notice type="warning">
+               This product is in the Trash and hidden from the store.{" "}
+               <button type="button" onClick={handleRestore} className="wp-link" style={linkBtnStyle}>Restore it</button>
+            </Notice>
+         )}
+         <form onSubmit={handleSubmit} className="wp-cols">
             {/* Main Column */}
-            <div className="lg:col-span-3 space-y-4 min-w-0">
-               <div className="space-y-1">
+            <div className="wp-col-main">
+               <div style={{ marginBottom: 20 }}>
+                  <label htmlFor="product-title-input" className="sr-only">Product name</label>
                   <input
+                     id="product-title-input"
                      required
                      placeholder="Enter title here"
-                     className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-3 xs:px-4 py-2 xs:py-2.5 text-[16px] xs:text-[18px] sm:text-[20px] bg-white shadow-sm font-semibold transition-all"
+                     className="wp-title-input"
                      value={formData.name}
                       onChange={(e) => {
                          const newName = e.target.value;
@@ -546,36 +639,41 @@ export default function ProductForm({ productId = null }) {
                       }}
                   />
                   {/* Permalink / Slug Row */}
-                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5 break-words">
-                     <span>Permalink:</span>
-                     <span className="text-gray-400 font-mono break-all">pairolifestyle.com/product/</span>
+                  <div className="wp-small flex flex-wrap items-center gap-1.5 break-words" style={{ marginTop: 8, color: "#3c434a" }} aria-live="polite">
+                     <span className="wp-strong">Permalink:</span>
+                     <span className="wp-muted break-all">pairolifestyle.com/product/</span>
 
                      {slugLocked ? (
-                        // Read-only view with pencil edit button
+                        // Read-only view with edit button
                         <>
-                           <span className="font-mono text-[#2271b1] font-semibold break-all">{formData.slug || <span className="text-gray-300 italic">auto-generated</span>}</span>
+                           <span className="wp-strong break-all">{formData.slug || <em className="wp-muted">auto-generated</em>}</span>
                            <button
                               type="button"
                               title="Edit permalink"
+                              aria-label="Edit permalink"
                               onClick={() => {
                                  setSlugDraftValue(formData.slug);
                                  setSlugCheckState(null);
                                  setSlugLocked(false);
                               }}
-                              className="ml-1 p-1.5 md:p-0.5 rounded hover:bg-gray-100 transition text-gray-400 hover:text-[#2271b1]"
+                              className="wp-btn"
+                              style={{ minHeight: 26, padding: "0 8px" }}
                            >
-                              <Pencil className="w-3.5 h-3.5" />
+                              <Pencil className="w-3 h-3" aria-hidden="true" /> Edit
                            </button>
                            {!slugManuallyEdited && formData.slug && (
-                              <span className="text-[10px] text-gray-300">(auto)</span>
+                              <span className="wp-muted">(auto)</span>
                            )}
                         </>
                      ) : (
                         // Edit mode: input + check status + update/cancel buttons
                         <>
+                           <label htmlFor="product-slug-input" className="sr-only">Permalink slug</label>
                            <input
+                              id="product-slug-input"
                               autoFocus
-                              className="border border-[#2271b1] bg-white rounded-[3px] outline-none px-2 py-0.5 text-[#2271b1] font-mono min-w-[120px] max-w-full focus:ring-1 focus:ring-[#2271b1]/30"
+                              className="wp-input"
+                              style={{ minWidth: 140, minHeight: 28 }}
                               value={slugDraftValue}
                               onChange={async (e) => {
                                  const raw = toSlug(e.target.value);
@@ -593,9 +691,9 @@ export default function ProductForm({ productId = null }) {
                               placeholder="url-slug"
                            />
                            {/* Uniqueness indicator */}
-                           {slugCheckState === "checking" && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
-                           {slugCheckState === "unique" && <span className="text-emerald-600 text-[10px] font-bold flex items-center gap-0.5"><Check className="w-3 h-3" /> Available</span>}
-                           {slugCheckState === "taken" && <span className="text-red-500 text-[10px] font-bold">Taken</span>}
+                           {slugCheckState === "checking" && <Loader2 className="w-3.5 h-3.5 animate-spin wp-muted" aria-label="Checking availability" />}
+                           {slugCheckState === "unique" && <span className="flex items-center gap-0.5" style={{ color: "#2f6f1a", fontWeight: 600 }}><Check className="w-3 h-3" aria-hidden="true" /> Available</span>}
+                           {slugCheckState === "taken" && <span style={{ color: "#b32d2e", fontWeight: 600 }}>Taken</span>}
 
                            {/* Update (lock) button */}
                            <button
@@ -607,16 +705,18 @@ export default function ProductForm({ productId = null }) {
                                  setSlugLocked(true);
                                  setSlugCheckState(null);
                               }}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded-[3px] bg-[#2271b1] text-white text-[10px] font-bold hover:bg-[#135e96] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                              className="wp-btn"
+                              style={{ minHeight: 26, padding: "0 8px" }}
                            >
-                              <Lock className="w-3 h-3" /> Update
+                              <Lock className="w-3 h-3" aria-hidden="true" /> Update
                            </button>
 
                            {/* Cancel button */}
                            <button
                               type="button"
                               onClick={() => { setSlugLocked(true); setSlugCheckState(null); }}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded-[3px] border border-gray-300 text-gray-600 text-[10px] font-bold hover:bg-gray-50 transition"
+                              className="wp-link"
+                              style={linkBtnStyle}
                            >
                               Cancel
                            </button>
@@ -625,90 +725,70 @@ export default function ProductForm({ productId = null }) {
                   </div>
                </div>
 
-               {/* Short Description */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">
-                     Product Short Description
-                  </div>
-                  <div className="p-3">
-                     <TiptapEditor
-                        content={formData.shortDescription}
-                        onChange={(html) => setFormData({ ...formData, shortDescription: html })}
-                     />
-                     <p className="text-[11px] text-gray-400 mt-1">Supports bold, italic, lists, and links. Displays as a rich excerpt on the product page.</p>
-                  </div>
-               </div>
-
                {/* Content / SEO Tabs */}
-               <div className="flex flex-wrap border-b border-[#ccd0d4] gap-4 sm:gap-6 select-none pb-0">
+               <div className="wp-tabs" role="tablist" aria-label="Editor sections">
                   <button
                      type="button"
+                     role="tab"
+                     id="pf-tab-content"
+                     aria-selected={activeFormTab === "content"}
+                     aria-controls="pf-form-panel"
                      onClick={() => setActiveFormTab("content")}
-                     className={`pb-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[1px] cursor-pointer ${
-                        activeFormTab === "content"
-                           ? "border-[#2271b1] text-[#2271b1]"
-                           : "border-transparent text-gray-500 hover:text-black"
-                     }`}
+                     className="wp-tab"
                   >
                      Content Editor
                   </button>
                   <button
                      type="button"
+                     role="tab"
+                     id="pf-tab-seo"
+                     aria-selected={activeFormTab === "seo"}
+                     aria-controls="pf-form-panel"
                      onClick={() => setActiveFormTab("seo")}
-                     className={`pb-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[1px] cursor-pointer ${
-                        activeFormTab === "seo"
-                           ? "border-[#2271b1] text-[#2271b1]"
-                           : "border-transparent text-gray-500 hover:text-black"
-                     }`}
+                     className="wp-tab"
                   >
                      SEO Settings
                   </button>
                </div>
 
+               <div id="pf-form-panel" role="tabpanel" aria-labelledby={activeFormTab === "seo" ? "pf-tab-seo" : "pf-tab-content"}>
                {activeFormTab === "content" ? (
                   <>
-                     {/* Long Description Meta Box with Tiptap */}
-                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-1 flex flex-wrap items-center justify-between gap-2">
-                           <div className="flex flex-wrap gap-2">
-                              <button type="button" className="p-1 px-3 bg-white border border-[#c3c4c7] border-b-white -mb-[5px] text-[12px] font-bold z-10">Visual</button>
-                              <button type="button" className="p-1 px-3 text-[12px] text-gray-400">Text</button>
-                           </div>
-                           <button type="button" className="text-[12px] text-[#2271b1] hover:text-black font-medium">Add Media</button>
-                        </div>
+                     {/* Long Description editor */}
+                     {/* No overflow:hidden here: it would trap the editor's sticky toolbar inside this box
+                         (offset by the admin-bar height, covering the first lines of text) */}
+                     <div className="wp-postbox" role="group" aria-label="Product description">
                         <TiptapEditor
                            content={formData.description}
-                           onChange={(html) => setFormData({ ...formData, description: html })}
+                           onChange={(html) => setFormData(prev => ({ ...prev, description: html }))}
                         />
                      </div>
 
                      {/* Product Data Meta Box */}
-                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-                           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                              <span className="text-[13px] font-bold text-gray-700">Product Data —</span>
-                              <div className="relative min-w-0">
-                                 <select 
-                                    className="appearance-none bg-white border border-[#c3c4c7] pl-3 pr-8 py-1 rounded-[3px] text-[13px] font-medium text-[#2271b1] focus:outline-none focus:border-[#2271b1] cursor-pointer"
-                                    value={formData.productType}
-                                    onChange={(e) => {
-                                       const val = e.target.value;
-                                       setFormData({ ...formData, productType: val });
-                                       if (val === "variable") setActiveTab("variants");
-                                       if (val === "gifting") setActiveTab("gifting");
-                                    }}
-                                 >
-                                    <option value="simple">Simple product</option>
-                                    <option value="variable">Variable product</option>
-                                    <option value="gifting">Gifting product</option>
-                                 </select>
-                                 <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                              </div>
-                           </div>
+                     <section className="wp-postbox" aria-labelledby="pf-data-title">
+                        <div className="wp-postbox-head" style={{ flexWrap: "wrap", paddingTop: 6, paddingBottom: 6 }}>
+                           <h2 id="pf-data-title" style={{ flex: "none" }}>Product data</h2>
+                           <span className="wp-muted" aria-hidden="true">—</span>
+                           <label htmlFor="product-type-select" className="sr-only">Product type</label>
+                           <select
+                              id="product-type-select"
+                              className="wp-select"
+                              value={formData.productType}
+                              onChange={(e) => {
+                                 const val = e.target.value;
+                                 setFormData(prev => ({ ...prev, productType: val }));
+                                 if (val === "variable") setActiveTab("variants");
+                                 if (val === "gifting") setActiveTab("gifting");
+                              }}
+                           >
+                              <option value="simple">Simple product</option>
+                              <option value="variable">Variable product</option>
+                              <option value="gifting">Gifting product</option>
+                           </select>
                         </div>
-                        <div className="flex flex-col md:flex-row min-h-[400px]">
+                        <div className="wp-vtabs">
                            {/* Vertical Tabs */}
-                           <div className="w-full md:w-44 bg-[#f6f7f7] border-b md:border-b-0 md:border-r border-[#c3c4c7] flex flex-row md:flex-col overflow-x-auto md:overflow-visible shrink-0">
+                           <div className="wp-vtabs-list" role="tablist" aria-label="Product data">
                               {[
                                  { id: "general", label: "General", icon: Zap },
                                  { id: "inventory", label: "Inventory", icon: Package },
@@ -721,71 +801,69 @@ export default function ProductForm({ productId = null }) {
                                  <button
                                     key={tab.id}
                                     type="button"
+                                    role="tab"
+                                    id={`pf-vtab-${tab.id}`}
+                                    aria-selected={activeTab === tab.id}
+                                    aria-controls="pf-vtab-panel"
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`p-3 text-[13px] text-left border-b border-[#c3c4c7]/30 flex items-center gap-2 md:gap-3 shrink-0 whitespace-nowrap md:whitespace-normal transition-all ${activeTab === tab.id
-                                       ? "bg-white text-black font-bold -mr-[1px] border-l-[3px] border-l-[#2271b1] z-10" 
-                                       : "text-[#2271b1] hover:bg-[#f0f0f1]"
-                                       }`}
+                                    className="wp-vtab"
                                  >
-                                    <tab.icon className={`w-3.5 h-3.5 ${activeTab === tab.id ? 'text-[#2271b1]' : 'text-gray-400'}`} /> {tab.label}
+                                    <tab.icon className="w-4 h-4" aria-hidden="true" style={{ flex: "none" }} /> {tab.label}
                                  </button>
                               ))}
                            </div>
 
                            {/* Tab Panels */}
-                           <div className="flex-1 min-w-0 p-3 sm:p-4 md:p-8 bg-white overflow-y-auto">
+                           <div id="pf-vtab-panel" role="tabpanel" aria-labelledby={`pf-vtab-${activeTab}`} className="wp-vtabs-panel">
                               {activeTab === "general" && (
-                                 <div className="space-y-4 max-w-xl">
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Regular price</label>
-                                       <div className="w-full min-w-0 flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
-                                          <span className="text-gray-400 text-[13px]">$</span>
-                                          <input className="w-full bg-transparent text-[14px] outline-none" placeholder="0.00" value={formData.compareAtPrice} onChange={(e) => setFormData({ ...formData, compareAtPrice: e.target.value })} />
-                                       </div>
+                                 <div>
+                                    <div className="wp-frow">
+                                       <label htmlFor="regular-price-input" className="wp-flabel">Regular price ($)</label>
+                                       <input id="regular-price-input" type="number" min="0" step="0.01" inputMode="decimal" className="wp-input" placeholder="0.00" value={formData.compareAtPrice ?? ""} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, compareAtPrice: v })); }} />
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Sale price</label>
-                                       <div className="w-full min-w-0 flex-1 flex items-center gap-2 border border-gray-200 bg-gray-50/50 px-3 py-2 rounded-sm focus-within:border-[#2271b1] transition-colors">
-                                          <span className="text-gray-400 text-[13px] font-bold">$</span>
-                                          <input id="sale-price-input" className="w-full bg-transparent text-[14px] outline-none font-bold" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} />
-                                       </div>
+                                    <div className="wp-frow">
+                                       <label htmlFor="sale-price-input" className="wp-flabel">Sale price ($)</label>
+                                       <input id="sale-price-input" type="number" min="0" step="0.01" inputMode="decimal" className="wp-input" placeholder="0.00" value={formData.price ?? ""} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, price: v })); }} />
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Shipping Type</label>
-                                       <select className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" value={formData.shippingType} onChange={(e) => setFormData({ ...formData, shippingType: e.target.value })}>
+                                    <div className="wp-frow">
+                                       <label htmlFor="shipping-type-select" className="wp-flabel">Shipping type</label>
+                                       <select id="shipping-type-select" className="wp-select" value={formData.shippingType} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, shippingType: v })); }}>
                                           <option value="Express">Express Shipping</option>
                                           <option value="Standard">Standard Shipping</option>
                                           <option value="Free">Free Shipping</option>
                                           <option value="Priority">Priority Mail</option>
                                        </select>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Color</label>
-                                       <input 
-                                          className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
-                                          placeholder="e.g. Black, Navy Blue, Crimson" 
-                                          value={formData.color || ""} 
-                                          onChange={(e) => setFormData({ ...formData, color: e.target.value })} 
+                                    <div className="wp-frow">
+                                       <label htmlFor="product-color-input" className="wp-flabel">Color</label>
+                                       <input
+                                          id="product-color-input"
+                                          className="wp-input"
+                                          placeholder="e.g. Black, Navy Blue, Crimson"
+                                          value={formData.color || ""}
+                                          onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, color: v })); }}
                                        />
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Gender</label>
-                                       <select 
-                                          className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
-                                          value={formData.gender || "unisex"} 
-                                          onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                    <div className="wp-frow">
+                                       <label htmlFor="product-gender-select" className="wp-flabel">Gender</label>
+                                       <select
+                                          id="product-gender-select"
+                                          className="wp-select"
+                                          value={formData.gender || "unisex"}
+                                          onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, gender: v })); }}
                                        >
                                           <option value="unisex">Unisex</option>
                                           <option value="male">Male</option>
                                           <option value="female">Female</option>
                                        </select>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Age Group</label>
-                                       <select 
-                                          className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" 
-                                          value={formData.ageGroup || "adult"} 
-                                          onChange={(e) => setFormData({ ...formData, ageGroup: e.target.value })}
+                                    <div className="wp-frow">
+                                       <label htmlFor="product-age-select" className="wp-flabel">Age group</label>
+                                       <select
+                                          id="product-age-select"
+                                          className="wp-select"
+                                          value={formData.ageGroup || "adult"}
+                                          onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, ageGroup: v })); }}
                                        >
                                           <option value="adult">Adult</option>
                                           <option value="kids">Kids</option>
@@ -798,84 +876,80 @@ export default function ProductForm({ productId = null }) {
                               )}
 
                               {activeTab === "inventory" && (
-                                 <div className="space-y-4 max-w-xl">
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">SKU</label>
-                                       <input className="w-full min-w-0 flex-1 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm uppercase focus:border-[#2271b1]" placeholder="e.g. PR-001" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} />
+                                 <div>
+                                    <div className="wp-frow">
+                                       <label htmlFor="product-sku-input" className="wp-flabel">SKU</label>
+                                       <input id="product-sku-input" className="wp-input uppercase" placeholder="e.g. PR-001" value={formData.sku} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, sku: v })); }} />
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-4 border-b border-gray-50">
-                                       <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Track Stock</label>
-                                       <div className="flex items-center gap-3">
-                                          <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1]" checked={formData.manageStock} onChange={(e) => setFormData({ ...formData, manageStock: e.target.checked })} />
-                                          <span className="text-[12px] text-gray-500 font-medium">Enable inventory tracking for this product</span>
-                                       </div>
+                                    <div className="wp-frow">
+                                       <span className="wp-flabel">Track stock</span>
+                                       <label className="wp-check" htmlFor="manage-stock-input">
+                                          <input id="manage-stock-input" type="checkbox" checked={formData.manageStock} onChange={(e) => { const v = e.target.checked; setFormData(prev => ({ ...prev, manageStock: v })); }} />
+                                          <span>Enable inventory tracking for this product</span>
+                                       </label>
                                     </div>
                                     {formData.manageStock && (
-                                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-2">
-                                          <label className="text-[12px] font-bold text-gray-400 uppercase w-full sm:w-40 sm:shrink-0">Stock Quantity</label>
-                                          <input id="stock-input" type="number" className="w-32 border border-gray-200 bg-gray-50/50 p-2 text-[14px] outline-none rounded-sm focus:border-[#2271b1]" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} />
+                                       <div className="wp-frow">
+                                          <label htmlFor="stock-input" className="wp-flabel">Stock quantity</label>
+                                          <input id="stock-input" type="number" className="wp-input" value={formData.stock} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, stock: v })); }} />
                                        </div>
                                     )}
                                  </div>
                               )}
 
                               {activeTab === "variants" && (
-                                 <div className="space-y-4">
-                                    <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2">
-                                       <p className="text-[13px] font-bold text-gray-700">Variant Attributes</p>
+                                 <div>
+                                    <div className="flex flex-wrap items-center justify-between gap-2" style={{ margin: "6px 0 14px" }}>
+                                       <h3 className="wp-strong" style={{ fontSize: 14, margin: 0 }}>Variant attributes</h3>
                                        <div className="flex flex-wrap gap-2">
-                                          <button type="button" onClick={() => addTemplate("color")} className="text-[11px] font-bold border border-gray-200 px-3 py-1.5 bg-white hover:bg-gray-50 rounded">+ Color</button>
-                                          <button type="button" onClick={() => addTemplate("size")} className="text-[11px] font-bold border border-gray-200 px-3 py-1.5 bg-white hover:bg-gray-50 rounded">+ Size</button>
-                                          <button type="button" onClick={addAttribute} className="bg-[#2271b1] text-white px-3 py-1.5 rounded font-bold text-[11px] hover:bg-[#135e96]">+ Custom</button>
+                                          <button type="button" onClick={() => addTemplate("color")} className="wp-btn">+ Color</button>
+                                          <button type="button" onClick={() => addTemplate("size")} className="wp-btn">+ Size</button>
+                                          <button type="button" onClick={addAttribute} className="wp-btn wp-btn-primary">+ Custom</button>
                                        </div>
                                     </div>
 
                                     {(formData.attributes || []).map((attr, aIdx) => {
-                                       const updateAttr = (key, v) => { const n=[...formData.attributes]; n[aIdx][key]=v; setFormData({...formData,attributes:n}); };
-                                       const updateVal = (vIdx, key, v) => { const n=[...formData.attributes]; n[aIdx].values[vIdx][key]=v; setFormData({...formData,attributes:n}); };
-                                       const removeVal = (vIdx) => { const n=[...formData.attributes]; n[aIdx].values=n[aIdx].values.filter((_,i)=>i!==vIdx); setFormData({...formData,attributes:n}); };
+                                       const mapAttr = (fn) => setFormData(prev => ({ ...prev, attributes: (prev.attributes || []).map((a, i) => i === aIdx ? fn(a) : a) }));
+                                       const updateAttr = (key, v) => mapAttr(a => ({ ...a, [key]: v }));
+                                       const updateVal = (vIdx, key, v) => mapAttr(a => ({ ...a, values: (a.values || []).map((val, i) => i === vIdx ? { ...val, [key]: v } : val) }));
+                                       const removeVal = (vIdx) => mapAttr(a => ({ ...a, values: (a.values || []).filter((_, i) => i !== vIdx) }));
 
                                        return (
-                                          <div key={aIdx} className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-                                             <div className="flex flex-wrap items-center gap-2 px-3 py-2.5 bg-gray-50 border-b border-gray-200">
-                                                <input className="border border-gray-200 rounded px-2 py-1 text-[12px] font-bold w-32 min-w-0 outline-none focus:border-[#2271b1] bg-white" value={attr.name} onChange={e=>updateAttr("name",e.target.value)} />
-                                                <select className="border border-gray-200 rounded px-2 py-1 text-[11px] font-bold outline-none text-[#2271b1] bg-white" value={attr.type} onChange={e=>updateAttr("type",e.target.value)}>
+                                          <div key={aIdx} style={subBoxStyle}>
+                                             <div style={subHeadStyle}>
+                                                <label htmlFor={`attr-${aIdx}-name`} className="sr-only">Attribute name</label>
+                                                <input id={`attr-${aIdx}-name`} className="wp-input wp-strong" style={{ width: 160 }} placeholder="Attribute name" value={attr.name} onChange={e=>updateAttr("name",e.target.value)} />
+                                                <label htmlFor={`attr-${aIdx}-type`} className="sr-only">Attribute type</label>
+                                                <select id={`attr-${aIdx}-type`} className="wp-select" value={attr.type} onChange={e=>updateAttr("type",e.target.value)}>
                                                    <option value="color">Color</option>
                                                    <option value="size">Size</option>
                                                    <option value="custom">Custom</option>
                                                 </select>
-                                                <button type="button" onClick={()=>setFormData({...formData,attributes:formData.attributes.filter((_,i)=>i!==aIdx)})} className="ml-auto text-gray-300 hover:text-red-500 p-1.5 md:p-0.5"><X className="w-3.5 h-3.5" /></button>
+                                                <button type="button" aria-label={`Remove attribute ${attr.name || ""}`.trim()} title="Remove attribute" onClick={()=>{ setFormData(prev=>({...prev,attributes:(prev.attributes||[]).filter((_,i)=>i!==aIdx)})); setAttrValueDrafts({}); }} className="hover:text-red-700" style={{ ...iconBtnStyle, marginLeft: "auto" }}><X className="w-4 h-4" aria-hidden="true" /></button>
                                              </div>
-                                             <div className="divide-y divide-gray-50">
+                                             <div>
                                                 {(attr.values||[]).map((val,vIdx)=>{
                                                     const swatchType = val.swatchType || "color";
+                                                    const vid = `attr-${aIdx}-val-${vIdx}`;
                                                     return (
-                                                    <div key={vIdx} className="flex flex-wrap items-start gap-3 px-3 py-2.5 border-b border-gray-50 last:border-0">
+                                                    <div key={vIdx} className="flex flex-wrap items-start gap-3" style={{ padding: "10px 12px", borderBottom: "1px solid #f0f0f1" }}>
                                                        {/* Swatch Config — only for color attributes */}
                                                        {attr.type==="color" && (
-                                                          <div className="flex flex-col gap-1.5 shrink-0">
+                                                          <div className="flex flex-col gap-2 shrink-0 min-w-0 max-w-full">
                                                              {/* Toggle between Color Picker and Image Swatch */}
-                                                             <div className="flex rounded overflow-hidden border border-gray-200 text-[10px] font-bold">
+                                                             <div className="wp-seg" role="group" aria-label="Swatch type">
                                                                 <button
                                                                    type="button"
+                                                                   aria-pressed={swatchType==="color"}
                                                                    onClick={()=>updateVal(vIdx,"swatchType","color")}
-                                                                   className={`px-2 py-1 transition-colors ${
-                                                                      swatchType==="color"
-                                                                         ? "bg-[#2271b1] text-white"
-                                                                         : "bg-white text-gray-400 hover:bg-gray-50"
-                                                                   }`}
                                                                    title="Use a solid color swatch"
                                                                 >
                                                                    Color
                                                                 </button>
                                                                 <button
                                                                    type="button"
+                                                                   aria-pressed={swatchType==="image"}
                                                                    onClick={()=>updateVal(vIdx,"swatchType","image")}
-                                                                   className={`px-2 py-1 transition-colors ${
-                                                                      swatchType==="image"
-                                                                         ? "bg-[#2271b1] text-white"
-                                                                         : "bg-white text-gray-400 hover:bg-gray-50"
-                                                                   }`}
                                                                    title="Use an image as the swatch (texture, pattern, etc.)"
                                                                 >
                                                                    Image
@@ -883,25 +957,29 @@ export default function ProductForm({ productId = null }) {
                                                              </div>
                                                              {/* Swatch preview + picker */}
                                                              {swatchType==="color" ? (
-                                                                <div className="flex flex-col gap-2 bg-gray-50 p-2 rounded border border-gray-100 w-full xs:w-auto shrink-0 min-w-0 max-w-full xs:min-w-[160px]">
-                                                                   <div className="flex items-center gap-2">
+                                                                <div className="flex flex-col gap-2 min-w-0 max-w-full" style={{ background: "#f6f7f7", border: "1px solid #dcdcde", padding: 8 }}>
+                                                                   <div className="flex items-center gap-3">
                                                                       {/* Final preview bubble */}
                                                                       <div
-                                                                         className="w-8 h-8 rounded-full border-2 border-white shadow ring-1 ring-gray-200 shrink-0"
+                                                                         className="w-9 h-9 rounded-full shrink-0"
                                                                          style={{
                                                                             background: getSwatchBackground(val),
-                                                                            backgroundSize: "cover"
+                                                                            backgroundSize: "cover",
+                                                                            border: "2px solid #fff",
+                                                                            boxShadow: "0 0 0 1px #c3c4c7"
                                                                          }}
                                                                          title="Combined Swatch Preview"
+                                                                         aria-hidden="true"
                                                                       />
                                                                       {/* Controls */}
                                                                       <div className="flex flex-col gap-1">
-                                                                         <div className="flex items-center gap-1">
-                                                                            <span className="text-[9px] text-gray-400 font-bold uppercase w-10">Mode</span>
+                                                                         <div className="flex items-center gap-2">
+                                                                            <label htmlFor={`${vid}-mode`} className="wp-small wp-muted" style={{ width: 52 }}>Mode</label>
                                                                             <select
+                                                                               id={`${vid}-mode`}
                                                                                value={val.colorMode || "single"}
                                                                                onChange={e=>updateVal(vIdx,"colorMode",e.target.value)}
-                                                                               className="border border-gray-200 rounded px-1 py-0.5 text-[9px] bg-white outline-none focus:border-[#2271b1] w-20 font-medium"
+                                                                               className="wp-select"
                                                                             >
                                                                                <option value="single">Single</option>
                                                                                <option value="dual">Dual</option>
@@ -909,12 +987,13 @@ export default function ProductForm({ productId = null }) {
                                                                                <option value="quad">Quad</option>
                                                                             </select>
                                                                          </div>
-                                                                         <div className="flex items-center gap-1">
-                                                                            <span className="text-[9px] text-gray-400 font-bold uppercase w-10">Texture</span>
+                                                                         <div className="flex items-center gap-2">
+                                                                            <label htmlFor={`${vid}-texture`} className="wp-small wp-muted" style={{ width: 52 }}>Texture</label>
                                                                             <select
+                                                                               id={`${vid}-texture`}
                                                                                value={val.texture || ""}
                                                                                onChange={e=>updateVal(vIdx,"texture",e.target.value)}
-                                                                               className="border border-gray-200 rounded px-1 py-0.5 text-[9px] bg-white outline-none focus:border-[#2271b1] w-20 font-medium"
+                                                                               className="wp-select"
                                                                             >
                                                                                <option value="">No Texture</option>
                                                                                <option value="leather-smooth">Leather S</option>
@@ -932,45 +1011,46 @@ export default function ProductForm({ productId = null }) {
                                                                       </div>
                                                                    </div>
                                                                    {/* Individual Color pickers */}
-                                                                   <div className="flex items-center gap-1.5 flex-wrap">
+                                                                   <div className="flex items-center gap-2 flex-wrap">
+                                                                      <span className="wp-small wp-muted">Colors</span>
                                                                       {/* Color 1 */}
                                                                       <div className="relative flex items-center justify-center">
-                                                                         <div className="w-5 h-5 rounded-full border border-gray-300 shadow cursor-pointer shrink-0" style={{ backgroundColor: val.hex || "#000000" }} title="Color 1" />
-                                                                         <input type="color" value={val.hex || "#000000"} onChange={e=>updateVal(vIdx,"hex",e.target.value)} className="w-5 h-5 opacity-0 absolute inset-0 cursor-pointer" />
+                                                                         <div className="w-6 h-6 rounded-full cursor-pointer shrink-0" style={{ backgroundColor: val.hex || "#000000", border: "1px solid #8c8f94" }} title="Color 1" aria-hidden="true" />
+                                                                         <input type="color" aria-label="Color 1" value={val.hex || "#000000"} onChange={e=>updateVal(vIdx,"hex",e.target.value)} className="w-6 h-6 opacity-0 absolute inset-0 cursor-pointer" />
                                                                       </div>
-                                                                      
+
                                                                       {/* Color 2 */}
                                                                       {(val.colorMode === "dual" || val.colorMode === "triple" || val.colorMode === "quad") && (
                                                                          <div className="relative flex items-center justify-center">
-                                                                            <div className="w-5 h-5 rounded-full border border-gray-300 shadow cursor-pointer shrink-0" style={{ backgroundColor: val.hex2 || "#ffffff" }} title="Color 2" />
-                                                                            <input type="color" value={val.hex2 || "#ffffff"} onChange={e=>updateVal(vIdx,"hex2",e.target.value)} className="w-5 h-5 opacity-0 absolute inset-0 cursor-pointer" />
+                                                                            <div className="w-6 h-6 rounded-full cursor-pointer shrink-0" style={{ backgroundColor: val.hex2 || "#ffffff", border: "1px solid #8c8f94" }} title="Color 2" aria-hidden="true" />
+                                                                            <input type="color" aria-label="Color 2" value={val.hex2 || "#ffffff"} onChange={e=>updateVal(vIdx,"hex2",e.target.value)} className="w-6 h-6 opacity-0 absolute inset-0 cursor-pointer" />
                                                                          </div>
                                                                       )}
 
                                                                       {/* Color 3 */}
                                                                       {(val.colorMode === "triple" || val.colorMode === "quad") && (
                                                                          <div className="relative flex items-center justify-center">
-                                                                            <div className="w-5 h-5 rounded-full border border-gray-300 shadow cursor-pointer shrink-0" style={{ backgroundColor: val.hex3 || "#ffffff" }} title="Color 3" />
-                                                                            <input type="color" value={val.hex3 || "#ffffff"} onChange={e=>updateVal(vIdx,"hex3",e.target.value)} className="w-5 h-5 opacity-0 absolute inset-0 cursor-pointer" />
+                                                                            <div className="w-6 h-6 rounded-full cursor-pointer shrink-0" style={{ backgroundColor: val.hex3 || "#ffffff", border: "1px solid #8c8f94" }} title="Color 3" aria-hidden="true" />
+                                                                            <input type="color" aria-label="Color 3" value={val.hex3 || "#ffffff"} onChange={e=>updateVal(vIdx,"hex3",e.target.value)} className="w-6 h-6 opacity-0 absolute inset-0 cursor-pointer" />
                                                                          </div>
                                                                       )}
 
                                                                       {/* Color 4 */}
                                                                       {(val.colorMode === "quad") && (
                                                                          <div className="relative flex items-center justify-center">
-                                                                            <div className="w-5 h-5 rounded-full border border-gray-300 shadow cursor-pointer shrink-0" style={{ backgroundColor: val.hex4 || "#ffffff" }} title="Color 4" />
-                                                                            <input type="color" value={val.hex4 || "#ffffff"} onChange={e=>updateVal(vIdx,"hex4",e.target.value)} className="w-5 h-5 opacity-0 absolute inset-0 cursor-pointer" />
+                                                                            <div className="w-6 h-6 rounded-full cursor-pointer shrink-0" style={{ backgroundColor: val.hex4 || "#ffffff", border: "1px solid #8c8f94" }} title="Color 4" aria-hidden="true" />
+                                                                            <input type="color" aria-label="Color 4" value={val.hex4 || "#ffffff"} onChange={e=>updateVal(vIdx,"hex4",e.target.value)} className="w-6 h-6 opacity-0 absolute inset-0 cursor-pointer" />
                                                                          </div>
                                                                       )}
                                                                    </div>
                                                                 </div>
                                                              ) : (
-                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                <div className="flex items-center gap-2 shrink-0">
                                                                    {val.image ? (
-                                                                      <img src={val.image} alt="swatch" className="w-7 h-7 rounded-full object-cover border border-gray-200 shadow" />
+                                                                      <img src={val.image} alt="swatch" className="w-8 h-8 rounded-full object-cover" style={{ border: "1px solid #c3c4c7" }} />
                                                                    ) : (
-                                                                      <div className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center">
-                                                                         <ImageIcon className="w-3 h-3 text-gray-300" />
+                                                                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ border: "2px dashed #c3c4c7", background: "#f6f7f7" }} aria-hidden="true">
+                                                                         <ImageIcon className="w-3.5 h-3.5 wp-muted" />
                                                                       </div>
                                                                    )}
                                                                    <InlinePick
@@ -985,71 +1065,79 @@ export default function ProductForm({ productId = null }) {
                                                           </div>
                                                        )}
                                                        {/* Value label */}
-                                                       <input className="flex-1 min-w-[120px] border border-gray-200 rounded px-2 py-1 text-[12px] mt-0.5" placeholder="Label" value={val.label} onChange={e=>updateVal(vIdx,"label",e.target.value)} />
-                                                       {/* Variant product image (separate from swatch) */}
-                                                       <div className="flex flex-col items-center gap-0.5 shrink-0">
-                                                          <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wide">Product img</span>
-                                                          <InlinePick value={val.variantImage} onChange={url=>updateVal(vIdx,"variantImage",url)} label="+" />
+                                                       <div className="flex-1 min-w-[140px]">
+                                                          <label htmlFor={`${vid}-label`} className="sr-only">Value label</label>
+                                                          <input id={`${vid}-label`} className="wp-input wp-full" placeholder="Label" value={val.label} onChange={e=>updateVal(vIdx,"label",e.target.value)} />
                                                        </div>
-                                                       <button type="button" onClick={()=>removeVal(vIdx)} className="text-gray-300 hover:text-red-500 mt-0.5 shrink-0 p-1.5 md:p-0"><X className="w-3.5 h-3.5" /></button>
+                                                       {/* Variant product image (separate from swatch) */}
+                                                       <div className="flex items-center gap-2 shrink-0">
+                                                          <span className="wp-small wp-muted">Product image</span>
+                                                          <InlinePick value={val.variantImage} onChange={url=>updateVal(vIdx,"variantImage",url)} label="+ Image" />
+                                                       </div>
+                                                       <button type="button" aria-label={`Remove value ${val.label || ""}`.trim()} title="Remove value" onClick={()=>removeVal(vIdx)} className="hover:text-red-700 shrink-0" style={iconBtnStyle}><X className="w-4 h-4" aria-hidden="true" /></button>
                                                     </div>
                                                  );})}
                                              </div>
-                                             <div className="p-2">
-                                                <input className="w-full border border-gray-200 rounded px-3 py-1 text-[12px]" placeholder="Add value..." onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); addAttributeValue(aIdx,e.target.value); e.target.value=""; } }} />
+                                             <div style={{ padding: "8px 12px" }}>
+                                                <label htmlFor={`attr-${aIdx}-add`} className="sr-only">Add value to {attr.name || "attribute"}</label>
+                                                <input id={`attr-${aIdx}-add`} className="wp-input wp-full" placeholder="Add value... (press Enter)" value={attrValueDrafts[aIdx] || ""} onChange={e=>{ const v=e.target.value; setAttrValueDrafts(prev=>({...prev,[aIdx]:v})); }} onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); addAttributeValue(aIdx,(attrValueDrafts[aIdx]||"").trim()); setAttrValueDrafts(prev=>({...prev,[aIdx]:""})); } }} />
                                              </div>
                                           </div>
                                        );
                                     })}
 
-                                    <div className="pt-4 border-t border-gray-100">
-                                       <button type="button" onClick={generateCombinations} className="bg-white border border-[#2271b1] text-[#2271b1] px-4 py-1.5 rounded-[3px] text-[11px] font-bold hover:bg-[#f0f6fb]">Generate All Combinations</button>
+                                    <div style={{ paddingTop: 12, borderTop: "1px solid #f0f0f1" }}>
+                                       <button type="button" onClick={generateCombinations} className="wp-btn">Generate All Combinations</button>
                                        {formData.variantCombinations?.length > 0 && (
-                                          <div className="mt-4 border border-gray-200 rounded-lg overflow-x-auto max-w-full">
-                                             <table className="w-full min-w-[480px] text-left text-[11px]">
-                                                <thead className="bg-gray-50 border-b border-gray-200 text-gray-400 uppercase font-bold">
+                                          <div className="wp-table-box" style={{ marginTop: 14 }}>
+                                             <table className="wp-list-table" style={{ minWidth: 480 }}>
+                                                <thead>
                                                    <tr>
-                                                      <th className="px-4 py-3 w-16">IMG</th>
-                                                      <th className="px-4 py-3">Variant</th>
-                                                      <th className="px-4 py-3 w-32">Regular Price ($)</th>
-                                                      <th className="px-4 py-3 w-32">Sale Price ($)</th>
-                                                      <th className="px-4 py-3 w-10"></th>
+                                                      <th style={{ width: 90 }}>Image</th>
+                                                      <th>Variant</th>
+                                                      <th style={{ width: 140 }}>Regular price ($)</th>
+                                                      <th style={{ width: 140 }}>Sale price ($)</th>
+                                                      <th style={{ width: 44 }}><span className="sr-only">Actions</span></th>
                                                    </tr>
                                                 </thead>
                                                 <tbody>
                                                    {formData.variantCombinations.map((comb, cIdx) => (
-                                                      <tr key={cIdx} className="border-b border-gray-100">
-                                                         <td className="px-4 py-2"><InlinePick value={comb.image} onChange={url=>{ const n=[...formData.variantCombinations]; n[cIdx].image=url; setFormData({...formData,variantCombinations:n}); }} /></td>
-                                                         <td className="px-4 py-2 font-bold">{comb.title}</td>
-                                                         <td className="px-4 py-2">
+                                                      <tr key={cIdx}>
+                                                         <td><InlinePick value={comb.image} onChange={url=>setFormData(prev=>({...prev,variantCombinations:(prev.variantCombinations||[]).map((c,i)=>i===cIdx?{...c,image:url}:c)}))} /></td>
+                                                         <td className="wp-strong">{comb.title}</td>
+                                                         <td>
                                                             <input
                                                                type="number"
+                                                               min="0"
                                                                step="0.01"
-                                                               className="w-full border border-gray-200 p-1 text-[11px] outline-none focus:border-[#2271b1] rounded"
+                                                               inputMode="decimal"
+                                                               aria-label={`Regular price for ${comb.title}`}
+                                                               className="wp-input wp-full"
                                                                placeholder="e.g. 0.00"
                                                                value={comb.compareAtPrice !== undefined && comb.compareAtPrice !== null ? comb.compareAtPrice : ""}
                                                                onChange={(e) => {
-                                                                  const n = [...formData.variantCombinations];
-                                                                  n[cIdx].compareAtPrice = e.target.value === "" ? "" : Number(e.target.value);
-                                                                  setFormData({ ...formData, variantCombinations: n });
+                                                                  const v = e.target.value === "" ? "" : Number(e.target.value);
+                                                                  setFormData(prev => ({ ...prev, variantCombinations: (prev.variantCombinations || []).map((c, i) => i === cIdx ? { ...c, compareAtPrice: v } : c) }));
                                                                }}
                                                             />
                                                          </td>
-                                                         <td className="px-4 py-2">
+                                                         <td>
                                                             <input
                                                                type="number"
+                                                               min="0"
                                                                step="0.01"
-                                                               className="w-full border border-gray-200 p-1 text-[11px] outline-none focus:border-[#2271b1] rounded font-bold"
+                                                               inputMode="decimal"
+                                                               aria-label={`Sale price for ${comb.title}`}
+                                                               className="wp-input wp-full"
                                                                placeholder="e.g. 0.00"
                                                                value={comb.price !== undefined && comb.price !== null ? comb.price : ""}
                                                                onChange={(e) => {
-                                                                  const n = [...formData.variantCombinations];
-                                                                  n[cIdx].price = e.target.value === "" ? "" : Number(e.target.value);
-                                                                  setFormData({ ...formData, variantCombinations: n });
+                                                                  const v = e.target.value === "" ? "" : Number(e.target.value);
+                                                                  setFormData(prev => ({ ...prev, variantCombinations: (prev.variantCombinations || []).map((c, i) => i === cIdx ? { ...c, price: v } : c) }));
                                                                }}
                                                             />
                                                          </td>
-                                                         <td className="px-4 py-2"><button type="button" className="p-1.5 md:p-0" onClick={()=>setFormData({...formData,variantCombinations:formData.variantCombinations.filter((_,i)=>i!==cIdx)})}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button></td>
+                                                         <td><button type="button" aria-label={`Remove variant ${comb.title}`} title="Remove variant" className="hover:text-red-700" style={iconBtnStyle} onClick={()=>setFormData(prev => ({...prev,variantCombinations:prev.variantCombinations.filter((_,i)=>i!==cIdx)}))}><X className="w-4 h-4" aria-hidden="true" /></button></td>
                                                       </tr>
                                                    ))}
                                                 </tbody>
@@ -1061,105 +1149,118 @@ export default function ProductForm({ productId = null }) {
                               )}
 
                               {activeTab === "gifting" && (
-                                 <div className="space-y-4">
-                                    <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2">
-                                       <div>
-                                          <p className="text-[13px] font-bold text-gray-700">Gifting Items</p>
-                                          <p className="text-[11px] text-gray-500">Customers pick from these. Each selected item adds its price to the product price and asks for a logo upload.</p>
+                                 <div>
+                                    <div className="flex flex-wrap items-start justify-between gap-2" style={{ margin: "6px 0 10px" }}>
+                                       <div className="min-w-0" style={{ flex: "1 1 240px" }}>
+                                          <h3 className="wp-strong" style={{ fontSize: 14, margin: 0 }}>Gifting items</h3>
+                                          <p className="wp-desc">Customers pick from these. Each selected item adds its price to the product price and asks for a logo upload.</p>
                                        </div>
                                        <button
                                           type="button"
-                                          onClick={() => setFormData({
-                                             ...formData,
+                                          onClick={() => setFormData(prev => ({
+                                             ...prev,
                                              corporateGifting: {
-                                                ...(formData.corporateGifting || {}),
-                                                items: [...(formData.corporateGifting?.items || []), { name: "", description: "", image: "", priceDelta: "", active: true, _localKey: Date.now() + Math.random() }],
+                                                ...(prev.corporateGifting || {}),
+                                                items: [...(prev.corporateGifting?.items || []), { name: "", description: "", image: "", priceDelta: "", active: true, _localKey: Date.now() + Math.random() }],
                                              },
-                                          })}
-                                          className="text-[11px] font-bold border border-[#2271b1] text-[#2271b1] px-3 py-1.5 bg-white hover:bg-blue-50 rounded flex items-center gap-1"
+                                          }))}
+                                          className="wp-btn"
                                        >
-                                          <Plus className="w-3 h-3" /> Add Item
+                                          <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Add Item
                                        </button>
                                     </div>
 
-                                    <div className="flex items-center gap-3">
-                                       <label className="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Minimum items a customer must select</label>
+                                    <div className="wp-frow" style={{ marginBottom: 10 }}>
+                                       <label htmlFor="gifting-min-selections" className="wp-flabel">Minimum items a customer must select</label>
                                        <input
+                                          id="gifting-min-selections"
                                           type="number"
                                           min="1"
-                                          className="w-20 border border-gray-200 bg-gray-50/50 p-1.5 text-[13px] outline-none rounded-sm focus:border-[#2271b1]"
+                                          className="wp-input"
+                                          style={{ maxWidth: 120 }}
                                           value={formData.corporateGifting?.minSelections ?? 3}
-                                          onChange={(e) => setFormData({ ...formData, corporateGifting: { ...(formData.corporateGifting || {}), minSelections: e.target.value } })}
+                                          onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, corporateGifting: { ...(prev.corporateGifting || {}), minSelections: v } })); }}
                                        />
                                     </div>
 
                                     {(formData.corporateGifting?.items || []).length === 0 ? (
-                                       <p className="text-[12px] text-gray-400 italic py-6 text-center border border-dashed border-gray-200 rounded">No items yet — add at least {Number(formData.corporateGifting?.minSelections) || 3} so customers can meet the minimum.</p>
+                                       <p className="wp-muted text-center" style={{ padding: "24px 12px", border: "1px dashed #c3c4c7" }}>No items yet — add at least {Number(formData.corporateGifting?.minSelections) || 3} so customers can meet the minimum.</p>
                                     ) : (
-                                       <div className="space-y-2">
+                                       <div>
                                           {(formData.corporateGifting?.items || []).length < (Number(formData.corporateGifting?.minSelections) || 3) && (
-                                             <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 font-semibold">Only {(formData.corporateGifting?.items || []).length} item(s) but the minimum is {Number(formData.corporateGifting?.minSelections) || 3} — customers won't be able to order until there are enough items.</p>
+                                             <div className="wp-notice wp-notice-warning"><p>Only {(formData.corporateGifting?.items || []).length} item(s) but the minimum is {Number(formData.corporateGifting?.minSelections) || 3} — customers won&apos;t be able to order until there are enough items.</p></div>
                                           )}
                                           {(formData.corporateGifting?.items || []).map((item, idx) => {
-                                             const updateItem = (patch) => setFormData({
-                                                ...formData,
+                                             const updateItem = (patch) => setFormData(prev => ({
+                                                ...prev,
                                                 corporateGifting: {
-                                                   ...(formData.corporateGifting || {}),
-                                                   items: (formData.corporateGifting?.items || []).map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+                                                   ...(prev.corporateGifting || {}),
+                                                   items: (prev.corporateGifting?.items || []).map((it, i) => (i === idx ? { ...it, ...patch } : it)),
                                                 },
-                                             });
+                                             }));
                                              return (
-                                                <div key={item._id || item._localKey || idx} className="border border-gray-200 rounded p-3 bg-white flex flex-col sm:flex-row gap-3">
+                                                <div key={item._id || item._localKey || idx} className="flex flex-col sm:flex-row gap-3" style={{ ...subBoxStyle, padding: 12, marginBottom: 10 }}>
                                                    <div className="shrink-0 flex sm:flex-col items-center gap-2">
-                                                      <div className="w-16 h-16 rounded border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
-                                                         {item.image ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5 text-gray-300" />}
+                                                      <div className="wp-thumb" style={{ width: 64, height: 64 }}>
+                                                         {item.image ? <img src={item.image} alt={item.name} /> : <ImageIcon className="w-5 h-5 wp-muted" aria-hidden="true" />}
                                                       </div>
                                                       <InlinePick value={item.image} onChange={(url) => updateItem({ image: url })} label="+ Picture" doneLabel="✓ Change" title="Pick item picture" />
                                                    </div>
                                                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
-                                                      <input
-                                                         placeholder="Item name (e.g. Belt)"
-                                                         className="border border-gray-200 bg-gray-50/50 p-2 text-[13px] outline-none rounded-sm focus:border-[#2271b1]"
-                                                         value={item.name || ""}
-                                                         onChange={(e) => updateItem({ name: e.target.value })}
-                                                      />
-                                                      <div className="flex items-center border border-gray-200 bg-gray-50/50 rounded-sm focus-within:border-[#2271b1]">
-                                                         <span className="pl-2 text-[12px] text-gray-500 font-semibold">+ $</span>
+                                                      <div className="min-w-0">
+                                                         <label htmlFor={`gift-${idx}-name`} className="wp-label wp-small">Item name</label>
                                                          <input
+                                                            id={`gift-${idx}-name`}
+                                                            placeholder="Item name (e.g. Belt)"
+                                                            className="wp-input wp-full"
+                                                            value={item.name || ""}
+                                                            onChange={(e) => updateItem({ name: e.target.value })}
+                                                         />
+                                                      </div>
+                                                      <div className="min-w-0">
+                                                         <label htmlFor={`gift-${idx}-price`} className="wp-label wp-small">Price increase (+ $)</label>
+                                                         <input
+                                                            id={`gift-${idx}-price`}
                                                             type="number"
                                                             min="0"
                                                             step="0.01"
                                                             placeholder="Price increase"
-                                                            className="w-full bg-transparent p-2 text-[13px] outline-none"
+                                                            className="wp-input wp-full"
                                                             value={item.priceDelta ?? ""}
                                                             onChange={(e) => updateItem({ priceDelta: e.target.value })}
                                                          />
                                                       </div>
-                                                      <input
-                                                         placeholder="Short description shown to the customer"
-                                                         className="sm:col-span-2 border border-gray-200 bg-gray-50/50 p-2 text-[13px] outline-none rounded-sm focus:border-[#2271b1]"
-                                                         value={item.description || ""}
-                                                         onChange={(e) => updateItem({ description: e.target.value })}
-                                                      />
+                                                      <div className="sm:col-span-2 min-w-0">
+                                                         <label htmlFor={`gift-${idx}-desc`} className="wp-label wp-small">Description</label>
+                                                         <input
+                                                            id={`gift-${idx}-desc`}
+                                                            placeholder="Short description shown to the customer"
+                                                            className="wp-input wp-full"
+                                                            value={item.description || ""}
+                                                            onChange={(e) => updateItem({ description: e.target.value })}
+                                                         />
+                                                      </div>
                                                    </div>
                                                    <div className="shrink-0 flex sm:flex-col items-center justify-between gap-2">
-                                                      <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-600 cursor-pointer select-none">
+                                                      <label className="wp-check">
                                                          <input type="checkbox" checked={item.active !== false} onChange={(e) => updateItem({ active: e.target.checked })} />
                                                          Active
                                                       </label>
                                                       <button
                                                          type="button"
-                                                         onClick={() => setFormData({
-                                                            ...formData,
+                                                         onClick={() => setFormData(prev => ({
+                                                            ...prev,
                                                             corporateGifting: {
-                                                               ...(formData.corporateGifting || {}),
-                                                               items: (formData.corporateGifting?.items || []).filter((_, i) => i !== idx),
+                                                               ...(prev.corporateGifting || {}),
+                                                               items: (prev.corporateGifting?.items || []).filter((_, i) => i !== idx),
                                                             },
-                                                         })}
-                                                         className="text-gray-400 hover:text-red-600 transition-colors"
+                                                         }))}
+                                                         className="hover:text-red-700"
+                                                         style={iconBtnStyle}
                                                          aria-label="Remove item"
+                                                         title="Remove item"
                                                       >
-                                                         <X className="w-4 h-4" />
+                                                         <X className="w-4 h-4" aria-hidden="true" />
                                                       </button>
                                                    </div>
                                                 </div>
@@ -1171,52 +1272,69 @@ export default function ProductForm({ productId = null }) {
                               )}
 
                               {activeTab === "stats" && (
-                                 <div className="space-y-6">
-                                    <button type="button" onClick={() => setFormData({ ...formData, stats: [...(formData.stats || []), { label: "", value: "", icon: "Shield" }] })} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-sm text-[11px] font-bold">+ Add Stat</button>
+                                 <div>
+                                    <div style={{ margin: "6px 0 12px" }}>
+                                       <button type="button" onClick={() => setFormData(prev => ({ ...prev, stats: [...(prev.stats || []), { label: "", value: "", icon: "Shield" }] }))} className="wp-btn">+ Add Stat</button>
+                                    </div>
                                     {(formData.stats || []).map((stat, sIdx) => (
-                                       <div key={sIdx} className="flex flex-wrap items-center gap-2 sm:gap-4 bg-white p-3 sm:p-4 border border-gray-100 rounded shadow-sm">
-                                          <input className="flex-1 min-w-[100px] border-b border-gray-100 p-1.5 text-[13px]" placeholder="Label" value={stat.label} onChange={e=>{ const n=[...formData.stats]; n[sIdx].label=e.target.value; setFormData({...formData,stats:n}); }} />
-                                          <input className="flex-1 min-w-[100px] border-b border-gray-100 p-1.5 text-[13px]" placeholder="Value" value={stat.value} onChange={e=>{ const n=[...formData.stats]; n[sIdx].value=e.target.value; setFormData({...formData,stats:n}); }} />
-                                          <button type="button" className="p-1.5 md:p-0" onClick={()=>setFormData({...formData,stats:formData.stats.filter((_,i)=>i!==sIdx)})}><X className="w-4 h-4 text-gray-300" /></button>
+                                       <div key={sIdx} className="flex flex-wrap items-end gap-2" style={{ ...subBoxStyle, padding: 10, marginBottom: 10 }}>
+                                          <div className="flex-1 min-w-[120px]">
+                                             <label htmlFor={`stat-${sIdx}-label`} className="wp-label wp-small">Label</label>
+                                             <input id={`stat-${sIdx}-label`} className="wp-input wp-full" placeholder="Label" value={stat.label} onChange={e=>{ const v=e.target.value; setFormData(prev=>({...prev,stats:(prev.stats||[]).map((x,i)=>i===sIdx?{...x,label:v}:x)})); }} />
+                                          </div>
+                                          <div className="flex-1 min-w-[120px]">
+                                             <label htmlFor={`stat-${sIdx}-value`} className="wp-label wp-small">Value</label>
+                                             <input id={`stat-${sIdx}-value`} className="wp-input wp-full" placeholder="Value" value={stat.value} onChange={e=>{ const v=e.target.value; setFormData(prev=>({...prev,stats:(prev.stats||[]).map((x,i)=>i===sIdx?{...x,value:v}:x)})); }} />
+                                          </div>
+                                          <button type="button" aria-label="Remove stat" title="Remove stat" className="hover:text-red-700" style={iconBtnStyle} onClick={()=>setFormData(prev => ({...prev,stats:prev.stats.filter((_,i)=>i!==sIdx)}))}><X className="w-4 h-4" aria-hidden="true" /></button>
                                        </div>
                                     ))}
                                  </div>
                               )}
 
                               {activeTab === "faqs" && (
-                                 <div className="space-y-6">
-                                    <button type="button" onClick={() => setFormData({ ...formData, faqs: [...(formData.faqs || []), { question: "", answer: "" }] })} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-sm text-[11px] font-bold">+ Add FAQ</button>
+                                 <div>
+                                    <div style={{ margin: "6px 0 12px" }}>
+                                       <button type="button" onClick={() => setFormData(prev => ({ ...prev, faqs: [...(prev.faqs || []), { question: "", answer: "" }] }))} className="wp-btn">+ Add FAQ</button>
+                                    </div>
                                     {(formData.faqs || []).map((faq, fIdx) => (
-                                       <div key={fIdx} className="bg-white border border-gray-100 p-4 rounded shadow-sm space-y-4">
-                                          <input className="w-full border-b border-gray-100 p-2 text-[13px] font-bold" placeholder="Question" value={faq.question} onChange={e=>{ const n=[...formData.faqs]; n[fIdx].question=e.target.value; setFormData({...formData,faqs:n}); }} />
-                                          <textarea className="w-full border-b border-gray-100 p-2 text-[13px]" placeholder="Answer" rows={2} value={faq.answer} onChange={e=>{ const n=[...formData.faqs]; n[fIdx].answer=e.target.value; setFormData({...formData,faqs:n}); }} />
-                                          <button type="button" onClick={()=>setFormData({...formData,faqs:formData.faqs.filter((_,i)=>i!==fIdx)})} className="text-red-500 text-[11px]">Remove</button>
+                                       <div key={fIdx} style={{ ...subBoxStyle, padding: 12, marginBottom: 10 }}>
+                                          <div className="wp-field">
+                                             <label htmlFor={`faq-${fIdx}-q`} className="wp-label">Question</label>
+                                             <input id={`faq-${fIdx}-q`} className="wp-input wp-full" placeholder="Question" value={faq.question} onChange={e=>{ const v=e.target.value; setFormData(prev=>({...prev,faqs:(prev.faqs||[]).map((x,i)=>i===fIdx?{...x,question:v}:x)})); }} />
+                                          </div>
+                                          <div className="wp-field">
+                                             <label htmlFor={`faq-${fIdx}-a`} className="wp-label">Answer</label>
+                                             <textarea id={`faq-${fIdx}-a`} className="wp-textarea" placeholder="Answer" rows={2} value={faq.answer} onChange={e=>{ const v=e.target.value; setFormData(prev=>({...prev,faqs:(prev.faqs||[]).map((x,i)=>i===fIdx?{...x,answer:v}:x)})); }} />
+                                          </div>
+                                          <button type="button" onClick={()=>setFormData(prev => ({...prev,faqs:prev.faqs.filter((_,i)=>i!==fIdx)}))} style={dangerLinkStyle}>Remove</button>
                                        </div>
                                     ))}
                                  </div>
                               )}
 
                                {activeTab === "sizeguide" && (
-                                   <div className="space-y-6">
-                                      <div className="bg-white border border-gray-100 p-4 sm:p-6 rounded shadow-sm space-y-4 max-w-xl">
-                                         <h3 className="text-[14px] font-bold text-gray-700 border-b border-gray-100 pb-2">Size Chart Configuration</h3>
-                                         
+                                   <div>
+                                      <div style={{ maxWidth: 560, margin: "6px 0 16px" }}>
+                                         <h3 className="wp-strong" style={{ fontSize: 14, margin: "0 0 10px" }}>Size chart configuration</h3>
+
                                          {/* Size Chart Source */}
-                                         <div className="space-y-1.5">
-                                            <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">Size Chart Source</label>
-                                            <select 
-                                               className="w-full border border-gray-200 bg-white p-2 text-[13px] outline-none rounded focus:border-[#2271b1] cursor-pointer"
+                                         <div className="wp-field">
+                                            <label htmlFor="size-chart-source-select" className="wp-label">Size chart source</label>
+                                            <select
+                                               id="size-chart-source-select"
+                                               className="wp-select wp-full"
                                                value={formData.sizeChartSource || "category_default"}
                                                onChange={(e) => {
                                                   const val = e.target.value;
-                                                  setFormData({ 
-                                                     ...formData, 
+                                                  setFormData(prev => ({
+                                                     ...prev,
                                                      sizeChartSource: val,
                                                      sizeGuide: {
-                                                        ...(formData.sizeGuide || {}),
+                                                        ...(prev.sizeGuide || {}),
                                                         enabled: val === "product_custom"
                                                      }
-                                                  });
+                                                  }));
                                                }}
                                             >
                                                <option value="category_default">Use Category Default</option>
@@ -1224,8 +1342,8 @@ export default function ProductForm({ productId = null }) {
                                                <option value="product_custom">Create Custom Size Chart for this Product</option>
                                                <option value="none">No Size Chart (Disabled)</option>
                                             </select>
-                                            <p className="text-[11px] text-gray-400">
-                                               {formData.sizeChartSource === "category_default" 
+                                            <p className="wp-desc">
+                                               {formData.sizeChartSource === "category_default"
                                                   ? "This product will automatically inherit the size chart assigned to its primary category."
                                                   : formData.sizeChartSource === "custom"
                                                   ? "Select a specific master size chart below to override the category default."
@@ -1238,12 +1356,13 @@ export default function ProductForm({ productId = null }) {
 
                                          {/* Size Chart Selection */}
                                          {formData.sizeChartSource === "custom" && (
-                                            <div className="space-y-1.5 pt-2 animate-in fade-in duration-200">
-                                               <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400 block">Select Reusable Size Chart</label>
-                                               <select 
-                                                  className="w-full border border-gray-200 bg-white p-2 text-[13px] outline-none rounded focus:border-[#2271b1] cursor-pointer"
+                                            <div className="wp-field">
+                                               <label htmlFor="size-chart-select" className="wp-label">Select reusable size chart</label>
+                                               <select
+                                                  id="size-chart-select"
+                                                  className="wp-select wp-full"
                                                   value={formData.sizeChart || ""}
-                                                  onChange={(e) => setFormData({ ...formData, sizeChart: e.target.value })}
+                                                  onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, sizeChart: v })); }}
                                                >
                                                   <option value="">-- Choose Size Chart --</option>
                                                   {sizeCharts.map((sc) => (
@@ -1253,8 +1372,8 @@ export default function ProductForm({ productId = null }) {
                                                   ))}
                                                </select>
                                                {sizeCharts.length === 0 && (
-                                                  <p className="text-[11px] text-red-500 font-bold">
-                                                     No published size charts found. <a href="/admin/products/size-charts/new" className="underline" target="_blank" rel="noopener noreferrer">Create one here</a>
+                                                  <p className="wp-desc" style={{ color: "#b32d2e" }}>
+                                                     No published size charts found. <a href="/admin/products/size-charts/new" className="wp-link" style={{ textDecoration: "underline" }} target="_blank" rel="noopener noreferrer">Create one here</a>
                                                   </p>
                                                )}
                                             </div>
@@ -1263,40 +1382,42 @@ export default function ProductForm({ productId = null }) {
 
                                       {/* Inline Custom Size Chart Editor (only shown if sizeChartSource is product_custom) */}
                                       {formData.sizeChartSource === "product_custom" && (
-                                         <div className="space-y-6 animate-in fade-in duration-300">
+                                         <div>
                                             {/* Size Name & Video */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 max-w-4xl">
-                                               <div className="bg-white border border-[#c3c4c7] p-4 rounded space-y-3 shadow-sm">
-                                                  <label className="block text-[11px] font-bold text-gray-400 uppercase">Size Column Name</label>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ marginBottom: 16 }}>
+                                               <div className="min-w-0">
+                                                  <label htmlFor="size-guide-size-name" className="wp-label">Size column name</label>
                                                   <input
-                                                     className="w-full border border-[#c3c4c7] p-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded"
+                                                     id="size-guide-size-name"
+                                                     className="wp-input wp-full"
                                                      placeholder="e.g. Jacket Size, Waist Size, Dress Size"
                                                      value={formData.sizeGuide?.sizeName || ""}
-                                                     onChange={(e) => setFormData({
-                                                        ...formData,
+                                                     onChange={(e) => { const v = e.target.value; setFormData(prev => ({
+                                                        ...prev,
                                                         sizeGuide: {
-                                                           ...(formData.sizeGuide || {}),
-                                                           sizeName: e.target.value
+                                                           ...(prev.sizeGuide || {}),
+                                                           sizeName: v
                                                         }
-                                                     })}
+                                                     })); }}
                                                   />
-                                                  <p className="text-[11px] text-gray-400">Label shown as the first column header in the size table (e.g. "Jacket Size").</p>
+                                                  <p className="wp-desc">Label shown as the first column header in the size table (e.g. &quot;Jacket Size&quot;).</p>
                                                </div>
-                                               <div className="bg-white border border-[#c3c4c7] p-4 rounded space-y-3 shadow-sm">
-                                                  <label className="block text-[11px] font-bold text-gray-400 uppercase">YouTube Video Link</label>
+                                               <div className="min-w-0">
+                                                  <label htmlFor="size-guide-video-url" className="wp-label">YouTube video link</label>
                                                   <input
-                                                     className="w-full border border-[#c3c4c7] p-2 text-[13px] outline-none focus:border-[#2271b1] bg-white rounded"
+                                                     id="size-guide-video-url"
+                                                     className="wp-input wp-full"
                                                      placeholder="e.g. https://www.youtube.com/watch?v=ipyhV51zUWk"
                                                      value={formData.sizeGuide?.videoUrl || ""}
-                                                     onChange={(e) => setFormData({
-                                                        ...formData,
+                                                     onChange={(e) => { const v = e.target.value; setFormData(prev => ({
+                                                        ...prev,
                                                         sizeGuide: {
-                                                           ...(formData.sizeGuide || {}),
-                                                           videoUrl: e.target.value
+                                                           ...(prev.sizeGuide || {}),
+                                                           videoUrl: v
                                                         }
-                                                     })}
+                                                     })); }}
                                                   />
-                                                  <p className="text-[11px] text-gray-400">URL to instructions video (YouTube embed/watch link).</p>
+                                                  <p className="wp-desc">URL to instructions video (YouTube embed/watch link).</p>
                                                </div>
                                             </div>
 
@@ -1313,7 +1434,7 @@ export default function ProductForm({ productId = null }) {
                                                   ? formData.sizeGuide.columnsCm
                                                   : DEFAULT_COLS_CM;
                                                const updateColsCm = (cols) =>
-                                                  setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), columnsCm: cols } });
+                                                  setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), columnsCm: cols } }));
                                                const addColCm = () => {
                                                   const key = `col_${Date.now()}`;
                                                   updateColsCm([...colsCm, { key, label: "New Column" }]);
@@ -1324,72 +1445,74 @@ export default function ProductForm({ productId = null }) {
                                                   updateColsCm(updated);
                                                };
                                                return (
-                                                  <div className="bg-white border border-[#c3c4c7] p-4 rounded max-w-4xl shadow-sm">
-                                                     <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-                                                        <h4 className="text-[13px] font-bold text-gray-700">Size Chart (CM)</h4>
+                                                  <div style={subBoxStyle}>
+                                                     <div style={subHeadStyle}>
+                                                        <h4 className="wp-strong" style={{ fontSize: 14, margin: 0, flex: 1 }}>Size chart (CM)</h4>
                                                         <div className="flex flex-wrap gap-2">
                                                            <button type="button" onClick={addColCm}
-                                                              className="border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded text-[11px] font-bold hover:bg-[#2271b1] hover:text-white transition">
+                                                              className="wp-btn">
                                                               + Add Column
                                                            </button>
                                                            <button type="button"
                                                               onClick={() => {
-                                                                 const cm = [...(formData.sizeGuide?.sizesCm || [])];
                                                                  const emptyRow = {};
                                                                  colsCm.forEach(c => { emptyRow[c.key] = ""; });
-                                                                 cm.push(emptyRow);
-                                                                 setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesCm: cm } });
+                                                                 setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesCm: [...(prev.sizeGuide?.sizesCm || []), emptyRow] } }));
                                                               }}
-                                                              className="bg-[#2271b1] text-white px-3 py-1 rounded text-[11px] font-bold hover:bg-[#135e96]">
+                                                              className="wp-btn wp-btn-primary">
                                                               + Add Row
                                                            </button>
                                                         </div>
                                                      </div>
                                                      <div className="overflow-x-auto max-w-full">
-                                                        <table className="w-full min-w-[400px] text-left text-[11px] border-collapse">
+                                                        <table className="wp-list-table" style={{ minWidth: 420 }}>
                                                            <thead>
-                                                              <tr className="bg-gray-50 border-b border-gray-200">
+                                                              <tr>
                                                                  {colsCm.map((col, cIdx) => (
-                                                                    <th key={col.key} className="p-1">
-                                                                       <div className="flex items-center gap-1 group">
+                                                                    <th key={col.key} style={{ padding: 6 }}>
+                                                                       <div className="flex items-center gap-1">
                                                                           <input
-                                                                             className="border border-transparent hover:border-gray-200 focus:border-[#2271b1] bg-transparent outline-none text-gray-500 font-bold uppercase text-[10px] w-full min-w-[60px] px-1 py-0.5 rounded"
+                                                                             aria-label={`Column ${cIdx + 1} name`}
+                                                                             className="wp-input wp-full wp-strong"
+                                                                             style={{ minWidth: 70 }}
                                                                              value={col.label}
                                                                              onChange={(e) => renameColCm(cIdx, e.target.value)}
                                                                           />
                                                                           {colsCm.length > 1 && (
                                                                              <button type="button" onClick={() => removeColCm(cIdx)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition flex-shrink-0 p-1 md:p-0">
-                                                                                <X className="w-3 h-3" />
+                                                                                aria-label={`Remove column ${col.label}`}
+                                                                                title="Remove column"
+                                                                                className="hover:text-red-700 flex-shrink-0"
+                                                                                style={{ ...iconBtnStyle, minWidth: 24 }}>
+                                                                                <X className="w-3.5 h-3.5" aria-hidden="true" />
                                                                              </button>
                                                                           )}
                                                                        </div>
                                                                     </th>
                                                                  ))}
-                                                                 <th className="p-1 w-8" />
+                                                                 <th style={{ width: 40, padding: 6 }}><span className="sr-only">Actions</span></th>
                                                               </tr>
                                                            </thead>
-                                                           <tbody className="divide-y divide-gray-100">
+                                                           <tbody>
                                                               {(formData.sizeGuide?.sizesCm || []).map((row, rIdx) => (
                                                                  <tr key={rIdx}>
                                                                     {colsCm.map(col => (
-                                                                       <td key={col.key} className="p-1">
+                                                                       <td key={col.key} style={{ padding: 6 }}>
                                                                           <input
-                                                                             className="w-full border border-gray-200 p-1 text-[11px]"
+                                                                             aria-label={`${col.label}, row ${rIdx + 1}`}
+                                                                             className="wp-input wp-full"
                                                                              value={row[col.key] || ""}
                                                                              onChange={(e) => {
-                                                                                const cm = [...(formData.sizeGuide?.sizesCm || [])];
-                                                                                cm[rIdx] = { ...cm[rIdx], [col.key]: e.target.value };
-                                                                                setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesCm: cm } });
+                                                                                const v = e.target.value;
+                                                                                setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesCm: (prev.sizeGuide?.sizesCm || []).map((r, i) => i === rIdx ? { ...r, [col.key]: v } : r) } }));
                                                                              }}
                                                                           />
                                                                        </td>
                                                                     ))}
-                                                                    <td className="p-1 text-center">
-                                                                       <button type="button" className="p-1.5 md:p-0" onClick={() => {
-                                                                          const cm = (formData.sizeGuide?.sizesCm || []).filter((_, i) => i !== rIdx);
-                                                                          setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesCm: cm } });
-                                                                       }}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button>
+                                                                    <td style={{ padding: 6, textAlign: "center" }}>
+                                                                       <button type="button" aria-label={`Remove row ${rIdx + 1}`} title="Remove row" className="hover:text-red-700" style={iconBtnStyle} onClick={() => {
+                                                                          setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesCm: (prev.sizeGuide?.sizesCm || []).filter((_, i) => i !== rIdx) } }));
+                                                                       }}><X className="w-4 h-4" aria-hidden="true" /></button>
                                                                     </td>
                                                                  </tr>
                                                               ))}
@@ -1413,7 +1536,7 @@ export default function ProductForm({ productId = null }) {
                                                   ? formData.sizeGuide.columnsIn
                                                   : DEFAULT_COLS_IN;
                                                const updateColsIn = (cols) =>
-                                                  setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), columnsIn: cols } });
+                                                  setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), columnsIn: cols } }));
                                                const addColIn = () => {
                                                   const key = `col_${Date.now()}`;
                                                   updateColsIn([...colsIn, { key, label: "New Column" }]);
@@ -1424,72 +1547,74 @@ export default function ProductForm({ productId = null }) {
                                                   updateColsIn(updated);
                                                };
                                                return (
-                                                  <div className="bg-white border border-[#c3c4c7] p-4 rounded max-w-4xl shadow-sm">
-                                                     <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-                                                        <h4 className="text-[13px] font-bold text-gray-700">Size Chart (INCHES)</h4>
+                                                  <div style={subBoxStyle}>
+                                                     <div style={subHeadStyle}>
+                                                        <h4 className="wp-strong" style={{ fontSize: 14, margin: 0, flex: 1 }}>Size chart (INCHES)</h4>
                                                         <div className="flex flex-wrap gap-2">
                                                            <button type="button" onClick={addColIn}
-                                                              className="border border-[#2271b1] text-[#2271b1] px-3 py-1 rounded text-[11px] font-bold hover:bg-[#2271b1] hover:text-white transition">
+                                                              className="wp-btn">
                                                               + Add Column
                                                            </button>
                                                            <button type="button"
                                                               onClick={() => {
-                                                                 const inches = [...(formData.sizeGuide?.sizesIn || [])];
                                                                  const emptyRow = {};
                                                                  colsIn.forEach(c => { emptyRow[c.key] = ""; });
-                                                                 inches.push(emptyRow);
-                                                                 setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesIn: inches } });
+                                                                 setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesIn: [...(prev.sizeGuide?.sizesIn || []), emptyRow] } }));
                                                               }}
-                                                              className="bg-[#2271b1] text-white px-3 py-1 rounded text-[11px] font-bold hover:bg-[#135e96]">
+                                                              className="wp-btn wp-btn-primary">
                                                               + Add Row
                                                            </button>
                                                         </div>
                                                      </div>
                                                      <div className="overflow-x-auto max-w-full">
-                                                        <table className="w-full min-w-[400px] text-left text-[11px] border-collapse">
+                                                        <table className="wp-list-table" style={{ minWidth: 420 }}>
                                                            <thead>
-                                                              <tr className="bg-gray-50 border-b border-gray-200">
+                                                              <tr>
                                                                  {colsIn.map((col, cIdx) => (
-                                                                    <th key={col.key} className="p-1">
-                                                                       <div className="flex items-center gap-1 group">
+                                                                    <th key={col.key} style={{ padding: 6 }}>
+                                                                       <div className="flex items-center gap-1">
                                                                           <input
-                                                                             className="border border-transparent hover:border-gray-200 focus:border-[#2271b1] bg-transparent outline-none text-gray-500 font-bold uppercase text-[10px] w-full min-w-[60px] px-1 py-0.5 rounded"
+                                                                             aria-label={`Column ${cIdx + 1} name`}
+                                                                             className="wp-input wp-full wp-strong"
+                                                                             style={{ minWidth: 70 }}
                                                                              value={col.label}
                                                                              onChange={(e) => renameColIn(cIdx, e.target.value)}
                                                                           />
                                                                           {colsIn.length > 1 && (
                                                                              <button type="button" onClick={() => removeColIn(cIdx)}
-                                                                                className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition flex-shrink-0 p-1 md:p-0">
-                                                                                <X className="w-3 h-3" />
+                                                                                aria-label={`Remove column ${col.label}`}
+                                                                                title="Remove column"
+                                                                                className="hover:text-red-700 flex-shrink-0"
+                                                                                style={{ ...iconBtnStyle, minWidth: 24 }}>
+                                                                                <X className="w-3.5 h-3.5" aria-hidden="true" />
                                                                              </button>
                                                                           )}
                                                                        </div>
                                                                     </th>
                                                                  ))}
-                                                                 <th className="p-1 w-8" />
+                                                                 <th style={{ width: 40, padding: 6 }}><span className="sr-only">Actions</span></th>
                                                               </tr>
                                                            </thead>
-                                                           <tbody className="divide-y divide-gray-100">
+                                                           <tbody>
                                                               {(formData.sizeGuide?.sizesIn || []).map((row, rIdx) => (
                                                                  <tr key={rIdx}>
                                                                     {colsIn.map(col => (
-                                                                       <td key={col.key} className="p-1">
+                                                                       <td key={col.key} style={{ padding: 6 }}>
                                                                           <input
-                                                                             className="w-full border border-gray-200 p-1 text-[11px]"
+                                                                             aria-label={`${col.label}, row ${rIdx + 1}`}
+                                                                             className="wp-input wp-full"
                                                                              value={row[col.key] || ""}
                                                                              onChange={(e) => {
-                                                                                const inches = [...(formData.sizeGuide?.sizesIn || [])];
-                                                                                inches[rIdx] = { ...inches[rIdx], [col.key]: e.target.value };
-                                                                                setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesIn: inches } });
+                                                                                const v = e.target.value;
+                                                                                setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesIn: (prev.sizeGuide?.sizesIn || []).map((r, i) => i === rIdx ? { ...r, [col.key]: v } : r) } }));
                                                                              }}
                                                                           />
                                                                        </td>
                                                                     ))}
-                                                                    <td className="p-1 text-center">
-                                                                       <button type="button" className="p-1.5 md:p-0" onClick={() => {
-                                                                          const inches = (formData.sizeGuide?.sizesIn || []).filter((_, i) => i !== rIdx);
-                                                                          setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesIn: inches } });
-                                                                       }}><X className="w-3.5 h-3.5 text-gray-300 hover:text-red-500" /></button>
+                                                                    <td style={{ padding: 6, textAlign: "center" }}>
+                                                                       <button type="button" aria-label={`Remove row ${rIdx + 1}`} title="Remove row" className="hover:text-red-700" style={iconBtnStyle} onClick={() => {
+                                                                          setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesIn: (prev.sizeGuide?.sizesIn || []).filter((_, i) => i !== rIdx) } }));
+                                                                       }}><X className="w-4 h-4" aria-hidden="true" /></button>
                                                                     </td>
                                                                  </tr>
                                                               ))}
@@ -1501,37 +1626,38 @@ export default function ProductForm({ productId = null }) {
                                             })()}
 
                                             {/* Instructions */}
-                                            <div className="bg-white border border-[#c3c4c7] p-4 rounded max-w-4xl shadow-sm space-y-4">
-                                               <div className="flex justify-between items-center mb-1 flex-wrap gap-2">
-                                                  <h4 className="text-[13px] font-bold text-gray-700">How to Measure Instructions</h4>
+                                            <div style={subBoxStyle}>
+                                               <div style={subHeadStyle}>
+                                                  <h4 className="wp-strong" style={{ fontSize: 14, margin: 0, flex: 1 }}>How to measure instructions</h4>
                                                   <button type="button"
                                                      onClick={() => {
-                                                        const inst = [...(formData.sizeGuide?.instructions || [])];
-                                                        inst.push({ title: "", desc: "" });
-                                                        setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), instructions: inst } });
+                                                        setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), instructions: [...(prev.sizeGuide?.instructions || []), { title: "", desc: "" }] } }));
                                                      }}
-                                                     className="bg-[#2271b1] text-white px-3 py-1 rounded text-[11px] font-bold hover:bg-[#135e96]">
+                                                     className="wp-btn wp-btn-primary">
                                                      + Add Instruction
                                                   </button>
                                                </div>
-                                               <div className="space-y-4">
+                                               <div style={{ padding: 12 }}>
                                                   {(formData.sizeGuide?.instructions || []).map((row, rIdx) => {
                                                      const updateRow = (key, val) => {
-                                                        const inst = [...(formData.sizeGuide?.instructions || [])];
-                                                        inst[rIdx][key] = val;
-                                                        setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), instructions: inst } });
+                                                        setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), instructions: (prev.sizeGuide?.instructions || []).map((r, i) => i === rIdx ? { ...r, [key]: val } : r) } }));
                                                      };
                                                      return (
-                                                        <div key={rIdx} className="border border-gray-100 p-3 rounded bg-gray-50/50 flex gap-4 items-start">
-                                                           <div className="flex-1 min-w-0 space-y-2">
+                                                        <div key={rIdx} className="flex gap-3 items-start" style={{ padding: "10px 0", borderBottom: "1px solid #f0f0f1" }}>
+                                                           <div className="flex-1 min-w-0 flex flex-col gap-2">
+                                                              <label htmlFor={`instr-${rIdx}-title`} className="sr-only">Instruction {rIdx + 1} title</label>
                                                               <input
-                                                                 className="w-full border border-gray-200 p-1.5 text-[12px] font-bold bg-white"
+                                                                 id={`instr-${rIdx}-title`}
+                                                                 className="wp-input wp-full wp-strong"
                                                                  placeholder="e.g. Sleeve Length"
                                                                  value={row.title}
                                                                  onChange={(e) => updateRow("title", e.target.value)}
                                                               />
+                                                              <label htmlFor={`instr-${rIdx}-desc`} className="sr-only">Instruction {rIdx + 1} text</label>
                                                               <textarea
-                                                                 className="w-full border border-gray-200 p-1.5 text-[12px] bg-white resize-none"
+                                                                 id={`instr-${rIdx}-desc`}
+                                                                 className="wp-textarea"
+                                                                 style={{ resize: "none" }}
                                                                  placeholder="Instruction text..."
                                                                  rows={2}
                                                                  value={row.desc}
@@ -1541,12 +1667,14 @@ export default function ProductForm({ productId = null }) {
                                                            <button
                                                               type="button"
                                                               onClick={() => {
-                                                                 const inst = (formData.sizeGuide?.instructions || []).filter((_, idx) => idx !== rIdx);
-                                                                 setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), instructions: inst } });
+                                                                 setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), instructions: (prev.sizeGuide?.instructions || []).filter((_, idx) => idx !== rIdx) } }));
                                                               }}
-                                                              className="text-gray-300 hover:text-red-500 mt-1 shrink-0 p-1.5 md:p-0"
+                                                              aria-label={`Remove instruction ${rIdx + 1}`}
+                                                              title="Remove instruction"
+                                                              className="hover:text-red-700 shrink-0"
+                                                              style={iconBtnStyle}
                                                            >
-                                                              <X className="w-4 h-4" />
+                                                              <X className="w-4 h-4" aria-hidden="true" />
                                                            </button>
                                                         </div>
                                                      );
@@ -1560,7 +1688,7 @@ export default function ProductForm({ productId = null }) {
 
                            </div>
                         </div>
-                     </div>
+                     </section>
                   </>
                ) : (
                   <SEOConfigPanel
@@ -1569,92 +1697,106 @@ export default function ProductForm({ productId = null }) {
                      parentTitle={formData.name}
                      parentDescription={formData.shortDescription || formData.description}
                      parentSlug={formData.slug}
-                     parentImage={formData.image || (formData.images && formData.images[0])}
+                     parentImage={formData.images?.[0] || ""}
                      parentType="product"
                   />
                )}
+               </div>
+
+               {/* Short Description (always mounted, independent of the Content/SEO tabs) */}
+               <div>
+                  <Postbox title="Product short description" id="pf-short-desc">
+                     <TiptapEditor
+                        content={formData.shortDescription}
+                        onChange={(html) => setFormData(prev => ({ ...prev, shortDescription: html }))}
+                     />
+                     <p className="wp-desc">Supports bold, italic, lists, and links. Displays as a rich excerpt on the product page.</p>
+                  </Postbox>
+               </div>
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-4 min-w-0">
-               <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Publish</div>
-                  <div className="p-3 space-y-4 text-[13px]">
-                     <div className="flex flex-wrap justify-between items-center gap-2">
-                        <button type="button" onClick={handleSubmit} className="border border-[#c3c4c7] px-3 py-1.5 rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[12px] font-medium">Save Draft</button>
-                        <button type="button" onClick={() => formData.slug && window.open(`/product/${formData.slug}`, '_blank')} className="text-[#2271b1] underline text-[12px]" title={formData.slug ? `Preview /product/${formData.slug}` : 'Save first to preview'}>Preview</button>
+            <div className="wp-col-side">
+               <section className="wp-postbox" aria-labelledby="pf-publish-title">
+                  <div className="wp-postbox-head"><h2 id="pf-publish-title">Publish</h2></div>
+                  <div className="flex flex-wrap justify-between items-center gap-2" style={{ padding: "10px 12px 2px" }}>
+                     <button type="button" disabled={saving} onClick={(e) => handleSubmit(e, { asDraft: true })} className="wp-btn">Save Draft</button>
+                     <button type="button" onClick={() => previewUrl && window.open(previewUrl, '_blank')} className="wp-btn" title={previewUrl ? `Preview ${previewUrl}` : 'Save first to preview'}>Preview</button>
+                  </div>
+                  <div className="wp-misc">
+                     <div className="wp-misc-row">
+                        <label htmlFor="product-status-select" className="wp-muted">Status:</label>
+                        <strong className="wp-strong">{formData.status}</strong>
+                        <select
+                           id="product-status-select"
+                           className="wp-select"
+                           style={{ marginLeft: "auto" }}
+                           value={formData.status}
+                           onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, status: v })); }}
+                        >
+                           <option value="Draft">Draft</option>
+                           <option value="Published">Published</option>
+                        </select>
                      </div>
-                     <div className="space-y-3 py-3 border-y border-gray-100">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p><span className="text-gray-400">Status:</span> <strong>{formData.status}</strong></p>
-                            <select 
-                                className="text-[11px] border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#2271b1]"
-                                value={formData.status}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            >
-                                <option value="Draft">Draft</option>
-                                <option value="Published">Published</option>
-                            </select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <input 
-                              type="checkbox" 
+                     <div className="wp-misc-row">
+                        <span className="wp-muted">Visibility:</span> <strong className="wp-strong">Public</strong>
+                     </div>
+                     <div className="wp-misc-row">
+                        <label htmlFor="isFeatured" className="wp-check">
+                           <input
+                              type="checkbox"
                               id="isFeatured"
                               checked={formData.isFeatured}
-                              onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
+                              onChange={(e) => { const v = e.target.checked; setFormData(prev => ({ ...prev, isFeatured: v })); }}
                            />
-                           <label htmlFor="isFeatured" className="text-gray-400 cursor-pointer">Featured Product</label>
-                        </div>
-                        <p><span className="text-gray-400">Visibility:</span> <strong>Public</strong></p>
-                     </div>
-                     <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex flex-wrap justify-between items-center gap-2">
-                        <button type="button" className="text-red-600 underline">Move to Trash</button>
-                        <button type="submit" disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold hover:bg-[#135e96]">
-                           {saving ? "Saving..." : (productId ? "Update" : "Publish")}
-                        </button>
+                           <span>Featured product</span>
+                        </label>
                      </div>
                   </div>
-               </div>
-
-               <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex items-center justify-between">
-                      <span>Categories</span>
-                      <button type="button" onClick={() => router.push("/admin/categories")} className="text-[10px] text-[#2271b1] hover:underline font-normal">Manage</button>
-                   </div>
-                   <div className="p-4 max-h-48 overflow-y-auto border-b border-gray-100">
-                      {categories.length === 0 ? (
-                         <p className="text-[11px] text-gray-400 italic">No categories found.</p>
-                      ) : (
-                         categories.map(cat => (
-                            <label key={cat._id} className="flex items-center gap-2 text-[13px] mb-2 cursor-pointer">
-                               <input 
-                                  type="checkbox" 
-                                  className="w-4 h-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1]" 
-                                  checked={(formData.categories || []).includes(cat._id)} 
-                                  onChange={e => {
-                                     const n = e.target.checked ? [...(formData.categories || []), cat._id] : (formData.categories || []).filter(id => id !== cat._id);
-                                     setFormData({ ...formData, categories: n });
-                                  }} 
-                               /> 
-                               {cat.name}
-                            </label>
-                         ))
-                      )}
-                   </div>
-                </div>
-
-               <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Product Image</div>
-                  <div className="p-4">
-                     <MediaPicker value={formData.images[0]} onChange={url => setFormData({ ...formData, images: [url, ...(formData.images?.slice(1) || [])] })} />
+                  <div className="wp-box-foot">
+                     {productId && !formData.isDeleted && <button type="button" onClick={handleTrash} style={dangerLinkStyle}>Move to Trash</button>}
+                     <span className="wp-spacer" />
+                     <button type="submit" disabled={saving} className="wp-btn wp-btn-primary" style={{ minHeight: 36 }}>
+                        {saving ? "Saving..." : (productId ? "Update" : "Publish")}
+                     </button>
                   </div>
-                  <div className="p-4 border-t border-gray-100">
-                     <label className="text-[13px] font-bold block mb-2 text-gray-700">Product Gallery</label>
-                     <MediaPicker multiple value={formData.images.slice(1)} onChange={urls => setFormData({ ...formData, images: [formData.images[0] || "", ...urls] })} />
-                  </div>
-               </div>
+               </section>
+
+               <Postbox
+                  title="Product categories"
+                  id="pf-categories"
+                  aside={<button type="button" onClick={() => router.push("/admin/categories")} className="wp-link" style={linkBtnStyle}>Manage</button>}
+               >
+                  {categories.length === 0 ? (
+                     <p className="wp-muted">No categories found.</p>
+                  ) : (
+                     <div className="wp-checklist" role="group" aria-labelledby="pf-categories-title">
+                        {categories.map(cat => (
+                           <label key={cat._id} className="wp-check">
+                              <input
+                                 type="checkbox"
+                                 checked={(formData.categories || []).includes(cat._id)}
+                                 onChange={e => {
+                                    const checked = e.target.checked;
+                                    setFormData(prev => ({ ...prev, categories: checked ? [...(prev.categories || []), cat._id] : (prev.categories || []).filter(id => id !== cat._id) }));
+                                 }}
+                              />
+                              <span>{cat.name}</span>
+                           </label>
+                        ))}
+                     </div>
+                  )}
+               </Postbox>
+
+               <Postbox title="Product image" id="pf-image">
+                  <MediaPicker value={formData.images[0]} onChange={url => setFormData(prev => ({ ...prev, images: [url, ...(prev.images?.slice(1) || [])] }))} />
+               </Postbox>
+
+               <Postbox title="Product gallery" id="pf-gallery">
+                  <MediaPicker multiple value={formData.images.slice(1)} onChange={urls => setFormData(prev => ({ ...prev, images: [prev.images[0] || "", ...urls] }))} />
+               </Postbox>
             </div>
          </form>
-    </AdminPageLayout>
+      </Page>
    );
 }

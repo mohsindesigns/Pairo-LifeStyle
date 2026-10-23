@@ -4,18 +4,20 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "react-hot-toast";
 import Link from "next/link";
 import {
-  Plus, X, ChevronDown, ChevronUp, Save, Globe,
-  Truck, Check, Info, Loader2, GripVertical, ShieldCheck
+  Plus, X, ChevronDown, ChevronUp, Save, Check, Loader2, GripVertical,
 } from "lucide-react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, Notice } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import { COUNTRIES, countryName } from "@/lib/countries";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ShippingTaxTabs from "@/components/admin/settings/ShippingTaxTabs";
+import { normalizeMethodSettings } from "./methodSettings";
 
 // ─── Shared WordPress input styles ─────────────────────────────────────────────
-const inp  = "w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white transition-all shadow-sm";
-const lbl  = "block text-[13px] font-semibold text-[#1d2327] mb-1.5";
-const hint = "text-[12px] text-[#646970] mt-1.5 italic leading-relaxed";
+const inp  = "wp-input wp-full";
+const sel  = "wp-select wp-full";
+const lbl  = "wp-label";
+const hint = "wp-desc";
 
 const PROVIDERS = [
   { key: "FLAT_RATE",     label: "Flat Rate",     emoji: "📦", desc: "Fixed cost per order" },
@@ -44,30 +46,39 @@ const VALUE_PLACEHOLDERS = {
   custom:      "Comma separated match values",
 };
 
-// ─── WordPress Navigation Tabs ──────────────────────────────────────────────────
-function NavTabs({ activeTab }) {
-  const tab = (href, key, label) => (
-    <Link
-      href={href}
-      className={`px-4 py-2 text-[14px] font-semibold border-t-2 border-x border-b transition-all ${
-        activeTab === key
-          ? "bg-[#f0f2f1] border-t-[#2271b1] border-x-[#c3c4c7] border-b-transparent translate-y-[1px] text-[#1d2327]"
-          : "bg-white border-t-transparent border-x-transparent border-b-[#c3c4c7] text-[#2271b1] hover:text-[#135e96] hover:bg-[#fafafa]"
-      }`}
-    >
-      {label}
-    </Link>
-  );
+// Display-only labels for the region chips in the zones table.
+const RULE_CHIP_LABELS = {
+  state: "State", province: "Province", city: "City", postal_code: "Postcode",
+  postal_code_range: "Postcodes", region: "Region", custom: "Custom",
+};
+
+function regionChips(matchRules) {
+  return (matchRules || []).flatMap((r) => {
+    const values = r.values || [];
+    if (r.type === "country") return values.map((code) => countryName(code) || code);
+    const label = RULE_CHIP_LABELS[r.type] || r.type;
+    if (values.length === 0) return [`${label}: any`];
+    return [`${label}: ${values.join(r.type === "postal_code_range" ? " – " : ", ")}`];
+  });
+}
+
+
+// ─── Label-left form row ───────────────────────────────────────────────────────
+function FRow({ label, htmlFor, hint: hintText, children }) {
   return (
-    <div className="flex flex-wrap border-b border-[#c3c4c7] mb-6 mt-1 gap-1">
-      {tab("/admin/settings/shipping", "shipping", "Shipping")}
-      {tab("/admin/settings/tax", "tax", "Tax Settings")}
-      {tab("/admin/settings/shipping/pickup-locations", "pickup-locations", "Pickup Locations")}
+    <div className="wp-frow">
+      {htmlFor ? (
+        <label className="wp-flabel" htmlFor={htmlFor}>{label}</label>
+      ) : (
+        <span className="wp-flabel">{label}</span>
+      )}
+      <div className="min-w-0" style={{ flex: "1 1 320px", maxWidth: 520 }}>{children}</div>
+      {hintText && <p className="wp-hint">{hintText}</p>}
     </div>
   );
 }
 
-// ─── Country Multi-Select (searchable checklist + pills) ──────────────────────
+// ─── Country Multi-Select (searchable checklist + chips) ──────────────────────
 function CountryMultiSelect({ values, onChange }) {
   const [filter, setFilter] = useState("");
   const selected = values || [];
@@ -81,15 +92,15 @@ function CountryMultiSelect({ values, onChange }) {
 
   return (
     <div>
-      <label className="text-[10px] font-bold text-[#646970] uppercase tracking-wider block mb-1">Countries</label>
+      <span className={lbl}>Countries</span>
 
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {selected.map(code => (
-            <span key={code} className="inline-flex items-center gap-1 bg-[#f0f6fb] border border-[#c3c4c7] text-[#1d2327] text-[11px] font-semibold px-2 py-0.5 rounded-[3px]">
+            <span key={code} className="wp-chip">
               {code} — {countryName(code)}
-              <button type="button" onClick={() => remove(code)} className="text-[#646970] hover:text-[#d63638]" title="Remove">
-                <X className="w-3 h-3" />
+              <button type="button" onClick={() => remove(code)} className="min-w-[24px] min-h-[24px] justify-center" title="Remove" aria-label={`Remove ${countryName(code) || code}`}>
+                <X className="w-3.5 h-3.5" />
               </button>
             </span>
           ))}
@@ -101,19 +112,20 @@ function CountryMultiSelect({ values, onChange }) {
         value={filter}
         onChange={e => setFilter(e.target.value)}
         placeholder="Search countries by name or code…"
+        aria-label="Search countries"
       />
 
-      <div className="max-h-48 overflow-y-auto border border-[#c3c4c7] bg-white rounded-[3px] divide-y divide-[#f0f0f1]">
+      <div className="wp-checklist" style={{ maxHeight: 192, padding: 0 }}>
         {filtered.length === 0 && (
-          <div className="px-3 py-4 text-center text-[11px] text-[#646970] italic">No countries match &quot;{filter}&quot;</div>
+          <div className="wp-muted px-3 py-3 text-center">No countries match &quot;{filter}&quot;</div>
         )}
         {filtered.map(c => {
           const checked = selected.includes(c.code);
           return (
-            <label key={c.code} className={`flex items-center gap-2 px-3 py-1.5 text-[12px] cursor-pointer hover:bg-[#f0f6fb] ${checked ? "bg-[#f0f6fb]" : ""}`}>
-              <input type="checkbox" checked={checked} onChange={() => toggle(c.code)} className="accent-[#2271b1]" />
-              <span className="font-semibold text-[#1d2327]">{c.code}</span>
-              <span className="text-[#646970]">— {c.name}</span>
+            <label key={c.code} className={`wp-check px-2.5 ${checked ? "bg-[#f0f6fc]" : ""}`}>
+              <input type="checkbox" checked={checked} onChange={() => toggle(c.code)} />
+              <span className="wp-strong">{c.code}</span>
+              <span className="wp-muted">— {c.name}</span>
             </label>
           );
         })}
@@ -127,7 +139,7 @@ function CountryMultiSelect({ values, onChange }) {
 function RuleTypeSelect({ value, onChange }) {
   const options = value === "region" ? [LEGACY_REGION_TYPE, ...RULE_TYPES] : RULE_TYPES;
   return (
-    <select className={inp} value={value} onChange={e => onChange(e.target.value)}>
+    <select className={sel} value={value} onChange={e => onChange(e.target.value)} aria-label="Rule type">
       {options.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
     </select>
   );
@@ -142,27 +154,27 @@ function RuleValueEditor({ rule, onUpdate }) {
   if (rule.type === "postal_code_range") {
     const [from = "", to = ""] = rule.values || [];
     return (
-      <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] font-bold text-[#646970] uppercase tracking-wider block mb-1">From</label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="block">
+          <span className={lbl}>From</span>
           <input className={inp} value={from} onChange={e => onUpdate({ values: [e.target.value, to] })} placeholder="e.g. 10001" />
-        </div>
-        <div>
-          <label className="text-[10px] font-bold text-[#646970] uppercase tracking-wider block mb-1">To</label>
+        </label>
+        <label className="block">
+          <span className={lbl}>To</span>
           <input className={inp} value={to} onChange={e => onUpdate({ values: [from, e.target.value] })} placeholder="e.g. 19999" />
-        </div>
+        </label>
       </div>
     );
   }
 
   return (
-    <div>
-      <label className="text-[10px] font-bold text-[#646970] uppercase tracking-wider block mb-1">Values (Comma Separated)</label>
+    <label className="block">
+      <span className={lbl}>Values (comma separated)</span>
       <input className={inp}
         value={(rule.values || []).join(", ")}
         onChange={e => onUpdate({ values: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })}
         placeholder={VALUE_PLACEHOLDERS[rule.type] || "Comma separated values"} />
-    </div>
+    </label>
   );
 }
 
@@ -174,47 +186,42 @@ function CoverageRulesEditor({ matchRules, onChange, variant = "edit" }) {
   const delRule = (i) => onChange(rules.filter((_, idx) => idx !== i));
 
   const create = variant === "create";
-  const rowBg = create ? "bg-[#f6f7f7]" : "bg-white";
-  const labelColor = create ? "text-[#50575e]" : "text-[#646970]";
-  const emptyBg = create ? "bg-[#f6f7f7]" : "bg-white";
   const emptyText = create
     ? "Wildcard — matches all addresses"
     : "No coverage rules — matches all addresses (Wildcard Fallback)";
 
   return (
     <div>
-      <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 mb-2">
-        <div className="min-w-0">
-          <label className={lbl}>Coverage Rules</label>
-          <p className={hint}>
-            {create
-              ? "Leave empty to match all locations (acts as a wildcard fallback)."
-              : "The zone matches customer location if all rules pass. Leave empty for wildcard fallback."}
-          </p>
-        </div>
-        <button type="button" onClick={addRule} className="text-[#2271b1] text-[12px] font-bold hover:underline flex items-center gap-1 shrink-0">
-          <Plus className="w-3 h-3" />Add Location Rule
-        </button>
-      </div>
+      <p className={hint} style={{ marginTop: 0, marginBottom: 8 }}>
+        {create
+          ? "Leave empty to match all locations (acts as a wildcard fallback)."
+          : "The zone matches customer location if all rules pass. Leave empty for wildcard fallback."}
+      </p>
 
       {rules.length === 0 && (
-        <div className={`text-[11px] text-[#646970] italic border border-dashed border-[#c3c4c7] ${emptyBg} rounded-[3px] px-4 py-3 text-center`}>{emptyText}</div>
+        <div className="wp-muted border border-dashed border-[#c3c4c7] bg-white px-3 py-3 mb-2">{emptyText}</div>
       )}
 
       <div className="space-y-2">
         {rules.map((rule, i) => (
-          <div key={i} className={`${rowBg} border border-[#c3c4c7] p-3 space-y-2`}>
-            <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2">
-              <div className="w-full xs:w-[180px]">
-                <label className={`text-[10px] font-bold ${labelColor} uppercase tracking-wider block mb-1`}>Rule Type</label>
+          <div key={i} className="bg-white border border-[#dcdcde] p-3 space-y-2">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div className="w-full sm:w-[220px]">
+                <span className={lbl}>Rule type</span>
                 <RuleTypeSelect value={rule.type} onChange={type => updRule(i, { type, values: [] })} />
               </div>
-              <button type="button" onClick={() => delRule(i)} className="text-[#b32d2e] hover:text-[#d63638] text-[11px] font-bold hover:underline self-end pb-1.5">Remove Rule</button>
+              <div className="wp-row-actions" style={{ visibility: "visible", paddingTop: 0 }}>
+                <button type="button" onClick={() => delRule(i)} className="is-danger max-[782px]:min-h-[40px]">Remove rule</button>
+              </div>
             </div>
             <RuleValueEditor rule={rule} onUpdate={u => updRule(i, u)} />
           </div>
         ))}
       </div>
+
+      <button type="button" onClick={addRule} className="wp-btn mt-2">
+        <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add location rule
+      </button>
     </div>
   );
 }
@@ -243,34 +250,27 @@ function ProviderSettings({ provider, settings, onChange }) {
   }, [provider]);
 
   if (provider === "FLAT_RATE") return (
-    <div>
-      <label className={lbl}>Shipping Cost ($) <span className="text-red-500">*</span></label>
-      <input type="number" min="0" className={`${inp} max-w-[200px] font-bold`} value={settings.cost ?? ""} onChange={e => s("cost", Number(e.target.value))} placeholder="e.g. 10" />
-    </div>
+    <FRow label={<>Shipping cost ($) <span className="text-[#d63638]">*</span></>} htmlFor="method-cost">
+      <input id="method-cost" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.cost ?? ""} onChange={e => s("cost", e.target.value)} placeholder="e.g. 10" required aria-required="true" />
+    </FRow>
   );
   if (provider === "FREE_SHIPPING") return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <label className={lbl}>Minimum Order Amount ($)</label>
-        <input type="number" min="0" className={`${inp} font-semibold`} value={settings.minimumOrderAmount ?? ""} onChange={e => s("minimumOrderAmount", Number(e.target.value))} placeholder="0 = always free" />
-        <p className={hint}>Leave 0 to always offer free shipping.</p>
-      </div>
-      <div>
-        <label className={lbl}>Fallback Cost ($)</label>
-        <input type="number" min="0" className={`${inp} font-semibold`} value={settings.fallbackCost ?? ""} onChange={e => s("fallbackCost", Number(e.target.value))} placeholder="Charged if minimum not met" />
-      </div>
-    </div>
+    <>
+      <FRow label="Minimum order amount ($)" htmlFor="method-min" hint="Leave blank (or 0) to always offer free shipping.">
+        <input id="method-min" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.minimumOrderAmount ?? ""} onChange={e => s("minimumOrderAmount", e.target.value)} placeholder="Blank = always free" />
+      </FRow>
+      <FRow label="Fallback cost ($)" htmlFor="method-fallback">
+        <input id="method-fallback" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.fallbackCost ?? ""} onChange={e => s("fallbackCost", e.target.value)} placeholder="Charged if minimum not met" />
+      </FRow>
+    </>
   );
   if (provider === "LOCAL_PICKUP") return (
-    <div className="space-y-4">
-      <div>
-        <label className={lbl}>Handling Fee ($)</label>
-        <input type="number" min="0" className={`${inp} max-w-[200px] font-bold`} value={settings.cost ?? ""} onChange={e => s("cost", Number(e.target.value))} placeholder="0" />
-        <p className={hint}>Usually 0. This is an optional admin/preparation charge.</p>
-      </div>
-      <div>
-        <label className={lbl}>Pickup Location</label>
-        <select className={inp} value={settings.pickupLocationId ?? ""} onChange={e => s("pickupLocationId", e.target.value || null)} disabled={loadingLocations}>
+    <>
+      <FRow label="Handling fee ($)" htmlFor="method-fee" hint="Usually 0. This is an optional admin/preparation charge.">
+        <input id="method-fee" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.cost ?? ""} onChange={e => s("cost", e.target.value)} placeholder="0" />
+      </FRow>
+      <FRow label="Pickup location" htmlFor="method-pickup">
+        <select id="method-pickup" className={sel} value={settings.pickupLocationId ?? ""} onChange={e => s("pickupLocationId", e.target.value || null)} disabled={loadingLocations}>
           <option value="">— No specific location —</option>
           {pickupLocations.map(loc => (
             <option key={loc._id} value={loc._id}>{loc.name}{loc.address?.city ? ` (${loc.address.city})` : ""}</option>
@@ -280,18 +280,18 @@ function ProviderSettings({ provider, settings, onChange }) {
           {loadingLocations ? (
             "Loading pickup locations…"
           ) : pickupLocations.length === 0 ? (
-            <>No active pickup locations yet. <Link href="/admin/settings/shipping/pickup-locations" className="text-[#2271b1] hover:underline">Add one</Link>.</>
+            <>No active pickup locations yet. <Link href="/admin/settings/shipping/pickup-locations" className="wp-link">Add one</Link>.</>
           ) : (
             "Customers will see this location's address and instructions at checkout."
           )}
         </p>
-      </div>
-    </div>
+      </FRow>
+    </>
   );
   return null;
 }
 
-// ─── Add / Edit Method Modal (WP Theme) ─────────────────────────────────────────
+// ─── Add / Edit Method Modal ────────────────────────────────────────────────────
 function MethodModal({ zoneId, initial, onClose, onSaved }) {
   const blank = { name: "", description: "", provider: "FLAT_RATE", settings: {}, status: "Active", sortOrder: 0, activeFrom: "", activeUntil: "" };
   const [m, setM] = useState(initial ?? blank);
@@ -300,12 +300,14 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
 
   const save = async () => {
     if (!m.name?.trim()) return toast.error("Method name is required.");
+    const normalized = normalizeMethodSettings(m.provider, m.settings);
+    if (normalized.error) return toast.error(normalized.error);
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/shipping/zones/${zoneId}/methods`, {
         method: m._id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...m, id: m._id }),
+        body: JSON.stringify({ ...m, settings: normalized.settings, id: m._id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save.");
@@ -316,88 +318,68 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 overflow-y-auto" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white border border-[#c3c4c7] shadow-2xl w-full max-w-xl max-h-[calc(100dvh-1rem)] sm:max-h-[90vh] flex flex-col overflow-hidden rounded-none">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b border-[#c3c4c7] bg-[#f6f7f7]">
-          <div className="min-w-0">
-            <h2 className="text-[14px] font-bold text-[#1d2327] m-0">{m._id ? "Edit" : "Add"} Shipping Method</h2>
-          </div>
-          <button onClick={onClose} className="p-1 shrink-0 text-[#646970] hover:text-[#d63638]"><X className="w-4 h-4" /></button>
+    <div className="wp-modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="method-modal-title">
+        <div className="wp-modal-head">
+          <h2 id="method-modal-title">{m._id ? "Edit" : "Add"} shipping method</h2>
+          <button type="button" onClick={onClose} className="wp-notice-dismiss min-w-[40px] min-h-[40px] justify-center" aria-label="Close dialog"><X className="w-5 h-5" /></button>
         </div>
 
-        {/* Body */}
-        <div className="overflow-y-auto flex-1 p-4 sm:p-5 space-y-4 sm:space-y-5">
-          {/* Name & description */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Method Name <span className="text-red-500">*</span></label>
-              <input className={inp} value={m.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Standard Delivery" />
-            </div>
-            <div>
-              <label className={lbl}>Description</label>
-              <input className={inp} value={m.description} onChange={e => set("description", e.target.value)} placeholder="Shown to customer (optional)" />
-            </div>
-          </div>
+        <div className="wp-modal-body">
+          <FRow label={<>Method name <span className="text-[#d63638]">*</span></>} htmlFor="method-name">
+            <input id="method-name" className={inp} value={m.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Standard Delivery" />
+          </FRow>
+          <FRow label="Description" htmlFor="method-desc" hint="Shown to the customer (optional).">
+            <input id="method-desc" className={inp} value={m.description} onChange={e => set("description", e.target.value)} placeholder="Shown to customer (optional)" />
+          </FRow>
 
           {/* Provider selector */}
-          <div>
-            <label className={lbl}>Shipping Type</label>
-            <div className="grid grid-cols-1 xs:grid-cols-3 gap-2 sm:gap-3 mt-1.5">
+          <FRow label="Shipping type">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="group" aria-label="Shipping type">
               {PROVIDERS.map(p => (
                 <button key={p.key} type="button"
                   onClick={() => setM(prev => ({ ...prev, provider: p.key, settings: {} }))}
-                  className={`relative border text-left p-3 transition-all rounded-none ${
+                  aria-pressed={m.provider === p.key}
+                  className={`relative border text-left px-3 py-2 min-h-[44px] rounded-[3px] cursor-pointer ${
                     m.provider === p.key
-                      ? "border-[#2271b1] bg-[#f0f6fb] shadow-sm"
+                      ? "border-[#2271b1] bg-[#f0f6fc] shadow-[0_0_0_1px_#2271b1]"
                       : "border-[#c3c4c7] bg-white hover:border-[#8c8f94]"
                   }`}
                 >
-                  {m.provider === p.key && <Check className="absolute top-2 right-2 w-3.5 h-3.5 text-[#2271b1]" />}
-                  <div className="text-xl mb-1">{p.emoji}</div>
-                  <div className="text-[12px] font-bold text-[#1d2327]">{p.label}</div>
-                  <div className="text-[10px] text-[#646970] mt-0.5 leading-snug">{p.desc}</div>
+                  {m.provider === p.key && <Check className="absolute top-2 right-2 w-4 h-4 text-[#2271b1]" aria-hidden="true" />}
+                  <span className="wp-strong block"><span aria-hidden="true">{p.emoji}</span> {p.label}</span>
+                  <span className="wp-muted wp-small block mt-0.5">{p.desc}</span>
                 </button>
               ))}
             </div>
-          </div>
+          </FRow>
 
           {/* Provider settings */}
-          <div className="bg-[#f6f7f7] border border-[#c3c4c7] p-3 sm:p-4">
-            <p className="text-[11px] font-bold text-[#646970] uppercase tracking-wider mb-3">Rate Configuration</p>
-            <ProviderSettings provider={m.provider} settings={m.settings ?? {}} onChange={v => set("settings", v)} />
-          </div>
+          <ProviderSettings provider={m.provider} settings={m.settings ?? {}} onChange={v => set("settings", v)} />
 
           {/* Schedule & status */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={lbl}>Active From</label>
-              <input type="datetime-local" className={inp} value={m.activeFrom || ""} onChange={e => set("activeFrom", e.target.value)} />
-            </div>
-            <div>
-              <label className={lbl}>Active Until</label>
-              <input type="datetime-local" className={inp} value={m.activeUntil || ""} onChange={e => set("activeUntil", e.target.value)} />
-            </div>
-            <div>
-              <label className={lbl}>Sort Order</label>
-              <input type="number" className={inp} value={m.sortOrder ?? 0} onChange={e => set("sortOrder", Number(e.target.value))} />
-            </div>
-            <div>
-              <label className={lbl}>Status</label>
-              <select className={inp} value={m.status} onChange={e => set("status", e.target.value)}>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
+          <FRow label="Active from" htmlFor="method-from">
+            <input id="method-from" type="datetime-local" className={inp} value={m.activeFrom || ""} onChange={e => set("activeFrom", e.target.value)} />
+          </FRow>
+          <FRow label="Active until" htmlFor="method-until">
+            <input id="method-until" type="datetime-local" className={inp} value={m.activeUntil || ""} onChange={e => set("activeUntil", e.target.value)} />
+          </FRow>
+          <FRow label="Sort order" htmlFor="method-sort">
+            <input id="method-sort" type="number" className={inp} style={{ maxWidth: 120 }} value={m.sortOrder ?? 0} onChange={e => set("sortOrder", Number(e.target.value))} />
+          </FRow>
+          <FRow label="Status" htmlFor="method-status">
+            <select id="method-status" className={sel} style={{ maxWidth: 200 }} value={m.status} onChange={e => set("status", e.target.value)}>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </FRow>
         </div>
 
-        {/* Footer */}
-        <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2 px-4 sm:px-5 py-3 border-t border-[#c3c4c7] bg-[#f6f7f7]">
-          <button type="button" onClick={onClose} className="w-full xs:w-auto px-3 py-1.5 text-[12px] text-[#2271b1] border border-[#c3c4c7] bg-white rounded-[3px] hover:bg-[#f6f7f7] font-semibold">Cancel</button>
-          <button type="button" onClick={save} disabled={saving} className="w-full xs:w-auto justify-center flex items-center gap-1.5 px-4 py-1.5 bg-[#2271b1] border border-[#2271b1] text-white text-[12px] font-bold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 transition-colors">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            {saving ? "Saving…" : "Save Method"}
+        <div className="wp-modal-foot flex-wrap">
+          <button type="button" onClick={onClose} className="wp-btn">Cancel</button>
+          <button type="button" onClick={save} disabled={saving} className="wp-btn wp-btn-primary">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Save className="w-3.5 h-3.5" aria-hidden="true" />}
+            {saving ? "Saving…" : "Save method"}
           </button>
         </div>
       </div>
@@ -405,13 +387,22 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
   );
 }
 
-// ─── Zone Postbox (Metabox) ────────────────────────────────────────────────────
-function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabled }) {
+// Number of columns in the zones table (drag handle, name, regions, methods, status).
+const ZONE_COLS = 5;
+
+function StatusPill({ status }) {
+  return (
+    <span className={`wp-pill wp-pill-sm ${status === "Active" ? "wp-st-processing" : "wp-st-pending"}`}>{status}</span>
+  );
+}
+
+// ─── Zone row(s) in the zones table ────────────────────────────────────────────
+function ZoneCard({ zone: initZone, onDelete, onUpdate, onDuplicate, dragHandle, deleteDisabled, onMoveUp, onMoveDown, moveDisabled }) {
   const { showConfirm } = usePopup();
   const [zone, setZone]               = useState(initZone);
   const [methods, setMethods]         = useState([]);
   const [hasLoaded, setHasLoaded]     = useState(false);
-  const [expanded, setExpanded]       = useState(true);
+  const [expanded, setExpanded]       = useState(false);
   const [loadingMethods, setLM]       = useState(false);
   const [showMethodModal, setSMM]     = useState(false);
   const [editingMethod, setEM]        = useState(null);
@@ -419,6 +410,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
   const [form, setForm]               = useState(initZone);
   const [savingZone, setSavingZone]   = useState(false);
   const [deletingMethod, setDM]       = useState(null);
+  const [duplicating, setDuplicating] = useState(null);
 
   const loadMethods = useCallback(async () => {
     if (!zone._id) return;
@@ -434,18 +426,16 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
     finally { setLM(false); }
   }, [zone._id]);
 
-  useEffect(() => {
-    let active = true;
-    Promise.resolve().then(() => {
-      if (active) loadMethods();
-    });
-    return () => { active = false; };
-  }, [loadMethods]);
+  // Methods are fetched the first time the zone is expanded, then cached
+  // (mutations below refresh the cache).
+  const expand = () => {
+    setExpanded(true);
+    if (!hasLoaded && !loadingMethods) loadMethods();
+  };
 
   const toggle = () => {
-    const next = !expanded;
-    setExpanded(next);
-    if (next) loadMethods();
+    if (expanded) setExpanded(false);
+    else expand();
   };
 
   const saveZone = async () => {
@@ -463,206 +453,273 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
   };
 
   const deleteMethod = async (mid) => {
-    const ok = await showConfirm("Are you sure you want to delete this shipping method?");
+    const ok = await showConfirm("Delete this shipping method? Customers in this zone will no longer see it at checkout. This cannot be undone.", "Delete shipping method", { confirmText: "Delete", danger: true });
     if (!ok) return;
     setDM(mid);
     try {
       const res = await fetch(`/api/admin/shipping/zones/${zone._id}/methods?id=${mid}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Delete failed (HTTP ${res.status}).`);
       await loadMethods();
       toast.success("Method deleted.");
     } catch (e) { toast.error(e.message); }
     finally { setDM(null); }
   };
 
+  const duplicateMethod = async (mid) => {
+    setDuplicating(mid);
+    try {
+      const res = await fetch(`/api/admin/shipping/zones/${zone._id}/methods/${mid}/duplicate`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Duplicate failed (HTTP ${res.status}).`);
+      await loadMethods();
+      toast.success(`Created "${data.method.name}" (inactive).`);
+      setEM(data.method); setSMM(true);
+    } catch (e) { toast.error(e.message); }
+    finally { setDuplicating(null); }
+  };
+
+  const duplicateZone = async () => {
+    setDuplicating(zone._id);
+    try { await onDuplicate(zone._id); }
+    finally { setDuplicating(null); }
+  };
+
   const providerLabel = { FLAT_RATE: "Flat Rate", FREE_SHIPPING: "Free Shipping", LOCAL_PICKUP: "Local Pickup" };
   const displayCount = hasLoaded ? methods.length : (initZone.methodCount ?? 0);
+  // Before the methods are loaded, show the summary the zones list returns.
+  const pillMethods = hasLoaded ? methods : (initZone.methodSummary || []);
+  const chips = regionChips(zone.matchRules);
+  const zid = zone._id;
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-sm mb-4 rounded-none overflow-hidden">
-      {/* Zone header row */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-3 sm:px-4 py-3 bg-white border-b border-[#c3c4c7] select-none gap-2 sm:gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          {dragHandle}
-          <div className="flex items-center gap-3 cursor-pointer min-w-0" onClick={toggle}>
-            <button className="text-[#646970] hover:text-[#1d2327] transition-colors shrink-0">
-              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-            <div className="w-7 h-7 rounded-[3px] bg-[#f0f6fb] border border-[#c3c4c7] flex items-center justify-center shrink-0">
-              <Globe className="w-3.5 h-3.5 text-[#2271b1]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13.5px] font-bold text-[#1d2327] leading-tight flex items-center gap-2 flex-wrap">
-                <span className="truncate">{zone.name}</span>
-                {zone.isCatchAll && (
-                  <span
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold border border-[#dba617] bg-[#fcf9e8] text-[#8a6100] px-1.5 py-0.5 rounded-[2px] min-w-0 sm:shrink-0"
-                    title="This zone automatically matches any address not covered by another zone."
-                  >
-                    <ShieldCheck className="w-3 h-3" />Catch-all — matches any other address
-                  </span>
-                )}
-              </p>
-              {zone.description && <p className="text-[11px] text-[#646970] mt-0.5 truncate">{zone.description}</p>}
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
-          <span className={`text-[9px] font-bold uppercase border px-2 py-0.5 rounded-[2px] ${
-            zone.status === "Active" ? "border-green-300 bg-green-50 text-green-700" : "border-[#c3c4c7] bg-[#f6f7f7] text-[#646970]"
-          }`}>{zone.status}</span>
-
-          <span className="text-[11px] text-[#2c3338] bg-[#f6f7f7] border border-[#c3c4c7] px-2 py-0.5 rounded-[3px] font-semibold">
-            {displayCount} method{displayCount !== 1 ? "s" : ""}
-          </span>
-
-          <button onClick={() => { setForm(zone); setEditing(p => !p); setExpanded(true); }} className="text-[#2271b1] hover:text-[#135e96] text-[12px] font-semibold hover:underline" title="Edit zone">Edit Settings</button>
-          <span className="text-[#c3c4c7]">|</span>
-          {deleteDisabled ? (
+    <>
+      {/* Zone row */}
+      <tr>
+        <td className="wp-check-col" style={{ verticalAlign: "middle" }}>{dragHandle}</td>
+        <td>
+          <button
+            type="button"
+            className="wp-row-title bg-transparent border-0 p-0 cursor-pointer text-left"
+            onClick={() => { setForm(zone); setEditing(p => !p); expand(); }}
+            aria-expanded={editing}
+          >
+            {zone.name}
+          </button>
+          {zone.isCatchAll && (
             <span
-              className="text-[#a7aaad] text-[12px] font-semibold cursor-not-allowed select-none"
-              title="This is your only catch-all zone — every store needs one so customers outside all other zones can still check out. Create another catch-all zone first if you want to remove this one."
+              className="wp-pill wp-pill-sm wp-st-confirmed ml-2 align-middle"
+              title="This zone automatically matches any address not covered by another zone."
             >
-              Delete
+              Catch-all
             </span>
-          ) : (
-            <button onClick={() => onDelete(zone._id)} className="text-[#b32d2e] hover:text-[#d63638] text-[12px] font-semibold hover:underline" title="Delete zone">Delete</button>
           )}
-        </div>
-      </div>
+          {zone.description && <div className="wp-muted wp-small mt-0.5">{zone.description}</div>}
+          <div className="wp-mobile-meta">
+            {chips.length ? chips.join(", ") : "Everywhere (catch-all)"} · {displayCount} method{displayCount !== 1 ? "s" : ""} · {zone.status}
+          </div>
+          <div className="wp-row-actions">
+            <span><button type="button" onClick={() => { setForm(zone); setEditing(p => !p); expand(); }} className="max-[782px]:min-h-[40px]" title="Edit zone">Edit</button></span>
+            {!zone.isCatchAll && onDuplicate && (
+              <span>
+                <button type="button" onClick={duplicateZone} disabled={duplicating === zone._id} className="max-[782px]:min-h-[40px]" title="Copy this zone and its methods (created inactive)">
+                  {duplicating === zone._id ? "Duplicating…" : "Duplicate"}
+                </button>
+              </span>
+            )}
+            <span>
+              {deleteDisabled ? (
+                <span
+                  className="is-muted cursor-not-allowed select-none"
+                  title="This is your only catch-all zone — every store needs one so customers outside all other zones can still check out. Create another catch-all zone first if you want to remove this one."
+                >
+                  Delete
+                </span>
+              ) : (
+                <button type="button" onClick={() => onDelete(zone._id)} className="is-danger max-[782px]:min-h-[40px]" title="Delete zone">Delete</button>
+              )}
+            </span>
+            {onMoveUp && (
+              <span>
+                <button type="button" onClick={onMoveUp} disabled={moveDisabled} className="max-[782px]:min-h-[40px]" aria-label={`Move ${zone.name} up`}>Move up</button>
+              </span>
+            )}
+            {onMoveDown && (
+              <span>
+                <button type="button" onClick={onMoveDown} disabled={moveDisabled} className="max-[782px]:min-h-[40px]" aria-label={`Move ${zone.name} down`}>Move down</button>
+              </span>
+            )}
+            <span>
+              <button type="button" onClick={toggle} className="inline-flex items-center gap-1 max-[782px]:min-h-[40px]" aria-expanded={expanded}>
+                {expanded ? <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />}
+                {expanded ? "Hide methods" : "Show methods"}
+              </button>
+            </span>
+          </div>
+        </td>
+        <td className="wp-hide-sm">
+          {chips.length === 0 ? (
+            <span className="wp-muted">Everywhere — matches any other address</span>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {chips.map((c, i) => <span key={i} className="wp-chip wp-small" style={{ padding: "1px 6px" }}>{c}</span>)}
+            </div>
+          )}
+        </td>
+        <td className="wp-hide-sm">
+          {pillMethods.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {pillMethods.map(m => (
+                <span key={m._id} className={`wp-pill wp-pill-sm ${m.status === "Active" ? "" : "opacity-60"}`} title={providerLabel[m.provider]}>{m.name}</span>
+              ))}
+            </div>
+          ) : (
+            <span className="wp-muted">{displayCount} method{displayCount !== 1 ? "s" : ""}</span>
+          )}
+        </td>
+        <td className="wp-hide-sm"><StatusPill status={zone.status} /></td>
+      </tr>
 
       {/* Edit zone inline form */}
       {editing && (
-        <div className="border-b border-[#c3c4c7] bg-[#fafafa] p-3 sm:p-5 space-y-4">
-          <p className="text-[12px] font-bold text-[#1d2327] uppercase tracking-wider">Zone Configuration</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><label className={lbl}>Zone Name</label><input className={inp} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
-            <div><label className={lbl}>Description</label><input className={inp} value={form.description || ""} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} /></div>
-            <div><label className={lbl}>Priority (higher wins tie)</label><input type="number" className={inp} value={form.priority ?? 0} onChange={e => setForm(p => ({ ...p, priority: Number(e.target.value) }))} /></div>
-            <div>
-              <label className={lbl}>Status</label>
-              <select className={inp} value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
+        <tr style={{ background: "#f6f7f7" }}>
+          <td colSpan={ZONE_COLS} style={{ padding: 12 }}>
+            <div className="wp-postbox" style={{ margin: 0 }}>
+              <div className="wp-postbox-head"><h2>Edit zone: {zone.name}</h2></div>
+              <div className="wp-inside">
+                <FRow label="Zone name" htmlFor={`zone-${zid}-name`}>
+                  <input id={`zone-${zid}-name`} className={inp} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+                </FRow>
+                <FRow label="Description" htmlFor={`zone-${zid}-desc`}>
+                  <input id={`zone-${zid}-desc`} className={inp} value={form.description || ""} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
+                </FRow>
+                <FRow label="Priority" htmlFor={`zone-${zid}-priority`} hint="Higher priority wins a tie.">
+                  <input id={`zone-${zid}-priority`} type="number" className={inp} style={{ maxWidth: 120 }} value={form.priority ?? 0} onChange={e => setForm(p => ({ ...p, priority: Number(e.target.value) }))} />
+                </FRow>
+                <FRow label="Status" htmlFor={`zone-${zid}-status`}>
+                  <select id={`zone-${zid}-status`} className={sel} style={{ maxWidth: 200 }} value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </FRow>
+
+                {zone.isCatchAll && (
+                  <div className="wp-notice wp-notice-warning" style={{ margin: "8px 0" }}>
+                    <p>This is your store&apos;s catch-all zone. It matches any address not covered by another zone. Adding a coverage rule here will turn it into a regular zone — make sure another catch-all zone exists first, or the save will be rejected.</p>
+                  </div>
+                )}
+
+                <FRow label="Zone regions">
+                  <CoverageRulesEditor matchRules={form.matchRules} onChange={matchRules => setForm(p => ({ ...p, matchRules }))} variant="edit" />
+                </FRow>
+              </div>
+              <div className="wp-box-foot">
+                <button type="button" onClick={saveZone} disabled={savingZone} className="wp-btn wp-btn-primary">
+                  {savingZone ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Save className="w-3.5 h-3.5" aria-hidden="true" />}{savingZone ? "Saving…" : "Save zone"}
+                </button>
+                <button type="button" onClick={() => setEditing(false)} className="wp-btn">Cancel</button>
+              </div>
             </div>
-          </div>
-
-          {zone.isCatchAll && (
-            <div className="flex items-start gap-2 border border-[#dba617] bg-[#fcf9e8] text-[#8a6100] px-3 py-2.5 text-[12px] rounded-[3px]">
-              <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <p>This is your store&apos;s catch-all zone. It matches any address not covered by another zone. Adding a coverage rule here will turn it into a regular zone — make sure another catch-all zone exists first, or the save will be rejected.</p>
-            </div>
-          )}
-
-          {/* Coverage rules */}
-          <CoverageRulesEditor matchRules={form.matchRules} onChange={matchRules => setForm(p => ({ ...p, matchRules }))} variant="edit" />
-
-          <div className="flex flex-wrap gap-2 pt-2">
-            <button onClick={saveZone} disabled={savingZone} className="flex items-center gap-1.5 px-4 py-1.5 bg-[#2271b1] border border-[#2271b1] text-white text-[12px] font-bold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 transition-colors cursor-pointer">
-              {savingZone ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}{savingZone ? "Saving…" : "Save Zone Settings"}
-            </button>
-            <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-[12px] text-[#2271b1] border border-[#c3c4c7] bg-white rounded-[3px] hover:bg-[#f6f7f7] font-semibold">Cancel</button>
-          </div>
-        </div>
+          </td>
+        </tr>
       )}
 
       {/* Methods panel */}
       {expanded && (
-        <div className="bg-[#f6f7f7] p-3 sm:p-4">
-          <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 mb-3">
-            <p className="text-[11px] font-bold text-[#50575e] uppercase tracking-wider">Shipping Rates & Methods</p>
-            <button onClick={() => { setEM(null); setSMM(true); }} className="self-start xs:self-auto shrink-0 bg-white border border-[#2271b1] text-[#2271b1] hover:bg-[#f0f6fb] px-2.5 py-1 rounded-[3px] text-[11.5px] font-bold transition-all shadow-sm flex items-center gap-1 cursor-pointer">
-              <Plus className="w-3 h-3" />Add Shipping Method
-            </button>
-          </div>
-
-          {loadingMethods && <div className="flex items-center gap-2 text-[12px] text-[#646970] py-3"><Loader2 className="w-3.5 h-3.5 animate-spin" />Loading methods…</div>}
-
-          {!loadingMethods && methods.length === 0 && (
-            <div className="border border-dashed border-[#c3c4c7] bg-white p-4 sm:p-6 text-center">
-              <Truck className="w-8 h-8 text-[#ccd0d4] mx-auto mb-2" />
-              <p className="text-[12.5px] font-bold text-[#1d2327]">No shipping methods assigned</p>
-              <p className="text-[11.5px] text-[#646970]">Customers matched to this zone will not be able to checkout. Add a method above.</p>
+        <tr style={{ background: "#f6f7f7" }}>
+          <td colSpan={ZONE_COLS} style={{ padding: "8px 12px 14px" }}>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span className="wp-strong">Shipping methods for {zone.name}</span>
+              <button type="button" onClick={() => { setEM(null); setSMM(true); }} className="wp-btn">
+                <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add shipping method
+              </button>
             </div>
-          )}
 
-          {methods.length > 0 && (
-            <div className="overflow-x-auto w-full max-w-full border border-[#c3c4c7] bg-white">
-              <table className="wp-list-table widefat striped posts w-full min-w-[420px] md:min-w-[540px] border-collapse bg-white text-left text-[13px]">
-                <thead>
-                  <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338]">
-                    <th className="px-3 py-2 font-bold min-w-[140px] w-[35%]">Method Name</th>
-                    <th className="hidden md:table-cell px-3 py-2 font-bold min-w-[120px] w-[25%]">Provider</th>
-                    <th className="px-3 py-2 font-bold min-w-[90px] w-[20%]">Cost</th>
-                    <th className="px-3 py-2 font-bold min-w-[90px] w-[10%]">Status</th>
-                    <th className="px-3 py-2 font-bold min-w-[100px] w-[10%] text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {methods.map(m => {
-                    const cost = m.provider === "FLAT_RATE" ? `$${m.settings?.cost ?? 0}`
-                      : m.provider === "FREE_SHIPPING" ? (m.settings?.minimumOrderAmount > 0 ? `Free over $${m.settings.minimumOrderAmount}` : "Free") : `$${m.settings?.cost ?? 0}`;
-                    return (
-                      <tr key={m._id} className="hover:bg-[#f0f6fb] border-b border-[#f0f0f1] last:border-0 group">
-                        <td className="px-3 py-2.5">
-                          <span className="font-bold text-[#1d2327]">{m.name}</span>
-                          {m.description && <p className="text-[11px] text-[#646970] mt-0.5">{m.description}</p>}
-                        </td>
-                        <td className="hidden md:table-cell px-3 py-2.5 text-[#646970]">
-                          {providerLabel[m.provider]}
-                        </td>
-                        <td className="px-3 py-2.5 font-bold text-[#2271b1]">
-                          {cost}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <span className={`text-[10px] font-bold uppercase border px-1.5 py-0.5 rounded-[2px] ${
-                            m.status === "Active" ? "border-green-300 bg-green-50 text-green-700" : "border-[#c3c4c7] bg-[#f6f7f7] text-[#646970]"
-                          }`}>{m.status}</span>
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => { setEM(m); setSMM(true); }} className="text-[#2271b1] hover:text-[#135e96] font-semibold text-[12px] hover:underline cursor-pointer">Edit</button>
-                            <span className="text-[#c3c4c7]">|</span>
-                            <button onClick={() => deleteMethod(m._id)} disabled={deletingMethod === m._id} className="text-[#b32d2e] hover:text-[#d63638] font-semibold text-[12px] hover:underline cursor-pointer">
-                              {deletingMethod === m._id ? "..." : "Delete"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+            {loadingMethods && <p className="wp-muted flex items-center gap-2 m-0 py-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />Loading methods…</p>}
+
+            {!loadingMethods && methods.length === 0 && (
+              <div className="bg-white border border-dashed border-[#c3c4c7] px-3 py-3">
+                <p className="wp-strong m-0">No shipping methods assigned</p>
+                <p className="wp-muted m-0">Customers matched to this zone will not be able to checkout. Add a method above.</p>
+              </div>
+            )}
+
+            {methods.length > 0 && (
+              <div className="wp-table-box">
+                <table className="wp-list-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Title</th>
+                      <th scope="col" className="wp-hide-sm">Type</th>
+                      <th scope="col">Cost</th>
+                      <th scope="col" className="wp-hide-sm">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {methods.map(m => {
+                      const cost = m.provider === "FLAT_RATE" ? `$${m.settings?.cost ?? 0}`
+                        : m.provider === "FREE_SHIPPING" ? (m.settings?.minimumOrderAmount > 0 ? `Free over $${m.settings.minimumOrderAmount}` : "Free") : `$${m.settings?.cost ?? 0}`;
+                      return (
+                        <tr key={m._id}>
+                          <td>
+                            <button type="button" onClick={() => { setEM(m); setSMM(true); }} className="wp-row-title bg-transparent border-0 p-0 cursor-pointer text-left">{m.name}</button>
+                            {m.description && <div className="wp-muted wp-small mt-0.5">{m.description}</div>}
+                            <div className="wp-mobile-meta">{providerLabel[m.provider]} · {m.status}</div>
+                            <div className="wp-row-actions">
+                              <span><button type="button" onClick={() => { setEM(m); setSMM(true); }} className="max-[782px]:min-h-[40px]">Edit</button></span>
+                              <span>
+                                <button type="button" onClick={() => duplicateMethod(m._id)} disabled={duplicating === m._id} className="max-[782px]:min-h-[40px]" title="Copy this method (created inactive)">
+                                  {duplicating === m._id ? "Duplicating…" : "Duplicate"}
+                                </button>
+                              </span>
+                              <span>
+                                <button type="button" onClick={() => deleteMethod(m._id)} disabled={deletingMethod === m._id} className="is-danger max-[782px]:min-h-[40px]">
+                                  {deletingMethod === m._id ? "Deleting…" : "Delete"}
+                                </button>
+                              </span>
+                            </div>
+                          </td>
+                          <td className="wp-hide-sm">{providerLabel[m.provider]}</td>
+                          <td className="wp-strong">{cost}</td>
+                          <td className="wp-hide-sm"><StatusPill status={m.status} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </td>
+        </tr>
       )}
 
       {showMethodModal && (
-        <MethodModal zoneId={zone._id} initial={editingMethod} onClose={() => { setSMM(false); setEM(null); }}
-          onSaved={async (saved) => {
-            if (saved) {
-              setMethods(prev => {
-                const exists = prev.some(m => m._id === saved._id);
-                if (exists) return prev.map(m => m._id === saved._id ? saved : m);
-                return [...prev, saved];
-              });
-              setHasLoaded(true);
-            }
-            await loadMethods();
-            setSMM(false);
-            setEM(null);
-          }} />
+        <tr>
+          <td colSpan={ZONE_COLS} style={{ padding: 0, border: 0 }}>
+            <MethodModal zoneId={zone._id} initial={editingMethod} onClose={() => { setSMM(false); setEM(null); }}
+              onSaved={async (saved) => {
+                if (saved) {
+                  setMethods(prev => {
+                    const exists = prev.some(m => m._id === saved._id);
+                    if (exists) return prev.map(m => m._id === saved._id ? saved : m);
+                    return [...prev, saved];
+                  });
+                  setHasLoaded(true);
+                }
+                await loadMethods();
+                setSMM(false);
+                setEM(null);
+              }} />
+          </td>
+        </tr>
       )}
-    </div>
+    </>
   );
 }
 
-// ─── Add Zone Postbox (Metabox) ────────────────────────────────────────────────
-function AddZoneForm({ onCreated }) {
+// ─── Add Zone Postbox ──────────────────────────────────────────────────────────
+function AddZoneForm({ onCreated, open, setOpen }) {
   const blank = { name: "", description: "", priority: 0, sortOrder: 0, status: "Active", matchRules: [] };
-  const [open, setOpen] = useState(false);
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
 
@@ -680,51 +737,58 @@ function AddZoneForm({ onCreated }) {
     finally { setSaving(false); }
   };
 
-  if (!open) return (
-    <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-2 border border-dashed border-[#8c8f94] bg-white rounded-none py-4 text-[13px] font-bold text-[#2271b1] hover:border-[#2271b1] hover:bg-[#f0f6fb] transition-all">
-      <Plus className="w-4 h-4" />Create Shipping Zone
-    </button>
-  );
+  // Opened from the "Add shipping zone" button in the page header.
+  if (!open) return null;
 
   return (
-    <div className="bg-white border-2 border-[#2271b1] shadow-sm p-3 sm:p-5 space-y-4 sm:space-y-5 rounded-none">
-      <p className="text-[14px] font-bold text-[#1d2327] m-0 border-b border-[#f0f0f1] pb-2.5">New Shipping Zone</p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div><label className={lbl}>Zone Name <span className="text-red-500">*</span></label><input className={inp} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Pakistan" /></div>
-        <div><label className={lbl}>Description</label><input className={inp} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional notes" /></div>
-        <div><label className={lbl}>Priority</label><input type="number" className={inp} value={form.priority} onChange={e => setForm(p => ({ ...p, priority: Number(e.target.value) }))} /><p className={hint}>Higher priority zones win on ties during checkout.</p></div>
-        <div><label className={lbl}>Status</label><select className={inp} value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+    <section id="new-zone" className="wp-postbox" aria-labelledby="new-zone-title" style={{ marginTop: 12, scrollMarginTop: 56 }}>
+      <div className="wp-postbox-head"><h2 id="new-zone-title">New shipping zone</h2></div>
+      <div className="wp-inside">
+        <FRow label={<>Zone name <span className="text-[#d63638]">*</span></>} htmlFor="new-zone-name" hint="Give your zone a name, e.g. Local, or Europe.">
+          <input id="new-zone-name" className={inp} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Pakistan" />
+        </FRow>
+        <FRow label="Description" htmlFor="new-zone-desc">
+          <input id="new-zone-desc" className={inp} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional notes" />
+        </FRow>
+        <FRow label="Priority" htmlFor="new-zone-priority" hint="Higher priority zones win on ties during checkout.">
+          <input id="new-zone-priority" type="number" className={inp} style={{ maxWidth: 120 }} value={form.priority} onChange={e => setForm(p => ({ ...p, priority: Number(e.target.value) }))} />
+        </FRow>
+        <FRow label="Status" htmlFor="new-zone-status">
+          <select id="new-zone-status" className={sel} style={{ maxWidth: 200 }} value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+        </FRow>
+        <FRow label="Zone regions">
+          <CoverageRulesEditor matchRules={form.matchRules} onChange={matchRules => setForm(p => ({ ...p, matchRules }))} variant="create" />
+        </FRow>
       </div>
-
-      <CoverageRulesEditor matchRules={form.matchRules} onChange={matchRules => setForm(p => ({ ...p, matchRules }))} variant="create" />
-
-      <div className="flex flex-wrap gap-2 pt-1">
-        <button onClick={create} disabled={saving} className="flex items-center gap-1.5 px-4 py-1.5 bg-[#2271b1] border border-[#2271b1] text-white text-[12px] font-bold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 transition-colors cursor-pointer">
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}{saving ? "Creating…" : "Create Shipping Zone"}
+      <div className="wp-box-foot">
+        <button type="button" onClick={create} disabled={saving} className="wp-btn wp-btn-primary">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}{saving ? "Creating…" : "Create shipping zone"}
         </button>
-        <button onClick={() => setOpen(false)} className="px-3 py-1.5 text-[12px] text-[#2271b1] border border-[#c3c4c7] bg-white rounded-[3px] hover:bg-[#f6f7f7] font-semibold">Cancel</button>
+        <button type="button" onClick={() => { setOpen(false); setForm(blank); }} className="wp-btn">Cancel</button>
       </div>
-    </div>
+    </section>
   );
 }
 
-// ─── WordPress Style Toggle (Check Switch) ──────────────────────────────────────
-function Toggle({ on, onChange, disabled }) {
+// ─── WordPress Style Toggle (switch) ───────────────────────────────────────────
+function Toggle({ on, onChange, disabled, label }) {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
       onClick={onChange}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-        on ? "bg-[#2271b1]" : "bg-[#c3c4c7]"
-      } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+      className={`inline-flex items-center min-h-[40px] bg-transparent border-0 p-0 ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
     >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-          on ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
+      <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${on ? "bg-[#2271b1]" : "bg-[#8c8f94]"}`}>
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+            on ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </span>
     </button>
   );
 }
@@ -739,6 +803,26 @@ export default function ShippingSettingsPage() {
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const [reordering, setReordering] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const openAddZone = () => {
+    setAddOpen(true);
+    // Wait for the form to render, then bring it into view and focus the name field.
+    setTimeout(() => {
+      document.getElementById("new-zone")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("new-zone-name")?.focus({ preventScroll: true });
+    }, 50);
+  };
+
+  const handleDuplicate = async (id) => {
+    try {
+      const res = await fetch(`/api/admin/shipping/zones/${id}/duplicate`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Duplicate failed (HTTP ${res.status}).`);
+      setZones(p => [...p, data.zone]);
+      toast.success(`Created "${data.zone.name}" (inactive) with ${data.zone.methodCount} method${data.zone.methodCount === 1 ? "" : "s"}.`);
+    } catch (e) { toast.error(e.message); }
+  };
 
   useEffect(() => {
     (async () => {
@@ -791,7 +875,7 @@ export default function ShippingSettingsPage() {
   };
 
   const handleDelete = async (id) => {
-    const ok = await showConfirm("Delete this zone and ALL its shipping methods? This cannot be undone.");
+    const ok = await showConfirm("Delete this zone and ALL its shipping methods? This cannot be undone.", "Delete shipping zone", { confirmText: "Delete zone", danger: true });
     if (!ok) return;
     try {
       const res = await fetch(`/api/admin/shipping/zones?id=${id}`, { method: "DELETE" });
@@ -822,6 +906,7 @@ export default function ShippingSettingsPage() {
           ...z,
           isCatchAll: (z.matchRules?.length ?? 0) === 0,
           methodCount: byId[z._id]?.methodCount ?? 0,
+          methodSummary: byId[z._id]?.methodSummary ?? [],
         }));
       });
     } catch (e) {
@@ -842,117 +927,141 @@ export default function ShippingSettingsPage() {
     setDragIndex(null);
   };
 
+  // Keyboard/touch alternative to drag — same persistence call.
+  const moveZone = (index, delta) => {
+    const target = index + delta;
+    if (reordering || target < 0 || target >= zones.length) return;
+    const next = [...zones];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved);
+    setZones(next);
+    persistOrder(next);
+  };
+
   const catchAllCount = zones.filter(z => z.isCatchAll).length;
 
   return (
     <RequirePermission permission="settings.view">
-    <AdminPageLayout title="Shipping settings" breadcrumbs={[{ label: "Settings" }, { label: "Shipping" }]}>
-      <NavTabs activeTab="shipping" />
+    <Page>
+      <PageHeader
+        title="Shipping"
+        actions={shippingEnabled && !loading && (
+          <button type="button" onClick={openAddZone} className="wp-btn">
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add shipping zone
+          </button>
+        )}
+      />
+      <ShippingTaxTabs activeTab="shipping" />
 
-      {/* ── 1. Enable / Disable Section ─────────────────────── */}
-      <div className="bg-white border border-[#c3c4c7] shadow-sm p-4 flex items-center justify-between flex-wrap gap-3 mb-6">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 shrink-0 rounded-[3px] bg-[#f0f6fb] flex items-center justify-center border border-[#c3c4c7]">
-            <Truck className="w-4 h-4 text-[#2271b1]" />
-          </div>
-          <div>
-            <p className="text-[13.5px] font-bold text-[#1d2327]">Enable Shipping & Delivery Module</p>
-            <p className="text-[11.5px] text-[#646970]">
-              Toggle shipping rates and calculation features. When ON, your shipping zones and rates are applied. When OFF, website checkout displays Free Delivery.
+      {/* ── 1. Enable / Disable ─────────────────────── */}
+      <section className="wp-postbox" aria-labelledby="shipping-options-title">
+        <div className="wp-postbox-head"><h2 id="shipping-options-title">Shipping options</h2></div>
+        <div className="wp-inside" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <div className="wp-frow">
+            <span className="wp-flabel" id="shipping-enabled-label">Enable shipping</span>
+            <div className="flex items-center gap-3">
+              <Toggle on={shippingEnabled} onChange={handleToggleShipping} disabled={togglingShipping} label="Enable shipping and delivery module" />
+              <span className={shippingEnabled ? "wp-strong" : "wp-muted"}>
+                {shippingEnabled ? "Active" : "Inactive"}
+              </span>
+            </div>
+            <p className="wp-hint">
+              When on, your shipping zones and rates are applied. When off, checkout offers Free Delivery.
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-[12px] font-bold ${shippingEnabled ? "text-green-600" : "text-[#646970]"}`}>
-            {shippingEnabled ? "ACTIVE" : "INACTIVE"}
-          </span>
-          <Toggle on={shippingEnabled} onChange={handleToggleShipping} disabled={togglingShipping} />
-        </div>
-      </div>
+      </section>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 gap-2 text-[13px] text-[#646970]">
-          <Loader2 className="w-4 h-4 animate-spin" />Loading shipping zones…
-        </div>
+        <p className="wp-muted flex items-center gap-2 py-6">
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />Loading shipping zones…
+        </p>
       ) : !shippingEnabled ? (
         /* ── Module OFF View: Show Free Delivery status notice, hide zones/features ── */
-        <div className="bg-white border border-[#c3c4c7] p-8 text-center shadow-sm mb-6">
-          <div className="w-12 h-12 rounded-full bg-[#f0f6fb] text-[#2271b1] flex items-center justify-center mx-auto mb-3">
-            <Truck className="w-6 h-6" />
-          </div>
-          <p className="text-[15px] font-bold text-[#1d2327] mb-1">Shipping Module is Turned OFF</p>
-          <p className="text-[13px] text-[#646970] max-w-lg mx-auto mb-4">
-            Custom shipping zones, rules, and rate calculations are currently inactive. All customers on the website checkout page will automatically receive <strong className="text-[#1d2327]">Free Delivery ($0.00)</strong>.
+        <div className="wp-notice wp-notice-warning">
+          <p>
+            <strong className="wp-strong">Shipping is turned off.</strong> Custom shipping zones, rules, and rate calculations are currently inactive. All customers on the website checkout page will automatically receive <strong className="wp-strong">Free Delivery ($0.00)</strong>. Turn shipping on above to view and configure shipping zones and rates.
           </p>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#f0f6fb] border border-[#c3c4c7] rounded-[3px] text-[12px] text-[#2271b1] font-semibold">
-            <Info className="w-3.5 h-3.5" /> Turn the switch ON above to view and configure shipping zones and rates.
-          </div>
         </div>
       ) : (
-        /* ── Module ON View: Show features and things (Zones, Rules, Rates) ── */
+        /* ── Module ON View: Zones, Rules, Rates ── */
         <>
-          {/* WordPress Style Notice Callout */}
-          <div className="bg-white border-l-4 border-[#72aee6] shadow-sm p-4 mb-6 text-[13.5px] text-[#1d2327]">
-            <p className="font-semibold mb-1">Store Shipping Management</p>
-            <p className="text-[#646970] leading-relaxed">
-              Create zones representing your shipping locations, then assign methods and rates to them.
-              During checkout, the matching engine looks for the most specific geographical match.
-              Drag zones by their handle to reorder them, and use the country picker below to avoid typos in coverage rules.
-              Every store keeps exactly one catch-all zone (marked below) that matches any address not covered elsewhere.
-            </p>
-          </div>
+          <p className="wp-muted" style={{ margin: "0 0 10px", maxWidth: 900 }}>
+            A shipping zone is a geographic region where a certain set of shipping methods are offered.
+            During checkout, the matching engine looks for the most specific geographical match.
+            Drag zones by their handle (or use Move up / Move down) to reorder them. Every store keeps exactly one catch-all zone
+            that matches any address not covered elsewhere.
+          </p>
 
-          <div className="space-y-4 pb-16">
-            {zones.length === 0 && (
-              <div className="bg-white border border-[#c3c4c7] p-6 sm:p-12 text-center shadow-sm">
-                <Globe className="w-10 h-10 text-[#ccd0d4] mx-auto mb-3" />
-                <p className="text-[14px] font-bold text-[#1d2327] mb-1">No shipping zones configured</p>
-                <p className="text-[12px] text-[#646970] max-w-sm mx-auto">Create a shipping zone below to start configuring shipping rates for your customers.</p>
-              </div>
-            )}
+          {reordering && (
+            <Notice type="info">
+              <span className="inline-flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />Saving new zone order…</span>
+            </Notice>
+          )}
 
-            {reordering && (
-              <div className="flex items-center gap-2 text-[12px] text-[#2271b1] font-semibold">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />Saving new zone order…
-              </div>
-            )}
+          <div className="wp-table-box">
+            <table className="wp-list-table">
+              <thead>
+                <tr>
+                  <th scope="col" className="wp-check-col"><span className="sr-only">Reorder</span></th>
+                  <th scope="col">Zone name</th>
+                  <th scope="col" className="wp-hide-sm">Region(s)</th>
+                  <th scope="col" className="wp-hide-sm">Shipping method(s)</th>
+                  <th scope="col" className="wp-hide-sm">Status</th>
+                </tr>
+              </thead>
 
-            <div className="space-y-3">
+              {zones.length === 0 && (
+                <tbody>
+                  <tr>
+                    <td colSpan={ZONE_COLS}>
+                      <span className="wp-strong">No shipping zones configured.</span>{" "}
+                      <span className="wp-muted">Use “Add shipping zone” above to start configuring shipping rates for your customers.</span>
+                    </td>
+                  </tr>
+                </tbody>
+              )}
+
               {zones.map((zone, index) => (
-                <div
+                <tbody
                   key={zone._id}
                   onDragOver={e => { e.preventDefault(); if (overIndex !== index) setOverIndex(index); }}
                   onDragLeave={() => setOverIndex(o => (o === index ? null : o))}
                   onDrop={() => handleDrop(index)}
-                  className={`transition-all rounded-none ${dragIndex === index ? "opacity-40" : ""} ${overIndex === index && dragIndex !== null && dragIndex !== index ? "outline outline-2 outline-[#2271b1] outline-offset-2" : ""}`}
+                  className={`${dragIndex === index ? "opacity-40" : ""} ${overIndex === index && dragIndex !== null && dragIndex !== index ? "[&>tr:first-child>td]:shadow-[inset_0_2px_0_#2271b1]" : ""}`}
+                  style={{ borderTop: index > 0 ? "1px solid #dcdcde" : undefined }}
                 >
                   <ZoneCard
                     zone={zone}
                     onDelete={handleDelete}
+                    onDuplicate={handleDuplicate}
                     onUpdate={updated => setZones(p => p.map(z => z._id === updated._id ? { ...z, ...updated } : z))}
                     deleteDisabled={zone.isCatchAll && catchAllCount <= 1}
+                    onMoveUp={index > 0 ? () => moveZone(index, -1) : undefined}
+                    onMoveDown={index < zones.length - 1 ? () => moveZone(index, 1) : undefined}
+                    moveDisabled={reordering}
                     dragHandle={
                       <span
                         draggable
                         onDragStart={e => { e.stopPropagation(); setDragIndex(index); }}
                         onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
                         onClick={e => e.stopPropagation()}
-                        className="cursor-grab active:cursor-grabbing text-[#a7aaad] hover:text-[#646970] shrink-0 px-0.5"
+                        className="inline-flex cursor-grab active:cursor-grabbing text-[#8c8f94] hover:text-[#1d2327] p-1"
                         title="Drag to reorder zones"
                       >
-                        <GripVertical className="w-4 h-4" />
+                        <GripVertical className="w-4 h-4" aria-hidden="true" />
                       </span>
                     }
                   />
-                </div>
+                </tbody>
               ))}
-            </div>
-
-            <AddZoneForm onCreated={zone => setZones(p => [...p, zone])} />
+            </table>
           </div>
+
+          <AddZoneForm open={addOpen} setOpen={setAddOpen} onCreated={zone => setZones(p => [...p, zone])} />
         </>
       )}
-    </AdminPageLayout>
+    </Page>
     </RequirePermission>
   );
 }

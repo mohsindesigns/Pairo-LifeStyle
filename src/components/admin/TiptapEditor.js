@@ -11,7 +11,7 @@ import { Link } from '@tiptap/extension-link';
 import { Image as TiptapImage } from '@tiptap/extension-image';
 import { Extension, Node } from '@tiptap/core';
 import { NodeSelection } from '@tiptap/pm/state';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useId } from 'react';
 import { 
   Bold, 
   Italic, 
@@ -41,6 +41,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import MediaPickerModal from './MediaPickerModal';
+import { usePopup } from '@/context/PopupContext';
 
 // --- CUSTOM FONT SIZE EXTENSION ---
 const FontSize = Extension.create({
@@ -119,9 +120,10 @@ const Iframe = Node.create({
 });
 
 const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) => {
+  const { showPrompt, showConfirm } = usePopup();
   if (!editor) return null;
 
-  const btnClass = (active) => `p-2 rounded-[2px] border border-transparent hover:border-[#c3c4c7] hover:bg-white transition-all ${active ? 'bg-white border-[#c3c4c7] shadow-sm text-[#2271b1]' : 'text-gray-600'}`;
+  const btnClass = (active) => `inline-flex items-center justify-center w-10 h-10 md:w-8 md:h-8 rounded-[2px] border ${active ? 'bg-white border-[#8c8f94] text-[#1d2327] shadow-[inset_0_1px_2px_rgba(0,0,0,0.12)]' : 'border-transparent text-[#3c434a] hover:bg-white hover:border-[#c3c4c7] hover:text-[#2271b1]'}`;
 
   const getHeadingValue = () => {
     if (editor.isActive('heading', { level: 1 })) return 'h1';
@@ -170,9 +172,9 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
     }
   };
 
-  const insertLink = () => {
+  const insertLink = async () => {
     const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('Enter URL (relative /page for internal, or https:// for external):', previousUrl);
+    const url = await showPrompt('Enter URL (relative /page for internal, or https:// for external):', previousUrl || '', 'Insert link');
     
     if (url === null) return;
 
@@ -181,7 +183,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
       return;
     }
 
-    const openInNewTab = window.confirm('Open link in a new tab?');
+    const openInNewTab = await showConfirm('Open link in a new tab?', 'Link target', { confirmText: 'New tab', cancelText: 'Same tab' });
     if (openInNewTab) {
       editor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank', rel: 'noopener' }).run();
     } else {
@@ -189,8 +191,8 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
     }
   };
 
-  const insertVideo = () => {
-    const url = window.prompt('Enter YouTube or Vimeo URL or Iframe source URL:');
+  const insertVideo = async () => {
+    const url = await showPrompt('Enter YouTube or Vimeo URL or Iframe source URL:', '', 'Embed video');
     if (!url) return;
 
     let embedUrl = url;
@@ -209,16 +211,18 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
     editor.chain().focus().unsetAllMarks().clearNodes().run();
   };
 
-  const selectClass = "text-[12px] border border-[#c3c4c7] bg-white px-2 py-1.5 rounded-[2px] outline-none hover:border-[#8c8f94] transition-all cursor-pointer font-medium text-gray-700 h-[32px] flex items-center";
+  const selectClass = "text-[13px] border border-[#8c8f94] bg-white pl-2 pr-6 rounded-[3px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] cursor-pointer text-[#2c3338] h-10 md:h-8 max-w-full";
+  const textBtnClass = "wp-btn";
 
   return (
-    <div className="bg-[#f6f7f7] px-1.5 xs:px-3 py-2 select-none max-w-full">
-      <div className="flex flex-wrap items-center gap-1 xs:gap-1.5 tiptap-toolbar max-w-full min-w-0">
+    <div className="bg-[#f6f7f7] px-2 py-1.5 select-none max-w-full">
+      <div className="flex flex-wrap items-center gap-1 tiptap-toolbar max-w-full min-w-0" role="toolbar" aria-label="Formatting">
         {/* Block / Headings Type */}
         <select 
           value={getHeadingValue()} 
           onChange={handleHeadingChange}
           className={selectClass}
+          aria-label="Block format"
         >
           <option value="p">Paragraph</option>
           <option value="h1">Heading 1</option>
@@ -234,6 +238,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           onChange={handleFontSizeChange}
           className={selectClass}
           title="Font Size"
+          aria-label="Font Size"
           defaultValue="default"
         >
           <option value="default">Size (Default)</option>
@@ -248,7 +253,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           <option value="48px">48px</option>
         </select>
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
+        <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
         {/* Core Typography Styles */}
         <button
@@ -256,41 +261,50 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={btnClass(editor.isActive('bold'))}
           title="Bold"
+          aria-label="Bold"
+          aria-pressed={editor.isActive('bold')}
         >
-          <Bold className="w-3.5 h-3.5" />
+          <Bold className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={btnClass(editor.isActive('italic'))}
           title="Italic"
+          aria-label="Italic"
+          aria-pressed={editor.isActive('italic')}
         >
-          <Italic className="w-3.5 h-3.5" />
+          <Italic className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           className={btnClass(editor.isActive('underline'))}
           title="Underline"
+          aria-label="Underline"
+          aria-pressed={editor.isActive('underline')}
         >
-          <UnderlineIcon className="w-3.5 h-3.5" />
+          <UnderlineIcon className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleStrike().run()}
           className={btnClass(editor.isActive('strike'))}
           title="Strikethrough"
+          aria-label="Strikethrough"
+          aria-pressed={editor.isActive('strike')}
         >
-          <Strikethrough className="w-3.5 h-3.5" />
+          <Strikethrough className="w-4 h-4" aria-hidden="true" />
         </button>
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
+        <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
         {/* Color Selectors */}
         <select 
           onChange={handleColorChange}
           className={selectClass}
           title="Text Color"
+          aria-label="Text Color"
           defaultValue="default"
         >
           <option value="default">Color (Default)</option>
@@ -308,6 +322,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           onChange={handleHighlightChange}
           className={selectClass}
           title="Background Highlight"
+          aria-label="Background Highlight"
           defaultValue="none"
         >
           <option value="none">Highlight (None)</option>
@@ -318,7 +333,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           <option value="#e9d5ff">Purple</option>
         </select>
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
+        <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
         {/* Alignment */}
         <button
@@ -326,35 +341,43 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           onClick={() => editor.chain().focus().setTextAlign('left').run()}
           className={btnClass(editor.isActive({ textAlign: 'left' }))}
           title="Align Left"
+          aria-label="Align Left"
+          aria-pressed={editor.isActive({ textAlign: 'left' })}
         >
-          <AlignLeft className="w-3.5 h-3.5" />
+          <AlignLeft className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().setTextAlign('center').run()}
           className={btnClass(editor.isActive({ textAlign: 'center' }))}
           title="Align Center"
+          aria-label="Align Center"
+          aria-pressed={editor.isActive({ textAlign: 'center' })}
         >
-          <AlignCenter className="w-3.5 h-3.5" />
+          <AlignCenter className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().setTextAlign('right').run()}
           className={btnClass(editor.isActive({ textAlign: 'right' }))}
           title="Align Right"
+          aria-label="Align Right"
+          aria-pressed={editor.isActive({ textAlign: 'right' })}
         >
-          <AlignRight className="w-3.5 h-3.5" />
+          <AlignRight className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().setTextAlign('justify').run()}
           className={btnClass(editor.isActive({ textAlign: 'justify' }))}
           title="Justify"
+          aria-label="Justify"
+          aria-pressed={editor.isActive({ textAlign: 'justify' })}
         >
-          <AlignJustify className="w-3.5 h-3.5" />
+          <AlignJustify className="w-4 h-4" aria-hidden="true" />
         </button>
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
+        <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
         {/* Lists & Quotes */}
         <button
@@ -362,27 +385,33 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={btnClass(editor.isActive('bulletList'))}
           title="Bullet List"
+          aria-label="Bullet List"
+          aria-pressed={editor.isActive('bulletList')}
         >
-          <List className="w-3.5 h-3.5" />
+          <List className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={btnClass(editor.isActive('orderedList'))}
           title="Numbered List"
+          aria-label="Numbered List"
+          aria-pressed={editor.isActive('orderedList')}
         >
-          <ListOrdered className="w-3.5 h-3.5" />
+          <ListOrdered className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           className={btnClass(editor.isActive('blockquote'))}
           title="Blockquote"
+          aria-label="Blockquote"
+          aria-pressed={editor.isActive('blockquote')}
         >
-          <Quote className="w-3.5 h-3.5" />
+          <Quote className="w-4 h-4" aria-hidden="true" />
         </button>
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
+        <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
         {/* Links */}
         <button
@@ -390,8 +419,10 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           onClick={insertLink}
           className={btnClass(editor.isActive('link'))}
           title="Insert Link"
+          aria-label="Insert Link"
+          aria-pressed={editor.isActive('link')}
         >
-          <LinkIcon className="w-3.5 h-3.5" />
+          <LinkIcon className="w-4 h-4" aria-hidden="true" />
         </button>
         {editor.isActive('link') && (
           <button
@@ -399,8 +430,9 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
             onClick={() => editor.chain().focus().unsetLink().run()}
             className={btnClass(false)}
             title="Unlink"
+            aria-label="Unlink"
           >
-            <Link2Off className="w-3.5 h-3.5" />
+            <Link2Off className="w-4 h-4" aria-hidden="true" />
           </button>
         )}
 
@@ -408,42 +440,43 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
         <button
           type="button"
           onClick={onInsertImage}
-          className="flex items-center gap-1 bg-[#2271b1] text-white px-2.5 py-1 text-[12px] font-semibold rounded-[2px] hover:bg-[#135e96] transition-colors ml-1"
+          className={textBtnClass}
           title="Add Media / Image from Library"
         >
-          <ImageIcon className="w-3.5 h-3.5" /> Add Image
+          <ImageIcon className="w-4 h-4" aria-hidden="true" /> Add Media
         </button>
 
         <button
           type="button"
           onClick={insertVideo}
-          className="flex items-center gap-1 bg-white border border-[#c3c4c7] text-gray-700 px-2 py-1 text-[12px] font-semibold rounded-[2px] hover:bg-gray-50 transition-colors"
+          className={textBtnClass}
           title="Embed Video (YouTube / Vimeo)"
         >
-          <VideoIcon className="w-3.5 h-3.5" /> Embed Video
+          <VideoIcon className="w-4 h-4" aria-hidden="true" /> Embed Video
         </button>
 
         {selectedImage && (
           <button
             type="button"
             onClick={onOpenImageEditor}
-            className="flex items-center gap-1 bg-amber-500 text-white px-2.5 py-1 text-[12px] font-bold rounded-[2px] hover:bg-amber-600 transition-colors animate-pulse"
+            className={textBtnClass}
             title="Selected Image Options"
           >
-            <Sliders className="w-3.5 h-3.5" /> Edit Image Size/Align
+            <Sliders className="w-4 h-4" aria-hidden="true" /> Edit Image Size/Align
           </button>
         )}
 
-        <div className="w-[1px] h-5 bg-gray-300 mx-0.5" />
+        <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
         {/* Utilities */}
         <button
           type="button"
           onClick={clearFormatting}
-          className="p-2 rounded-[2px] border border-transparent hover:border-[#c3c4c7] hover:bg-white text-gray-600 transition-all"
+          className={btnClass(false)}
           title="Clear Formatting"
+          aria-label="Clear Formatting"
         >
-          <Eraser className="w-3.5 h-3.5" />
+          <Eraser className="w-4 h-4" aria-hidden="true" />
         </button>
         
         <div className="flex-1" />
@@ -452,18 +485,20 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
         <button
           type="button"
           onClick={() => editor.chain().focus().undo().run()}
-          className="p-2 rounded-[2px] text-gray-500 hover:text-gray-800"
+          className={btnClass(false)}
           title="Undo"
+          aria-label="Undo"
         >
-          <Undo className="w-3.5 h-3.5" />
+          <Undo className="w-4 h-4" aria-hidden="true" />
         </button>
         <button
           type="button"
           onClick={() => editor.chain().focus().redo().run()}
-          className="p-2 rounded-[2px] text-gray-500 hover:text-gray-800"
+          className={btnClass(false)}
           title="Redo"
+          aria-label="Redo"
         >
-          <Redo className="w-3.5 h-3.5" />
+          <Redo className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -472,30 +507,29 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
 
 // --- IMAGE EDIT PANEL (ALWAYS VISIBLE & WORKING WHEN AN IMAGE IS CLICKED) ---
 const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose }) => {
+  const uid = useId();
   if (!selectedImage) return null;
 
   return (
-    <div className="w-full bg-[#f0f6fc] border-b border-[#2271b1]/30 p-3 shadow-md transition-all select-none animate-in fade-in slide-in-from-top-2 duration-150">
+    <div className="w-full bg-white border-t border-[#dcdcde] px-3 py-2.5 select-none" role="group" aria-label="Image settings">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded bg-[#2271b1] text-white flex items-center justify-center font-bold">
-            <Sliders className="w-4 h-4" />
-          </div>
+          <Sliders className="w-4 h-4 text-[#646970]" aria-hidden="true" />
           <div>
-            <span className="text-[12px] font-bold text-[#1d2327] uppercase tracking-wider block">
+            <span className="text-[13px] font-semibold text-[#1d2327] block">
               Image Customization
             </span>
-            <span className="text-[10px] text-gray-500 block truncate max-w-[200px]">
+            <span className="text-[12px] text-[#646970] block truncate max-w-[200px]">
               {selectedImage.alt || selectedImage.src?.split('/').pop() || 'Selected Image'}
             </span>
           </div>
         </div>
 
         {/* Controls Container */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Width Preset / Custom */}
-          <div className="flex items-center gap-1 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[2px]">
-            <span className="text-[11px] font-bold text-gray-700">Width:</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <label htmlFor={`${uid}-width`} className="text-[13px] text-[#1d2327]">Width:</label>
             <select
               value={['auto', '25%', '33%', '50%', '75%', '100%'].includes(selectedImage.width) ? selectedImage.width : 'custom'}
               onChange={(e) => {
@@ -504,7 +538,8 @@ const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose 
                   onUpdate({ width: val });
                 }
               }}
-              className="text-[11px] bg-transparent outline-none font-semibold text-[#2271b1] cursor-pointer"
+              id={`${uid}-width`}
+              className="wp-select"
             >
               <option value="auto">Auto (Original)</option>
               <option value="25%">25% Width</option>
@@ -519,31 +554,36 @@ const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose 
               placeholder="e.g. 400px"
               value={selectedImage.width || ''}
               onChange={(e) => onUpdate({ width: e.target.value })}
-              className="w-16 text-[11px] border-l border-gray-200 pl-1.5 text-gray-800 outline-none font-medium bg-transparent"
+              aria-label="Custom width"
+              className="wp-input"
+              style={{ width: 90 }}
               title="Custom width (e.g. 350px or 60%)"
             />
           </div>
 
           {/* Height */}
-          <div className="flex items-center gap-1 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[2px]">
-            <span className="text-[11px] font-bold text-gray-700">Height:</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <label htmlFor={`${uid}-height`} className="text-[13px] text-[#1d2327]">Height:</label>
             <input
               type="text"
               placeholder="auto or px"
               value={selectedImage.height || ''}
               onChange={(e) => onUpdate({ height: e.target.value })}
-              className="w-16 text-[11px] text-gray-800 outline-none font-medium bg-transparent"
+              id={`${uid}-height`}
+              className="wp-input"
+              style={{ width: 90 }}
               title="Custom height (e.g. 250px or auto)"
             />
           </div>
 
           {/* Alignment & Text Wrap */}
-          <div className="flex items-center gap-1 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[2px]">
-            <span className="text-[11px] font-bold text-gray-700">Align:</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <label htmlFor={`${uid}-align`} className="text-[13px] text-[#1d2327]">Align:</label>
             <select
               value={selectedImage.align || 'center'}
               onChange={(e) => onUpdate({ align: e.target.value })}
-              className="text-[11px] bg-transparent outline-none font-semibold text-gray-800 cursor-pointer"
+              id={`${uid}-align`}
+              className="wp-select"
             >
               <option value="center">Center Block (No wrap)</option>
               <option value="left">Left Block (No wrap)</option>
@@ -554,14 +594,16 @@ const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose 
           </div>
 
           {/* Alt Text */}
-          <div className="flex items-center gap-1 bg-white border border-[#c3c4c7] px-2 py-1 rounded-[2px] min-w-[140px]">
-            <span className="text-[11px] font-bold text-gray-700">Alt:</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <label htmlFor={`${uid}-alt`} className="text-[13px] text-[#1d2327]">Alt:</label>
             <input
               type="text"
               placeholder="SEO alt text..."
               value={selectedImage.alt || ''}
               onChange={(e) => onUpdate({ alt: e.target.value })}
-              className="w-28 text-[11px] text-gray-800 outline-none font-medium bg-transparent"
+              id={`${uid}-alt`}
+              className="wp-input"
+              style={{ width: 160 }}
             />
           </div>
 
@@ -570,26 +612,26 @@ const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose 
             <button
               type="button"
               onClick={onReplace}
-              className="flex items-center gap-1 bg-[#2271b1] text-white px-2.5 py-1 text-[11px] font-bold rounded-[2px] hover:bg-[#135e96] transition-colors"
+              className="wp-btn"
               title="Replace image from media library"
             >
-              <RefreshCw className="w-3 h-3" /> Replace
+              <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Replace
             </button>
             <button
               type="button"
               onClick={onRemove}
-              className="flex items-center gap-1 bg-white border border-red-300 text-red-600 px-2 py-1 text-[11px] font-bold rounded-[2px] hover:bg-red-50 transition-colors"
+              className="wp-btn" style={{ color: "#b32d2e", borderColor: "#b32d2e" }}
               title="Delete this image"
             >
-              <Trash2 className="w-3 h-3" /> Delete
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Delete
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex items-center gap-1 bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-bold rounded-[2px] hover:bg-emerald-700 transition-colors shadow-sm"
+              className="wp-btn wp-btn-primary"
               title="Save & Close image toolbar"
             >
-              <Check className="w-3 h-3" /> Done
+              <Check className="w-3.5 h-3.5" aria-hidden="true" /> Done
             </button>
           </div>
         </div>
@@ -606,6 +648,9 @@ export default function TiptapEditor({ content, onChange }) {
 
   const editor = useEditor({
     immediatelyRender: false,
+    // Tiptap 3 no longer re-renders on every transaction by default; without this the toolbar
+    // (block format select, bold/italic/list states) never reflects where the cursor is.
+    shouldRerenderOnTransaction: true,
     extensions: [
       StarterKit.configure({
         heading: {
@@ -900,8 +945,8 @@ export default function TiptapEditor({ content, onChange }) {
   };
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-inner relative">
-      <div className="tiptap-sticky-header bg-[#f6f7f7] border-b border-[#c3c4c7] shadow-sm">
+    <div className="bg-white border border-[#dcdcde] relative">
+      <div className="tiptap-sticky-header bg-[#f6f7f7] border-b border-[#dcdcde]">
         <MenuBar 
           editor={editor} 
           onInsertImage={() => handleOpenMedia(false)}
@@ -960,6 +1005,8 @@ export default function TiptapEditor({ content, onChange }) {
         .tiptap-wrapper .ProseMirror h5, .tiptap-wrapper .ProseMirror h5 * { font-size: 1.02rem !important; font-weight: 650 !important; line-height: 1.4 !important; margin-top: 1rem; color: #555; }
         .tiptap-wrapper .ProseMirror h6, .tiptap-wrapper .ProseMirror h6 * { font-size: 0.9rem !important; font-weight: 650 !important; line-height: 1.4 !important; margin-top: 0.75rem; color: #666; }
         .tiptap-wrapper .ProseMirror p { margin-bottom: 0.75rem; }
+        /* Beat the admin's compact 13px p/li size so body text reads as body text next to headings */
+        .tiptap-wrapper .ProseMirror p, .tiptap-wrapper .ProseMirror li { font-size: 15px; line-height: 1.6; }
         .tiptap-wrapper .ProseMirror ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.75rem; }
         .tiptap-wrapper .ProseMirror ol { list-style-type: decimal; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.75rem; }
         .tiptap-wrapper .ProseMirror li { margin-bottom: 0.15rem; }

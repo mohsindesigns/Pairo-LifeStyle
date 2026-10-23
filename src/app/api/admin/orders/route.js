@@ -10,6 +10,7 @@ import { can } from "@/lib/rbac";
 import { getNextOrderNumber } from "@/lib/checkoutFulfillment";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
 import pairoEvents from "@/lib/events";
+import { buildOrderListQuery, buildOrderCountsPipeline, emptyOrderCounts } from "./orderListQuery";
 
 export async function GET(req) {
   try {
@@ -29,48 +30,36 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const search = searchParams.get("search");
+    const referral = searchParams.get("referral");
     const affiliateOnly = searchParams.get("affiliateOnly") === "true";
+    const trash = searchParams.get("trash") === "true" || searchParams.get("isDeleted") === "true";
     const page = parseInt(searchParams.get("page")) || 1;
     const limit = parseInt(searchParams.get("limit")) || 10;
     const skip = (page - 1) * limit;
 
-    let query = {};
-    // Filter by status if not "all"
-    if (status && status !== "all") {
-      if (status === "Affiliate") {
-        query.affiliateReferralCode = { $exists: true, $ne: null, $ne: "" };
-      } else {
-        query.status = status;
-      }
-    }
-    // Filter by affiliate if affiliateOnly is requested
-    if (affiliateOnly) {
-      query.affiliateReferralCode = { $exists: true, $ne: null, $ne: "" };
-    }
-    // Search logic
-    if (search) {
-      query.$or = [
-        { orderNumber: { $regex: search, $options: "i" } },
-        { "customer.email": { $regex: search, $options: "i" } },
-        { "shippingAddress.fullName": { $regex: search, $options: "i" } }
-      ];
-    }
+    const query = buildOrderListQuery({ status, search, referral, trash, affiliateOnly });
 
     // Fetch orders with lean() for performance and better serialization
-    const orders = await Order.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const [orders, total, countRows] = await Promise.all([
+      Order.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments(query),
+      Order.aggregate(buildOrderCountsPipeline(search)),
+    ]);
 
-    const total = await Order.countDocuments(query);
+    const counts = { ...emptyOrderCounts(), ...(countRows[0] || {}) };
+    delete counts._id;
 
     return NextResponse.json({
       success: true,
       orders,
+      counts,
       pagination: {
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.max(1, Math.ceil(total / limit)),
         currentPage: page
       }
     });
@@ -203,7 +192,7 @@ export async function POST(req) {
       let customerInfo = { userId: null, email: customer?.email || "", isGuest: true };
       if (customer?.customerId) {
         const existingCustomer = await Customer.findById(customer.customerId).session(mongoSession);
-        if (!existingCustomer) throw new Error("Selected customer not found");
+        if (!existingCustomer || existingCustomer.isDeleted) throw new Error("Selected customer not found");
         customerInfo = { userId: existingCustomer._id, email: existingCustomer.email, isGuest: false };
       }
 
@@ -272,8 +261,9 @@ export async function DELETE(req) {
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+    const permanent = searchParams.get("permanent") === "true";
 
-    if (!id) {
+    if (!id || !mongoose.isValidObjectId(id)) {
       return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
     }
 
@@ -282,7 +272,22 @@ export async function DELETE(req) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    // Cancel associated commissions first
+    // Default: move to Trash (soft delete). The order, its payment record and any
+    // affiliate commission are left untouched so it can be restored later.
+    if (!permanent) {
+      if (!order.isDeleted) {
+        await Order.updateOne({ _id: order._id }, { $set: { isDeleted: true, deletedAt: new Date() } });
+      }
+      return NextResponse.json({ success: true, message: "Order moved to trash" });
+    }
+
+    // Permanent delete is only allowed from the Trash, so a single click can never
+    // wipe out a live order.
+    if (!order.isDeleted) {
+      return NextResponse.json({ error: "Move the order to the Trash before deleting it permanently." }, { status: 409 });
+    }
+
+    // Permanent delete: cancel associated commissions first
     try {
       const { CommissionEngine } = await import("@/lib/affiliate/CommissionEngine");
       await CommissionEngine.cancelCommission(order._id);
@@ -292,10 +297,51 @@ export async function DELETE(req) {
 
     await Order.findByIdAndDelete(id);
 
-    return NextResponse.json({ success: true, message: "Order deleted successfully" });
+    return NextResponse.json({ success: true, message: "Order deleted permanently" });
   } catch (error) {
     console.error("Admin Order Delete Error:", error);
     return NextResponse.json({ error: "Delete failed: " + error.message }, { status: 500 });
   }
 }
 
+/**
+ * Restore an order from the Trash: PUT { id, isDeleted: false }.
+ */
+export async function PUT(req) {
+  try {
+    await dbConnect();
+    const session = await getServerSession(authOptions);
+
+    if (!session || !session.user.isStaff) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!can(session.user, "orders.update") && !can(session.user, "orders.edit") && !can(session.user, "orders.delete")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { id, isDeleted } = body || {};
+
+    if (!id || !mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
+    }
+    if (isDeleted !== false) {
+      return NextResponse.json({ error: "Only restoring (isDeleted: false) is supported" }, { status: 400 });
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      id,
+      { $set: { isDeleted: false, deletedAt: null } },
+      { new: true }
+    ).lean();
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, order });
+  } catch (error) {
+    console.error("Admin Order Restore Error:", error);
+    return NextResponse.json({ error: "Restore failed: " + error.message }, { status: 500 });
+  }
+}

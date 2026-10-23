@@ -1,18 +1,19 @@
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import Link from "next/link";
+import { Page, PageHeader } from "@/components/admin/ui";
 import ScriptEditor from "@/components/admin/ScriptEditor";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function NewScriptPage() {
   return (
-    <AdminPageLayout 
-      title="Add New Script" 
-      subtitle="Create a new tracking pixel or custom code injection."
-      breadcrumbs={[
-        { label: "Settings", href: "/admin/settings" },
-        { label: "Scripts", href: "/admin/settings/scripts" },
-        { label: "New Script" }
-      ]}
-    >
+    <RequirePermission permission="scripts.create">
+    <Page>
+      <PageHeader title="Add new script" />
+      <p style={{ margin: "0 0 14px" }}>
+        <Link href="/admin/settings/scripts" className="wp-link">← Back to Scripts</Link>
+        <span className="wp-muted"> · Create a new tracking pixel or custom code injection.</span>
+      </p>
       <ScriptEditor />
-    </AdminPageLayout>
+    </Page>
+    </RequirePermission>
   );
 }

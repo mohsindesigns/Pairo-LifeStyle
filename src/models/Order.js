@@ -198,6 +198,11 @@ const OrderSchema = new mongoose.Schema({
   affiliateId: { type: mongoose.Schema.Types.ObjectId, ref: 'Affiliate', index: true },
   affiliateReferralCode: { type: String, index: true },
 
+  // Soft delete ("Trash"). Trashed orders are hidden from admin lists/counts/stats
+  // until restored; only an explicit "Delete Permanently" removes the document.
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
+
   timeline: [{
     status: String,
     message: String,

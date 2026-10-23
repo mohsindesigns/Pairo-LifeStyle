@@ -8,6 +8,8 @@ const ProductSchema = new mongoose.Schema({
   shortDescription: { type: String },
   description: { type: String }, // Long Description (Rich Text)
   status: { type: String, enum: ['Draft', 'Published'], default: 'Draft' },
+  // Status before the product was trashed, so restoring puts it back (cleared on restore).
+  statusBeforeTrash: { type: String, enum: ['Draft', 'Published'] },
   isFeatured: { type: Boolean, default: false },
   category: { type: String }, // Main category string (Legacy)
   categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], // Multi-category support
@@ -109,7 +111,8 @@ const ProductSchema = new mongoose.Schema({
 
   // Meta
   productType: { type: String, enum: ['simple', 'variable', 'gifting'], default: 'simple' },
-  isDeleted: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null }, // when the product was moved to trash
   rating: { type: Number, default: 0 },
   reviewCount: { type: Number, default: 0 },
   ratingBreakdown: {

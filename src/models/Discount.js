@@ -12,6 +12,7 @@ const DiscountSchema = new mongoose.Schema({
   usagePerUserLimit: { type: Number, default: 1 }, // Max times one user can use this
   isActive: { type: Boolean, default: true, index: true },
   isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
   // Set when the system (not an admin) created the code, e.g. 'abandoned-cart'.
   source: { type: String, default: null, index: true },
   

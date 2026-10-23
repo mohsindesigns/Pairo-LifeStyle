@@ -3,10 +3,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import ProductQuestion from "@/models/ProductQuestion";
-import Product from "@/models/Product";
+import "@/models/Product"; // registers the model used by populate("productId")
 import { can } from "@/lib/rbac";
 import { sendQuestionReplyEmail } from "@/lib/email";
 import { logAction } from "@/lib/audit";
+import mongoose from "mongoose";
+
+const STATUSES = ["Pending", "Approved", "Hidden"];
 
 export async function PUT(req, { params }) {
   try {
@@ -19,45 +22,67 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const { id } = await params;
+    if (!mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ error: "Question not found" }, { status: 404 });
+    }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const { action, status, replyText } = body;
 
     await dbConnect();
     const question = await ProductQuestion.findById(id).populate("productId");
-    if (!question || question.isDeleted) {
+    if (!question) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
     }
 
+    // Restore from trash (the only action allowed on a trashed question)
+    if (action === "restore") {
+      if (!question.isDeleted) return NextResponse.json(question);
+      question.isDeleted = false;
+      question.deletedAt = null;
+      await question.save();
+      await logAction(req, session, "RESTORE_PRODUCT_QUESTION", "product_questions", {}, String(question._id));
+      return NextResponse.json(question);
+    }
+
+    if (question.isDeleted) {
+      return NextResponse.json({ error: "This question is in the trash. Restore it first." }, { status: 409 });
+    }
+
     if (action === "toggle_status") {
+      if (!STATUSES.includes(status)) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      }
       question.status = status;
       await question.save();
 
-      await logAction({
-        userId: session.user.id,
-        action: "TOGGLE_QUESTION_STATUS",
-        targetType: "ProductQuestion",
-        targetId: question._id,
-        details: { status }
-      });
+      await logAction(req, session, "TOGGLE_QUESTION_STATUS", "product_questions", { status }, String(question._id));
 
       return NextResponse.json(question);
     }
 
     if (action === "reply") {
-      if (!replyText || replyText.trim() === "") {
+      const text = String(replyText || "").trim();
+      if (!text) {
         return NextResponse.json({ error: "Reply text is required" }, { status: 400 });
       }
 
-      // Add reply to array
-      question.replies.push({
-        staffId: session.user.id,
-        staffName: session.user.name || "Store Administrator",
-        answer: replyText
-      });
-      
+      // The storefront shows the first reply as "the store answer", so editing an answer
+      // updates that reply in place instead of stacking a second, never-shown one.
+      const isEdit = question.replies.length > 0;
+      if (isEdit) {
+        question.replies[0].answer = text;
+        question.replies[0].staffId = session.user.id;
+        question.replies[0].staffName = session.user.name || "Store Administrator";
+      } else {
+        question.replies.push({
+          staffId: session.user.id,
+          staffName: session.user.name || "Store Administrator",
+          answer: text
+        });
+      }
+
       // Auto-approve the question when replying
       question.status = "Approved";
       await question.save();
@@ -69,19 +94,13 @@ export async function PUT(req, { params }) {
           customerEmail: question.customerEmail,
           customerName: question.customerName,
           originalQuestion: question.question,
-          replyText: replyText,
+          replyText: text,
           productName: product.name,
           productSlug: product.slug
         });
       }
 
-      await logAction({
-        userId: session.user.id,
-        action: "REPLY_PRODUCT_QUESTION",
-        targetType: "ProductQuestion",
-        targetId: question._id,
-        details: { replyText }
-      });
+      await logAction(req, session, isEdit ? "EDIT_PRODUCT_QUESTION_REPLY" : "REPLY_PRODUCT_QUESTION", "product_questions", { replyText: text }, String(question._id));
 
       return NextResponse.json(question);
     }
@@ -93,6 +112,8 @@ export async function PUT(req, { params }) {
   }
 }
 
+// DELETE moves a question to the trash. DELETE ?permanent=true removes it for good, and only
+// works on a question that is already in the trash.
 export async function DELETE(req, { params }) {
   try {
     const session = await getServerSession(authOptions);
@@ -104,26 +125,38 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const { id } = await params;
+    if (!mongoose.isValidObjectId(id)) {
+      return NextResponse.json({ error: "Question not found" }, { status: 404 });
+    }
+    const permanent = new URL(req.url).searchParams.get("permanent") === "true";
 
     await dbConnect();
     const question = await ProductQuestion.findById(id);
-    if (!question || question.isDeleted) {
+    if (!question) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
     }
 
+    if (permanent) {
+      if (!question.isDeleted) {
+        return NextResponse.json({ error: "Move the question to the trash before deleting it permanently." }, { status: 409 });
+      }
+      await ProductQuestion.deleteOne({ _id: id });
+      await logAction(req, session, "PERMANENT_DELETE_PRODUCT_QUESTION", "product_questions", {}, String(id));
+      return NextResponse.json({ success: true, message: "Question permanently deleted" });
+    }
+
+    if (question.isDeleted) {
+      return NextResponse.json({ success: true, message: "Question already in trash" });
+    }
+
     question.isDeleted = true;
+    question.deletedAt = new Date();
     await question.save();
 
-    await logAction({
-      userId: session.user.id,
-      action: "DELETE_PRODUCT_QUESTION",
-      targetType: "ProductQuestion",
-      targetId: id
-    });
+    await logAction(req, session, "DELETE_PRODUCT_QUESTION", "product_questions", {}, String(id));
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: "Question moved to trash" });
   } catch (error) {
     console.error("DELETE Admin Product Question Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

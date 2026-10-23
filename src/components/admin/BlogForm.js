@@ -1,29 +1,32 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { 
-   ChevronLeft, 
-   Save, 
-   Globe, 
-   Image as ImageIcon, 
-   ChevronDown,
-   Calendar,
-   Eye,
-   Edit
-} from "lucide-react";
+import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange } from "@/components/admin/slugChange";
+import Link from "next/link";
+import { Globe, Calendar, Edit } from "lucide-react";
 import dynamic from 'next/dynamic';
 const TiptapEditor = dynamic(() => import('./TiptapEditor'), { ssr: false });
 import MediaPicker from "@/components/admin/MediaPicker";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, Postbox } from "@/components/admin/ui";
 import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
 import { toast } from "react-hot-toast";
 
 export default function BlogForm({ blogId }) {
    const router = useRouter();
+   const { showConfirm } = usePopup();
+   // Slug the post was loaded / last saved with: changing it asks "Change URL?" first
+   const savedSlugRef = useRef(null);
    const [loading, setLoading] = useState(blogId ? true : false);
    const [saving, setSaving] = useState(false);
-   const [activeFormTab, setActiveFormTab] = useState("content");
+   const [busy, setBusy] = useState(false);
+   // ?tab=seo opens the SEO tab directly
+   const [activeFormTab, setActiveFormTab] = useState(() => {
+      if (typeof window === "undefined") return "content";
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      return tab === "seo" ? "seo" : "content";
+   });
    const [editSlug, setEditSlug] = useState(false);
    const [editorMode, setEditorMode] = useState("visual");
    const [formData, setFormData] = useState({
@@ -94,6 +97,7 @@ export default function BlogForm({ blogId }) {
                if (blogRes?.ok) {
                   const data = await blogRes.json().catch(() => null);
                   if (data && typeof data === "object" && data._id) {
+                     savedSlugRef.current = data.slug || null;
                      setFormData(prev => ({
                          ...prev,
                          showFeaturedProduct: data.showFeaturedProduct !== false,
@@ -126,7 +130,7 @@ export default function BlogForm({ blogId }) {
 
    const handleTrash = async () => {
       if (!blogId) return;
-      if (!confirm("Are you sure you want to move this post to trash?")) return;
+      if (!(await showConfirm("Are you sure you want to move this post to trash?", "Move to trash", { confirmText: "Move to trash", danger: true }))) return;
       try {
          const res = await fetch(`/api/admin/blogs?id=${blogId}`, {
             method: "DELETE"
@@ -144,25 +148,93 @@ export default function BlogForm({ blogId }) {
       }
    };
 
-   useEffect(() => {
-      if (typeof window !== 'undefined') {
-         const params = new URLSearchParams(window.location.search);
-         const tab = params.get("tab");
-         if (tab && (tab === "content" || tab === "seo")) {
-            setActiveFormTab(tab);
+   // A trashed post can be restored (its previous status comes back) or deleted for good
+   const handleRestore = async () => {
+      if (!blogId) return;
+      setBusy(true);
+      try {
+         const res = await fetch("/api/admin/blogs", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: blogId, isDeleted: false })
+         });
+         const data = await res.json().catch(() => ({}));
+         if (res.ok) {
+            setFormData(prev => ({ ...prev, isDeleted: false, status: data?.status || prev.status }));
+            toast.success("Post restored from the Trash.");
+         } else {
+            toast.error(data?.error || "Failed to restore the post.");
          }
+      } catch (err) {
+         console.error(err);
+         toast.error("Failed to restore the post.");
+      } finally {
+         setBusy(false);
       }
-   }, []);
+   };
 
-   const handleSubmit = async (e) => {
-      e.preventDefault();
+   const handlePermanentDelete = async () => {
+      if (!blogId) return;
+      if (!(await showConfirm(`Permanently delete "${formData.title}"? This cannot be undone.`, "Delete Permanently", { confirmText: "Delete Permanently", danger: true }))) return;
+      setBusy(true);
+      try {
+         const res = await fetch(`/api/admin/blogs?id=${blogId}&permanent=true`, { method: "DELETE" });
+         if (res.ok) {
+            toast.success("Post permanently deleted.");
+            router.push("/admin/blogs");
+         } else {
+            const data = await res.json().catch(() => ({}));
+            toast.error(data?.error || "Failed to delete the post.");
+         }
+      } catch (err) {
+         console.error(err);
+         toast.error("Failed to delete the post.");
+      } finally {
+         setBusy(false);
+      }
+   };
+
+   const handleDuplicate = async () => {
+      if (!blogId) return;
+      setBusy(true);
+      try {
+         const res = await fetch(`/api/admin/blogs/${blogId}/duplicate`, { method: "POST" });
+         const data = await res.json().catch(() => ({}));
+         if (res.ok && data?._id) {
+            toast.success("Post duplicated as a draft. Unsaved changes here were not copied.");
+            router.push(`/admin/blogs/${data._id}`);
+         } else {
+            toast.error(data?.error || "Failed to duplicate the post.");
+         }
+      } catch (err) {
+         console.error(err);
+         toast.error("Failed to duplicate the post.");
+      } finally {
+         setBusy(false);
+      }
+   };
+
+
+   // overrides: fields forced for this save only (e.g. "Save Draft" forces status Draft)
+   const handleSubmit = async (e, overrides = null) => {
+      e?.preventDefault?.();
+      // Existing post whose URL changed: confirm first; cancel saves nothing.
+      // An empty slug is regenerated from the title by the server, so compare against that.
+      if (blogId) {
+         const nextSlug = String(formData.slug || "").trim()
+            || String(formData.title || "").toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+         if (!(await confirmSlugChange(showConfirm, {
+            savedSlug: savedSlugRef.current,
+            nextSlug,
+            toPath: (slug) => `/blog/${slug}`,
+         }))) return;
+      }
       setSaving(true);
       try {
          const method = blogId ? "PUT" : "POST";
          // Strip immutable Mongoose fields that cause _id update errors
-         const { _id, __v, createdAt, updatedAt, ...cleanData } = formData;
+         const { _id, __v, createdAt, updatedAt, ...cleanData } = overrides ? { ...formData, ...overrides } : formData;
          const payload = blogId ? { ...cleanData, id: blogId } : cleanData;
-         console.log("[BlogForm] Submitting seo:", payload.seo);
          const res = await fetch("/api/admin/blogs", {
             method,
             headers: { "Content-Type": "application/json" },
@@ -170,14 +242,21 @@ export default function BlogForm({ blogId }) {
          });
          if (res.ok) {
             const savedBlog = await res.json();
-            toast.success(blogId ? "Blog post updated successfully!" : "Blog post created successfully!");
+            if (blogId && savedBlog?.slug) {
+               savedSlugRef.current = savedBlog.slug;
+               // Show the slug the server actually stored (it adds -1, -2… on a clash)
+               setFormData(prev => (prev.slug === savedBlog.slug ? prev : { ...prev, slug: savedBlog.slug }));
+            }
+            if (overrides) setFormData(prev => ({ ...prev, ...overrides }));
+            toast.success(overrides?.status === "Draft"
+               ? "Draft saved."
+               : (blogId ? "Post updated." : "Post published."));
             if (!blogId && savedBlog._id) {
                router.push(`/admin/blogs/${savedBlog._id}`);
             }
          } else {
             const errData = await res.json().catch(() => ({}));
             toast.error(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
-            console.error("[BlogForm] Save failed:", errData);
          }
       } catch (err) {
          console.error(err);
@@ -187,149 +266,174 @@ export default function BlogForm({ blogId }) {
       }
    };
 
-    if (loading) return <div className="p-4 sm:p-10 text-[13px] text-gray-400 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
+    if (loading) return <Page><p className="wp-muted" style={{ padding: "20px 0" }}>Loading editor…</p></Page>;
 
     if (blogId && !formData.title) {
        return (
-          <div className="p-4 sm:p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
-             <div className="bg-white p-4 sm:p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
-                <h2 className="text-[#d63638] font-bold text-[16px] mb-2">
-                   Failed to load blog data
-                </h2>
-                <p className="text-gray-600 text-[13px] mb-6 leading-relaxed">
-                   Your administrator session may have expired, or the blog post you are trying to edit does not exist. Please try logging back in.
-                </p>
-                <div className="flex flex-col gap-2.5">
-                   <button 
-                      type="button" 
-                      onClick={() => window.location.reload()} 
-                      className="w-full bg-[#2271b1] text-white px-4 py-2 text-[12px] font-bold hover:bg-[#135e96] transition-all text-center rounded-sm"
-                   >
-                      Retry Connection / Reload
-                   </button>
-                   <a 
-                      href="/admin-login" 
-                      className="w-full border border-[#c3c4c7] text-gray-700 px-4 py-2 text-[12px] font-bold bg-[#f6f7f7] hover:bg-[#f0f0f1] transition-all text-center block rounded-sm"
-                   >
-                      Log In to Admin Panel
-                   </a>
-                   <a 
-                      href="/admin/blogs" 
-                      className="w-full text-[#2271b1] text-[12px] hover:underline text-center mt-2 block"
-                   >
-                      ← Back to Blogs List
-                   </a>
+          <Page>
+             <PageHeader title="Edit Post" />
+             <div className="wp-notice wp-notice-error" role="alert" style={{ maxWidth: 640 }}>
+                <div style={{ padding: "6px 0" }}>
+                   <h2 className="wp-strong" style={{ fontSize: 14, margin: "0 0 4px" }}>
+                      Failed to load blog data
+                   </h2>
+                   <p style={{ margin: 0 }}>
+                      Your administrator session may have expired, or the blog post you are trying to edit does not exist. Please try logging back in.
+                   </p>
+                   <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 12 }}>
+                      <button
+                         type="button"
+                         onClick={() => window.location.reload()}
+                         className="wp-btn wp-btn-primary"
+                      >
+                         Retry Connection / Reload
+                      </button>
+                      <Link href="/admin-login" className="wp-btn">
+                         Log In to Admin Panel
+                      </Link>
+                      <Link href="/admin/blogs" className="wp-link">
+                         ← Back to Blogs List
+                      </Link>
+                   </div>
                 </div>
              </div>
-          </div>
+          </Page>
        );
     }
- 
+
+    // Presentational helper: plain-text buttons styled as WordPress links
+    const linkBtnStyle = { background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit", color: "#2271b1" };
+    const dangerLinkStyle = { ...linkBtnStyle, color: "#b32d2e", textDecoration: "underline" };
+
     return (
-    <AdminPageLayout 
-      title={blogId ? "Edit Blog" : "Add New Blog"} 
-      addNewLink="/admin/blogs/new"
-      addNewLabel="Add New"
-      breadcrumbs={[{ label: "Blog", href: "/admin/blogs" }, { label: blogId ? "Edit" : "New" }]}
-    >
-         <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start min-w-0">
+    <Page>
+      <PageHeader
+         title={blogId ? "Edit Post" : "Add New Post"}
+         actions={blogId ? <Link href="/admin/blogs/new" className="wp-btn">Add New Post</Link> : null}
+      />
+      {blogId && formData.isDeleted && (
+         <div className="wp-notice wp-notice-warning" role="status">
+            <p>
+               This post is in the Trash and is not shown on the site.{" "}
+               <button type="button" onClick={handleRestore} disabled={busy} className="wp-link" style={{ ...linkBtnStyle, textDecoration: "underline" }}>Restore it</button>
+            </p>
+         </div>
+      )}
+         {/* New posts: the primary button publishes. Existing posts: it saves with the chosen status. */}
+         <form onSubmit={(e) => handleSubmit(e, blogId ? null : { status: "Published" })} className="wp-cols">
             {/* Main Column */}
-            <div className="lg:col-span-3 space-y-4 min-w-0">
-               <div className="space-y-1">
+            <div className="wp-col-main">
+               <div style={{ marginBottom: 20 }}>
+                  <label htmlFor="blog-title-input" className="sr-only">Add title</label>
                   <input
+                     id="blog-title-input"
                      required
                      placeholder="Enter title here"
-                     className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-3 sm:px-4 py-2 sm:py-2.5 text-[16px] sm:text-[20px] bg-white shadow-sm font-semibold transition-all"
+                     className="wp-title-input"
                      value={formData.title}
                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   />
-                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex items-center gap-1.5 flex-wrap min-w-0 break-all">
-                     <span>Permalink:</span>
-                     <span className="text-gray-400 font-mono text-[11px] sm:text-xs">pairo.store/blog/</span>
-                     <input
-                        readOnly={!editSlug}
-                        className={`outline-none text-[#2271b1] font-mono px-1.5 py-0.5 rounded transition-all text-xs max-w-full min-w-0 ${
-                           editSlug ? "border border-[#c3c4c7] bg-white ring-1 ring-[#2271b1]/20" : "border-none bg-transparent pointer-events-none"
-                        }`}
-                        style={{ width: `${Math.min(220, Math.max(60, (formData.slug || "").length * 8.5))}px` }}
-                        value={formData.slug}
-                        onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                     />
+                  <div className="wp-small flex flex-wrap items-center gap-1.5 min-w-0" style={{ marginTop: 8, color: "#3c434a", wordBreak: "break-all" }}>
+                     <span className="wp-strong">Permalink:</span>
+                     <span className="wp-muted">pairo.store/blog/</span>
+                     {editSlug ? (
+                        <>
+                           <label htmlFor="blog-slug-input" className="sr-only">Permalink slug</label>
+                           <input
+                              id="blog-slug-input"
+                              className="wp-input"
+                              style={{ minHeight: 28, minWidth: 140, maxWidth: "100%" }}
+                              value={formData.slug}
+                              onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                           />
+                        </>
+                     ) : (
+                        // Shown as text so long slugs wrap instead of being cut off
+                        <span className="wp-strong" style={{ color: "#1d2327", minWidth: 0, wordBreak: "break-all" }}>{formData.slug || "—"}</span>
+                     )}
                      {!editSlug ? (
                         <button
                            type="button"
                            onClick={() => setEditSlug(true)}
-                           className="text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                           className="wp-btn"
+                           aria-label="Edit permalink"
+                           style={{ minHeight: 26, padding: "0 8px" }}
                         >
-                           <Edit className="w-3.5 h-3.5" />
+                           <Edit className="w-3 h-3" aria-hidden="true" /> Edit
                         </button>
                      ) : (
                         <button
                            type="button"
                            onClick={() => setEditSlug(false)}
-                           className="text-[10px] text-green-600 hover:underline font-bold"
+                           className="wp-btn"
+                           style={{ minHeight: 26, padding: "0 8px" }}
                         >
-                           Done
+                           OK
                         </button>
                      )}
                   </div>
                </div>
 
-               {/* Content / SEO Tabs */}
-               <div className="flex flex-wrap border-b border-[#ccd0d4] gap-x-4 sm:gap-x-6 gap-y-1 select-none pb-0">
+               {/* Content / SEO / FAQ Tabs */}
+               <div className="wp-tabs" role="tablist" aria-label="Editor sections">
                   <button
                      type="button"
+                     role="tab"
+                     id="bf-tab-content"
+                     aria-selected={activeFormTab === "content"}
+                     aria-controls="bf-form-panel"
                      onClick={() => setActiveFormTab("content")}
-                     className={`pb-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[1px] cursor-pointer ${
-                        activeFormTab === "content"
-                           ? "border-[#2271b1] text-[#2271b1]"
-                           : "border-transparent text-gray-500 hover:text-black"
-                     }`}
+                     className="wp-tab"
                   >
                      Content Editor
                   </button>
                   <button
                      type="button"
+                     role="tab"
+                     id="bf-tab-seo"
+                     aria-selected={activeFormTab === "seo"}
+                     aria-controls="bf-form-panel"
                      onClick={() => setActiveFormTab("seo")}
-                     className={`pb-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[1px] cursor-pointer ${
-                        activeFormTab === "seo"
-                           ? "border-[#2271b1] text-[#2271b1]"
-                           : "border-transparent text-gray-500 hover:text-black"
-                     }`}
+                     className="wp-tab"
                   >
                      SEO Settings
                   </button>
                   <button
                      type="button"
+                     role="tab"
+                     id="bf-tab-faq"
+                     aria-selected={activeFormTab === "faq"}
+                     aria-controls="bf-form-panel"
                      onClick={() => setActiveFormTab("faq")}
-                     className={`pb-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[1px] cursor-pointer ${
-                        activeFormTab === "faq"
-                           ? "border-[#2271b1] text-[#2271b1]"
-                           : "border-transparent text-gray-500 hover:text-black"
-                     }`}
+                     className="wp-tab"
                   >
                      FAQ Settings
                   </button>
                </div>
 
+               <div id="bf-form-panel" role="tabpanel" aria-labelledby={`bf-tab-${activeFormTab}`}>
                {activeFormTab === "content" && (
                   <>
-                     {/* Content Meta Box (General) */}
-                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex flex-wrap justify-between items-center gap-2">
-                           <span>General Content</span>
-                           <div className="flex flex-wrap gap-2 text-xs">
+                     {/* Editor box */}
+                     <div className="wp-postbox" role="group" aria-label="Post content" style={{ overflow: "hidden" }}>
+                        <div className="flex flex-wrap items-center gap-2" style={{ justifyContent: "flex-end", padding: "6px 8px 0", background: "#f6f7f7", borderBottom: "1px solid #dcdcde" }}>
+                           <span className="sr-only" id="bf-editor-mode-label">Editor mode</span>
+                           <div className="wp-tabs" role="group" aria-labelledby="bf-editor-mode-label" style={{ margin: 0, borderBottom: 0 }}>
                               <button
                                  type="button"
+                                 aria-pressed={editorMode === "visual"}
                                  onClick={() => setEditorMode("visual")}
-                                 className={`px-3 py-1 font-semibold rounded ${editorMode === "visual" ? "bg-white border border-[#c3c4c7] text-[#2271b1]" : "text-gray-600 hover:text-black"}`}
+                                 className={`wp-tab${editorMode === "visual" ? " is-current" : ""}`}
+                                 style={editorMode === "visual" ? { background: "#fff" } : undefined}
                               >
                                  Visual
                               </button>
                               <button
                                  type="button"
+                                 aria-pressed={editorMode === "html"}
                                  onClick={() => setEditorMode("html")}
-                                 className={`px-3 py-1 font-semibold rounded ${editorMode === "html" ? "bg-white border border-[#c3c4c7] text-[#2271b1]" : "text-gray-600 hover:text-black"}`}
+                                 className={`wp-tab${editorMode === "html" ? " is-current" : ""}`}
+                                 style={editorMode === "html" ? { background: "#fff" } : undefined}
                               >
                                  HTML
                               </button>
@@ -341,28 +445,33 @@ export default function BlogForm({ blogId }) {
                               onChange={(html) => setFormData({ ...formData, content: html })}
                            />
                         ) : (
-                           <textarea
-                              className="w-full p-4 font-mono text-[13px] outline-none border-none min-h-[350px] bg-[#fcfcfc] focus:bg-white transition-colors"
-                              placeholder="Type HTML content here..."
-                              value={formData.content}
-                              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                           />
+                           <>
+                              <label htmlFor="bf-html-content" className="sr-only">Post content (HTML)</label>
+                              <textarea
+                                 id="bf-html-content"
+                                 className="wp-textarea wp-full"
+                                 style={{ border: 0, borderRadius: 0, minHeight: 350, fontFamily: "Consolas, Monaco, monospace", fontSize: 13, padding: 12 }}
+                                 placeholder="Type HTML content here..."
+                                 value={formData.content}
+                                 onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                              />
+                           </>
                         )}
                      </div>
 
-                     {/* Excerpt Meta Box */}
-                     <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                        <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Excerpt</div>
-                        <div className="p-0">
-                           <textarea
-                              rows={4}
-                              className="w-full p-4 text-[13px] outline-none border-none resize-none leading-relaxed bg-[#fcfcfc] focus:bg-white transition-colors"
-                              placeholder="Add a brief summary of the post..."
-                              value={formData.excerpt}
-                              onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
-                           />
-                        </div>
-                     </div>
+                     {/* Excerpt */}
+                     <Postbox title="Excerpt" id="bf-excerpt">
+                        <label htmlFor="bf-excerpt-input" className="sr-only">Excerpt</label>
+                        <textarea
+                           id="bf-excerpt-input"
+                           rows={4}
+                           className="wp-textarea wp-full"
+                           placeholder="Add a brief summary of the post..."
+                           value={formData.excerpt}
+                           onChange={(e) => setFormData({ ...formData, excerpt: e.target.value })}
+                        />
+                        <p className="wp-desc">Excerpts are optional hand-crafted summaries of your content that can be used in your theme.</p>
+                     </Postbox>
                   </>
                )}
 
@@ -379,9 +488,10 @@ export default function BlogForm({ blogId }) {
                )}
 
                {activeFormTab === "faq" && (
-                  <div className="bg-white border border-[#c3c4c7] shadow-sm p-3 sm:p-6 space-y-4 sm:space-y-6">
-                     <div className="flex flex-wrap justify-between items-center gap-2 border-b border-gray-100 pb-3">
-                        <h2 className="text-[14px] font-bold text-gray-700 min-w-0 break-words">Frequently Asked Questions</h2>
+                  <Postbox
+                     title="Frequently Asked Questions"
+                     id="bf-faq"
+                     aside={
                         <button
                            type="button"
                            onClick={() => {
@@ -389,210 +499,218 @@ export default function BlogForm({ blogId }) {
                               faqs.push({ question: "", answer: "" });
                               setFormData({ ...formData, faqs });
                            }}
-                           className="bg-[#2271b1] hover:bg-[#135e96] text-white px-3 py-1.5 rounded-[3px] text-[11px] font-bold transition-colors shrink-0"
+                           className="wp-btn"
                         >
                            Add FAQ Item
                         </button>
-                     </div>
-                     
+                     }
+                  >
                      {(!formData.faqs || formData.faqs.length === 0) ? (
-                        <div className="text-center py-10 text-gray-400 text-xs">
+                        <p className="wp-muted" style={{ padding: "16px 0", textAlign: "center" }}>
                            No FAQ items have been added to this blog post yet. Click &quot;Add FAQ Item&quot; to begin.
-                        </div>
+                        </p>
                      ) : (
-                        <div className="space-y-4">
+                        <div className="flex flex-col gap-3">
                            {formData.faqs.map((faq, idx) => (
-                              <div key={idx} className="border border-[#ccd0d4] rounded-[3px] p-3 sm:p-4 bg-[#fcfcfc] space-y-3 relative group">
-                                 <div className="flex flex-wrap justify-between items-center gap-2">
-                                    <span className="text-xs font-bold text-gray-600">FAQ Item #{idx + 1}</span>
+                              <div key={idx} style={{ border: "1px solid #dcdcde", background: "#fff" }}>
+                                 <div className="flex flex-wrap items-center gap-2" style={{ padding: "8px 12px", borderBottom: "1px solid #dcdcde", background: "#f6f7f7" }}>
+                                    <span className="wp-strong">FAQ Item #{idx + 1}</span>
+                                    <span style={{ flex: 1 }} />
                                     <button
                                        type="button"
                                        onClick={() => {
                                           const faqs = formData.faqs.filter((_, i) => i !== idx);
                                           setFormData({ ...formData, faqs });
                                        }}
-                                       className="text-red-600 hover:text-red-800 text-[11px] font-bold"
+                                       style={dangerLinkStyle}
+                                       aria-label={`Delete FAQ item ${idx + 1}`}
                                     >
                                        Delete
                                     </button>
                                  </div>
-                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-600 block">Question</label>
-                                    <input
-                                       type="text"
-                                       className="w-full border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[12px] outline-none focus:border-[#2271b1]"
-                                       placeholder="e.g. What leather is used for this product?"
-                                       value={faq.question}
-                                       onChange={(e) => {
-                                          const faqs = [...formData.faqs];
-                                          faqs[idx].question = e.target.value;
-                                          setFormData({ ...formData, faqs });
-                                       }}
-                                    />
-                                 </div>
-                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-600 block">Answer</label>
-                                    <textarea
-                                       rows={3}
-                                       className="w-full border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[12px] outline-none focus:border-[#2271b1] resize-none"
-                                       placeholder="Enter the detailed answer..."
-                                       value={faq.answer}
-                                       onChange={(e) => {
-                                          const faqs = [...formData.faqs];
-                                          faqs[idx].answer = e.target.value;
-                                          setFormData({ ...formData, faqs });
-                                       }}
-                                    />
+                                 <div style={{ padding: 12 }}>
+                                    <div className="wp-field">
+                                       <label htmlFor={`bf-faq-q-${idx}`} className="wp-label">Question</label>
+                                       <input
+                                          id={`bf-faq-q-${idx}`}
+                                          type="text"
+                                          className="wp-input wp-full"
+                                          placeholder="e.g. What leather is used for this product?"
+                                          value={faq.question}
+                                          onChange={(e) => {
+                                             const faqs = [...formData.faqs];
+                                             faqs[idx].question = e.target.value;
+                                             setFormData({ ...formData, faqs });
+                                          }}
+                                       />
+                                    </div>
+                                    <div className="wp-field" style={{ marginBottom: 0 }}>
+                                       <label htmlFor={`bf-faq-a-${idx}`} className="wp-label">Answer</label>
+                                       <textarea
+                                          id={`bf-faq-a-${idx}`}
+                                          rows={3}
+                                          className="wp-textarea wp-full"
+                                          placeholder="Enter the detailed answer..."
+                                          value={faq.answer}
+                                          onChange={(e) => {
+                                             const faqs = [...formData.faqs];
+                                             faqs[idx].answer = e.target.value;
+                                             setFormData({ ...formData, faqs });
+                                          }}
+                                       />
+                                    </div>
                                  </div>
                               </div>
                            ))}
                         </div>
                      )}
-                  </div>
+                  </Postbox>
                )}
+               </div>
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-4 min-w-0">
+            <div className="wp-col-side">
                {/* Publish Box */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Publish</div>
-                  <div className="p-3 space-y-4">
-                     <div className="flex flex-wrap justify-between items-center gap-2">
-                        <button 
-                            type="button" 
-                            onClick={handleSubmit}
-                            className="border border-[#c3c4c7] px-3 py-1.5 rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[12px] font-medium"
+               <section className="wp-postbox" aria-labelledby="bf-publish-title">
+                  <div className="wp-postbox-head"><h2 id="bf-publish-title">Publish</h2></div>
+                  <div className="flex flex-wrap justify-between items-center gap-2" style={{ padding: "10px 12px 2px" }}>
+                     <button
+                         type="button"
+                         onClick={(e) => handleSubmit(e, { status: "Draft" })}
+                         disabled={saving}
+                         className="wp-btn"
+                     >
+                         Save Draft
+                     </button>
+                     <button type="button" onClick={() => formData.slug && window.open(`/blog/${formData.slug}`, '_blank')} className="wp-btn" title={formData.slug ? `Preview /blog/${formData.slug}` : 'Save first to preview'}>Preview</button>
+                  </div>
+                  <div className="wp-misc">
+                     <div className="wp-misc-row">
+                        <Globe className="w-4 h-4" aria-hidden="true" style={{ color: "#8c8f94" }} />
+                        <label htmlFor="bf-status-select" className="wp-muted">Status:</label>
+                        <strong className="wp-strong">{formData.status}</strong>
+                        <select
+                           id="bf-status-select"
+                           className="wp-select"
+                           style={{ marginLeft: "auto" }}
+                           value={formData.status}
+                           onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                         >
-                            Save Draft
-                        </button>
-                        <button type="button" onClick={() => formData.slug && window.open(`/blog/${formData.slug}`, '_blank')} className="text-[#2271b1] underline text-[12px]" title={formData.slug ? `Preview /blog/${formData.slug}` : 'Save first to preview'}>Preview</button>
+                           <option value="Draft">Draft</option>
+                           <option value="Published">Published</option>
+                        </select>
                      </div>
-                     <div className="space-y-3 py-3 border-y border-gray-100 text-[13px]">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p><span className="text-gray-400">Status:</span> <strong>{formData.status}</strong></p>
-                            <select
-                                className="text-[11px] border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#2271b1] max-w-full"
-                                value={formData.status}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            >
-                                <option value="Draft">Draft</option>
-                                <option value="Published">Published</option>
-                            </select>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-                            <p><span className="text-gray-400">Published Date:</span></p>
-                            <input
-                                type="date"
-                                className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 outline-none focus:border-[#2271b1] bg-white text-black max-w-full min-w-0"
-                                value={formData.publishedAt}
-                                onChange={(e) => setFormData({ ...formData, publishedAt: e.target.value })}
-                            />
-                        </div>
-                     </div>
-                     <div className="flex flex-wrap items-center justify-between gap-2 bg-[#f6f7f7] -mx-3 -mb-3 p-3 border-t border-[#ccd0d4]">
-                        {blogId ? (
-                           <button type="button" onClick={handleTrash} className="text-[#d63638] underline text-[12px]">Move to Trash</button>
-                        ) : (
-                           <div />
-                        )}
-                        <button 
-                           type="submit" 
-                           disabled={saving}
-                           className="bg-[#2271b1] text-white px-4 py-2 rounded-[3px] text-[13px] font-bold hover:bg-[#135e96] disabled:opacity-50"
-                        >
-                           {saving ? "Publishing..." : (blogId ? "Update" : "Publish")}
-                        </button>
+                     <div className="wp-misc-row">
+                        <Calendar className="w-4 h-4" aria-hidden="true" style={{ color: "#8c8f94" }} />
+                        <label htmlFor="bf-published-at" className="wp-muted">Published on:</label>
+                        <input
+                           id="bf-published-at"
+                           type="date"
+                           className="wp-input"
+                           style={{ marginLeft: "auto", minWidth: 0, maxWidth: "100%" }}
+                           value={formData.publishedAt}
+                           onChange={(e) => setFormData({ ...formData, publishedAt: e.target.value })}
+                        />
                      </div>
                   </div>
-               </div>
+                  <div className="wp-box-foot">
+                     {blogId ? (
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                           {formData.isDeleted ? (
+                              <button type="button" onClick={handlePermanentDelete} disabled={busy} style={dangerLinkStyle}>Delete Permanently</button>
+                           ) : (
+                              <button type="button" onClick={handleTrash} disabled={busy} style={dangerLinkStyle}>Move to Trash</button>
+                           )}
+                           <span aria-hidden="true" style={{ color: "#a7aaad" }}>|</span>
+                           <button type="button" onClick={handleDuplicate} disabled={busy} style={{ ...linkBtnStyle, textDecoration: "underline" }}>Duplicate</button>
+                        </span>
+                     ) : null}
+                     <span className="wp-spacer" />
+                     <button
+                        type="submit"
+                        disabled={saving}
+                        className="wp-btn wp-btn-primary"
+                        style={{ minHeight: 36 }}
+                     >
+                        {saving ? "Saving…" : (blogId ? "Update" : "Publish")}
+                     </button>
+                  </div>
+               </section>
 
                {/* Categories Box */}
-               <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700 flex flex-wrap items-center justify-between gap-2">
-                     <span>Categories</span>
-                     <button type="button" onClick={() => router.push("/admin/blogs/categories")} className="text-[10px] text-[#2271b1] hover:underline font-normal">Manage</button>
-                  </div>
-                  <div className="p-3 max-h-48 overflow-y-auto space-y-2">
-                     {categories.length === 0 ? (
-                        <p className="text-[11px] text-gray-400 italic">No categories found.</p>
-                     ) : (
-                        categories.map(cat => (
-                           <label key={cat._id} className="flex items-center gap-2 text-[13px] cursor-pointer min-w-0 break-words">
+               <Postbox
+                  title="Categories"
+                  id="bf-categories"
+                  aside={<button type="button" onClick={() => router.push("/admin/blogs/categories")} className="wp-link" style={linkBtnStyle}>Manage</button>}
+               >
+                  {categories.length === 0 ? (
+                     <p className="wp-muted">No categories found.</p>
+                  ) : (
+                     <div className="wp-checklist" role="group" aria-labelledby="bf-categories-title">
+                        {categories.map(cat => (
+                           <label key={cat._id} className="wp-check" style={{ wordBreak: "break-word" }}>
                               <input
                                  type="checkbox"
-                                 className="w-4 h-4 rounded border-gray-300 text-[#2271b1] focus:ring-[#2271b1] shrink-0"
                                  checked={formData.category === cat.name}
                                  onChange={() => setFormData({...formData, category: formData.category === cat.name ? "" : cat.name})}
                               />
-                              {cat.name}
+                              <span>{cat.name}</span>
                            </label>
-                        ))
-                     )}
-                  </div>
-               </div>
+                        ))}
+                     </div>
+                  )}
+               </Postbox>
 
-                {/* Featured Image Box */}
-                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Featured Image</div>
-                   <div className="p-4">
-                      <MediaPicker 
-                         value={formData.image}
-                         onChange={(url) => setFormData({...formData, image: url})}
-                         label="Set featured image"
-                      />
-                   </div>
-                </div>
+               {/* Featured Image Box */}
+               <Postbox title="Featured image" id="bf-featured-image">
+                  <MediaPicker
+                     value={formData.image}
+                     onChange={(url) => setFormData({...formData, image: url})}
+                     label="Set featured image"
+                  />
+               </Postbox>
 
-                {/* Featured Product Box */}
-                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Featured Product</div>
-                   <div className="p-4 space-y-4">
-                      <div className="space-y-1.5">
-                         <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Select Product</label>
-                         <select
-                            className="w-full min-w-0 border border-[#c3c4c7] p-2 text-[13px] outline-none focus:border-[#2271b1] bg-white"
-                            value={formData.featuredProductId || ""}
-                            onChange={(e) => setFormData({...formData, featuredProductId: e.target.value})}
-                         >
-                            <option value="">— Select a Product —</option>
-                            {products.map(product => (
-                               <option key={product._id} value={product._id || product.slug}>
-                                  {product.name}
-                               </option>
-                            ))}
-                         </select>
-                         <p className="text-[10px] text-gray-400">Choose a product to feature in the sidebar.</p>
-                      </div>
-                   </div>
-                </div>
+               {/* Featured Product Box */}
+               <Postbox title="Featured product" id="bf-featured-product">
+                  <label htmlFor="bf-featured-product-select" className="wp-label">Select product</label>
+                  <select
+                     id="bf-featured-product-select"
+                     className="wp-select wp-full"
+                     value={formData.featuredProductId || ""}
+                     onChange={(e) => setFormData({...formData, featuredProductId: e.target.value})}
+                  >
+                     <option value="">— Select a Product —</option>
+                     {products.map(product => (
+                        <option key={product._id} value={product._id || product.slug}>
+                           {product.name}
+                        </option>
+                     ))}
+                  </select>
+                  <p className="wp-desc">Choose a product to feature in the sidebar.</p>
+               </Postbox>
 
-                {/* Sidebar Settings Box */}
-                <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                   <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Sidebar Controls</div>
-                   <div className="p-4 space-y-3">
-                      <label className="flex items-center gap-2 text-[12px] font-medium text-gray-700 cursor-pointer">
-                         <input 
-                            type="checkbox"
-                            checked={formData.showFeaturedProduct}
-                            onChange={(e) => setFormData({...formData, showFeaturedProduct: e.target.checked})}
-                            className="rounded border-[#c3c4c7] text-[#2271b1] focus:ring-[#2271b1] w-4 h-4"
-                         />
-                         Enable Featured Product
-                      </label>
-                      <label className="flex items-center gap-2 text-[12px] font-medium text-gray-700 cursor-pointer">
-                         <input 
-                            type="checkbox"
-                            checked={formData.showSidebarIndex}
-                            onChange={(e) => setFormData({...formData, showSidebarIndex: e.target.checked})}
-                            className="rounded border-[#c3c4c7] text-[#2271b1] focus:ring-[#2271b1] w-4 h-4"
-                         />
-                         Enable Sidebar Index (TOC)
-                      </label>
-                   </div>
-                </div>
-             </div>
+               {/* Sidebar Settings Box */}
+               <Postbox title="Sidebar controls" id="bf-sidebar-controls">
+                  <label className="wp-check">
+                     <input
+                        type="checkbox"
+                        checked={formData.showFeaturedProduct}
+                        onChange={(e) => setFormData({...formData, showFeaturedProduct: e.target.checked})}
+                     />
+                     <span>Enable Featured Product</span>
+                  </label>
+                  <label className="wp-check">
+                     <input
+                        type="checkbox"
+                        checked={formData.showSidebarIndex}
+                        onChange={(e) => setFormData({...formData, showSidebarIndex: e.target.checked})}
+                     />
+                     <span>Enable Sidebar Index (TOC)</span>
+                  </label>
+               </Postbox>
+            </div>
          </form>
-    </AdminPageLayout>
+    </Page>
    );
 }

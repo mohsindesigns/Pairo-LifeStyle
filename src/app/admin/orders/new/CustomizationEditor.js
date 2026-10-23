@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useId } from "react";
 import { Upload, X, FileText, Loader2, AlertCircle, Check } from "lucide-react";
 import {
   CHANGE_LEATHER_COLORS, CHANGE_LEATHER_TYPES, CHANGE_INNER_LININGS, CHANGE_HARDWARE_COLORS,
@@ -8,8 +8,9 @@ import {
   ARTWORK_SLOTS, ARTWORK_ACCEPTED_FORMATS,
 } from "@/lib/customizationOptions";
 
-const inputClass = "w-full bg-white border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] transition-all text-black";
-const labelClass = "block text-[11px] font-bold text-[#3c434a] uppercase tracking-wide mb-1";
+const inputClass = "wp-select wp-full";
+const textClass = "wp-input wp-full";
+const labelClass = "wp-label";
 
 export function defaultCustomization() {
   return {
@@ -55,21 +56,27 @@ function ArtworkSlot({ label, artwork, onChange }) {
   };
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2 p-2 border border-[#dcdcde] rounded-[3px] bg-white">
-        <p className="text-[10px] font-bold uppercase text-[#3c434a] w-20 shrink-0">{label}</p>
+    <div>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "6px 0", borderBottom: "1px solid #f0f0f1" }}>
+        <span style={{ width: 110, flex: "none" }}>{label}</span>
         {artwork?.url ? (
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-7 h-7 rounded-[2px] border border-[#dcdcde] overflow-hidden shrink-0 bg-[#f6f7f7]">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+            <span className="wp-thumb" style={{ width: 32, height: 32 }}>
               {artwork.url.match(/\.(png|jpg|jpeg|svg|webp)$/i) ? (
-                <img src={artwork.url} alt={artwork.name} className="w-full h-full object-cover" />
+                <img src={artwork.url} alt={artwork.name} />
               ) : (
-                <div className="w-full h-full flex items-center justify-center"><FileText className="w-3 h-3 text-[#646970]" /></div>
+                <FileText className="w-4 h-4" aria-hidden="true" />
               )}
-            </div>
-            <span className="text-[11px] text-black font-semibold truncate flex-1">{artwork.name}</span>
-            <button type="button" onClick={() => onChange(null)} className="text-[#bc0b0d] hover:text-red-700 cursor-pointer shrink-0">
-              <X className="w-3.5 h-3.5" />
+            </span>
+            <span className="wp-strong" style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{artwork.name}</span>
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="wp-btn"
+              aria-label={`Remove ${label} artwork`}
+              style={{ minWidth: 32, padding: "0 6px", color: "#d63638", borderColor: "#d63638", flex: "none" }}
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         ) : (
@@ -77,15 +84,19 @@ function ArtworkSlot({ label, artwork, onChange }) {
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-[#2271b1] border border-dashed border-[#8c8f94] hover:border-[#2271b1] px-2.5 py-1 rounded-[3px] cursor-pointer disabled:opacity-50"
+            className="wp-btn"
           >
-            {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-            {uploading ? "Uploading..." : "Upload File"}
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Upload className="w-4 h-4" aria-hidden="true" />}
+            {uploading ? "Uploading..." : "Upload file"}
           </button>
         )}
-        <input ref={inputRef} type="file" accept={ARTWORK_ACCEPTED_FORMATS} className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+        <input ref={inputRef} type="file" accept={ARTWORK_ACCEPTED_FORMATS} className="hidden" aria-label={`Upload ${label} artwork`} onChange={(e) => handleFile(e.target.files?.[0])} />
       </div>
-      {error && <p className="text-[10px] text-red-600 font-semibold flex items-center gap-1"><AlertCircle className="w-3 h-3" />{error}</p>}
+      {error && (
+        <p role="alert" className="wp-small" style={{ margin: "4px 0 0", color: "#d63638", display: "flex", alignItems: "center", gap: 4 }}>
+          <AlertCircle className="w-3 h-3" aria-hidden="true" />{error}
+        </p>
+      )}
     </div>
   );
 }
@@ -101,116 +112,132 @@ export default function CustomizationEditor({ value, onChange }) {
     setFur({ placement: current.includes(p) ? current.filter(x => x !== p) : [...current, p] });
   };
 
+  const uid = useId();
+  const fid = (name) => `${uid}-${name}`;
+  const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "4px 12px" };
+  const section = { borderTop: "1px solid #dcdcde", paddingTop: 12, marginTop: 4 };
+
   return (
-    <div className="border border-[#dcdcde] bg-[#fbfbfb] rounded-[3px] p-3 space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className={labelClass}>Leather Color</label>
-          <select className={inputClass} value={c.leatherColor} onChange={(e) => set({ leatherColor: e.target.value })}>
+    <div style={{ border: "1px solid #dcdcde", background: "#f6f7f7", padding: 12 }}>
+      <div style={grid}>
+        <div className="wp-field">
+          <label htmlFor={fid("leather-color")} className={labelClass}>Leather color</label>
+          <select id={fid("leather-color")} className={inputClass} value={c.leatherColor} onChange={(e) => set({ leatherColor: e.target.value })}>
             {CHANGE_LEATHER_COLORS.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
           {c.leatherColor === "Other" && (
-            <input type="text" placeholder="Describe custom color..." value={c.leatherColorNote} onChange={(e) => set({ leatherColorNote: e.target.value })} className={`${inputClass} mt-1.5`} />
+            <input type="text" aria-label="Custom leather color" placeholder="Describe custom color..." value={c.leatherColorNote} onChange={(e) => set({ leatherColorNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
         </div>
-        <div>
-          <label className={labelClass}>Leather Type</label>
-          <select className={inputClass} value={c.leatherType} onChange={(e) => set({ leatherType: e.target.value })}>
+        <div className="wp-field">
+          <label htmlFor={fid("leather-type")} className={labelClass}>Leather type</label>
+          <select id={fid("leather-type")} className={inputClass} value={c.leatherType} onChange={(e) => set({ leatherType: e.target.value })}>
             {CHANGE_LEATHER_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
           {c.leatherType === "Other" && (
-            <input type="text" placeholder="Describe custom type..." value={c.leatherTypeNote} onChange={(e) => set({ leatherTypeNote: e.target.value })} className={`${inputClass} mt-1.5`} />
+            <input type="text" aria-label="Custom leather type" placeholder="Describe custom type..." value={c.leatherTypeNote} onChange={(e) => set({ leatherTypeNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
         </div>
-        <div>
-          <label className={labelClass}>Inner Lining</label>
-          <select className={inputClass} value={c.innerLining} onChange={(e) => set({ innerLining: e.target.value })}>
+        <div className="wp-field">
+          <label htmlFor={fid("inner-lining")} className={labelClass}>Inner lining</label>
+          <select id={fid("inner-lining")} className={inputClass} value={c.innerLining} onChange={(e) => set({ innerLining: e.target.value })}>
             {CHANGE_INNER_LININGS.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
           {c.innerLining === "Other" && (
-            <input type="text" placeholder="Describe custom lining..." value={c.innerLiningNote} onChange={(e) => set({ innerLiningNote: e.target.value })} className={`${inputClass} mt-1.5`} />
+            <input type="text" aria-label="Custom inner lining" placeholder="Describe custom lining..." value={c.innerLiningNote} onChange={(e) => set({ innerLiningNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
         </div>
-        <div>
-          <label className={labelClass}>Hardware Tone</label>
-          <select className={inputClass} value={c.hardwareColor} onChange={(e) => set({ hardwareColor: e.target.value })}>
+        <div className="wp-field">
+          <label htmlFor={fid("hardware")} className={labelClass}>Hardware tone</label>
+          <select id={fid("hardware")} className={inputClass} value={c.hardwareColor} onChange={(e) => set({ hardwareColor: e.target.value })}>
             {CHANGE_HARDWARE_COLORS.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
           {c.hardwareColor === "Other" && (
-            <input type="text" placeholder="Describe custom finish..." value={c.hardwareColorNote} onChange={(e) => set({ hardwareColorNote: e.target.value })} className={`${inputClass} mt-1.5`} />
+            <input type="text" aria-label="Custom hardware finish" placeholder="Describe custom finish..." value={c.hardwareColorNote} onChange={(e) => set({ hardwareColorNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
         </div>
       </div>
 
-      <div className="border-t border-[#dcdcde] pt-3">
-        <label className={labelClass}>Fur Accent (optional)</label>
-        <select className={inputClass} value={c.fur.type} onChange={(e) => setFur({ type: e.target.value })}>
-          {CHANGE_FUR_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-        {c.fur.type === "Other" && (
-          <input type="text" placeholder="Describe custom fur type..." value={c.fur.typeNote} onChange={(e) => setFur({ typeNote: e.target.value })} className={`${inputClass} mt-1.5`} />
-        )}
+      <div style={section}>
+        <div className="wp-field">
+          <label htmlFor={fid("fur-type")} className={labelClass}>Fur accent (optional)</label>
+          <select id={fid("fur-type")} className={inputClass} value={c.fur.type} onChange={(e) => setFur({ type: e.target.value })}>
+            {CHANGE_FUR_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          {c.fur.type === "Other" && (
+            <input type="text" aria-label="Custom fur type" placeholder="Describe custom fur type..." value={c.fur.typeNote} onChange={(e) => setFur({ typeNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
+          )}
+        </div>
 
         {c.fur.type !== "None" && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-            <div>
-              <label className={labelClass}>Fur Color</label>
-              <select className={inputClass} value={c.fur.color} onChange={(e) => setFur({ color: e.target.value })}>
-                <option value="">Select...</option>
-                {CHANGE_FUR_COLORS.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Fur Density</label>
-              <select className={inputClass} value={c.fur.density} onChange={(e) => setFur({ density: e.target.value })}>
-                <option value="">Select...</option>
-                {CHANGE_FUR_DENSITIES.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Removable?</label>
-              <select
-                className={inputClass}
-                value={c.fur.removable === true ? "Yes" : c.fur.removable === false ? "No" : ""}
-                onChange={(e) => setFur({ removable: e.target.value === "Yes" ? true : e.target.value === "No" ? false : null })}
-              >
-                <option value="">Select...</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-              </select>
-            </div>
-            <div className="sm:col-span-3">
-              <label className={labelClass}>Fur Placement</label>
-              <div className="flex flex-wrap gap-1.5">
-                {CHANGE_FUR_PLACEMENTS.map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => togglePlacement(p)}
-                    className={`px-2.5 py-1 rounded-[3px] text-[10px] font-bold uppercase border cursor-pointer flex items-center gap-1 ${(c.fur.placement || []).includes(p) ? "bg-[#2271b1] text-white border-[#2271b1]" : "bg-white text-black border-[#8c8f94]"}`}
-                  >
-                    {(c.fur.placement || []).includes(p) && <Check className="w-2.5 h-2.5" strokeWidth={3} />}
-                    {p}
-                  </button>
-                ))}
+          <>
+            <div style={grid}>
+              <div className="wp-field">
+                <label htmlFor={fid("fur-color")} className={labelClass}>Fur color</label>
+                <select id={fid("fur-color")} className={inputClass} value={c.fur.color} onChange={(e) => setFur({ color: e.target.value })}>
+                  <option value="">Select...</option>
+                  {CHANGE_FUR_COLORS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div className="wp-field">
+                <label htmlFor={fid("fur-density")} className={labelClass}>Fur density</label>
+                <select id={fid("fur-density")} className={inputClass} value={c.fur.density} onChange={(e) => setFur({ density: e.target.value })}>
+                  <option value="">Select...</option>
+                  {CHANGE_FUR_DENSITIES.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div className="wp-field">
+                <label htmlFor={fid("fur-removable")} className={labelClass}>Removable?</label>
+                <select
+                  id={fid("fur-removable")}
+                  className={inputClass}
+                  value={c.fur.removable === true ? "Yes" : c.fur.removable === false ? "No" : ""}
+                  onChange={(e) => setFur({ removable: e.target.value === "Yes" ? true : e.target.value === "No" ? false : null })}
+                >
+                  <option value="">Select...</option>
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
               </div>
             </div>
-          </div>
+            <fieldset className="wp-field" style={{ border: 0, padding: 0, margin: 0 }}>
+              <legend className={labelClass}>Fur placement</legend>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {CHANGE_FUR_PLACEMENTS.map(p => {
+                  const on = (c.fur.placement || []).includes(p);
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => togglePlacement(p)}
+                      aria-pressed={on}
+                      className={on ? "wp-btn wp-btn-primary" : "wp-btn"}
+                    >
+                      {on && <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />}
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </>
         )}
       </div>
 
-      <div className="border-t border-[#dcdcde] pt-3 space-y-2">
-        <label className={labelClass}>Artwork / Branding Logos</label>
+      <div style={section}>
+        <div className={labelClass}>Artwork / branding logos</div>
         {ARTWORK_SLOTS.map(slot => (
           <div key={slot.key}>
             <ArtworkSlot label={slot.label} artwork={c.artwork[slot.key]} onChange={(v) => setArtwork(slot.key, v)} />
             {slot.key === "other" && c.artwork.other && (
               <input
                 type="text"
+                aria-label="Exact placement of other artwork"
                 placeholder="Describe the exact placement..."
                 value={c.artwork.other?.note || ""}
                 onChange={(e) => setArtwork("other", { ...c.artwork.other, note: e.target.value })}
-                className={`${inputClass} mt-1`}
+                className={textClass}
+                style={{ marginTop: 6 }}
               />
             )}
           </div>

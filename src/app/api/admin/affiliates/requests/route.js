@@ -6,6 +6,7 @@ import AffiliateApplication from "@/models/AffiliateApplication";
 import { sendAffiliateApplicationApproved, sendAffiliateApplicationRejected } from "@/lib/email";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 import { can } from "@/lib/rbac";
@@ -100,6 +101,9 @@ export async function PUT(req) {
     // ─── Approve ─────────────────────────────────────────────────────────────
     const existing = await Affiliate.findOne({ email: application.email }).lean();
     if (existing) {
+      if (existing.isDeleted) {
+        return NextResponse.json({ error: "An affiliate with this email is in the Trash. Restore that affiliate instead of approving a new account." }, { status: 400 });
+      }
       return NextResponse.json({ error: "An active affiliate with this email already exists." }, { status: 400 });
     }
 
@@ -127,9 +131,11 @@ export async function PUT(req) {
       }
     }
 
-    // 2. Generate unique affiliateId
-    const affiliatesCount = await Affiliate.countDocuments();
-    const affiliateId = `AFF-${1000 + affiliatesCount + 1}`;
+    // 2. Generate unique affiliateId. Start from the count, then step past any id already taken
+    //    (an affiliate deleted permanently lowers the count, so the next number can be in use).
+    let idNumber = 1000 + (await Affiliate.countDocuments()) + 1;
+    while (await Affiliate.exists({ affiliateId: `AFF-${idNumber}` })) idNumber++;
+    const affiliateId = `AFF-${idNumber}`;
 
     // 3. Generate temporary password
     const tempPassword = crypto.randomBytes(6).toString("hex");
@@ -193,6 +199,34 @@ export async function PUT(req) {
 
   } catch (error) {
     console.error("[AdminAffiliateRequests PUT Error]", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// Delete an application record (any status). An approved application's affiliate account is
+// separate and is not affected. Uploaded KYC files are left on disk: an approved affiliate's
+// account points at the same files.
+export async function DELETE(req) {
+  await dbConnect();
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isStaff || !can(session.user, "affiliates.manage")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const applicationId = searchParams.get("id");
+    if (!applicationId || !mongoose.isValidObjectId(applicationId)) {
+      return NextResponse.json({ error: "Application not found." }, { status: 404 });
+    }
+
+    const result = await AffiliateApplication.deleteOne({ _id: applicationId });
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ error: "Application not found." }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, message: "Application deleted." });
+  } catch (error) {
+    console.error("[AdminAffiliateRequests DELETE Error]", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

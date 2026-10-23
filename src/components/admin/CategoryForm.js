@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
 import MediaPicker from "@/components/admin/MediaPicker";
 import { useRouter } from "next/navigation";
 import dynamic from 'next/dynamic';
@@ -9,16 +10,26 @@ const TiptapEditor = dynamic(() => import('@/components/admin/TiptapEditor'), { 
 import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
 import { Pencil, ExternalLink } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { getCategoryUrl } from "@/lib/routes";
+import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange } from "@/components/admin/slugChange";
 
 export default function CategoryForm({ categoryId = null, type = "product" }) {
   const router = useRouter();
+  const { showConfirm } = usePopup();
+  const [trashing, setTrashing] = useState(false);
   const [loading, setLoading] = useState(categoryId ? true : false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [notFound, setNotFound] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [availableItems, setAvailableItems] = useState([]);
   const [itemSearchTerm, setItemSearchTerm] = useState("");
 
   const [activeTab, setActiveTab] = useState("content");
   const [slugLocked, setSlugLocked] = useState(true);
+  // Slug the category was loaded / last saved with: changing it asks "Change URL?" first
+  const savedSlugRef = useRef(null);
   const [editorMode, setEditorMode] = useState("visual");
 
   const [formData, setFormData] = useState({
@@ -48,6 +59,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       if (directRes?.ok) {
         const directCat = await directRes.json().catch(() => null);
         if (directCat && directCat._id) {
+          savedSlugRef.current = directCat.slug || null;
           setFormData(prev => ({
             ...prev,
             ...directCat,
@@ -68,6 +80,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
         if (Array.isArray(data)) {
           const cat = data.find(c => String(c?._id) === String(categoryId));
           if (cat) {
+            savedSlugRef.current = cat.slug || null;
             setFormData(prev => ({
               ...prev,
               ...cat,
@@ -114,7 +127,10 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
   useEffect(() => {
     const init = async () => {
         let cat = null;
-        if (categoryId) cat = await fetchCategory();
+        if (categoryId) {
+          cat = await fetchCategory();
+          if (!cat) setNotFound(true);
+        }
         await fetchAvailableItems(cat);
         if (type === "product") {
           await fetchSizeCharts();
@@ -135,12 +151,30 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     init();
   }, [categoryId, type]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // "Save Draft" passes forceStatus="Draft"; the main button keeps the chosen status.
+  const handleSubmit = async (e, forceStatus) => {
+    e?.preventDefault?.();
+    if (!formData.name?.trim()) {
+      setSaveError("Enter a category name before saving.");
+      return;
+    }
+    if (categoryId && !formData._id) {
+      setSaveError("This category could not be loaded, so it cannot be saved.");
+      return;
+    }
+    // Existing category whose URL changed: confirm first; cancel saves nothing
+    if (formData._id && !(await confirmSlugChange(showConfirm, {
+      savedSlug: savedSlugRef.current,
+      nextSlug: formData.slug,
+      toPath: (slug) => `/${type === 'product' ? 'collections' : 'blog'}/${slug}`,
+    }))) return;
     setSaving(true);
+    setSaveError("");
     try {
       const method = formData._id ? "PUT" : "POST";
-      const body = { ...formData, id: formData._id };
+      const nextStatus = forceStatus || formData.status;
+      if (forceStatus) setFormData(prev => ({ ...prev, status: forceStatus }));
+      const body = { ...formData, status: nextStatus, id: formData._id };
       
       const res = await fetch("/api/admin/categories", {
         method,
@@ -150,19 +184,73 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       
       if (res.ok) {
         const savedCat = await res.json();
-        toast.success(categoryId ? "Category updated successfully!" : "Category created successfully!");
+        if (formData._id) savedSlugRef.current = savedCat?.slug || formData.slug || savedSlugRef.current;
+        toast.success(forceStatus === "Draft" ? "Draft saved." : (categoryId ? "Category updated." : "Category created."));
         if (!categoryId && savedCat._id) {
           router.push(type === 'product' ? `/admin/products/categories/${savedCat._id}` : `/admin/blogs/categories/${savedCat._id}`);
         }
       } else {
-        const data = await res.json();
-        toast.error("Error saving category: " + (data.error || "Unknown error"));
+        const data = await res.json().catch(() => ({}));
+        const msg = data.error || `Save failed (${res.status})`;
+        setSaveError(msg);
+        toast.error("Error saving category: " + msg);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save category. Check console.");
+      setSaveError("Could not reach the server. Your changes were not saved.");
+      toast.error("Failed to save category.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Soft delete via the same API the list uses (mode=trash never hard-deletes).
+  const handleTrash = async () => {
+    if (!formData._id) return;
+    const ok = await showConfirm(
+      `Move "${formData.name || "this category"}" to the trash? You can restore it from the Trash view.`,
+      "Move to Trash",
+      { confirmText: "Move to Trash", danger: true }
+    );
+    if (!ok) return;
+    setTrashing(true);
+    try {
+      const res = await fetch(`/api/admin/categories?id=${formData._id}&mode=trash`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Category moved to trash.");
+        router.push(type === 'product' ? '/admin/categories' : '/admin/blogs/categories');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      toast.error("Error moving category to trash: " + (data.error || "Unknown error"));
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to move category to trash.");
+    } finally {
+      setTrashing(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!formData._id) return;
+    setRestoring(true);
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: formData._id, isDeleted: false }),
+      });
+      if (res.ok) {
+        setFormData(prev => ({ ...prev, isDeleted: false, deletedAt: null }));
+        toast.success("Category restored.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error("Could not restore: " + (data.error || res.status));
+      }
+    } catch {
+      toast.error("Could not restore the category.");
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -171,402 +259,457 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     i.name?.toLowerCase().includes(itemSearchTerm.toLowerCase())
   );
 
-  const breadcrumbs = type === "product"
-    ? [{ label: "WooCommerce", href: "/admin/orders" }, { label: "Categories", href: "/admin/categories" }, { label: categoryId ? "Edit" : "New" }]
-    : [{ label: "Blog", href: "/admin/blogs" }, { label: "Categories", href: "/admin/blogs/categories" }, { label: categoryId ? "Edit" : "New" }];
+  const pageTitle = categoryId ? "Edit Category" : "Add New Category";
+  const addNewHref = type === 'product' ? "/admin/products/categories/new" : "/admin/blogs/categories/new";
+  const backHref = type === 'product' ? '/admin/categories' : '/admin/blogs/categories';
 
-  if (loading) return <div className="p-4 sm:p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading editor...</div>;
+  if (loading) {
+    return (
+      <Page>
+        <PageHeader title={pageTitle} />
+        <p className="wp-muted" role="status">Loading editor...</p>
+      </Page>
+    );
+  }
 
   return (
-    <AdminPageLayout 
-      title={categoryId ? "Edit Category" : "Add New Category"} 
-      breadcrumbs={breadcrumbs}
-      addNewLink={type === 'product' ? "/admin/products/categories/new" : "/admin/blogs/categories/new"}
-      addNewLabel="Add New"
-    >
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
-         {/* Main Column */}
-         <div className="lg:col-span-3 min-w-0 space-y-4">
-            <div className="space-y-1">
-                <input
-                   required
-                   placeholder="Enter title here"
-                   className="w-full border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-4 py-2.5 text-[20px] bg-white shadow-sm font-semibold transition-all"
-                   value={formData.name}
-                  onChange={(e) => {
-                     const name = e.target.value;
-                     const slug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
-                     setFormData({...formData, name, slug: formData._id ? formData.slug : slug});
-                  }}
-               />
-               <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5">
-                  <span>Permalink:</span>
-                  <span className="text-gray-400 font-mono break-all">
-                    pairolifestyle.com/{type === 'product' ? 'collections' : 'blog'}/
-                  </span>
-                  {slugLocked ? (
-                    <>
-                      <span className="font-mono text-[#2271b1] font-semibold break-all">{formData.slug ||<span className="text-gray-300 italic">auto-generated</span>}</span>
-                      <button
-                        type="button"
-                        title="Edit permalink"
-                        onClick={() => setSlugLocked(false)}
-                        className="ml-1 p-0.5 rounded hover:bg-gray-100 transition text-gray-400 hover:text-[#2271b1]"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        className="border border-[#2271b1] bg-white outline-none text-[#2271b1] font-mono rounded px-1 py-0.5 text-[12px] min-w-[120px] max-w-full"
-                        value={formData.slug}
-                        onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setSlugLocked(true)}
-                        className="text-[11px] text-[#2271b1] underline"
-                      >OK</button>
-                    </>
-                  )}
-               </div>
+    <Page>
+      <PageHeader
+        title={pageTitle}
+        actions={<Link href={addNewHref} className="wp-btn">Add New</Link>}
+        aside={<Link href={backHref} className="wp-link">&larr; Back to categories</Link>}
+      />
+
+      {notFound && (
+        <Notice type="error">
+          This category could not be found. It may have been deleted permanently. <Link href={backHref} className="wp-link">Back to categories</Link>
+        </Notice>
+      )}
+      {formData.isDeleted && (
+        <Notice type="warning">
+          This category is in the Trash and is hidden from the store.{" "}
+          <button type="button" className="wp-link" onClick={handleRestore} disabled={restoring} style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>
+            {restoring ? "Restoring…" : "Restore it"}
+          </button>
+        </Notice>
+      )}
+      {saveError && (
+        <Notice type="error" onDismiss={() => setSaveError("")}>{saveError}</Notice>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <div className="wp-cols">
+          {/* Main Column */}
+          <div className="wp-col-main">
+            <div className="wp-field">
+              <label htmlFor="category-name" className="sr-only">Category name</label>
+              <input
+                id="category-name"
+                required
+                placeholder="Enter title here"
+                className="wp-title-input"
+                value={formData.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  const slug = name.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+                  setFormData({...formData, name, slug: formData._id ? formData.slug : slug});
+                }}
+              />
+              <div className="wp-small wp-muted" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 6 }}>
+                <span className="wp-strong" style={{ fontWeight: 600 }}>Permalink:</span>
+                <span style={{ wordBreak: "break-all" }}>
+                  pairolifestyle.com/{type === 'product' ? 'collections' : 'blog'}/
+                </span>
+                {slugLocked ? (
+                  <>
+                    <span style={{ wordBreak: "break-all", color: "#2271b1", fontWeight: 600 }}>
+                      {formData.slug || <em className="wp-muted" style={{ fontWeight: 400 }}>auto-generated</em>}
+                    </span>
+                    <button
+                      type="button"
+                      title="Edit permalink"
+                      aria-label="Edit permalink"
+                      onClick={() => setSlugLocked(false)}
+                      className="wp-btn"
+                      style={{ minHeight: 24, padding: "0 8px", fontSize: 12 }}
+                    >
+                      <Pencil className="w-3 h-3" aria-hidden="true" /> Edit
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <label htmlFor="category-slug" className="sr-only">Slug</label>
+                    <input
+                      id="category-slug"
+                      className="wp-input"
+                      style={{ minWidth: 140, minHeight: 26, fontSize: 13 }}
+                      value={formData.slug}
+                      onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSlugLocked(true)}
+                      className="wp-btn"
+                      style={{ minHeight: 24, padding: "0 8px", fontSize: 12 }}
+                    >OK</button>
+                  </>
+                )}
+              </div>
+              <p className="wp-desc">The slug is the URL-friendly version of the name. It is usually all lowercase and contains only letters, numbers and hyphens.</p>
             </div>
 
             {/* Tabs Selector */}
-            <div className="flex flex-wrap border-b border-[#c3c4c7] mb-4 gap-1">
-               <button
-                  type="button"
-                  onClick={() => setActiveTab("content")}
-                  className={`px-4 py-2 text-[13px] font-bold border-t border-x rounded-t-[3px] -mb-[1px] transition-colors ${
-                     activeTab === "content"
-                        ? "bg-white border-[#c3c4c7] border-b-white text-gray-700"
-                        : "bg-[#eaeaea] border-transparent text-[#2271b1] hover:text-[#135e96]"
-                  }`}
-               >
-                  Content
-               </button>
-               <button
-                  type="button"
-                  onClick={() => setActiveTab("faq")}
-                  className={`px-4 py-2 text-[13px] font-bold border-t border-x rounded-t-[3px] -mb-[1px] transition-colors ${
-                     activeTab === "faq"
-                        ? "bg-white border-[#c3c4c7] border-b-white text-gray-700"
-                        : "bg-[#eaeaea] border-transparent text-[#2271b1] hover:text-[#135e96]"
-                  }`}
-               >
-                  FAQ ({formData.faqs?.length || 0})
-               </button>
+            <div className="wp-tabs" role="tablist" aria-label="Category sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "content"}
+                onClick={() => setActiveTab("content")}
+                className="wp-tab"
+              >
+                Content
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "faq"}
+                onClick={() => setActiveTab("faq")}
+                className="wp-tab"
+              >
+                FAQ ({formData.faqs?.length || 0})
+              </button>
             </div>
 
             {activeTab === "content" ? (
-               <>
-                  {/* Short Description — shown in banner overlay */}
-                  <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-bold text-[13px] text-gray-700">
-                        Short Description
-                        <span className="text-[11px] font-normal text-gray-400">Shown in banner overlay</span>
-                     </div>
-                     <div className="p-3">
-                        <textarea
-                           rows={3}
-                           placeholder="A brief tagline shown inside the category banner image..."
-                           className="w-full border border-[#c3c4c7] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] resize-none"
-                           value={formData.description || ""}
-                           onChange={(e) => setFormData({...formData, description: e.target.value})}
-                        />
-                     </div>
-                  </div>
+              <>
+                {/* Short Description — shown in banner overlay */}
+                <Postbox id="category-short-desc" title="Short Description" aside="Shown in banner overlay">
+                  <label htmlFor="category-description" className="sr-only">Short description</label>
+                  <textarea
+                    id="category-description"
+                    rows={3}
+                    placeholder="A brief tagline shown inside the category banner image..."
+                    className="wp-textarea"
+                    value={formData.description || ""}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  />
+                  <p className="wp-desc">A short line of text shown over the category banner on the storefront.</p>
+                </Postbox>
 
-                  {/* Content Editor */}
-                  <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-bold text-[13px] text-gray-700">
-                        <span>Full Description</span>
-                        <div className="flex gap-2 text-xs">
-                           <button
-                              type="button"
-                              onClick={() => setEditorMode("visual")}
-                              className={`px-3 py-1 font-semibold rounded ${editorMode === "visual" ? "bg-white border border-[#c3c4c7] text-[#2271b1]" : "text-gray-600 hover:text-black"}`}
-                           >
-                              Visual
-                           </button>
-                           <button
-                              type="button"
-                              onClick={() => setEditorMode("html")}
-                              className={`px-3 py-1 font-semibold rounded ${editorMode === "html" ? "bg-white border border-[#c3c4c7] text-[#2271b1]" : "text-gray-600 hover:text-black"}`}
-                           >
-                              HTML
-                           </button>
-                        </div>
-                     </div>
-                     <div className="p-0">
-                        {editorMode === "visual" ? (
-                           <TiptapEditor content={formData.content} onChange={(html) => setFormData({...formData, content: html})} />
-                        ) : (
-                           <textarea
-                              className="w-full p-4 font-mono text-[13px] outline-none border-none min-h-[350px] bg-[#fcfcfc] focus:bg-white transition-colors"
-                              placeholder="Type HTML content here..."
-                              value={formData.content}
-                              onChange={(e) => setFormData({...formData, content: e.target.value})}
-                           />
-                        )}
-                     </div>
+                {/* Content Editor */}
+                <section className="wp-postbox" aria-labelledby="category-content-title">
+                  <div className="wp-postbox-head">
+                    <h2 id="category-content-title">Full Description</h2>
+                    <div className="wp-seg" role="group" aria-label="Editor mode">
+                      <button
+                        type="button"
+                        aria-pressed={editorMode === "visual"}
+                        onClick={() => setEditorMode("visual")}
+                      >
+                        Visual
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={editorMode === "html"}
+                        onClick={() => setEditorMode("html")}
+                      >
+                        HTML
+                      </button>
+                    </div>
                   </div>
+                  <div>
+                    {editorMode === "visual" ? (
+                      <TiptapEditor content={formData.content} onChange={(html) => setFormData({...formData, content: html})} />
+                    ) : (
+                      <textarea
+                        aria-label="Full description HTML"
+                        className="w-full p-4 font-mono text-[13px] outline-none border-none min-h-[350px] bg-[#fcfcfc] focus:bg-white"
+                        placeholder="Type HTML content here..."
+                        value={formData.content}
+                        onChange={(e) => setFormData({...formData, content: e.target.value})}
+                      />
+                    )}
+                  </div>
+                </section>
 
-                  {/* Link Items */}
-                  <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 font-bold text-[13px] text-gray-700 flex flex-wrap justify-between gap-x-2">
-                        <span>Link {type === 'product' ? 'Products' : 'Blogs'}</span>
-                        <span className="text-[#2271b1]">{formData.linkedItems.length} selected</span>
-                     </div>
-                     <div className="p-3 space-y-3">
-                        <input 
-                           type="text" 
-                           placeholder={`Search ${type}s...`}
-                           value={itemSearchTerm}
-                           onChange={(e) => setItemSearchTerm(e.target.value)}
-                           className="w-full border border-[#c3c4c7] px-3 py-1.5 text-[12px] focus:border-[#2271b1] outline-none"
-                        />
-                        <div className="max-h-48 overflow-y-auto border border-gray-200 divide-y divide-gray-100">
-                           {filteredItems.length === 0 ? (
-                              <div className="p-3 text-center text-gray-400 text-[12px]">No items available.</div>
-                           ) : (
-                              filteredItems.map(item => (
-                                 <label key={item._id} className="flex items-center gap-3 p-2 min-w-0 hover:bg-[#f6f7f7] cursor-pointer">
-                                    <input 
-                                       type="checkbox" 
-                                       className="w-4 h-4 text-[#2271b1]"
-                                       checked={formData.linkedItems.includes(item._id)}
-                                       onChange={(e) => {
-                                          if(e.target.checked) setFormData({...formData, linkedItems: [...formData.linkedItems, item._id]});
-                                          else setFormData({...formData, linkedItems: formData.linkedItems.filter(id => id !== item._id)});
-                                       }}
-                                    />
-                                    <span className="text-[13px] min-w-0 break-words">{item.title || item.name}</span>
-                                 </label>
-                              ))
-                           )}
-                        </div>
-                     </div>
+                {/* Link Items */}
+                <Postbox
+                  id="category-linked-items"
+                  title={`Link ${type === 'product' ? 'Products' : 'Blogs'}`}
+                  aside={`${formData.linkedItems.length} selected`}
+                >
+                  <label htmlFor="category-item-search" className="sr-only">{`Search ${type}s`}</label>
+                  <input
+                    id="category-item-search"
+                    type="text"
+                    placeholder={`Search ${type}s...`}
+                    value={itemSearchTerm}
+                    onChange={(e) => setItemSearchTerm(e.target.value)}
+                    className="wp-input wp-full"
+                  />
+                  <div className="wp-checklist" style={{ marginTop: 8 }}>
+                    {filteredItems.length === 0 ? (
+                      <div className="wp-empty">No items available.</div>
+                    ) : (
+                      filteredItems.map(item => (
+                        <label key={item._id} className="wp-check" style={{ minWidth: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={formData.linkedItems.includes(item._id)}
+                            onChange={(e) => {
+                              if(e.target.checked) setFormData({...formData, linkedItems: [...formData.linkedItems, item._id]});
+                              else setFormData({...formData, linkedItems: formData.linkedItems.filter(id => id !== item._id)});
+                            }}
+                          />
+                          <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{item.title || item.name}</span>
+                        </label>
+                      ))
+                    )}
                   </div>
-               </>
+                  <p className="wp-desc">Ticked {type === 'product' ? 'products' : 'posts'} are assigned to this category when you save.</p>
+                </Postbox>
+              </>
             ) : (
-               <>
-                  {/* FAQ Manager */}
-                  <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-bold text-[13px] text-gray-700">
-                        <span>Frequently Asked Questions</span>
-                        <button
-                           type="button"
-                           onClick={() => {
-                              const faqs = [...(formData.faqs || []), { question: "", answer: "" }];
-                              setFormData({ ...formData, faqs });
-                           }}
-                           className="bg-[#2271b1] text-white px-2.5 py-1 rounded-[3px] text-[11px] font-bold hover:bg-[#135e96]"
-                        >
-                           Add New FAQ
-                        </button>
-                     </div>
-                     <div className="p-3 sm:p-4 space-y-4">
-                        {(!formData.faqs || formData.faqs.length === 0) ? (
-                           <div className="text-center py-6 text-[13px] text-gray-400 italic">No FAQs configured yet. Click "Add New FAQ" to create one.</div>
-                        ) : (
-                           formData.faqs.map((faq, idx) => (
-                              <div key={idx} className="border border-[#ccd0d4] rounded p-3 bg-gray-50/50 space-y-2 relative">
-                                 <div className="flex justify-between items-center border-b border-gray-100 pb-1.5">
-                                    <span className="text-[11px] font-bold text-gray-400 uppercase">FAQ #{idx + 1}</span>
-                                    <button
-                                       type="button"
-                                       onClick={() => {
-                                          const faqs = formData.faqs.filter((_, i) => i !== idx);
-                                          setFormData({ ...formData, faqs });
-                                       }}
-                                       className="text-red-600 hover:text-red-800 text-[11px] font-bold"
-                                    >
-                                       Delete
-                                    </button>
-                                 </div>
-                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-600 block">Question</label>
-                                    <input
-                                       type="text"
-                                       className="w-full border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[12px] outline-none focus:border-[#2271b1]"
-                                       placeholder="e.g. Do you ship worldwide?"
-                                       value={faq.question}
-                                       onChange={(e) => {
-                                          const faqs = [...formData.faqs];
-                                          faqs[idx].question = e.target.value;
-                                          setFormData({ ...formData, faqs });
-                                       }}
-                                    />
-                                 </div>
-                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-600 block">Answer</label>
-                                    <textarea
-                                       rows={3}
-                                       className="w-full border border-[#ccd0d4] rounded-[3px] px-3 py-1.5 text-[12px] outline-none focus:border-[#2271b1] resize-none"
-                                       placeholder="Enter the answer..."
-                                       value={faq.answer}
-                                       onChange={(e) => {
-                                          const faqs = [...formData.faqs];
-                                          faqs[idx].answer = e.target.value;
-                                          setFormData({ ...formData, faqs });
-                                       }}
-                                    />
-                                 </div>
-                              </div>
-                           ))
-                        )}
-                     </div>
+              <>
+                {/* FAQ Manager */}
+                <section className="wp-postbox" aria-labelledby="category-faq-title">
+                  <div className="wp-postbox-head">
+                    <h2 id="category-faq-title">Frequently Asked Questions</h2>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const faqs = [...(formData.faqs || []), { question: "", answer: "" }];
+                        setFormData({ ...formData, faqs });
+                      }}
+                      className="wp-btn"
+                    >
+                      Add New FAQ
+                    </button>
                   </div>
+                  <div className="wp-inside">
+                    {(!formData.faqs || formData.faqs.length === 0) ? (
+                      <div className="wp-empty">No FAQs configured yet. Click &ldquo;Add New FAQ&rdquo; to create one.</div>
+                    ) : (
+                      formData.faqs.map((faq, idx) => (
+                        <div key={idx} style={{ border: "1px solid #dcdcde", background: "#f6f7f7", padding: 12, marginBottom: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <span className="wp-strong">FAQ #{idx + 1}</span>
+                            <div className="wp-row-actions" style={{ visibility: "visible", padding: 0 }}>
+                              <button
+                                type="button"
+                                className="is-danger"
+                                aria-label={`Delete FAQ ${idx + 1}`}
+                                onClick={() => {
+                                  const faqs = formData.faqs.filter((_, i) => i !== idx);
+                                  setFormData({ ...formData, faqs });
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                          <div className="wp-field">
+                            <label htmlFor={`faq-q-${idx}`} className="wp-label">Question</label>
+                            <input
+                              id={`faq-q-${idx}`}
+                              type="text"
+                              className="wp-input wp-full"
+                              placeholder="e.g. Do you ship worldwide?"
+                              value={faq.question}
+                              onChange={(e) => {
+                                const faqs = [...formData.faqs];
+                                faqs[idx].question = e.target.value;
+                                setFormData({ ...formData, faqs });
+                              }}
+                            />
+                          </div>
+                          <div className="wp-field" style={{ marginBottom: 0 }}>
+                            <label htmlFor={`faq-a-${idx}`} className="wp-label">Answer</label>
+                            <textarea
+                              id={`faq-a-${idx}`}
+                              rows={3}
+                              className="wp-textarea"
+                              placeholder="Enter the answer..."
+                              value={faq.answer}
+                              onChange={(e) => {
+                                const faqs = [...formData.faqs];
+                                faqs[idx].answer = e.target.value;
+                                setFormData({ ...formData, faqs });
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </section>
 
-                  {/* FAQ Schema Custom Block */}
-                  <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 font-bold text-[13px] text-gray-700">
-                        <span>Custom FAQ JSON-LD Schema</span>
-                        <span className="text-[11px] font-normal text-gray-400">Optional: Overrides auto-generated schema</span>
-                     </div>
-                     <div className="p-3">
-                        <textarea
-                           rows={6}
-                           placeholder={`{\n  "@type": "FAQPage",\n  "mainEntity": [\n     ...\n  ]\n}`}
-                           className="w-full border border-[#c3c4c7] rounded-[3px] p-3 text-[12px] font-mono outline-none focus:border-[#2271b1] bg-gray-50/20"
-                           value={formData.faqSchemaCustom || ""}
-                           onChange={(e) => setFormData({...formData, faqSchemaCustom: e.target.value})}
-                        />
-                     </div>
-                  </div>
-               </>
+                {/* FAQ Schema Custom Block */}
+                <Postbox id="category-faq-schema" title="Custom FAQ JSON-LD Schema">
+                  <label htmlFor="category-faq-schema-input" className="sr-only">Custom FAQ JSON-LD schema</label>
+                  <textarea
+                    id="category-faq-schema-input"
+                    rows={6}
+                    placeholder={`{\n  "@type": "FAQPage",\n  "mainEntity": [\n     ...\n  ]\n}`}
+                    className="wp-textarea font-mono"
+                    value={formData.faqSchemaCustom || ""}
+                    onChange={(e) => setFormData({...formData, faqSchemaCustom: e.target.value})}
+                  />
+                  <p className="wp-desc">Optional. When filled in, this replaces the schema generated from the FAQs above.</p>
+                </Postbox>
+              </>
             )}
 
             {/* SEO Settings */}
             <SEOConfigPanel
-               seo={formData.seo || {}}
-               onChange={newSeo => setFormData({ ...formData, seo: newSeo })}
-               parentTitle={formData.name}
-               parentDescription={formData.description || formData.content}
-               parentSlug={formData.slug}
-               parentImage={formData.image}
-               parentType="category"
+              seo={formData.seo || {}}
+              onChange={newSeo => setFormData({ ...formData, seo: newSeo })}
+              parentTitle={formData.name}
+              parentDescription={formData.description || formData.content}
+              parentSlug={formData.slug}
+              parentImage={formData.image}
+              parentType="category"
             />
-         </div>
+          </div>
 
-         {/* Sidebar Column */}
-         <div className="min-w-0 space-y-4">
-            <div className="bg-white border border-[#c3c4c7] shadow-sm">
-               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Publish</div>
-               <div className="p-3 space-y-4 text-[13px]">
-                  <div className="space-y-3 py-2">
-                     <p className="flex items-center gap-2"><span className="text-gray-500 w-16">Status:</span> 
-                        <select className="border border-[#c3c4c7] px-1 py-0.5 min-w-0" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
-                           <option>Published</option>
-                           <option>Draft</option>
-                        </select>
-                     </p>
-                     <label className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input type="checkbox" checked={formData.isFeatured} onChange={(e) => setFormData({...formData, isFeatured: e.target.checked})} />
-                        Featured Category
-                     </label>
-                  </div>
-                  {formData.slug && (
-                     <a
-                        href={`/${type === 'product' ? 'collections' : 'blog'}/${formData.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-[11px] text-[#2271b1] hover:underline"
-                     >
-                        <ExternalLink className="w-3 h-3" /> Preview live page
-                     </a>
-                  )}
-                  <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex flex-wrap justify-between items-center gap-2">
-                     <button type="button" onClick={() => router.push(type === 'product' ? '/admin/categories' : '/admin/blogs/categories')} className="text-red-600 hover:underline">Cancel</button>
-                     <button type="submit" disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold hover:bg-[#135e96]">
-                        {saving ? "Saving..." : (categoryId ? "Update" : "Publish")}
-                     </button>
-                  </div>
-               </div>
-            </div>
-
-             {type === "product" && (
-              <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Default Size Chart</div>
-                <div className="p-3">
-                  <select
-                    className="w-full border border-[#c3c4c7] px-2 py-1.5 text-[13px] outline-none bg-white focus:border-[#2271b1] cursor-pointer"
-                    value={formData.sizeChart || ""}
-                    onChange={(e) => setFormData({ ...formData, sizeChart: e.target.value })}
-                  >
-                    <option value="">None (No default size chart)</option>
-                    {sizeCharts.map((sc) => (
-                      <option key={sc._id} value={sc._id}>
-                        {sc.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-gray-400 mt-1.5">
-                    Products in this category will automatically inherit this size chart unless overridden.
-                  </p>
-                </div>
+          {/* Sidebar Column */}
+          <div className="wp-col-side" style={{ flex: "1 1 280px" }}>
+            <section className="wp-postbox" aria-labelledby="category-publish-title">
+              <div className="wp-postbox-head">
+                <h2 id="category-publish-title">Publish</h2>
               </div>
-             )}
-
-            <div className="bg-white border border-[#c3c4c7] shadow-sm">
-               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Category Image</div>
-               <div className="p-3">
-                  <MediaPicker 
-                     value={formData.image} 
-                     onChange={(url) => setFormData({...formData, image: url})}
-                     label="Set image"
-                  />
-               </div>
-            </div>
-
-            <div className="bg-white border border-[#c3c4c7] shadow-sm">
-               <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Category Banner Image</div>
-               <div className="p-3 space-y-3">
-                  <MediaPicker 
-                     value={formData.banner || ""} 
-                     onChange={(url) => setFormData({...formData, banner: url})}
-                     label="Set banner image"
-                  />
-                  <div className="pt-3 border-t border-[#f0f0f1] space-y-2">
-                     <div className="flex items-center justify-between gap-2">
-                        <span className="text-[12px] font-bold text-gray-700">Banner Overlay Effect</span>
-                        <button
-                           type="button"
-                           onClick={() => setFormData({ ...formData, showBannerOverlay: !formData.showBannerOverlay })}
-                           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                              formData.showBannerOverlay ? 'bg-[#2271b1]' : 'bg-gray-300'
-                           }`}
-                           role="switch"
-                           aria-checked={Boolean(formData.showBannerOverlay)}
-                           title="Toggle banner overlay effect"
-                        >
-                           <span className="sr-only">Toggle banner overlay effect</span>
-                           <span
-                              aria-hidden="true"
-                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                 formData.showBannerOverlay ? 'translate-x-5' : 'translate-x-0'
-                              }`}
-                           />
-                        </button>
-                     </div>
-                     <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                           formData.showBannerOverlay ? 'bg-blue-50 text-[#2271b1] border border-blue-200' : 'bg-gray-100 text-gray-500 border border-gray-200'
-                        }`}>
-                           {formData.showBannerOverlay ? 'Overlay: ON' : 'Overlay: OFF'}
-                        </span>
-                        <span className="text-[11px] text-gray-400">
-                           {formData.showBannerOverlay ? 'Dark gradient overlay will show over banner' : 'No overlay applied on banner'}
-                        </span>
-                     </div>
+              <div className="wp-misc">
+                <div className="wp-misc-row">
+                  <label htmlFor="category-status">Status:</label>
+                  <select id="category-status" className="wp-select" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                    <option>Published</option>
+                    <option>Draft</option>
+                  </select>
+                </div>
+                <div className="wp-misc-row">
+                  <button
+                    type="button"
+                    className="wp-btn"
+                    disabled={saving || (categoryId && !formData._id)}
+                    onClick={(e) => handleSubmit(e, "Draft")}
+                  >
+                    Save Draft
+                  </button>
+                </div>
+                <label className="wp-check">
+                  <input type="checkbox" checked={formData.isFeatured} onChange={(e) => setFormData({...formData, isFeatured: e.target.checked})} />
+                  Featured Category
+                </label>
+                {/* Only product categories have a public page; blog categories have none. */}
+                {formData.slug && type === 'product' && (
+                  <div className="wp-misc-row">
+                    <a
+                      href={getCategoryUrl(formData.slug)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="wp-link"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                    >
+                      <ExternalLink className="w-3 h-3" aria-hidden="true" /> Preview live page
+                    </a>
                   </div>
-               </div>
-            </div>
-         </div>
+                )}
+              </div>
+              <div className="wp-box-foot">
+                <button
+                  type="button"
+                  onClick={() => router.push(type === 'product' ? '/admin/categories' : '/admin/blogs/categories')}
+                  className="wp-link"
+                  style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "#b32d2e" }}
+                >
+                  Cancel
+                </button>
+                {formData._id && !formData.isDeleted && (
+                  <button
+                    type="button"
+                    onClick={handleTrash}
+                    disabled={trashing || saving}
+                    className="wp-link"
+                    style={{ background: "none", border: 0, padding: 0, marginLeft: 12, cursor: "pointer", color: "#b32d2e" }}
+                  >
+                    {trashing ? "Moving…" : "Move to Trash"}
+                  </button>
+                )}
+                <span className="wp-spacer" />
+                <button type="submit" disabled={saving || (categoryId && !formData._id)} className="wp-btn wp-btn-primary">
+                  {saving ? "Saving..." : (categoryId ? "Update" : "Publish")}
+                </button>
+              </div>
+            </section>
+
+            {type === "product" && (
+              <Postbox id="category-size-chart" title="Default Size Chart">
+                <label htmlFor="category-size-chart-select" className="sr-only">Default size chart</label>
+                <select
+                  id="category-size-chart-select"
+                  className="wp-select wp-full"
+                  value={formData.sizeChart || ""}
+                  onChange={(e) => setFormData({ ...formData, sizeChart: e.target.value })}
+                >
+                  <option value="">None (No default size chart)</option>
+                  {sizeCharts.map((sc) => (
+                    <option key={sc._id} value={sc._id}>
+                      {sc.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="wp-desc">
+                  Products in this category will automatically inherit this size chart unless overridden.
+                </p>
+              </Postbox>
+            )}
+
+            <Postbox id="category-image" title="Category Image">
+              <MediaPicker
+                value={formData.image}
+                onChange={(url) => setFormData({...formData, image: url})}
+                label="Set image"
+              />
+              <p className="wp-desc">Shown on category cards and listings.</p>
+            </Postbox>
+
+            <Postbox id="category-banner" title="Category Banner Image">
+              <MediaPicker
+                value={formData.banner || ""}
+                onChange={(url) => setFormData({...formData, banner: url})}
+                label="Set banner image"
+              />
+              <div style={{ borderTop: "1px solid #f0f0f1", marginTop: 12, paddingTop: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span className="wp-strong" id="banner-overlay-label">Banner overlay effect</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, showBannerOverlay: !formData.showBannerOverlay })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2271b1] focus-visible:ring-offset-1 ${
+                      formData.showBannerOverlay ? 'bg-[#2271b1]' : 'bg-[#8c8f94]'
+                    }`}
+                    role="switch"
+                    aria-checked={Boolean(formData.showBannerOverlay)}
+                    aria-labelledby="banner-overlay-label"
+                    title="Toggle banner overlay effect"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        formData.showBannerOverlay ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="wp-desc">
+                  {formData.showBannerOverlay ? 'On: a dark gradient overlay will show over the banner.' : 'Off: no overlay is applied on the banner.'}
+                </p>
+              </div>
+            </Postbox>
+          </div>
+        </div>
       </form>
-    </AdminPageLayout>
+    </Page>
   );
 }

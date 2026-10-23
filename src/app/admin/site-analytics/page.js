@@ -3,8 +3,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
 import {
   BarChart3,
   FileText,
@@ -195,7 +195,8 @@ const fmtDuration = (ms) => {
 const fmtWhen = (value) => (value
   ? new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
   : "—");
-const fmtMoney = (v) => `$${Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Money is formatted in the store currency (from the API payload; USD when unknown).
+const moneyFormatter = (currency) => (v) => formatMoney(Number(v) || 0, currency || "USD");
 const fmtNum = (v) => (Number(v) || 0).toLocaleString();
 const pctText = (v) => `${Number(v || 0)}%`;
 let regionNames = null;
@@ -234,25 +235,37 @@ function downloadCsv(filename, columns = [], rows = []) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const slugId = (title) => `sa-${String(title || "").replace(/\W+/g, "-").replace(/^-|-$/g, "").toLowerCase()}`;
+
+function KpiStrip({ count, children }) {
+  // wp-stats is a 4-up strip (2-up on phones). Lines between tiles are drawn with a 1px grid gap so
+  // strips that wrap onto several rows still get row dividers.
+  const cols = count === 3 ? "min-[783px]:grid-cols-3!" : count === 5 ? "min-[783px]:grid-cols-5!" : "";
+  return (
+    <div
+      className={`wp-stats ${cols} max-[782px]:[&>*:last-child:nth-child(odd)]:col-span-2`}
+      style={{ gap: 1, background: "#dcdcde" }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function Kpi({ label, value, hint }) {
   return (
-    <div className="bg-white border border-[#ccd0d4] p-4 shadow-sm rounded-[2px]">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-      <p className="text-[22px] font-bold text-[#1d2327] mt-1">{value ?? "0"}</p>
-      {hint && <p className="text-[11px] text-[#8c8f94] mt-1">{hint}</p>}
+    <div className="wp-stat" style={{ background: "#fff", borderRight: 0, borderBottom: 0 }}>
+      <div className="wp-stat-label">{label}</div>
+      <div className="wp-stat-value" style={{ overflowWrap: "anywhere" }}>{value ?? "0"}</div>
+      {hint && <div className="wp-muted wp-small">{hint}</div>}
     </div>
   );
 }
 
 function Panel({ title, action, children }) {
   return (
-    <section className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px] overflow-hidden">
-      <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between gap-3">
-        <h3 className="text-[12px] font-bold uppercase tracking-wider text-[#1d2327]">{title}</h3>
-        {action}
-      </div>
-      <div className="overflow-x-auto">{children}</div>
-    </section>
+    <Postbox id={slugId(title)} title={title} aside={action} flush>
+      <div style={{ overflowX: "auto" }}>{children}</div>
+    </Postbox>
   );
 }
 
@@ -267,29 +280,30 @@ function DataTable({ title, columns = [], rows = [], empty = "No data for these 
           type="button"
           onClick={() => downloadCsv(`${title.replace(/\W+/g, "-").toLowerCase()}.csv`, safeColumns, safeRows)}
           disabled={safeRows.length === 0}
-          className="text-[11px] font-bold uppercase text-[#2271b1] hover:underline disabled:text-gray-300"
+          className="wp-link"
+          style={{ background: "none", border: 0, padding: 0, cursor: safeRows.length === 0 ? "default" : "pointer", color: safeRows.length === 0 ? "#a7aaad" : undefined, fontSize: 13 }}
         >
           Export CSV
         </button>
       }
     >
-      <table className="w-full text-[12px] text-left">
-        <thead className="text-[11px] uppercase text-[#646970] bg-[#fbfbfb]">
-          <tr>{safeColumns.map((c) => <th key={c.key} className="px-3 py-2 font-bold whitespace-nowrap">{c.label}</th>)}</tr>
+      <table className="wp-list-table">
+        <thead>
+          <tr>{safeColumns.map((c) => <th key={c.key} scope="col">{c.label}</th>)}</tr>
         </thead>
-        <tbody className="divide-y divide-[#f0f0f1]">
+        <tbody>
           {safeRows.length === 0 && (
-            <tr><td colSpan={safeColumns.length || 1} className="px-3 py-6 text-center italic text-[#8c8f94]">{empty}</td></tr>
+            <tr><td colSpan={safeColumns.length || 1} className="wp-muted" style={{ padding: "16px 10px" }}>{empty}</td></tr>
           )}
           {safeRows.map((row, i) => (
             <tr
               key={i}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               title={rowHint}
-              className={onRowClick ? "cursor-pointer hover:bg-[#f0f6fb]" : ""}
+              className={onRowClick ? "cursor-pointer hover:bg-[#f0f6fc]!" : ""}
             >
               {safeColumns.map((c) => (
-                <td key={c.key} className="px-3 py-2 align-top">{c.render ? c.render(row) : row[c.key]}</td>
+                <td key={c.key}>{c.render ? c.render(row) : row[c.key]}</td>
               ))}
             </tr>
           ))}
@@ -303,16 +317,16 @@ function BarRows({ rows = [], valueKey, labelKey, format = (v) => v }) {
   const safeRows = Array.isArray(rows) ? rows : [];
   const max = Math.max(1, ...safeRows.map((r) => Number(r[valueKey]) || 0));
   return (
-    <ul className="p-4 space-y-2">
-      {safeRows.length === 0 && <li className="text-center italic text-[12px] text-[#8c8f94]">No data.</li>}
+    <ul style={{ listStyle: "none", margin: 0, padding: "4px 12px" }}>
+      {safeRows.length === 0 && <li className="wp-empty">No data.</li>}
       {safeRows.map((r) => (
-        <li key={String(r[labelKey])} className="text-[12px]">
-          <div className="flex justify-between mb-0.5">
-            <span className="text-[#1d2327] truncate pr-2">{r[labelKey] || "(none)"}</span>
-            <span className="text-[#646970] whitespace-nowrap">{format(r[valueKey])}</span>
+        <li key={String(r[labelKey])} style={{ padding: "8px 0", borderBottom: "1px solid #f0f0f1" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 5 }}>
+            <span className="wp-strong" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r[labelKey] || "(none)"}</span>
+            <span className="wp-muted" style={{ whiteSpace: "nowrap" }}>{format(r[valueKey])}</span>
           </div>
-          <div className="h-2 bg-[#f0f0f1] rounded-[2px]">
-            <div className="h-2 bg-[#2271b1] rounded-[2px]" style={{ width: `${((Number(r[valueKey]) || 0) / max) * 100}%` }} />
+          <div aria-hidden="true" style={{ height: 4, background: "#f0f0f1", borderRadius: 2 }}>
+            <div style={{ height: 4, background: "#2271b1", borderRadius: 2, width: `${((Number(r[valueKey]) || 0) / max) * 100}%` }} />
           </div>
         </li>
       ))}
@@ -320,12 +334,12 @@ function BarRows({ rows = [], valueKey, labelKey, format = (v) => v }) {
   );
 }
 
-function describeEvent(e) {
+function describeEvent(e, currency) {
   if (e.name === "click") {
     return {
       type: "click",
       icon: MousePointer,
-      color: "text-blue-600 bg-blue-50 border-blue-200",
+      color: "text-[#135e96] bg-[#f0f6fc] border-[#c5d9ed]",
       title: `Clicked "${e.label || "Element"}"`,
       detail: e.href ? `Destination: ${e.href}` : e.section ? `In section: ${e.section}` : null,
     };
@@ -334,7 +348,7 @@ function describeEvent(e) {
     return {
       type: "section",
       icon: Eye,
-      color: "text-purple-600 bg-purple-50 border-purple-200",
+      color: "text-[#3c434a] bg-[#f6f7f7] border-[#dcdcde]",
       title: `Viewed section "${e.label || "Section"}"`,
       detail: `On screen for ${fmtDuration(e.durationMs)}`,
     };
@@ -343,7 +357,7 @@ function describeEvent(e) {
     return {
       type: "field",
       icon: AlertCircle,
-      color: "text-slate-600 bg-slate-50 border-slate-200",
+      color: "text-[#3c434a] bg-[#f6f7f7] border-[#dcdcde]",
       title: `Form field "${e.fieldName}"`,
       detail: e.filled ? "Filled in" : "Left empty / unfocused",
     };
@@ -352,18 +366,18 @@ function describeEvent(e) {
     return {
       type: "search",
       icon: Search,
-      color: "text-amber-600 bg-amber-50 border-amber-200",
+      color: "text-[#7a5300] bg-[#fcf9e8] border-[#f0c33c]",
       title: `Searched for "${e.search_term}"`,
       detail: null,
     };
   }
   if (e.name === "add_to_cart" || e.name === "purchase" || e.name === "begin_checkout") {
     const names = (e.items || []).map((i) => i.item_name).filter(Boolean).join(", ");
-    const val = e.value ? ` · ${e.currency || "$"}${Number(e.value).toFixed(2)}` : "";
+    const val = e.value ? ` · ${formatMoney(Number(e.value), e.currency || currency || "USD")}` : "";
     return {
       type: "ecommerce",
       icon: ShoppingBag,
-      color: "text-emerald-700 bg-emerald-50 border-emerald-300 font-bold",
+      color: "text-[#1f3d08] bg-[#edfaef] border-[#68de7c] font-semibold",
       title: `${e.name.replace(/_/g, " ").toUpperCase()}${val}`,
       detail: names || null,
     };
@@ -371,13 +385,13 @@ function describeEvent(e) {
   return {
     type: "event",
     icon: Activity,
-    color: "text-gray-600 bg-gray-50 border-gray-200",
+    color: "text-[#3c434a] bg-[#f6f7f7] border-[#dcdcde]",
     title: e.name.replace(/_/g, " "),
     detail: null,
   };
 }
 
-function JourneyPanel({ visitorId, onClose }) {
+function JourneyPanel({ visitorId, onClose, currency }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedSessions, setExpandedSessions] = useState({});
@@ -447,36 +461,43 @@ function JourneyPanel({ visitorId, onClose }) {
   const totalActiveMs = data?.sessions?.reduce((acc, s) => acc + (s.session?.activeMs || 0), 0) || 0;
   const hasConverted = data?.sessions?.some((s) => s.session?.conversionCount > 0);
 
+  const pill = "inline-flex items-center gap-1 rounded-[3px] px-2 py-0.5 text-[12px] whitespace-nowrap shrink-0";
+
   return (
-    <div className="fixed inset-0 z-[99999] overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[99999] overflow-hidden bg-black/50 flex justify-end">
       {/* Background click overlay */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      {/* Slide-over Drawer Panel - Fixed Viewport Bounds */}
-      <div className="relative w-full max-w-full sm:max-w-xl md:max-w-2xl h-screen max-h-screen bg-white shadow-2xl flex flex-col z-10 box-border overflow-hidden animate-in slide-in-from-right duration-200">
-        {/* Drawer Header */}
-        <div className="p-3.5 sm:p-4 border-b border-[#c3c4c7] bg-[#f6f7f7] flex items-center justify-between gap-3 shrink-0 min-w-0">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="w-9 h-9 rounded-full bg-[#2271b1] text-white flex items-center justify-center font-bold text-[13px] shadow-xs shrink-0">
+      {/* Slide-over drawer */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="journey-title"
+        className="relative w-full max-w-full sm:max-w-xl md:max-w-2xl h-[100dvh] max-h-[100dvh] bg-white flex flex-col z-10 box-border overflow-hidden border-l border-[#c3c4c7] text-[13px] text-[#3c434a]"
+      >
+        {/* Drawer header */}
+        <div className="px-4 py-3 border-b border-[#dcdcde] flex items-center justify-between gap-3 shrink-0 min-w-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="wp-avatar" aria-hidden="true">
               {data?.user?.name ? data.user.name.slice(0, 2).toUpperCase() : <User className="w-4 h-4" />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <h3 className="text-[14px] font-bold text-[#1d2327] truncate">
+                <h2 id="journey-title" className="text-[16px] font-semibold text-[#1d2327] truncate m-0">
                   {data?.user ? data.user.name : "Guest Visitor"}
-                </h3>
+                </h2>
                 {hasConverted && (
-                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  <span className={`${pill} bg-[#c6e1c6] text-[#1f3d08]`}>
+                    <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                     Converted
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-[#646970] mt-0.5 font-mono truncate min-w-0">
+              <p className="wp-muted wp-small mt-0.5 truncate min-w-0 m-0">
                 {data?.user?.email ? (
-                  <span>{data.user.email} · <span className="opacity-70">ID: {visitorId.slice(0, 10)}…</span></span>
+                  <span>{data.user.email} · <span className="font-mono">ID: {visitorId.slice(0, 10)}…</span></span>
                 ) : (
-                  <span>Visitor ID: {visitorId}</span>
+                  <span>Visitor ID: <span className="font-mono">{visitorId}</span></span>
                 )}
               </p>
             </div>
@@ -485,73 +506,69 @@ function JourneyPanel({ visitorId, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200/60 rounded-[3px] transition-colors cursor-pointer shrink-0"
-            title="Close Drawer (Esc)"
+            className="wp-notice-dismiss shrink-0"
+            aria-label="Close visitor journey"
+            title="Close (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Quick Highlights Summary Strip */}
-        <div className="grid grid-cols-3 border-b border-[#e5e5e5] bg-white divide-x divide-[#e5e5e5] text-center py-2.5 shrink-0 text-[#1d2327]">
-          <div className="px-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Sessions</div>
-            <div className="text-[15px] font-bold text-[#1d2327] mt-0.5">{totalSessions}</div>
-          </div>
-          <div className="px-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Pageviews</div>
-            <div className="text-[15px] font-bold text-[#1d2327] mt-0.5">{totalViews}</div>
-          </div>
-          <div className="px-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#646970]">Total Dwell</div>
-            <div className="text-[15px] font-bold text-[#1d2327] mt-0.5">{fmtDuration(totalActiveMs)}</div>
-          </div>
+        {/* Summary strip */}
+        <div className="grid grid-cols-3 border-b border-[#dcdcde] divide-x divide-[#dcdcde] shrink-0">
+          {[
+            ["Sessions", totalSessions],
+            ["Page views", totalViews],
+            ["Time on site", fmtDuration(totalActiveMs)],
+          ].map(([label, value]) => (
+            <div key={label} className="px-4 py-2.5 min-w-0">
+              <div className="wp-muted">{label}</div>
+              <div className="text-[18px] text-[#1d2327] leading-tight">{value}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Scrollable Content: Sessions & Journey Steps */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 sm:p-4 space-y-4 bg-[#f8f9fa] min-w-0">
+        {/* Scrollable content: sessions and journey steps */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-3 bg-[#f0f0f1] min-w-0">
           {loading && (
-            <div className="p-12 text-center text-[13px] text-[#646970] italic">
-              Loading visitor chronological timeline…
+            <div className="bg-white border border-[#c3c4c7] p-4 space-y-3" aria-busy="true">
+              <span className="sr-only">Loading visitor journey…</span>
+              <Skeleton height={18} />
+              <Skeleton height={18} width="80%" />
+              <Skeleton height={18} width="60%" />
             </div>
           )}
 
           {!loading && !data && (
-            <div className="p-6 text-center bg-red-50 text-red-700 border border-red-200 rounded text-[13px]">
-              Could not load visitor journey details.
-            </div>
+            <Notice type="error">Could not load visitor journey details.</Notice>
           )}
 
           {!loading && data && data.sessions?.length === 0 && (
-            <div className="p-6 text-center text-gray-500 italic text-[13px]">
-              No sessions found for this visitor.
-            </div>
+            <div className="wp-empty bg-white border border-[#c3c4c7] px-3">No sessions found for this visitor.</div>
           )}
 
-          {/* Multiple Sessions Toolbar */}
+          {/* Multiple sessions toolbar */}
           {!loading && totalSessions > 1 && (
-            <div className="flex items-center justify-between gap-2 px-1 text-[12px] bg-white border border-[#e5e5e5] rounded-[4px] p-2.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 font-semibold text-[#1d2327]">
-                <History className="w-3.5 h-3.5 text-[#2271b1]" />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 wp-strong">
+                <History className="w-4 h-4 text-[#646970]" aria-hidden="true" />
                 <span>{totalSessions} Visits Recorded</span>
               </div>
-              <div className="flex items-center gap-2 text-[11px]">
+              <div className="wp-subsub" style={{ margin: 0 }}>
                 <button
                   type="button"
                   onClick={collapseOlderSessions}
-                  className="text-[#50575e] hover:text-[#1d2327] hover:underline font-medium cursor-pointer"
                   title="Keep only the latest session open and collapse earlier visits"
                 >
-                  Latest Only
+                  Latest only
                 </button>
-                <span className="text-gray-300">|</span>
+                <span className="wp-sep">|</span>
                 <button
                   type="button"
                   onClick={expandAllSessions}
-                  className="text-[#2271b1] hover:underline font-semibold cursor-pointer"
                   title="Expand all visits in full"
                 >
-                  Expand All
+                  Expand all
                 </button>
               </div>
             </div>
@@ -567,182 +584,148 @@ function JourneyPanel({ visitorId, onClose }) {
               return (
                 <div
                   key={session.sessionId}
-                  className={`bg-white border rounded-[4px] shadow-xs overflow-hidden transition-all ${
-                    isLatest
-                      ? "border-[#2271b1]/50 ring-1 ring-[#2271b1]/20"
-                      : "border-[#dcdcde]"
-                  }`}
+                  className={`bg-white border overflow-hidden ${isLatest ? "border-[#2271b1]" : "border-[#c3c4c7]"}`}
                 >
-                  {/* Session Card Header / Toggle Button */}
+                  {/* Session header / toggle */}
                   <button
                     type="button"
                     onClick={() => toggleSession(session.sessionId)}
-                    className={`w-full text-left p-3 sm:p-3.5 transition-colors cursor-pointer select-none flex flex-col gap-2 min-w-0 ${
-                      isLatest ? "bg-white hover:bg-slate-50/80" : "bg-[#fbfbfb] hover:bg-[#f3f4f6]"
-                    }`}
+                    className="w-full text-left px-3 py-2.5 cursor-pointer select-none flex flex-col gap-2 min-w-0 bg-white hover:bg-[#f6f7f7]"
                     aria-expanded={isExpanded}
                   >
-                    {/* Top Row: Chevron, Session Badge, Time, and Status Badges */}
                     <div className="flex items-center justify-between gap-2 w-full min-w-0">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-[#8c8f94] shrink-0">
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-[#2271b1]" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4" />
-                          )}
+                        <span className="text-[#646970] shrink-0" aria-hidden="true">
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </span>
 
                         {isLatest ? (
-                          <span className="bg-[#2271b1] text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
-                            Latest Visit
-                          </span>
+                          <span className={`${pill} bg-[#2271b1] text-white`}>Latest visit</span>
                         ) : (
-                          <span className="bg-[#e0e2e5] text-[#2c3338] text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider shrink-0">
-                            Visit #{sessionNum}
-                          </span>
+                          <span className={`${pill} bg-[#dcdcde] text-[#2c3338]`}>Visit #{sessionNum}</span>
                         )}
 
-                        <span className="text-[12px] font-bold text-[#1d2327] truncate flex items-center gap-1.5 min-w-0">
-                          <Clock className="w-3.5 h-3.5 text-[#8c8f94] shrink-0" />
+                        <span className="wp-strong truncate flex items-center gap-1.5 min-w-0">
+                          <Clock className="w-3.5 h-3.5 text-[#646970] shrink-0" aria-hidden="true" />
                           <span className="truncate">{fmtWhen(session.startedAt)}</span>
                         </span>
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
                         {isConvertedSession && (
-                          <span className="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" />
+                          <span className={`${pill} bg-[#c6e1c6] text-[#1f3d08]`}>
+                            <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                             Converted
                           </span>
                         )}
                         {session.bounced && (
-                          <span className="bg-amber-100 text-amber-800 border border-amber-300 font-semibold px-1.5 py-0.5 rounded text-[10px]">
-                            Bounced
-                          </span>
+                          <span className={`${pill} bg-[#f8dda7] text-[#5c3f05]`}>Bounced</span>
                         )}
-                        <span className="text-[11px] text-[#646970] font-medium hidden sm:inline-block">
+                        <span className="wp-muted wp-small hidden sm:inline-block">
                           {pageViews.length} {pageViews.length === 1 ? "page" : "pages"} · {fmtDuration(session.activeMs)}
                         </span>
                       </div>
                     </div>
 
-                    {/* Metadata Summary Line */}
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#50575e] pl-6 min-w-0">
-                      <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] font-medium flex items-center gap-1 truncate max-w-full">
-                        <Globe className="w-3 h-3 text-[#2271b1] shrink-0" />
+                    {/* Metadata line */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 wp-muted wp-small pl-6 min-w-0">
+                      <span className="flex items-center gap-1 truncate max-w-full">
+                        <Globe className="w-3 h-3 shrink-0" aria-hidden="true" />
                         <span className="truncate">
                           Source: {session.source || "Direct"}{session.medium ? ` / ${session.medium}` : ""}
                         </span>
                       </span>
 
-                      <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] capitalize truncate">
+                      <span className="capitalize truncate">
                         {session.device || "Desktop"} · {session.browser || "Browser"}
                       </span>
 
-                      {session.country && (
-                        <span className="bg-white border border-[#dcdcde] px-2 py-0.5 rounded-[2px] shrink-0">
-                          {session.country}
-                        </span>
-                      )}
+                      {session.country && <span className="shrink-0">{session.country}</span>}
 
-                      <span className="text-[11px] text-[#646970] sm:hidden">
+                      <span className="sm:hidden">
                         {pageViews.length} pages · {fmtDuration(session.activeMs)}
                       </span>
 
                       {!isExpanded && (
-                        <span className="ml-auto text-[11px] text-[#2271b1] font-semibold flex items-center gap-0.5 shrink-0">
+                        <span className="ml-auto text-[#2271b1] flex items-center gap-0.5 shrink-0">
                           <span>View steps</span>
-                          <ChevronDown className="w-3 h-3" />
+                          <ChevronDown className="w-3 h-3" aria-hidden="true" />
                         </span>
                       )}
                     </div>
                   </button>
 
-                  {/* Expanded Step-by-Step Chronological Journey Timeline */}
+                  {/* Expanded step-by-step journey */}
                   {isExpanded && (
-                    <div className="border-t border-[#e5e5e5] p-3 sm:p-4 bg-white space-y-4">
+                    <div className="border-t border-[#dcdcde] p-3 space-y-3">
                       {pageViews.length === 0 ? (
-                        <p className="text-[12px] text-gray-400 italic pl-2">No page navigation captured for this session.</p>
+                        <p className="wp-muted m-0">No page navigation captured for this session.</p>
                       ) : (
-                        <div className="relative border-l-2 border-[#2271b1]/30 ml-3.5 space-y-4 py-1">
+                        <ol className="relative border-l-2 border-[#dcdcde] ml-2 space-y-3 py-1 list-none p-0 m-0">
                           {pageViews.map((pv, pIdx) => (
-                            <div key={pv._id} className="relative pl-5 sm:pl-6">
-                              {/* Step Node Dot */}
-                              <div className="absolute -left-[7px] top-2 w-3 h-3 rounded-full bg-white border-2 border-[#2271b1] shadow-xs" />
+                            <li key={pv._id} className="relative pl-5">
+                              {/* Step node */}
+                              <div className="absolute -left-[7px] top-3 w-3 h-3 rounded-full bg-white border-2 border-[#2271b1]" aria-hidden="true" />
 
-                              {/* Page View Card */}
-                              <div className="bg-[#fcfcfc] border border-[#e5e5e5] rounded-[4px] p-3 text-[12px] space-y-2.5 shadow-2xs hover:border-[#ccd0d4] transition-colors">
-                                {/* Page Header */}
+                              <div className="border border-[#dcdcde] p-3 space-y-2">
                                 <div className="flex flex-wrap items-start justify-between gap-2 min-w-0">
-                                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                                    <span className="bg-[#1d2327] text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
-                                      Step {pIdx + 1}
-                                    </span>
-                                    <span className="bg-[#f0f6fb] text-[#135e96] border border-[#c5d9e8] text-[10px] font-bold px-1.5 py-0.2 rounded uppercase shrink-0">
+                                  <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
+                                    <span className="wp-muted shrink-0">Step {pIdx + 1}</span>
+                                    <span className={`${pill} bg-[#f0f0f1] text-[#3c434a] capitalize`}>
                                       {pv.pageType || "Page"}
                                     </span>
                                     <a
                                       href={pv.path}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="font-mono font-bold text-[#1d2327] hover:text-[#2271b1] hover:underline break-all inline-flex items-center gap-1"
+                                      className="wp-link font-mono break-all inline-flex items-center gap-1 min-w-0"
                                     >
                                       <span>{pv.path}</span>
-                                      <ExternalLink className="w-3 h-3 opacity-60 shrink-0" />
+                                      <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" />
                                     </a>
                                   </div>
 
-                                  <span className="text-[11px] text-[#8c8f94] shrink-0 font-medium">
-                                    {fmtWhen(pv.enteredAt)}
-                                  </span>
+                                  <span className="wp-muted wp-small shrink-0">{fmtWhen(pv.enteredAt)}</span>
                                 </div>
 
                                 {/* Engagement details */}
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#50575e] bg-white p-2 rounded border border-[#f0f0f1]">
-                                  <span className="flex items-center gap-1 font-medium">
-                                    <Clock className="w-3 h-3 text-[#2271b1]" />
-                                    Time on page: <strong className="text-[#1d2327]">{fmtDuration(pv.engagedMs)}</strong>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 wp-small wp-muted">
+                                  <span>
+                                    Time on page: <strong className="wp-strong">{fmtDuration(pv.engagedMs)}</strong>
                                   </span>
-                                  <span>·</span>
-                                  <span className="flex items-center gap-1 font-medium">
-                                    Scroll depth: <strong className="text-[#1d2327]">{Math.round(pv.maxScrollPct || 0)}%</strong>
+                                  <span>
+                                    Scroll depth: <strong className="wp-strong">{Math.round(pv.maxScrollPct || 0)}%</strong>
                                   </span>
                                   {pv.referrer && (
-                                    <>
-                                      <span>·</span>
-                                      <span className="text-[#8c8f94] truncate max-w-xs" title={pv.referrer}>
-                                        From: {pv.referrer}
-                                      </span>
-                                    </>
+                                    <span className="truncate max-w-full" title={pv.referrer}>
+                                      From: {pv.referrer}
+                                    </span>
                                   )}
                                 </div>
 
-                                {/* On-Page Child Actions / Events */}
+                                {/* Actions on the page */}
                                 {pv.activity?.length > 0 && (
                                   <div className="pt-2 border-t border-[#f0f0f1] space-y-1.5">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#8c8f94] flex items-center justify-between">
-                                      <span>Actions Captured on Page ({pv.activity.length})</span>
+                                    <div className="wp-muted wp-small">
+                                      Actions on this page ({pv.activity.length})
                                     </div>
                                     <div className="space-y-1.5">
                                       {pv.activity.map((act, aIdx) => {
-                                        const parsed = describeEvent(act);
+                                        const parsed = describeEvent(act, currency);
                                         const ActIcon = parsed.icon;
                                         return (
                                           <div
                                             key={aIdx}
-                                            className={`flex items-start gap-2 p-2 rounded-[3px] border text-[11px] ${parsed.color}`}
+                                            className={`flex items-start gap-2 px-2 py-1.5 rounded-[2px] border text-[12px] ${parsed.color}`}
                                           >
-                                            <ActIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                            <ActIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
                                             <div className="flex-1 min-w-0">
-                                              <div className="font-semibold break-words">{parsed.title}</div>
+                                              <div className="break-words">{parsed.title}</div>
                                               {parsed.detail && (
-                                                <div className="text-[10px] opacity-85 mt-0.5 break-words">
-                                                  {parsed.detail}
-                                                </div>
+                                                <div className="mt-0.5 break-words opacity-90">{parsed.detail}</div>
                                               )}
                                             </div>
-                                            <span className="text-[10px] opacity-75 shrink-0 font-mono">
+                                            <span className="shrink-0 font-mono opacity-80">
                                               {fmtWhen(act.createdAt).slice(-8)}
                                             </span>
                                           </div>
@@ -752,28 +735,24 @@ function JourneyPanel({ visitorId, onClose }) {
                                   </div>
                                 )}
                               </div>
-                            </div>
+                            </li>
                           ))}
-                        </div>
+                        </ol>
                       )}
 
-                      {/* Unassigned Session Actions */}
+                      {/* Unassigned session actions */}
                       {unassigned?.length > 0 && (
-                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-[3px] text-[11px] space-y-1.5">
-                          <div className="font-bold text-[#646970] text-[10px] uppercase tracking-wider">
-                            Other Session Events ({unassigned.length})
-                          </div>
+                        <div className="p-3 bg-[#f6f7f7] border border-[#dcdcde] space-y-1.5">
+                          <div className="wp-muted wp-small">Other session events ({unassigned.length})</div>
                           <div className="space-y-1">
                             {unassigned.map((e, idx) => {
-                              const parsed = describeEvent(e);
+                              const parsed = describeEvent(e, currency);
                               const ActIcon = parsed.icon;
                               return (
-                                <div key={idx} className="flex items-center gap-2 text-[#1d2327]">
-                                  <ActIcon className="w-3 h-3 text-[#8c8f94] shrink-0" />
+                                <div key={idx} className="flex items-center gap-2 text-[#1d2327] wp-small min-w-0">
+                                  <ActIcon className="w-3 h-3 text-[#646970] shrink-0" aria-hidden="true" />
                                   <span className="truncate">{parsed.title}</span>
-                                  <span className="text-[10px] text-[#8c8f94] ml-auto shrink-0 font-mono">
-                                    {fmtWhen(e.createdAt)}
-                                  </span>
+                                  <span className="wp-muted ml-auto shrink-0 font-mono">{fmtWhen(e.createdAt)}</span>
                                 </div>
                               );
                             })}
@@ -787,14 +766,11 @@ function JourneyPanel({ visitorId, onClose }) {
             })}
         </div>
 
-        {/* Drawer Footer */}
-        <div className="p-3 sm:p-3.5 bg-[#f6f7f7] border-t border-[#c3c4c7] flex items-center justify-between text-[11px] text-[#646970] shrink-0">
-          <span className="truncate">Visitor Journey Telemetry</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3.5 py-1.5 bg-[#2271b1] text-white font-semibold rounded-[3px] hover:bg-[#135e96] transition-colors cursor-pointer shrink-0"
-          >
+        {/* Drawer footer */}
+        <div className="wp-box-foot shrink-0">
+          <span className="wp-muted truncate">Visitor journey</span>
+          <span className="wp-spacer" />
+          <button type="button" onClick={onClose} className="wp-btn wp-btn-primary">
             Close
           </button>
         </div>
@@ -823,12 +799,12 @@ const FILTER_LABELS = {
 
 function FilterSelect({ label, paramKey, value, onChange, options = [] }) {
   return (
-    <label className="flex flex-col gap-1 min-w-[130px] flex-1">
-      <span className="text-[11px] font-bold text-[#646970]">{label}</span>
+    <label className="flex flex-col min-w-0">
+      <span className="wp-label">{label}</span>
       <select
         value={value || "all"}
         onChange={(e) => onChange(paramKey, e.target.value)}
-        className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2 py-1.5 text-[12px] bg-white text-[#2c3338] outline-none truncate"
+        className="wp-select wp-full"
       >
         <option value="all">All</option>
         {(options || []).map((o) => (
@@ -839,53 +815,53 @@ function FilterSelect({ label, paramKey, value, onChange, options = [] }) {
   );
 }
 
+const LIVE_POLL_MS = 15000;
+
+// Path form /admin/site-analytics/<tab> (the [tab] route) → tab key.
+const tabFromPath = (pathname) => {
+  const m = /^\/admin\/site-analytics\/([^/?#]+)/.exec(pathname || "");
+  return m ? decodeURIComponent(m[1]) : null;
+};
+
+// URL → params with defaults (tab from the query, else the path segment, else overview; range 30).
+function paramsFromLocation(pathTab, search) {
+  const p = new URLSearchParams(search || "");
+  if (pathTab && !p.get("tab")) p.set("tab", pathTab);
+  if (!p.get("range") && !(p.get("from") && p.get("to"))) p.set("range", "30");
+  if (!p.get("tab")) p.set("tab", "overview");
+  return p;
+}
+
 function SiteAnalyticsView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams();
 
   // Unified client-side params state (initializes from URL, updates instantaneously with zero reload)
-  const [paramsState, setParamsState] = useState(() => {
-    const p = new URLSearchParams(searchParams.toString());
-    if (params?.tab && !p.get("tab")) {
-      p.set("tab", params.tab);
-    }
-    if (!p.get("range") && !(p.get("from") && p.get("to"))) {
-      p.set("range", "30");
-    }
-    if (!p.get("tab")) {
-      p.set("tab", "overview");
-    }
-    return p;
-  });
+  const [paramsState, setParamsState] = useState(() => paramsFromLocation(params?.tab, searchParams.toString()));
 
   const tab = paramsState.get("tab") || "overview";
   const hasCustom = Boolean(paramsState.get("from") && paramsState.get("to"));
-  const query = (() => {
-    const q = new URLSearchParams(paramsState.toString());
-    return q.toString();
-  })();
+  const query = paramsState.toString();
 
-  // Listen to browser Back/Forward navigation
+  // Browser Back/Forward: restore tab + filters from the URL (query form, or the /site-analytics/[tab] path form).
   useEffect(() => {
     const onPopState = () => {
-      const p = new URLSearchParams(window.location.search);
-      if (!p.get("tab")) p.set("tab", "overview");
-      if (!p.get("range") && !(p.get("from") && p.get("to"))) p.set("range", "30");
-      setParamsState(p);
+      setParamsState(paramsFromLocation(tabFromPath(window.location.pathname), window.location.search));
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const [data, setData] = useState(null);
-  const [isFetching, setIsFetching] = useState(false);
-  const [error, setError] = useState(false);
+  // Responses are cached by their full query (tab + every filter + dates). Only an exact match is
+  // ever shown; anything else shows the loading state until its own response arrives.
+  const [cache, setCache] = useState({});
+  const [settledRequest, setSettledRequest] = useState(null); // `${query}|${refreshKey}` of the last finished request
+  const [fetchError, setFetchError] = useState(null); // { key: query, message }
   const [options, setOptions] = useState(null);
   const [journeyId, setJourneyId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
-  const cacheRef = useRef({});
 
   useEffect(() => {
     fetch("/api/admin/site-analytics?tab=options")
@@ -894,23 +870,10 @@ function SiteAnalyticsView() {
       .catch(() => {});
   }, []);
 
-  // Fetch data with in-memory caching and silent background revalidation (Stale-While-Revalidate)
+  // Fetch (or silently revalidate) the current query. Errors are always recorded against the query.
   useEffect(() => {
     let cancelled = false;
-
-    // 1. If already in memory cache, display IMMEDIATELY (0ms delay, ZERO flicker)
-    if (cacheRef.current[query]) {
-      setData(cacheRef.current[query]);
-      setError(false);
-    } else {
-      // If switching tabs, check if we have data for this tab from any query
-      const match = Object.values(cacheRef.current).find((d) => d._tab === tab);
-      if (match) {
-        setData(match);
-      }
-    }
-
-    setIsFetching(true);
+    const requestKey = `${query}|${refreshKey}`;
     fetch(`/api/admin/site-analytics?${query}`)
       .then((r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -918,46 +881,75 @@ function SiteAnalyticsView() {
       })
       .then((j) => {
         if (cancelled) return;
-        if (j.success) {
-          const payload = { ...j.data, _tab: j.tab };
-          cacheRef.current[query] = payload;
-          setData(payload);
-          setError(false);
-        } else {
-          setError(true);
-        }
+        if (!j.success) throw new Error(j.error || "Request failed");
+        const payload = { ...j.data, _tab: j.tab, _currency: j.currency };
+        setCache((c) => ({ ...c, [query]: payload }));
+        setFetchError((e) => (e && e.key === query ? null : e));
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error("Site analytics fetch error:", err);
-        if (!cancelled && !cacheRef.current[query]) setError(true);
+        setFetchError({ key: query, message: err?.message || "Request failed" });
       })
       .finally(() => {
-        if (!cancelled) setIsFetching(false);
+        if (!cancelled) setSettledRequest(requestKey);
       });
 
     return () => { cancelled = true; };
-  }, [query, refreshKey, tab]);
+  }, [query, refreshKey]);
 
+  const isFetching = settledRequest !== `${query}|${refreshKey}`;
 
-  // Update parameters seamlessly with zero page reload
-  const setParams = useCallback((updates) => {
-    setParamsState((prev) => {
-      const next = new URLSearchParams(prev.toString());
-      for (const [k, v] of Object.entries(updates)) {
-        if (v === null || v === undefined || v === "" || v === "all") {
-          next.delete(k);
-        } else {
-          next.set(k, v);
-        }
+  // Live tab: poll every 15 seconds while the tab is active and the page is visible.
+  useEffect(() => {
+    if (tab !== "live") return undefined;
+    let timer = null;
+    const start = () => {
+      if (!timer) timer = setInterval(() => setRefreshKey((k) => k + 1), LIVE_POLL_MS);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        setRefreshKey((k) => k + 1);
+        start();
+      } else {
+        stop();
       }
-      if (typeof window !== "undefined") {
-        const queryStr = next.toString();
-        const newUrl = queryStr ? `/admin/site-analytics?${queryStr}` : `/admin/site-analytics`;
+    };
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [tab]);
+
+  // Update parameters with zero page reload. A tab change pushes a history entry (so Back returns
+  // to the previous tab); filter changes replace the current one. URL form matches the sidebar link.
+  const setParams = useCallback((updates) => {
+    const next = new URLSearchParams(paramsState.toString());
+    for (const [k, v] of Object.entries(updates)) {
+      if (v === null || v === undefined || v === "" || v === "all") {
+        next.delete(k);
+      } else {
+        next.set(k, v);
+      }
+    }
+    if (!next.get("tab")) next.set("tab", "overview");
+    if (next.toString() === paramsState.toString()) return;
+    if (typeof window !== "undefined") {
+      const newUrl = `/admin/site-analytics?${next.toString()}`;
+      if (next.get("tab") !== paramsState.get("tab")) {
+        window.history.pushState(null, "", newUrl);
+      } else {
         window.history.replaceState(null, "", newUrl);
       }
-      return next;
-    });
-  }, []);
+    }
+    setParamsState(next);
+  }, [paramsState]);
 
   const onFilter = (key, value) => setParams({ [key]: value });
   const rangeValue = hasCustom ? "custom" : (paramsState.get("range") || "30");
@@ -1008,332 +1000,330 @@ function SiteAnalyticsView() {
   const pinCategory = (row) => setParams({ category: row.category });
   const pinPriceBand = (row) => setParams({ priceBand: row.key });
 
+  const data = cache[query] || null;
   const isReady = Boolean(data && data._tab === tab);
+  const queryError = fetchError && fetchError.key === query ? fetchError : null;
+  const currency = data?._currency || options?.currency || "USD";
+  const fmtMoney = moneyFormatter(currency);
+  const retry = () => setRefreshKey((k) => k + 1);
 
   return (
-    <div className="space-y-5">
-      {/* WordPress Tablenav Filter Bar */}
-      <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] p-3 text-[13px] text-[#2c3338] space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          {/* Primary Quick Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Date Preset */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold uppercase text-[#646970] hidden sm:inline">Dates:</span>
-              <select
-                value={rangeValue}
-                onChange={(e) => onRangeChange(e.target.value)}
-                className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] font-medium bg-white text-[#2c3338] outline-none"
-              >
-                {DATE_PRESETS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Custom Dates inline */}
-            {hasCustom && (
-              <div className="flex items-center gap-1.5 bg-[#f6f7f7] border border-[#dcdcde] px-2 py-1 rounded-[3px]">
-                <span className="text-[11px] font-bold text-[#646970]">From</span>
-                <input
-                  type="date"
-                  value={paramsState.get("from") || ""}
-                  onChange={(e) => setParams({ from: e.target.value })}
-                  className="border border-[#8c8f94] rounded-[2px] px-1.5 py-0.5 text-[11px] bg-white text-[#2c3338]"
-                />
-                <span className="text-[11px] font-bold text-[#646970]">To</span>
-                <input
-                  type="date"
-                  value={paramsState.get("to") || ""}
-                  onChange={(e) => setParams({ to: e.target.value })}
-                  className="border border-[#8c8f94] rounded-[2px] px-1.5 py-0.5 text-[11px] bg-white text-[#2c3338]"
-                />
-              </div>
-            )}
-
-            {/* Shopper Type */}
-            <select
-              value={paramsState.get("segment") || "all"}
-              onChange={(e) => onFilter("segment", e.target.value)}
-              className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] bg-white text-[#2c3338] outline-none"
-            >
-              <option value="all">All Shoppers</option>
-              <option value="customer">Logged-in Customers</option>
-              <option value="guest">Guests</option>
-            </select>
-
-            {/* Device */}
-            <select
-              value={paramsState.get("device") || "all"}
-              onChange={(e) => onFilter("device", e.target.value)}
-              className="border border-[#8c8f94] hover:border-[#2271b1] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-[3px] px-2.5 py-1.5 text-[12px] bg-white text-[#2c3338] outline-none capitalize"
-            >
-              <option value="all">All Devices</option>
-              {DEVICES.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-
-            {/* Toggle More Filters */}
-            <button
-              type="button"
-              onClick={() => setShowMoreFilters(!showMoreFilters)}
-              className={`px-3 py-1.5 text-[12px] font-semibold border rounded-[3px] transition-colors flex items-center gap-1.5 cursor-pointer ${
-                secondaryActiveCount > 0 || showMoreFilters
-                  ? "bg-[#f0f6fb] border-[#2271b1] text-[#2271b1]"
-                  : "bg-[#f6f7f7] border-[#c3c4c7] text-[#2c3338] hover:bg-[#f0f0f1]"
-              }`}
-            >
-              <Filter className="w-3.5 h-3.5 text-[#2271b1]" />
-              <span>More Filters</span>
-              {secondaryActiveCount > 0 && (
-                <span className="bg-[#2271b1] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
-                  {secondaryActiveCount}
-                </span>
-              )}
-              {showMoreFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setRefreshKey((k) => k + 1)}
-              className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[#2c3338] font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Refresh data"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin text-[#2271b1]" : ""}`} />
-              <span>Refresh</span>
-            </button>
-            {(activeFilters.length > 0 || hasCustom || (rangeValue !== "30" && !hasCustom)) && (
+    <>
+      <PageHeader
+        title="Visitor analytics"
+        actions={<Link href="/admin/analytics" className="wp-btn">Sales analytics</Link>}
+        aside={
+          <div className="wp-seg" role="group" aria-label="Date range">
+            {DATE_PRESETS.map((p) => (
               <button
+                key={p.value}
                 type="button"
-                onClick={() => {
-                  setParams({
-                    range: "30",
-                    from: null,
-                    to: null,
-                    device: null,
-                    segment: null,
-                    source: null,
-                    medium: null,
-                    campaign: null,
-                    country: null,
-                    browser: null,
-                    os: null,
-                    pageType: null,
-                    category: null,
-                    priceBand: null,
-                    productId: null,
-                  });
-                }}
-                className="px-2.5 py-1.5 text-[12px] border border-[#c3c4c7] rounded-[3px] bg-white hover:bg-[#f6f7f7] text-[#d63638] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                aria-pressed={rangeValue === p.value}
+                onClick={() => { if (rangeValue !== p.value) onRangeChange(p.value); }}
               >
-                <X className="w-3.5 h-3.5" />
-                <span>Reset</span>
+                {p.label}
               </button>
-            )}
+            ))}
           </div>
-        </div>
+        }
+      />
 
-        {/* Expandable Secondary Filters */}
-        {showMoreFilters && (
-          <div className="pt-3 border-t border-[#f0f0f1] bg-[#fbfbfb] -mx-3 -mb-3 p-3 rounded-b-[3px]">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              <FilterSelect
-                label="Traffic Source"
-                paramKey="source"
-                value={paramsState.get("source")}
-                onChange={onFilter}
-                options={(options?.sources || []).map((v) => ({ value: v, label: v }))}
+      {/* Filters */}
+      <div className="wp-toolbar" role="group" aria-label="Filters">
+        {/* Custom dates inline */}
+        {hasCustom && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5">
+              <span>From</span>
+              <input
+                type="date"
+                value={paramsState.get("from") || ""}
+                onChange={(e) => setParams({ from: e.target.value })}
+                className="wp-input"
               />
-              <FilterSelect
-                label="UTM Medium"
-                paramKey="medium"
-                value={paramsState.get("medium")}
-                onChange={onFilter}
-                options={(options?.mediums || []).map((v) => ({ value: v, label: v }))}
+            </label>
+            <label className="flex items-center gap-1.5">
+              <span>To</span>
+              <input
+                type="date"
+                value={paramsState.get("to") || ""}
+                onChange={(e) => setParams({ to: e.target.value })}
+                className="wp-input"
               />
-              <FilterSelect
-                label="Campaign"
-                paramKey="campaign"
-                value={paramsState.get("campaign")}
-                onChange={onFilter}
-                options={(options?.campaigns || []).map((v) => ({ value: v, label: v }))}
-              />
-              <FilterSelect
-                label="Country"
-                paramKey="country"
-                value={paramsState.get("country")}
-                onChange={onFilter}
-                options={(options?.countries || []).map((v) => ({ value: v, label: v }))}
-              />
-              <FilterSelect
-                label="Page Type"
-                paramKey="pageType"
-                value={paramsState.get("pageType")}
-                onChange={onFilter}
-                options={(options?.pageTypes || []).map((v) => ({ value: v, label: v }))}
-              />
-              <FilterSelect
-                label="Browser"
-                paramKey="browser"
-                value={paramsState.get("browser")}
-                onChange={onFilter}
-                options={(options?.browsers || []).map((v) => ({ value: v, label: v }))}
-              />
-              <FilterSelect
-                label="Operating System"
-                paramKey="os"
-                value={paramsState.get("os")}
-                onChange={onFilter}
-                options={(options?.oses || []).map((v) => ({ value: v, label: v }))}
-              />
-              <FilterSelect
-                label="Product Category"
-                paramKey="category"
-                value={paramsState.get("category")}
-                onChange={onFilter}
-                options={(options?.categories || []).map((v) => ({ value: v, label: v }))}
-              />
-              <FilterSelect
-                label="Price Range"
-                paramKey="priceBand"
-                value={paramsState.get("priceBand")}
-                onChange={onFilter}
-                options={(options?.priceBands || []).map((b) => ({ value: b.key, label: b.label }))}
-              />
-              <FilterSelect
-                label="Specific Product"
-                paramKey="productId"
-                value={paramsState.get("productId")}
-                onChange={onFilter}
-                options={(options?.products || []).map((p) => ({ value: p.id, label: p.name }))}
-              />
-            </div>
+            </label>
           </div>
         )}
 
-        {/* Active Filter Badges */}
-        {activeFilters.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[12px]">
-            <span className="text-[11px] font-bold text-[#646970] uppercase mr-1">Active:</span>
-            {activeFilters.map((k) => (
-              <span
-                key={k}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[2px] bg-[#f0f6fb] border border-[#c5d9e8] text-[#135e96] font-medium"
-              >
-                <span className="text-[#646970]">{FILTER_LABELS[k] || k}:</span>
-                <span className="font-semibold">{paramsState.get(k)}</span>
-                <button
-                  type="button"
-                  onClick={() => setParams({ [k]: null })}
-                  className="text-[#646970] hover:text-[#d63638] ml-0.5 font-bold cursor-pointer"
-                  title="Remove filter"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                const clearObj = Object.fromEntries(activeFilters.map((k) => [k, null]));
-                setParams(clearObj);
-              }}
-              className="text-[11px] text-[#2271b1] hover:underline ml-1 font-semibold cursor-pointer"
-            >
-              Clear all
-            </button>
-          </div>
+        {/* Shopper type */}
+        <select
+          aria-label="Shopper type"
+          value={paramsState.get("segment") || "all"}
+          onChange={(e) => onFilter("segment", e.target.value)}
+          className="wp-select"
+        >
+          <option value="all">All Shoppers</option>
+          <option value="customer">Logged-in Customers</option>
+          <option value="guest">Guests</option>
+        </select>
+
+        {/* Device */}
+        <select
+          aria-label="Device"
+          value={paramsState.get("device") || "all"}
+          onChange={(e) => onFilter("device", e.target.value)}
+          className="wp-select capitalize"
+        >
+          <option value="all">All Devices</option>
+          {DEVICES.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+
+        {/* Toggle more filters */}
+        <button
+          type="button"
+          onClick={() => setShowMoreFilters(!showMoreFilters)}
+          className="wp-btn"
+          aria-expanded={showMoreFilters}
+          aria-controls="sa-more-filters"
+        >
+          <Filter className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>More filters{secondaryActiveCount > 0 ? ` (${secondaryActiveCount})` : ""}</span>
+          {showMoreFilters ? <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />}
+        </button>
+
+        <span className="wp-spacer" />
+
+        <button
+          type="button"
+          onClick={() => setRefreshKey((k) => k + 1)}
+          className="wp-btn"
+          title="Refresh data"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" />
+          <span>Refresh</span>
+        </button>
+        {(activeFilters.length > 0 || hasCustom || (rangeValue !== "30" && !hasCustom)) && (
+          <button
+            type="button"
+            onClick={() => {
+              setParams({
+                range: "30",
+                from: null,
+                to: null,
+                device: null,
+                segment: null,
+                source: null,
+                medium: null,
+                campaign: null,
+                country: null,
+                browser: null,
+                os: null,
+                pageType: null,
+                category: null,
+                priceBand: null,
+                productId: null,
+              });
+            }}
+            className="wp-btn"
+          >
+            Reset filters
+          </button>
         )}
       </div>
 
-      {/* WordPress Categorized Nav-Tabs */}
-      <div className="space-y-2">
-        <nav className="flex flex-wrap items-center gap-1.5 border-b border-[#c3c4c7] pb-0">
-          {TAB_GROUPS.map((group) => {
-            const isGroupActive = group.tabs.some((t) => t.key === tab);
-            return (
-              <button
-                key={group.id}
-                type="button"
-                onClick={() => setParams({ tab: group.tabs[0].key })}
-                className={`px-3.5 py-2 text-[13px] font-semibold rounded-t-[4px] transition-all flex items-center gap-2 cursor-pointer -mb-[1px] ${
-                  isGroupActive
-                    ? "bg-white border-t-2 border-t-[#2271b1] border-l border-r border-[#c3c4c7] border-b-white text-[#1d2327] shadow-xs"
-                    : "bg-[#f6f7f7] hover:bg-white text-[#50575e] hover:text-[#1d2327] border border-transparent"
-                }`}
-              >
-                <group.icon className={`w-4 h-4 ${isGroupActive ? "text-[#2271b1]" : "text-[#646970]"}`} />
-                <span>{group.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+      {/* Expandable secondary filters */}
+      {showMoreFilters && (
+        <div id="sa-more-filters" className="wp-postbox">
+          <div className="wp-inside grid grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-4 gap-y-3">
+            <FilterSelect
+              label="Traffic Source"
+              paramKey="source"
+              value={paramsState.get("source")}
+              onChange={onFilter}
+              options={(options?.sources || []).map((v) => ({ value: v, label: v }))}
+            />
+            <FilterSelect
+              label="UTM Medium"
+              paramKey="medium"
+              value={paramsState.get("medium")}
+              onChange={onFilter}
+              options={(options?.mediums || []).map((v) => ({ value: v, label: v }))}
+            />
+            <FilterSelect
+              label="Campaign"
+              paramKey="campaign"
+              value={paramsState.get("campaign")}
+              onChange={onFilter}
+              options={(options?.campaigns || []).map((v) => ({ value: v, label: v }))}
+            />
+            <FilterSelect
+              label="Country"
+              paramKey="country"
+              value={paramsState.get("country")}
+              onChange={onFilter}
+              options={(options?.countries || []).map((v) => ({ value: v, label: v }))}
+            />
+            <FilterSelect
+              label="Page Type"
+              paramKey="pageType"
+              value={paramsState.get("pageType")}
+              onChange={onFilter}
+              options={(options?.pageTypes || []).map((v) => ({ value: v, label: v }))}
+            />
+            <FilterSelect
+              label="Browser"
+              paramKey="browser"
+              value={paramsState.get("browser")}
+              onChange={onFilter}
+              options={(options?.browsers || []).map((v) => ({ value: v, label: v }))}
+            />
+            <FilterSelect
+              label="Operating System"
+              paramKey="os"
+              value={paramsState.get("os")}
+              onChange={onFilter}
+              options={(options?.oses || []).map((v) => ({ value: v, label: v }))}
+            />
+            <FilterSelect
+              label="Product Category"
+              paramKey="category"
+              value={paramsState.get("category")}
+              onChange={onFilter}
+              options={(options?.categories || []).map((v) => ({ value: v, label: v }))}
+            />
+            <FilterSelect
+              label="Price Range"
+              paramKey="priceBand"
+              value={paramsState.get("priceBand")}
+              onChange={onFilter}
+              options={(options?.priceBands || []).map((b) => ({ value: b.key, label: b.label }))}
+            />
+            <FilterSelect
+              label="Specific Product"
+              paramKey="productId"
+              value={paramsState.get("productId")}
+              onChange={onFilter}
+              options={(options?.products || []).map((p) => ({ value: p.id, label: p.name }))}
+            />
+          </div>
+        </div>
+      )}
 
-        {/* Secondary Sub-Tabs (WordPress subsubsub style) */}
-        {(() => {
-          const currentGroup = TAB_GROUPS.find((g) => g.tabs.some((t) => t.key === tab)) || TAB_GROUPS[0];
-          if (currentGroup.tabs.length <= 1) return null;
+      {/* Active filter chips */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-3">
+          <span className="wp-muted mr-1">Filtered by:</span>
+          {activeFilters.map((k) => (
+            <span key={k} className="wp-chip min-w-0 max-w-full">
+              <span className="wp-muted shrink-0">{FILTER_LABELS[k] || k}:</span>
+              <span className="wp-strong truncate">{paramsState.get(k)}</span>
+              <button
+                type="button"
+                onClick={() => setParams({ [k]: null })}
+                aria-label={`Remove ${FILTER_LABELS[k] || k} filter`}
+                title="Remove filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              const clearObj = Object.fromEntries(activeFilters.map((k) => [k, null]));
+              setParams(clearObj);
+            }}
+            className="wp-link ml-1"
+            style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Report groups */}
+      <div className="wp-tabs" role="tablist" aria-label="Report groups" style={{ marginBottom: 0 }}>
+        {TAB_GROUPS.map((group) => {
+          const isGroupActive = group.tabs.some((t) => t.key === tab);
           return (
-            <div className="flex flex-wrap items-center gap-1.5 py-1 px-1 text-[12px]">
-              <span className="text-[#646970] font-bold text-[11px] uppercase mr-1">Views:</span>
-              {currentGroup.tabs.map((t) => {
-                const isSubActive = tab === t.key;
-                return (
+            <button
+              key={group.id}
+              type="button"
+              role="tab"
+              aria-selected={isGroupActive}
+              onClick={() => setParams({ tab: group.tabs[0].key })}
+              className="wp-tab inline-flex items-center gap-1.5"
+            >
+              <group.icon className="w-4 h-4 hidden sm:inline" aria-hidden="true" />
+              <span>{group.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Reports within the group */}
+      {(() => {
+        const currentGroup = TAB_GROUPS.find((g) => g.tabs.some((t) => t.key === tab)) || TAB_GROUPS[0];
+        if (currentGroup.tabs.length <= 1) return null;
+        return (
+          <div className="wp-subsub" role="tablist" aria-label={`${currentGroup.label} reports`} style={{ margin: "10px 0 0" }}>
+            {currentGroup.tabs.map((t, i) => {
+              const isSubActive = tab === t.key;
+              return (
+                <span key={t.key} className="inline-flex items-center">
+                  {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
                   <button
-                    key={t.key}
                     type="button"
+                    role="tab"
+                    aria-selected={isSubActive}
                     onClick={() => setParams({ tab: t.key })}
-                    className={`px-2.5 py-1 rounded-[3px] font-medium transition cursor-pointer ${
-                      isSubActive
-                        ? "bg-[#2271b1] text-white font-bold shadow-xs"
-                        : "bg-white border border-[#dcdcde] text-[#50575e] hover:text-[#1d2327] hover:border-[#c3c4c7]"
-                    }`}
+                    className={isSubActive ? "is-current" : undefined}
                   >
                     {t.label}
                   </button>
-                );
-              })}
-            </div>
-          );
-        })()}
-      </div>
+                </span>
+              );
+            })}
+          </div>
+        );
+      })()}
 
-      {/* Top subtle progress bar during background revalidation */}
-      <div className="h-0.5 -mt-2 mb-2 overflow-hidden rounded-[2px] bg-transparent">
+      {/* Thin progress bar during background revalidation */}
+      <div className="h-0.5 mt-3 mb-3 overflow-hidden" aria-hidden="true">
         {isFetching && (
-          <div className="h-full bg-[#2271b1] animate-pulse w-full transition-all duration-300" />
+          <div className="h-full bg-[#2271b1] motion-safe:animate-pulse w-full" />
         )}
       </div>
 
-      {/* Only show full loading block when there is NO data in cache yet */}
-      {!isReady && !data && isFetching && !error && (
-        <div className="p-16 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">
-          Loading visitor analytics…
-        </div>
+      {/* No data for this exact query yet: loading, then data or an error */}
+      {!isReady && (!queryError || isFetching) && (
+        <LoadingBlock />
       )}
-      {error && !data && (
-        <div className="p-16 text-center text-[13px] text-red-500 font-bold bg-white border border-[#ccd0d4]">
-          Failed to load this view. Please try refreshing.
-        </div>
+      {!isReady && queryError && !isFetching && (
+        <Notice type="error">
+          Failed to load this view.{" "}
+          <button type="button" className="wp-btn" onClick={retry}>Retry</button>
+        </Notice>
+      )}
+      {isReady && queryError && (
+        <Notice type="warning">
+          Couldn&apos;t refresh this view, so the data shown may be out of date.{" "}
+          <button type="button" className="wp-btn" onClick={retry} disabled={isFetching}>Retry</button>
+        </Notice>
       )}
 
       {/* Keep active tab rendered and smooth during background updates */}
-      {isReady && tab === "overview" && <OverviewTab data={data} />}
+      {isReady && tab === "overview" && <OverviewTab data={data} currency={currency} />}
       {isReady && tab === "pages" && (
-        <div className="space-y-6">
+        <div>
           <DataTable
             title="Pages"
             rows={data.pages || []}
             columns={[
-              { key: "path", label: "Path", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+              { key: "path", label: "Path", render: (r) => <span className="font-mono break-all wp-small">{r.path}</span> },
               { key: "pageType", label: "Type" },
               { key: "title", label: "Title" },
               { key: "views", label: "Views" },
@@ -1344,12 +1334,12 @@ function SiteAnalyticsView() {
               { key: "exitRate", label: "Exit rate", render: (r) => pctText(r.exitRate) },
             ]}
           />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5">
             <DataTable
               title="Entry pages (bounce)"
               rows={data.entries || []}
               columns={[
-                { key: "path", label: "Landing page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+                { key: "path", label: "Landing page", render: (r) => <span className="font-mono break-all wp-small">{r.path}</span> },
                 { key: "sessions", label: "Sessions" },
                 { key: "bounceRate", label: "Bounce", render: (r) => pctText(r.bounceRate) },
                 { key: "conversionRate", label: "Converted", render: (r) => pctText(r.conversionRate) },
@@ -1376,7 +1366,7 @@ function SiteAnalyticsView() {
           empty="No section views yet. Sections appear once visitors scroll them into view for at least a second."
           columns={[
             { key: "section", label: "Section" },
-            { key: "path", label: "Page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+            { key: "path", label: "Page", render: (r) => <span className="font-mono break-all wp-small">{r.path}</span> },
             { key: "impressions", label: "Views" },
             { key: "uniqueSessions", label: "Unique sessions" },
             { key: "avgMs", label: "Avg time in view", render: (r) => fmtDuration(r.avgMs) },
@@ -1385,14 +1375,14 @@ function SiteAnalyticsView() {
         />
       )}
       {isReady && tab === "clicks" && (
-        <div className="space-y-6">
+        <div>
           <DataTable
             title="Clicks"
             rows={data.labels || []}
             empty="No clicks recorded yet."
             columns={[
               { key: "label", label: "Clicked" },
-              { key: "path", label: "On page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+              { key: "path", label: "On page", render: (r) => <span className="font-mono break-all wp-small">{r.path}</span> },
               { key: "clicks", label: "Clicks" },
               { key: "uniqueSessions", label: "Unique sessions" },
               { key: "sections", label: "Sections", render: (r) => (r.sections || []).filter(Boolean).join(", ") || "—", csv: (r) => (r.sections || []).filter(Boolean).join(" | ") },
@@ -1402,7 +1392,7 @@ function SiteAnalyticsView() {
             title="Links followed"
             rows={data.links || []}
             columns={[
-              { key: "href", label: "Destination", render: (r) => <span className="font-mono break-all">{r.href}</span> },
+              { key: "href", label: "Destination", render: (r) => <span className="font-mono break-all wp-small">{r.href}</span> },
               { key: "clicks", label: "Clicks" },
               { key: "uniqueSessions", label: "Unique sessions" },
             ]}
@@ -1430,7 +1420,7 @@ function SiteAnalyticsView() {
         />
       )}
       {isReady && tab === "categories" && (
-        <div className="space-y-6">
+        <div>
           <DataTable
             title="Categories"
             rows={data.categories || []}
@@ -1452,7 +1442,7 @@ function SiteAnalyticsView() {
             title="Category pages"
             rows={data.categoryPages || []}
             columns={[
-              { key: "categorySlug", label: "Category page", render: (r) => <span className="font-mono">/{r.categorySlug}</span> },
+              { key: "categorySlug", label: "Category page", render: (r) => <span className="font-mono wp-small">/{r.categorySlug}</span> },
               { key: "views", label: "Views" },
               { key: "uniqueVisitors", label: "Unique visitors" },
             ]}
@@ -1460,8 +1450,8 @@ function SiteAnalyticsView() {
         </div>
       )}
       {isReady && tab === "prices" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5">
             <Panel title="Product views by price range"><BarRows rows={data.bands || []} valueKey="views" labelKey="label" /></Panel>
             <Panel title="Revenue by price range"><BarRows rows={data.bands || []} valueKey="revenue" labelKey="label" format={fmtMoney} /></Panel>
           </div>
@@ -1484,7 +1474,7 @@ function SiteAnalyticsView() {
         </div>
       )}
       {isReady && tab === "search" && (
-        <div className="space-y-6">
+        <div>
           <DataTable
             title="Zero-result searches"
             rows={data.zeroSearches || []}
@@ -1512,7 +1502,7 @@ function SiteAnalyticsView() {
             empty="No form interactions yet. Fields are recorded when a visitor leaves them."
             columns={[
               { key: "field", label: "Field" },
-              { key: "path", label: "Page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+              { key: "path", label: "Page", render: (r) => <span className="font-mono break-all wp-small">{r.path}</span> },
               { key: "interactions", label: "Interactions" },
               { key: "filled", label: "Filled in" },
               { key: "fillRate", label: "Fill rate", render: (r) => pctText(r.fillRate) },
@@ -1522,7 +1512,7 @@ function SiteAnalyticsView() {
         </div>
       )}
       {isReady && tab === "audience" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5">
           {[
             ["segment", "Shopper type"], ["device", "Device"], ["browser", "Browser"], ["os", "Operating system"],
             ["source", "Traffic source"], ["medium", "UTM medium"], ["campaign", "Campaign"], ["country", "Country"],
@@ -1545,12 +1535,12 @@ function SiteAnalyticsView() {
         </div>
       )}
       {isReady && tab === "users" && (
-        <div className="space-y-6">
+        <div>
           <DataTable
             title="Logged-in customers"
             rows={data.customers || []}
             columns={[
-              { key: "name", label: "Customer", render: (r) => <div><div className="font-bold text-[#1d2327]">{r.name || "—"}</div><div className="text-[11px] text-[#8c8f94]">{r.email}</div></div> },
+              { key: "name", label: "Customer", render: (r) => <div><div className="wp-strong">{r.name || "—"}</div><div className="wp-muted wp-small">{r.email}</div></div> },
               { key: "sessions", label: "Sessions" },
               { key: "pageViews", label: "Page views" },
               { key: "avgSessionMs", label: "Avg session", render: (r) => fmtDuration(r.avgSessionMs) },
@@ -1558,40 +1548,40 @@ function SiteAnalyticsView() {
               { key: "orders", label: "Orders" },
               { key: "revenue", label: "Revenue", render: (r) => fmtMoney(r.revenue) },
               { key: "lastSeen", label: "Last seen", render: (r) => fmtWhen(r.lastSeen) },
-              { key: "journey", label: "", csv: () => "", render: (r) => <button type="button" onClick={() => openJourney(r.visitorId)} className="text-[#2271b1] font-bold hover:underline">Journey</button> },
+              { key: "journey", label: "", csv: () => "", render: (r) => <button type="button" onClick={() => openJourney(r.visitorId)} className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>Journey</button> },
             ]}
           />
           <DataTable
             title="Recent visitors"
             rows={data.recent || []}
             columns={[
-              { key: "visitorId", label: "Visitor", render: (r) => <span className="font-mono text-[11px]">{r.visitorId.slice(0, 8)}…</span> },
-              { key: "who", label: "Who", render: (r) => r.userEmail || <span className="text-[#8c8f94]">Guest</span>, csv: (r) => r.userEmail || "Guest" },
+              { key: "visitorId", label: "Visitor", render: (r) => <span className="font-mono wp-small">{r.visitorId.slice(0, 8)}…</span> },
+              { key: "who", label: "Who", render: (r) => r.userEmail || <span className="wp-muted">Guest</span>, csv: (r) => r.userEmail || "Guest" },
               { key: "device", label: "Device", render: (r) => `${r.device}${r.browser ? ` · ${r.browser}` : ""}${r.os ? ` · ${r.os}` : ""}`, csv: (r) => `${r.device} ${r.browser} ${r.os}` },
               { key: "source", label: "Source", render: (r) => `${r.source}${r.medium ? ` / ${r.medium}` : ""}` },
-              { key: "landed", label: "Landed → left", render: (r) => <span className="font-mono text-[11px] break-all">{r.entryPath} → {r.exitPath}</span>, csv: (r) => `${r.entryPath} -> ${r.exitPath}` },
-              { key: "pageViews", label: "Pages", render: (r) => <span>{r.pageViews}{r.bounced && <span className="ml-1 text-[10px] font-bold text-orange-600">BOUNCE</span>}</span> },
+              { key: "landed", label: "Landed → left", render: (r) => <span className="font-mono wp-small break-all">{r.entryPath} → {r.exitPath}</span>, csv: (r) => `${r.entryPath} -> ${r.exitPath}` },
+              { key: "pageViews", label: "Pages", render: (r) => <span>{r.pageViews}{r.bounced && <span className="wp-pill wp-pill-sm wp-st-confirmed" style={{ marginLeft: 6 }}>Bounced</span>}</span> },
               { key: "clickCount", label: "Clicks" },
               { key: "activeMs", label: "Time", render: (r) => fmtDuration(r.activeMs) },
               { key: "lastSeenAt", label: "Last seen", render: (r) => fmtWhen(r.lastSeenAt) },
-              { key: "journey", label: "", csv: () => "", render: (r) => <button type="button" onClick={() => openJourney(r.visitorId)} className="text-[#2271b1] font-bold hover:underline">Journey</button> },
+              { key: "journey", label: "", csv: () => "", render: (r) => <button type="button" onClick={() => openJourney(r.visitorId)} className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>Journey</button> },
             ]}
           />
         </div>
       )}
       {isReady && tab === "variants" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div>
+          <KpiStrip count={3}>
             <Kpi label="Visitors who viewed a product" value={fmtNum(data.viewerSessions)} />
             <Kpi label="Visitors who chose a size or colour" value={fmtNum(data.pickerSessions)} />
             <Kpi label="Choice rate" value={pctText(data.pickRate)} hint="Of product viewers" />
-          </div>
+          </KpiStrip>
           <DataTable
             title="Size & colour choices"
             rows={data.options || []}
             empty="No choices yet. A choice is recorded when a shopper picks a size or colour on a product page."
             columns={[
-              { key: "path", label: "Product page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+              { key: "path", label: "Product page", render: (r) => <span className="font-mono break-all wp-small">{r.path}</span> },
               { key: "group", label: "Option" },
               { key: "value", label: "Choice" },
               { key: "selections", label: "Selections" },
@@ -1601,12 +1591,12 @@ function SiteAnalyticsView() {
         </div>
       )}
       {isReady && tab === "errors" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div>
+          <KpiStrip count={3}>
             <Kpi label="Sessions that hit an error" value={fmtNum(data.errorSessions)} />
             <Kpi label="Conversion: sessions with an error" value={pctText(data.errorConversionRate)} />
             <Kpi label="Conversion: all sessions" value={pctText(data.overallConversionRate)} />
-          </div>
+          </KpiStrip>
           <DataTable
             title="API errors"
             rows={data.api || []}
@@ -1642,15 +1632,15 @@ function SiteAnalyticsView() {
         </div>
       )}
       {isReady && tab === "checkout" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div>
+          <KpiStrip count={5}>
             <Kpi label="Started checkout" value={fmtNum(data.kpis?.started)} />
             <Kpi label="Purchased" value={fmtNum(data.kpis?.purchased)} />
             <Kpi label="Checkout conversion" value={pctText(data.kpis?.conversionRate)} />
             <Kpi label="Abandoned" value={fmtNum(data.kpis?.abandoned)} hint={`${pctText(data.kpis?.abandonRate)} of checkouts`} />
             <Kpi label="Saw an error" value={fmtNum(data.kpis?.errorSessions)} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          </KpiStrip>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5">
             <DataTable
               title="Checkout funnel"
               rows={data.steps || []}
@@ -1693,12 +1683,12 @@ function SiteAnalyticsView() {
               { key: "uniqueSessions", label: "Unique sessions" },
             ]}
           />
-          <p className="text-[12px] text-[#646970]">Reasons are inferred from what a shopper did just before leaving, so they show likely causes, not confirmed ones.</p>
+          <p className="wp-muted" style={{ margin: "-8px 0 20px" }}>Reasons are inferred from what a shopper did just before leaving, so they show likely causes, not confirmed ones.</p>
         </div>
       )}
       {isReady && tab === "retention" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div>
+          <KpiStrip count={8}>
             <Kpi label="Customers (first order in range)" value={fmtNum(data.kpis?.cohortCustomers)} />
             <Kpi label="Bought again" value={pctText(data.kpis?.repeatRate)} hint="Ever, to date" />
             <Kpi label="Bought again within 30 days" value={pctText(data.kpis?.repeat30Rate)} />
@@ -1707,7 +1697,7 @@ function SiteAnalyticsView() {
             <Kpi label="Avg orders per customer" value={data.kpis?.avgOrders ?? "0"} />
             <Kpi label="Avg lifetime revenue" value={fmtMoney(data.kpis?.avgRevenue)} />
             <Kpi label="Accounts created → purchased" value={`${data.kpis?.accountsCreated || 0} → ${data.kpis?.accountsPurchased || 0}`} />
-          </div>
+          </KpiStrip>
           <DataTable
             title="Monthly cohorts"
             rows={data.cohorts || []}
@@ -1719,7 +1709,7 @@ function SiteAnalyticsView() {
               { key: "avgRevenue", label: "Avg revenue", render: (r) => fmtMoney(r.avgRevenue) },
             ]}
           />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-5">
             <DataTable
               title="First visit: where customers came from"
               rows={data.firstTouch || []}
@@ -1740,16 +1730,16 @@ function SiteAnalyticsView() {
               ]}
             />
           </div>
-          <p className="text-[12px] text-[#646970]">Only the date range applies on this tab. Customers count when their first order falls in the range. Guest orders aren't linked to an account, and visit sources only exist for visits made while logged in.</p>
+          <p className="wp-muted" style={{ margin: "-8px 0 20px" }}>Only the date range applies on this tab. Customers count when their first order falls in the range. Guest orders aren&apos;t linked to an account, and visit sources only exist for visits made while logged in.</p>
         </div>
       )}
       {isReady && tab === "friction" && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div>
+          <KpiStrip count={3}>
             <Kpi label="Dead clicks" value={fmtNum(data.kpis?.deadClicks)} hint="Clicks that got no response" />
             <Kpi label="Rage-click bursts" value={fmtNum(data.kpis?.rageBursts)} hint="Three or more rapid clicks on one element" />
             <Kpi label="Sessions with friction" value={pctText(data.kpis?.sessionsHitPct)} hint={(data.kpis?.sessionsHit || 0) + " sessions"} />
-          </div>
+          </KpiStrip>
           <DataTable
             title="Friction points"
             rows={data.rows || []}
@@ -1757,12 +1747,12 @@ function SiteAnalyticsView() {
             columns={[
               { key: "type", label: "Type", render: (r) => (r.type === "rage_click" ? "Rage click" : "Dead click") },
               { key: "label", label: "Element" },
-              { key: "path", label: "Page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+              { key: "path", label: "Page", render: (r) => <span className="font-mono break-all wp-small">{r.path}</span> },
               { key: "count", label: "Count" },
               { key: "uniqueSessions", label: "Unique sessions" },
             ]}
           />
-          <p className="text-[12px] text-[#646970]">A dead click is a click on a button or link that gave no visible response within 1.5 seconds. A rage click is three or more rapid clicks on the same element.</p>
+          <p className="wp-muted" style={{ margin: "-8px 0 20px" }}>A dead click is a click on a button or link that gave no visible response within 1.5 seconds. A rage click is three or more rapid clicks on the same element.</p>
         </div>
       )}
       {/* Page Speed tab — disabled for now, not removed. {isReady && tab === "speed" && <SpeedTab data={data} />} */}
@@ -1772,21 +1762,21 @@ function SiteAnalyticsView() {
           rows={data.sessions || []}
           empty="No visitors are active right now. This list refreshes every 15 seconds."
           columns={[
-            { key: "visitorId", label: "Visitor", render: (r) => <span className="font-mono text-[11px]">{r.visitorId.slice(0, 8)}…</span> },
-            { key: "who", label: "Who", render: (r) => r.userEmail || <span className="text-[#8c8f94]">Guest</span>, csv: (r) => r.userEmail || "Guest" },
+            { key: "visitorId", label: "Visitor", render: (r) => <span className="font-mono wp-small">{r.visitorId.slice(0, 8)}…</span> },
+            { key: "who", label: "Who", render: (r) => r.userEmail || <span className="wp-muted">Guest</span>, csv: (r) => r.userEmail || "Guest" },
             { key: "device", label: "Device", render: (r) => `${r.device}${r.browser ? ` · ${r.browser}` : ""}` },
             { key: "source", label: "Source" },
-            { key: "exitPath", label: "Current page", render: (r) => <span className="font-mono break-all">{r.exitPath}</span> },
+            { key: "exitPath", label: "Current page", render: (r) => <span className="font-mono break-all wp-small">{r.exitPath}</span> },
             { key: "pageViews", label: "Pages" },
             { key: "activeMs", label: "Time", render: (r) => fmtDuration(r.activeMs) },
             { key: "lastSeenAt", label: "Last activity", render: (r) => fmtWhen(r.lastSeenAt) },
-            { key: "journey", label: "", csv: () => "", render: (r) => <button type="button" onClick={() => openJourney(r.visitorId)} className="text-[#2271b1] font-bold hover:underline">Journey</button> },
+            { key: "journey", label: "", csv: () => "", render: (r) => <button type="button" onClick={() => openJourney(r.visitorId)} className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>Journey</button> },
           ]}
         />
       )}
 
-      {journeyId && <JourneyPanel visitorId={journeyId} onClose={() => setJourneyId(null)} />}
-    </div>
+      {journeyId && <JourneyPanel visitorId={journeyId} onClose={() => setJourneyId(null)} currency={currency} />}
+    </>
   );
 }
 
@@ -1828,7 +1818,7 @@ function VitalKpi({ label, value, unit, hint, ratingKey }) {
 
 function SpeedTab({ data }) {
   return (
-    <div className="space-y-6">
+    <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <VitalKpi label="Largest Contentful Paint" value={data.kpis?.avgLcp} unit="ms" ratingKey="avgLcp" hint={`${fmtNum(data.kpis?.sampleSize)} samples`} />
         <VitalKpi label="Cumulative Layout Shift" value={data.kpis?.avgCls} unit="" ratingKey="avgCls" hint="Lower is better" />
@@ -1840,7 +1830,7 @@ function SpeedTab({ data }) {
         rows={data.rows || []}
         empty="No Core Web Vitals recorded for these filters yet."
         columns={[
-          { key: "path", label: "Page", render: (r) => <span className="font-mono break-all">{r.path}</span> },
+          { key: "path", label: "Page", render: (r) => <span className="font-mono break-all wp-small">{r.path}</span> },
           { key: "device", label: "Device" },
           { key: "sessions", label: "Sessions" },
           { key: "samples", label: "Samples" },
@@ -1850,7 +1840,7 @@ function SpeedTab({ data }) {
           { key: "avgTtfb", label: "TTFB", render: (r) => <span className={r.avgTtfb !== null ? VITALS_RATING_STYLE[vitalsRating("avgTtfb", r.avgTtfb)] : ""}>{r.avgTtfb ?? "—"}ms</span> },
         ]}
       />
-      <p className="text-[12px] text-[#646970]">Core Web Vitals are captured directly from real shoppers&apos; browsers. Green is good, amber needs improvement, red is poor, per Google&apos;s standard thresholds.</p>
+      <p className="wp-muted" style={{ margin: "-8px 0 20px" }}>Core Web Vitals are captured directly from real shoppers&apos; browsers. Green is good, amber needs improvement, red is poor, per Google&apos;s standard thresholds.</p>
     </div>
   );
 }
@@ -1878,135 +1868,91 @@ function TrackingFeaturesMatrix() {
   const totalTrackedCount = TRACKING_CATEGORIES.reduce((acc, cat) => acc + cat.items.length, 0);
 
   return (
-    <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[3px] overflow-hidden">
-      {/* WordPress-style Header with Filter controls */}
-      <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Activity className="w-4 h-4 text-[#2271b1]" />
-          <h3 className="text-[13px] font-bold text-[#1d2327]">
-            Active Tracking Capabilities & System Features
-          </h3>
-          <span className="bg-emerald-50 text-emerald-700 border border-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            {totalTrackedCount} Metrics Tracking Live
-          </span>
-        </div>
-
-        {/* Search */}
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-[#8c8f94] absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Filter features (e.g. friction, cart)..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-2.5 py-1 text-[11px] border border-[#8c8f94] rounded-[3px] bg-white text-[#2c3338] outline-none focus:border-[#2271b1] w-48 sm:w-60"
-            />
-            {searchQuery && (
+    <Postbox id="sa-tracking" title="What is being tracked" aside={`${totalTrackedCount} metrics`} flush>
+      {/* Filter controls */}
+      <div className="wp-toolbar" style={{ margin: 0, padding: "10px 12px", borderBottom: "1px solid #f0f0f1" }}>
+        <div className="wp-subsub" role="group" aria-label="Tracking category" style={{ margin: 0 }}>
+          <button
+            type="button"
+            aria-pressed={activeCategory === "all"}
+            onClick={() => setActiveCategory("all")}
+            className={activeCategory === "all" ? "is-current" : undefined}
+          >
+            All <span className="wp-count">({totalTrackedCount})</span>
+          </button>
+          {TRACKING_CATEGORIES.map((cat) => (
+            <span key={cat.id} className="inline-flex items-center">
+              <span className="wp-sep" aria-hidden="true">|</span>
               <button
                 type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-pressed={activeCategory === cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={activeCategory === cat.id ? "is-current" : undefined}
               >
-                <X className="w-3 h-3" />
+                {cat.title.split(" ")[0]} <span className="wp-count">({cat.items.length})</span>
               </button>
-            )}
-          </div>
+            </span>
+          ))}
+        </div>
+        <span className="wp-spacer" />
+        <div className="wp-search relative">
+          <input
+            type="search"
+            aria-label="Filter tracked features"
+            placeholder="Filter features (e.g. friction, cart)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="wp-input"
+            style={{ paddingRight: searchQuery ? 28 : undefined }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear filter"
+              className="wp-notice-dismiss absolute right-1 top-1/2 -translate-y-1/2"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Category Filter Pills */}
-      <div className="px-4 py-2 bg-white border-b border-[#f0f0f1] flex flex-wrap items-center gap-1.5 text-[11px]">
-        <button
-          type="button"
-          onClick={() => setActiveCategory("all")}
-          className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors cursor-pointer ${
-            activeCategory === "all"
-              ? "bg-[#2271b1] text-white"
-              : "text-[#50575e] bg-[#f0f0f1] hover:bg-[#e0e0e1]"
-          }`}
-        >
-          All Capabilities ({totalTrackedCount})
-        </button>
-        {TRACKING_CATEGORIES.map((cat) => {
-          const Icon = cat.icon;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-2.5 py-1 rounded-[3px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeCategory === cat.id
-                  ? "bg-[#2271b1] text-white"
-                  : "text-[#50575e] bg-[#f0f0f1] hover:bg-[#e0e0e1]"
-              }`}
-            >
-              <Icon className="w-3 h-3" />
-              <span>{cat.title.split(" ")[0]} ({cat.items.length})</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Feature Cards Grid */}
-      <div className="p-4 bg-[#fbfbfb]">
+      {/* Feature groups */}
+      <div className="wp-inside">
         {filteredCategories.length === 0 ? (
-          <div className="p-8 text-center text-[#646970] text-[12px] bg-white border border-[#e5e5e5] rounded-[3px]">
-            No tracking features match your search "{searchQuery}".
+          <div className="wp-empty">
+            No tracking features match your search &quot;{searchQuery}&quot;.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredCategories.map((cat) => {
               const Icon = cat.icon;
               return (
-                <div
-                  key={cat.id}
-                  className="bg-white border border-[#dcdcde] rounded-[3px] p-4 shadow-xs flex flex-col justify-between hover:border-[#2271b1] transition-colors"
-                >
-                  <div>
-                    {/* Card Header */}
-                    <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-[#f0f0f1]">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded bg-[#f0f6fb] text-[#2271b1] flex items-center justify-center shrink-0">
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="text-[13px] font-bold text-[#1d2327]">
-                            {cat.title}
-                          </h4>
-                          <p className="text-[11px] text-[#646970]">
-                            {cat.description}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                        Active
-                      </span>
+                <div key={cat.id} className="border border-[#dcdcde] p-3 min-w-0">
+                  <div className="flex items-start gap-2 pb-2 border-b border-[#f0f0f1]">
+                    <Icon className="w-4 h-4 text-[#646970] shrink-0 mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="wp-strong" style={{ fontSize: 14, margin: 0 }}>{cat.title}</h3>
+                      <p className="wp-muted" style={{ margin: "2px 0 0" }}>{cat.description}</p>
                     </div>
-
-                    {/* Features List */}
-                    <div className="mt-3 space-y-2.5">
-                      {cat.items.map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-[12px]">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-bold text-[#1d2327] mr-1.5">
-                              {item.name}:
-                            </span>
-                            <span className="text-[#50575e] leading-relaxed">
-                              {item.desc}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <span className="wp-pill wp-pill-sm wp-st-published">Active</span>
                   </div>
 
-                  {/* Card Footer */}
-                  <div className="mt-3.5 pt-2 border-t border-[#f0f0f1] flex items-center justify-between text-[11px] text-[#8c8f94]">
-                    <span>Automated Real-Time Telemetry</span>
-                    <span className="font-semibold text-[#2271b1]">{cat.items.length} monitored metrics</span>
+                  <ul style={{ listStyle: "none", margin: "8px 0 0", padding: 0 }}>
+                    {cat.items.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2" style={{ padding: "5px 0" }}>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#00a32a] shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <span className="wp-strong">{item.name}:</span>{" "}
+                          <span>{item.desc}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="wp-muted wp-small" style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0f0f1" }}>
+                    {cat.items.length} monitored metrics
                   </div>
                 </div>
               );
@@ -2014,17 +1960,21 @@ function TrackingFeaturesMatrix() {
           </div>
         )}
       </div>
-    </div>
+    </Postbox>
   );
 }
 
-function OverviewTab({ data }) {
+function OverviewTab({ data, currency }) {
+  const fmtMoney = moneyFormatter(currency);
   const k = data.kpis;
   const maxSessions = Math.max(1, ...data.daily.map((d) => d.sessions));
   const funnelBase = data.funnel[0]?.sessions || 0;
+  // Presentation only: totals for the chart's text summary, and tighter bar spacing for long ranges.
+  const dailyTotals = data.daily.reduce((t, d) => ({ sessions: t.sessions + (d.sessions || 0), converted: t.converted + (d.converted || 0) }), { sessions: 0, converted: 0 });
+  const barGap = data.daily.length > 90 ? 0 : data.daily.length > 31 ? 1 : undefined;
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div>
+      <KpiStrip count={12}>
         <Kpi label="Sessions" value={k.sessions.toLocaleString()} hint={`${k.liveNow} live now`} />
         <Kpi label="Unique visitors" value={k.visitors.toLocaleString()} hint={`${k.returningPct}% returning`} />
         <Kpi label="Page views" value={k.pageViews.toLocaleString()} hint={`${k.pagesPerSession} pages / session`} />
@@ -2037,97 +1987,85 @@ function OverviewTab({ data }) {
         <Kpi label="Avg order value" value={fmtMoney(k.aov)} />
         <Kpi label="Clicks tracked" value={k.clicks.toLocaleString()} />
         <Kpi label="Logged-in sessions" value={pctText(k.identifiedPct)} />
-      </div>
+      </KpiStrip>
 
-      <Panel
+      <Postbox
+        id="sa-daily"
         title="Daily sessions and sales"
-        action={
-          <div className="flex items-center gap-4 text-[11px]">
-            <span className="flex items-center gap-1.5 text-[#1d2327]">
-              <span className="w-2.5 h-2.5 rounded-sm bg-[#2271b1]" /> Sessions
+        aside={
+          <span className="inline-flex items-center gap-3" aria-hidden="true">
+            <span className="inline-flex items-center gap-1.5">
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: "#2271b1", display: "inline-block" }} /> Sessions
             </span>
-            <span className="flex items-center gap-1.5 text-[#1d2327]">
-              <span className="w-2.5 h-2.5 rounded-sm bg-[#10b981]" /> Converted
+            <span className="inline-flex items-center gap-1.5">
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: "#dba617", display: "inline-block" }} /> Converted
             </span>
-          </div>
+          </span>
         }
       >
-        <div className="p-4 sm:p-6">
-          {data.daily.length === 0 ? (
-            <p className="text-center italic text-[#8c8f94] text-[12px] py-8">No sessions for these filters.</p>
-          ) : (
-            <div>
-              <div className="flex items-end gap-1.5 sm:gap-2 h-48 border-b border-[#e5e5e5] pb-1 px-1">
-                {data.daily.map((d, idx) => {
-                  const sessionHeight = maxSessions > 0 ? (d.sessions / maxSessions) * 100 : 0;
-                  const convHeight = maxSessions > 0 ? (d.converted / maxSessions) * 100 : 0;
-                  const showLabel = data.daily.length <= 14 || idx % Math.ceil(data.daily.length / 10) === 0 || idx === data.daily.length - 1;
-                  const dateShort = d.day ? d.day.slice(5) : "";
-                  return (
-                    <div
-                      key={d.day}
-                      className="flex-1 min-w-[8px] max-w-[36px] h-full flex flex-col justify-end items-center group relative mx-auto"
-                    >
-                      {/* Hover Tooltip */}
-                      <div className="absolute -top-12 z-30 hidden group-hover:flex flex-col items-center bg-[#1d2327] text-white text-[10px] px-2.5 py-1.5 rounded shadow-lg pointer-events-none whitespace-nowrap">
-                        <span className="font-bold">{d.day}</span>
-                        <span>{d.sessions} sessions · {d.converted} converted · {fmtMoney(d.revenue)}</span>
-                      </div>
-
-                      {/* Bar Container */}
-                      <div className="w-full h-full flex items-end justify-center gap-0.5 bg-gray-50/80 rounded-t-[2px] p-[1px] hover:bg-gray-100 transition-colors">
-                        {/* Sessions Bar */}
+        {data.daily.length === 0 ? (
+          <div className="wp-empty">No sessions for these filters.</div>
+        ) : (
+          <figure style={{ margin: 0 }} aria-label={`Daily sessions chart, ${data.daily.length} days: ${dailyTotals.sessions.toLocaleString()} sessions, ${dailyTotals.converted.toLocaleString()} converted`}>
+            <div className="wp-chart" style={barGap !== undefined ? { gap: barGap } : undefined}>
+              {data.daily.map((d) => {
+                const sessionHeight = maxSessions > 0 ? (d.sessions / maxSessions) * 100 : 0;
+                const convHeight = maxSessions > 0 ? (d.converted / maxSessions) * 100 : 0;
+                const tip = `${d.day}: ${d.sessions} sessions · ${d.converted} converted · ${fmtMoney(d.revenue)}`;
+                return (
+                  <div key={d.day} className="wp-bar-col" tabIndex={0} aria-label={tip}>
+                    <span className="wp-bar-tip">{tip}</span>
+                    <div style={{ width: "100%", maxWidth: 44, height: "100%", display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 1 }}>
+                      {/* Sessions bar */}
+                      <div
+                        className={`wp-bar ${d.sessions > 0 ? "" : "is-empty"}`}
+                        style={{ height: `${Math.max(sessionHeight, d.sessions > 0 ? 4 : 0)}%`, flex: 1, minWidth: 0 }}
+                      />
+                      {/* Converted bar */}
+                      {d.converted > 0 && (
                         <div
-                          className="w-full bg-[#2271b1] rounded-t-[2px] transition-all min-h-[2px]"
-                          style={{ height: `${Math.max(sessionHeight, d.sessions > 0 ? 4 : 0)}%` }}
+                          style={{ height: `${Math.max(convHeight, 4)}%`, width: "35%", maxWidth: 8, minWidth: 1, minHeight: 4, background: "#dba617", borderRadius: "2px 2px 0 0" }}
                         />
-                        {/* Converted Bar */}
-                        {d.converted > 0 && (
-                          <div
-                            className="w-1.5 bg-[#10b981] rounded-t-[2px] transition-all min-h-[4px]"
-                            style={{ height: `${Math.max(convHeight, 4)}%` }}
-                          />
-                        )}
-                      </div>
-
-                      {/* X-axis Date label */}
-                      <span className="absolute -bottom-5 text-[9px] text-[#8c8f94] truncate select-none">
-                        {showLabel ? dateShort : ""}
-                      </span>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-              <div className="h-5" />
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </div>
-      </Panel>
+            <div className="wp-chart-x" aria-hidden="true" style={{ overflow: "hidden", ...(barGap !== undefined ? { gap: barGap } : {}) }}>
+              {data.daily.map((d, idx) => {
+                const showLabel = data.daily.length <= 14 || idx % Math.ceil(data.daily.length / 10) === 0 || idx === data.daily.length - 1;
+                const dateShort = d.day ? d.day.slice(5) : "";
+                return <span key={d.day} style={data.daily.length > 14 ? { overflow: "visible" } : undefined}>{showLabel ? dateShort : ""}</span>;
+              })}
+            </div>
+          </figure>
+        )}
+      </Postbox>
 
-      {/* Conversion Funnel */}
+      {/* Conversion funnel */}
       <Panel title="Conversion funnel">
-        <table className="w-full text-[12px] text-left">
-          <thead className="text-[11px] uppercase text-[#646970] bg-[#fbfbfb]">
+        <table className="wp-list-table">
+          <thead>
             <tr>
-              <th className="px-3 py-2">Step</th>
-              <th className="px-3 py-2">Sessions</th>
-              <th className="px-3 py-2">Events</th>
-              <th className="px-3 py-2">Of product viewers</th>
+              <th scope="col">Step</th>
+              <th scope="col" className="wp-num">Sessions</th>
+              <th scope="col" className="wp-num wp-hide-sm">Events</th>
+              <th scope="col">Of product viewers</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#f0f0f1]">
+          <tbody>
             {data.funnel.map((f) => (
               <tr key={f.name}>
-                <td className="px-3 py-2 font-bold text-[#1d2327]">{FUNNEL_LABELS[f.name]}</td>
-                <td className="px-3 py-2">{f.sessions}</td>
-                <td className="px-3 py-2">{f.events}</td>
-                <td className="px-3 py-2">
+                <td className="wp-strong">{FUNNEL_LABELS[f.name]}</td>
+                <td className="wp-num">{f.sessions}</td>
+                <td className="wp-num wp-hide-sm">{f.events}</td>
+                <td>
                   <div className="flex items-center gap-2">
-                    <div
-                      className="h-2 bg-[#2271b1] rounded"
-                      style={{ width: `${funnelBase ? (f.sessions / funnelBase) * 120 : 0}px`, minWidth: 2 }}
-                    />
-                    <span className="text-[#646970]">
+                    <div aria-hidden="true" style={{ flex: "1 1 120px", maxWidth: 160, height: 4, background: "#f0f0f1", borderRadius: 2 }}>
+                      <div style={{ height: 4, borderRadius: 2, background: "#2271b1", width: `${funnelBase ? (f.sessions / funnelBase) * 100 : 0}%`, minWidth: 2 }} />
+                    </div>
+                    <span className="wp-muted" style={{ whiteSpace: "nowrap" }}>
                       {funnelBase ? Math.round((f.sessions / funnelBase) * 100) : 0}%
                     </span>
                   </div>
@@ -2138,8 +2076,27 @@ function OverviewTab({ data }) {
         </table>
       </Panel>
 
-      {/* Tracking Engine & Feature Matrix */}
+      {/* Tracking engine & feature matrix */}
       <TrackingFeaturesMatrix />
+    </div>
+  );
+}
+
+function LoadingBlock() {
+  return (
+    <div aria-busy="true">
+      <span className="sr-only">Loading visitor analytics…</span>
+      <div className="wp-stats">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="wp-stat">
+            <Skeleton height={14} width="50%" />
+            <Skeleton height={28} width="70%" style={{ margin: "8px 0 2px" }} />
+          </div>
+        ))}
+      </div>
+      <Postbox>
+        <Skeleton height={220} />
+      </Postbox>
     </div>
   );
 }
@@ -2147,14 +2104,18 @@ function OverviewTab({ data }) {
 export default function SiteAnalyticsPage() {
   return (
     <RequirePermission permission="analytics.view">
-      <AdminPageLayout
-        title="Visitor Analytics"
-        breadcrumbs={[{ label: "Analytics", href: "/admin/analytics" }, { label: "Visitors" }]}
-      >
-        <Suspense fallback={<div className="p-16 text-center text-[13px] text-gray-500 italic bg-white border border-[#ccd0d4]">Loading…</div>}>
+      <Page>
+        <Suspense
+          fallback={
+            <>
+              <PageHeader title="Visitor analytics" />
+              <LoadingBlock />
+            </>
+          }
+        >
           <SiteAnalyticsView />
         </Suspense>
-      </AdminPageLayout>
+      </Page>
     </RequirePermission>
   );
 }

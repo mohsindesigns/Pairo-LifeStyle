@@ -1,306 +1,392 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { useCallback, useState } from "react";
+import { FileText } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { Eye, Trash2, Search, ChevronLeft, ChevronRight, X, FileText } from "lucide-react";
-import { usePopup } from "@/context/PopupContext";
+import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { usePopup } from "@/context/PopupContext";
+import {
+  useInboxList, runBulk, readError, StatusViews, Pager, BulkActions, SearchForm,
+  SkeletonRows, SelectAllBox, Drawer, DangerLink, KV, formatDateTime,
+} from "../contact/_shared/inbox-ui";
+
+const API = "/api/admin/corporate-gifting-inquiries";
 
 const STATUS_COLORS = {
-  New: "bg-blue-100 text-blue-700 border-blue-200",
-  Contacted: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  Quoted: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  "In Progress": "bg-purple-100 text-purple-700 border-purple-200",
-  Completed: "bg-green-100 text-green-700 border-green-200",
-  Cancelled: "bg-red-100 text-red-700 border-red-200"
+  New: "wp-st-out",
+  Contacted: "wp-st-confirmed",
+  Quoted: "wp-st-shipped",
+  "In Progress": "wp-st-packed",
+  Completed: "wp-st-delivered",
+  Cancelled: "wp-st-cancelled",
 };
-const ALL_STATUSES = ["New", "Contacted", "Quoted", "In Progress", "Completed", "Cancelled"];
+const ALL_STATUSES = Object.keys(STATUS_COLORS);
 const PRIORITIES = ["Low", "Medium", "High"];
+const VIEWS = [["all", "All"], ...ALL_STATUSES.map((s) => [s, s]), ["trash", "Trash"]];
 
-const Detail = ({ label, value }) =>
-  value ? (
-    <div>
-      <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-      <p className="text-[#1d2327] font-medium mt-0.5 break-words">{value}</p>
-    </div>
-  ) : null;
+const isImage = (u) => /\.(png|jpe?g|webp|svg|gif)$/i.test(u || "");
 
-function DetailModal({ inquiry, onClose, onSaved }) {
+function GiftingDrawer({ inquiry, onClose, onSaved, onTrash, onRestore, onDelete }) {
   const [status, setStatus] = useState(inquiry.status);
   const [priority, setPriority] = useState(inquiry.priority || "Medium");
   const [notes, setNotes] = useState(inquiry.adminNotes || "");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const trashed = !!inquiry.isDeleted;
 
-  const save = async () => {
+  const save = async (e) => {
+    e?.preventDefault();
     setSaving(true);
+    setError("");
     try {
-      const res = await fetch(`/api/admin/corporate-gifting-inquiries/${inquiry._id}`, {
+      const res = await fetch(`${API}/${inquiry._id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, priority, adminNotes: notes })
+        body: JSON.stringify({ status, priority, adminNotes: notes }),
       });
+      if (!res.ok) {
+        setError(await readError(res, "Could not save the changes."));
+        return;
+      }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to save");
       toast.success("Inquiry updated");
       onSaved(data);
       onClose();
-    } catch (e) {
-      toast.error(e.message || "Failed to save");
+    } catch {
+      setError("Could not save the changes. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
   };
 
-  const isImage = (u) => /\.(png|jpe?g|webp|svg|gif)$/i.test(u || "");
+  const footer = trashed ? (
+    <>
+      <DangerLink onClick={() => onDelete(inquiry)}>Delete permanently</DangerLink>
+      <button type="button" className="wp-btn" onClick={onClose}>Close</button>
+      <button type="button" className="wp-btn wp-btn-primary" onClick={() => onRestore(inquiry)}>Restore</button>
+    </>
+  ) : (
+    <>
+      <DangerLink onClick={() => onTrash(inquiry)}>Move to Trash</DangerLink>
+      <button type="button" className="wp-btn" onClick={onClose}>Cancel</button>
+      <button type="submit" form="gifting-edit-form" className="wp-btn wp-btn-primary" disabled={saving}>
+        {saving ? "Saving..." : "Save"}
+      </button>
+    </>
+  );
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-3 sm:p-6" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-100 sticky top-0 bg-white z-10">
-          <div>
-            <h2 className="text-[16px] font-bold text-[#1d2327]">{inquiry.company}</h2>
-            <p className="text-[12px] text-[#646970]">{inquiry.contactName} · {inquiry.email}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X className="w-5 h-5" /></button>
-        </div>
+    <Drawer
+      titleId="gifting-detail-title"
+      title={inquiry.company}
+      subtitle={<>{inquiry.contactName} · <a href={`mailto:${inquiry.email}`} className="wp-link" style={{ wordBreak: "break-all" }}>{inquiry.email}</a></>}
+      onClose={onClose}
+      footer={footer}
+    >
+      {trashed && <Notice type="warning">This inquiry is in the Trash. Restore it to change its status.</Notice>}
+      {error && <Notice type="error">{error}</Notice>}
 
-        <div className="p-4 sm:p-6 space-y-5">
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 text-[13px]">
-            <Detail label="Phone" value={inquiry.phone} />
-            <Detail label="Location" value={[inquiry.city, inquiry.country].filter(Boolean).join(", ")} />
-            <Detail label="Submitted" value={new Date(inquiry.createdAt).toLocaleString()} />
-          </div>
-
-          <hr className="border-gray-100" />
-
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-4 text-[13px]">
-            <Detail label="Occasion" value={inquiry.occasion} />
-            <Detail label="Number of packs" value={inquiry.quantity} />
-            <Detail label="Budget per pack" value={inquiry.budget} />
-            <Detail label="Needed by" value={inquiry.deliveryDate} />
-            <Detail label="Branding" value={inquiry.branding} />
-            <Detail label="Packaging" value={inquiry.packaging} />
-            <Detail label="Leather" value={inquiry.leather} />
-            <Detail label="Brand colors" value={inquiry.brandColors} />
-            <Detail label="Greeting card" value={inquiry.greetingCard ? "Yes" : ""} />
-          </div>
-
-          {inquiry.items?.length > 0 && (
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Items in pack</p>
-              <div className="flex flex-wrap gap-1.5">
-                {inquiry.items.map((i) => (
-                  <span key={i} className="text-[12px] bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full">{i}</span>
-                ))}
+      {!trashed && (
+        <form id="gifting-edit-form" onSubmit={save}>
+          <Postbox title="Status" id="gifting-status-box">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0 12px" }}>
+              <div className="wp-field">
+                <label htmlFor="gifting-status" className="wp-label">Status</label>
+                <select id="gifting-status" value={status} onChange={(e) => setStatus(e.target.value)} className="wp-select wp-full">
+                  {ALL_STATUSES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="wp-field">
+                <label htmlFor="gifting-priority" className="wp-label">Priority</label>
+                <select id="gifting-priority" value={priority} onChange={(e) => setPriority(e.target.value)} className="wp-select wp-full">
+                  {PRIORITIES.map((s) => <option key={s}>{s}</option>)}
+                </select>
               </div>
             </div>
-          )}
-
-          {inquiry.notes && (
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Notes</p>
-              <p className="text-[13px] text-[#1d2327] leading-relaxed bg-gray-50 p-3 rounded-lg whitespace-pre-wrap">{inquiry.notes}</p>
+            <div className="wp-field" style={{ marginBottom: 0 }}>
+              <label htmlFor="gifting-admin-notes" className="wp-label">Admin notes</label>
+              <textarea
+                id="gifting-admin-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                placeholder="Internal notes (not visible to the customer)..."
+                className="wp-textarea wp-full"
+              />
             </div>
-          )}
+          </Postbox>
+        </form>
+      )}
 
+      <Postbox title="Contact" id="gifting-contact">
+        <KV label="Contact" value={inquiry.contactName} />
+        <KV label="Email" value={<a href={`mailto:${inquiry.email}`} className="wp-link" style={{ wordBreak: "break-all" }}>{inquiry.email}</a>} />
+        <KV label="Phone" value={inquiry.phone} />
+        <KV label="Location" value={[inquiry.city, inquiry.country].filter(Boolean).join(", ")} />
+        <KV label="Submitted" value={formatDateTime(inquiry.createdAt)} />
+      </Postbox>
+
+      <Postbox title="Gift packs" id="gifting-packs">
+        <KV label="Occasion" value={inquiry.occasion} />
+        <KV label="Number of packs" value={inquiry.quantity} />
+        <KV label="Budget per pack" value={inquiry.budget} />
+        <KV label="Needed by" value={inquiry.deliveryDate} />
+        <KV label="Branding" value={inquiry.branding} />
+        <KV label="Packaging" value={inquiry.packaging} />
+        <KV label="Leather" value={inquiry.leather} />
+        <KV label="Brand colors" value={inquiry.brandColors} />
+        <KV label="Greeting card" value={inquiry.greetingCard ? "Yes" : ""} />
+        {inquiry.items?.length > 0 && (
+          <div style={{ paddingTop: 10 }}>
+            <div className="wp-label">Items in pack</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {inquiry.items.map((i) => <span key={i} className="wp-chip">{i}</span>)}
+            </div>
+          </div>
+        )}
+      </Postbox>
+
+      {inquiry.notes && (
+        <Postbox title="Customer notes" id="gifting-notes">
+          <div className="wp-note-body is-customer" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{inquiry.notes}</div>
+        </Postbox>
+      )}
+
+      {(inquiry.logos?.length > 0 || inquiry.referenceImages?.length > 0) && (
+        <Postbox title="Files" id="gifting-files">
           {inquiry.logos?.length > 0 && (
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Logo files ({inquiry.logos.length})</p>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            <div className="wp-field">
+              <div className="wp-label">Logo files ({inquiry.logos.length})</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 8 }}>
                 {inquiry.logos.map((l, i) => (
-                  <a key={i} href={l.url} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
+                  <a
+                    key={i}
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ aspectRatio: "1 / 1", overflow: "hidden", border: "1px solid #dcdcde", background: "#f6f7f7", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >
                     {isImage(l.url) ? (
-                      <img src={l.url} alt={l.name} className="w-full h-full object-contain p-1" />
+                      <img src={l.url} alt={l.name || `Logo ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 4 }} />
                     ) : (
-                      <span className="flex flex-col items-center text-[10px] text-gray-500 p-1 text-center break-all"><FileText className="w-5 h-5 mb-1" />{l.name}</span>
+                      <span className="wp-muted wp-small" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: 4, textAlign: "center", wordBreak: "break-all" }}>
+                        <FileText className="w-5 h-5" aria-hidden="true" style={{ marginBottom: 4 }} />{l.name}
+                      </span>
                     )}
                   </a>
                 ))}
               </div>
             </div>
           )}
-
           {inquiry.referenceImages?.length > 0 && (
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Reference images ({inquiry.referenceImages.length})</p>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            <div className="wp-field" style={{ marginBottom: 0 }}>
+              <div className="wp-label">Reference images ({inquiry.referenceImages.length})</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 8 }}>
                 {inquiry.referenceImages.map((u, i) => (
-                  <a key={i} href={u} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-lg overflow-hidden border border-gray-100">
-                    <img src={u} alt={`Reference ${i + 1}`} className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
+                  <a key={i} href={u} target="_blank" rel="noopener noreferrer" style={{ display: "block", aspectRatio: "1 / 1", overflow: "hidden", border: "1px solid #dcdcde" }}>
+                    <img src={u} alt={`Reference ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   </a>
                 ))}
               </div>
             </div>
           )}
+        </Postbox>
+      )}
 
-          <hr className="border-gray-100" />
-
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-2">Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className="border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] w-full outline-none focus:border-[#2271b1]">
-                {ALL_STATUSES.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-2">Priority</label>
-              <select value={priority} onChange={(e) => setPriority(e.target.value)} className="border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] w-full outline-none focus:border-[#2271b1]">
-                {PRIORITIES.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-2">Admin notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Internal notes (not visible to the customer)..."
-              className="border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] w-full outline-none focus:border-[#2271b1] resize-none"
-            />
-          </div>
-        </div>
-
-        <div className="p-3 sm:p-6 border-t border-gray-100 flex flex-col-reverse xs:flex-row xs:justify-end gap-2 sm:gap-3">
-          <button onClick={onClose} className="border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Cancel</button>
-          <button onClick={save} disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] disabled:opacity-60">
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
-      </div>
-    </div>
+      {trashed && inquiry.adminNotes && (
+        <Postbox title="Admin notes" id="gifting-admin-notes-ro">
+          <div className="wp-note-body" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{inquiry.adminNotes}</div>
+        </Postbox>
+      )}
+    </Drawer>
   );
 }
 
 export default function CorporateGiftingInquiriesPage() {
   const { showConfirm } = usePopup();
-  const [inquiries, setInquiries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [counts, setCounts] = useState({});
-  const [selected, setSelected] = useState(null);
-  const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState({});
+  const list = useInboxList(API);
+  const { view, items, selectedIds, reload, setItems } = list;
+  const isTrash = view === "trash";
+  const [bulkAction, setBulkAction] = useState("");
+  const [open, setOpen] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page, limit: 20 });
-      if (search) params.set("search", search);
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      const res = await fetch(`/api/admin/corporate-gifting-inquiries?${params}`);
-      const data = await res.json();
-      if (res.ok) {
-        setInquiries(data.items || []);
-        setPagination(data.pagination || {});
-        setCounts(data.counts || {});
-      }
-    } catch {
-      toast.error("Failed to load inquiries");
-    } finally {
-      setLoading(false);
+  const bulkOptions = isTrash
+    ? [["restore", "Restore"], ["delete", "Delete permanently"]]
+    : [...ALL_STATUSES.filter((s) => s !== view).map((s) => [`status:${s}`, `Change status to ${s}`]), ["trash", "Move to Trash"]];
+
+  const act = async (action, ids) => {
+    const n = ids.length;
+    if (action === "delete") {
+      const ok = await showConfirm(
+        `${n} inquir${n === 1 ? "y" : "ies"} will be deleted permanently. This cannot be undone.`,
+        "Delete permanently?",
+        { confirmText: "Delete Permanently", danger: true }
+      );
+      if (!ok) return false;
     }
-  }, [page, search, statusFilter]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const remove = async (id) => {
-    if (!(await showConfirm("Move this inquiry to trash?"))) return;
-    const res = await fetch(`/api/admin/corporate-gifting-inquiries/${id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("Inquiry removed"); load(); } else toast.error("Failed to delete");
+    const [name, status] = action.split(":");
+    const verb = name === "status" ? `set to ${status}` : name === "trash" ? "moved to the Trash" : name === "restore" ? "restored" : "deleted permanently";
+    const done = await runBulk(API, name, ids, { extra: status ? { status } : {}, verb, noun: "inquiry" });
+    reload();
+    return done;
   };
+
+  const applyBulk = async () => {
+    if (!bulkAction || selectedIds.length === 0) return;
+    if (await act(bulkAction, selectedIds)) list.setSelectedIds([]);
+    setBulkAction("");
+  };
+
+  const onSaved = useCallback((u) => {
+    setItems((prev) => prev.map((i) => (i._id === u._id ? u : i)));
+    reload({ silent: true });
+  }, [reload, setItems]);
+
+  const closeAfter = (fn) => async (inq) => { if (await fn(inq)) setOpen(null); };
+
+  const headerRow = (
+    <tr>
+      <th scope="col" className="wp-check-col">
+        <SelectAllBox label="Select all inquiries" list={list} />
+      </th>
+      <th scope="col">Company</th>
+      <th scope="col" className="wp-hide-sm">Contact</th>
+      <th scope="col" className="wp-hide-sm">Occasion</th>
+      <th scope="col" className="wp-hide-sm wp-num">Packs</th>
+      <th scope="col" className="wp-hide-sm">Status</th>
+      <th scope="col" className="wp-hide-sm">Date</th>
+    </tr>
+  );
 
   return (
     <RequirePermission permission="submissions.view">
-      <AdminPageLayout title="Corporate Gifting Inquiries">
-        <div className="space-y-4">
-          <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
-            {[["all", "All"], ...ALL_STATUSES.map((s) => [s, s])].map(([val, label]) => (
-              <li key={val} className="flex items-center gap-1">
-                <button onClick={() => { setStatusFilter(val); setPage(1); }} className={`hover:text-[#135e96] ${statusFilter === val ? "text-[#1d2327] font-semibold" : ""}`}>
-                  {label} <span className="text-[#646970] font-normal">({counts[val] || 0})</span>
-                </button>
-                {val !== "Cancelled" && <span className="text-[#c3c4c7]">|</span>}
-              </li>
-            ))}
-          </ul>
+      <Page>
+        <PageHeader title="Corporate Gifting Inquiries" />
 
-          <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex items-center gap-2 shadow-sm">
-            <input
-              type="text"
-              placeholder="Search by company, contact, email, occasion..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] w-full max-w-sm bg-white focus:border-[#2271b1] rounded-[3px]"
-            />
-            <Search className="w-3.5 h-3.5 text-gray-400" />
-          </div>
+        <StatusViews
+          label="Filter inquiries by status"
+          views={VIEWS}
+          current={view}
+          counts={list.counts}
+          onChange={(v) => { list.setView(v); setBulkAction(""); }}
+        />
 
-          <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
-            <table className="w-full text-left border-collapse text-[13px] min-w-[700px]">
-              <thead>
-                <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                  {["Company", "Contact", "Occasion", "Packs", "Status", "Date", "Actions"].map((h) => (
-                    <th key={h} className="px-4 py-2 font-bold text-[#1d2327]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#f0f0f1]">
-                {loading ? (
-                  <tr><td colSpan={7} className="p-8 text-center italic text-gray-400">Loading inquiries...</td></tr>
-                ) : inquiries.length === 0 ? (
-                  <tr><td colSpan={7} className="p-8 text-center italic text-gray-400">No inquiries found.</td></tr>
-                ) : (
-                  inquiries.map((inq) => (
-                    <tr key={inq._id} className="hover:bg-[#f6f7f7] group transition-colors">
-                      <td className="px-4 py-3 font-medium text-[#1d2327]">{inq.company}</td>
-                      <td className="px-4 py-3 text-[#646970]">{inq.contactName}<br /><span className="text-[12px] break-all">{inq.email}</span></td>
-                      <td className="px-4 py-3 text-[#646970]">{inq.occasion || "—"}</td>
-                      <td className="px-4 py-3 text-[#646970]">{inq.quantity || "—"}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${STATUS_COLORS[inq.status] || "bg-gray-100 text-gray-600"}`}>{inq.status}</span>
-                      </td>
-                      <td className="px-4 py-3 text-[#646970]">{new Date(inq.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <button onClick={() => setSelected(inq)} className="flex items-center gap-1 text-[#2271b1] hover:text-[#135e96] text-[12px] font-medium">
-                            <Eye className="w-3.5 h-3.5" /> View
-                          </button>
-                          <button onClick={() => remove(inq._id)} className="flex items-center gap-1 text-[#d63638] hover:text-[#bc0b0d] text-[12px] font-medium">
-                            <Trash2 className="w-3.5 h-3.5" /> Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {pagination.pages > 1 && (
-            <div className="flex items-center gap-2 text-[13px]">
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="border border-[#ccd0d4] px-2 py-1 rounded-[3px] disabled:opacity-40 hover:bg-[#f6f7f7]">
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <span className="text-[#646970]">Page {page} of {pagination.pages}</span>
-              <button onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))} disabled={page === pagination.pages} className="border border-[#ccd0d4] px-2 py-1 rounded-[3px] disabled:opacity-40 hover:bg-[#f6f7f7]">
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+        <div className="wp-toolbar">
+          <BulkActions
+            id="gifting-bulk-action"
+            options={bulkOptions}
+            value={bulkAction}
+            onChange={setBulkAction}
+            onApply={applyBulk}
+            disabled={!bulkAction || selectedIds.length === 0}
+          />
+          <span className="wp-spacer" />
+          <SearchForm
+            id="gifting-search"
+            label="Search inquiries"
+            placeholder="Company, contact, email, occasion..."
+            value={list.searchInput}
+            onChange={list.onSearchChange}
+            onSubmit={list.submitSearch}
+          />
         </div>
 
-        {selected && (
-          <DetailModal
-            inquiry={selected}
-            onClose={() => setSelected(null)}
-            onSaved={(u) => setInquiries((prev) => prev.map((i) => (i._id === u._id ? u : i)))}
+        <div className="wp-toolbar">
+          <span className="wp-spacer" />
+          <Pager pagination={list.pagination} onPage={list.goToPage} />
+        </div>
+
+        {list.error && <Notice type="error">{list.error}</Notice>}
+
+        <div className="wp-table-box">
+          <table className="wp-list-table">
+            <thead>{headerRow}</thead>
+            <tbody>
+              {list.loading ? (
+                <SkeletonRows cols={6} />
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="wp-muted">
+                    {list.query ? `No inquiries match “${list.query}”.` : isTrash ? "The Trash is empty." : "No inquiries found."}
+                  </td>
+                </tr>
+              ) : (
+                items.map((inq) => {
+                  const selected = selectedIds.includes(inq._id);
+                  return (
+                    <tr key={inq._id} className={selected ? "is-selected" : undefined}>
+                      <td className="wp-check-col">
+                        <input type="checkbox" aria-label={`Select ${inq.company}`} checked={selected} onChange={() => list.toggleSelect(inq._id)} />
+                      </td>
+                      <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                        <button
+                          type="button"
+                          onClick={() => setOpen(inq)}
+                          className="wp-row-title"
+                          style={{ background: "none", border: 0, padding: 0, cursor: "pointer", textAlign: "left", fontWeight: inq.status === "New" ? 700 : 600 }}
+                        >
+                          {inq.company}
+                        </button>
+                        <div className="wp-mobile-meta">
+                          {inq.contactName} · <span style={{ wordBreak: "break-all" }}>{inq.email}</span>
+                          <br />
+                          <span className={`wp-pill wp-pill-sm ${STATUS_COLORS[inq.status] || "wp-st-draft"}`}>{inq.status}</span>
+                          {" · "}{inq.occasion || "—"} · {inq.quantity || "—"} packs · {new Date(inq.createdAt).toLocaleDateString()}
+                        </div>
+                        <div className="wp-row-actions">
+                          <span><button type="button" onClick={() => setOpen(inq)}>{isTrash ? "View" : "View / Edit"}</button></span>
+                          {isTrash ? (
+                            <>
+                              <span><button type="button" onClick={() => act("restore", [inq._id])}>Restore</button></span>
+                              <span><button type="button" className="is-danger" onClick={() => act("delete", [inq._id])}>Delete permanently</button></span>
+                            </>
+                          ) : (
+                            <>
+                              {inq.status === "New" && (
+                                <span><button type="button" onClick={() => act("status:Contacted", [inq._id])}>Mark contacted</button></span>
+                              )}
+                              <span><button type="button" className="is-danger" onClick={() => act("trash", [inq._id])}>Trash</button></span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="wp-hide-sm" style={{ wordBreak: "break-word" }}>
+                        <div className="wp-strong">{inq.contactName}</div>
+                        <a href={`mailto:${inq.email}`} className="wp-link wp-small" style={{ wordBreak: "break-all" }}>{inq.email}</a>
+                      </td>
+                      <td className="wp-hide-sm">{inq.occasion || "—"}</td>
+                      <td className="wp-hide-sm wp-num">{inq.quantity || "—"}</td>
+                      <td className="wp-hide-sm">
+                        <span className={`wp-pill ${STATUS_COLORS[inq.status] || "wp-st-draft"}`}>{inq.status}</span>
+                      </td>
+                      <td className="wp-hide-sm wp-muted" style={{ whiteSpace: "nowrap" }}>{formatDateTime(inq.createdAt)}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+            <tfoot>{headerRow}</tfoot>
+          </table>
+        </div>
+
+        <div className="wp-toolbar">
+          <span className="wp-spacer" />
+          <Pager pagination={list.pagination} onPage={list.goToPage} />
+        </div>
+
+        {open && (
+          <GiftingDrawer
+            key={open._id}
+            inquiry={open}
+            onClose={() => setOpen(null)}
+            onSaved={onSaved}
+            onTrash={closeAfter((i) => act("trash", [i._id]))}
+            onRestore={closeAfter((i) => act("restore", [i._id]))}
+            onDelete={closeAfter((i) => act("delete", [i._id]))}
           />
         )}
-      </AdminPageLayout>
+      </Page>
     </RequirePermission>
   );
 }

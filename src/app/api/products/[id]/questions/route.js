@@ -25,7 +25,8 @@ export async function GET(req, { params }) {
         { _id: mongoose.isValidObjectId(paramId) ? paramId : null },
         { id: /^\d+$/.test(paramId) ? parseInt(paramId) : -1 },
         { slug: paramId }
-      ]
+      ],
+      isDeleted: { $ne: true }
     }).select("_id name slug").lean();
 
     if (!product) {
@@ -112,7 +113,8 @@ export async function POST(req, { params }) {
         { _id: mongoose.isValidObjectId(paramId) ? paramId : null },
         { id: /^\d+$/.test(paramId) ? parseInt(paramId) : -1 },
         { slug: paramId }
-      ]
+      ],
+      isDeleted: { $ne: true }
     }).select("_id name slug").lean();
 
     if (!product) {

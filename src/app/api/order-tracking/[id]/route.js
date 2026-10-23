@@ -9,9 +9,10 @@ export async function GET(req, { params }) {
     const { id } = await params;
 
     const isMongoId = /^[0-9a-fA-F]{24}$/.test(id);
+    // Orders an admin moved to the Trash are not viewable by the customer.
     const order = isMongoId
-      ? await Order.findById(id)
-      : await Order.findOne({ orderNumber: id });
+      ? await Order.findOne({ _id: id, isDeleted: { $ne: true } })
+      : await Order.findOne({ orderNumber: id, isDeleted: { $ne: true } });
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
