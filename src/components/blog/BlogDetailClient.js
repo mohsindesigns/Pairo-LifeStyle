@@ -90,31 +90,58 @@ const BlogCard = ({ post }) => (
 );
 
 import { useCart } from "@/context/CartContext";
+import { createPortal } from "react-dom";
+import SizeSelectionModal from "@/components/product/SizeSelectionModal";
 import { useRouter } from "next/navigation";
 
 export default function BlogDetailClient({ post, posts, featuredProduct, postDate }) {
    const { addToCart } = useCart();
    const router = useRouter();
 
+   // Same purchase rules as the homepage product cards (src/components/home/ProductCard.js):
+   //  - gifting products need their own page (pick items, upload a logo),
+   //  - products with options (size, colour...) open the SizeSelectionModal so the shopper must choose,
+   //  - simple products are added directly.
+   // Previously this added the product immediately with a made-up size ("Standard" / first size), so
+   // shoppers could skip choosing a size or option.
+   const [optionsModal, setOptionsModal] = useState({ open: false, buyNow: false });
+
+   const featuredAttributes =
+      featuredProduct?.attributes || featuredProduct?.variants?.map((v) => ({ name: v.name, values: v.values })) || [];
+   const featuredNeedsOptions = featuredProduct?.productType === "variable" && featuredAttributes.length > 0;
+
+   const startPurchase = (buyNow) => {
+      if (!featuredProduct) return;
+      if (featuredProduct.productType === "gifting") {
+         router.push(getProductUrl(featuredProduct));
+         return;
+      }
+      if (featuredNeedsOptions) {
+         setOptionsModal({ open: true, buyNow });
+         return;
+      }
+      addToCart(featuredProduct, !buyNow);
+      if (buyNow) router.push("/checkout");
+   };
+
    const handleAddToCart = (e) => {
       e.preventDefault();
-      addToCart({
-         ...featuredProduct,
-         quantity: 1,
-         selectedSize: featuredProduct.sizes?.[0] || "Standard",
-         selectedColor: featuredProduct.colors?.[0]?.name || "Original"
-      });
+      startPurchase(false);
    };
 
    const handleBuyNow = (e) => {
       e.preventDefault();
-      addToCart({
-         ...featuredProduct,
-         quantity: 1,
-         selectedSize: featuredProduct.sizes?.[0] || "Standard",
-         selectedColor: featuredProduct.colors?.[0]?.name || "Original"
-      });
-      router.push("/checkout");
+      startPurchase(true);
+   };
+
+   // The shopper confirmed their options in the modal.
+   const handleOptionsConfirmed = (cartItem) => {
+      const buyNow = optionsModal.buyNow;
+      addToCart(cartItem, !buyNow);
+      if (buyNow) {
+         setOptionsModal({ open: false, buyNow: false });
+         router.push("/checkout");
+      }
    };
 
    const carouselRef = useRef(null);
@@ -611,6 +638,15 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
                                  </button>
                               </div>
                            </div>
+                           {optionsModal.open && featuredNeedsOptions && createPortal(
+                              <SizeSelectionModal
+                                 product={featuredProduct}
+                                 isOpen={optionsModal.open}
+                                 onClose={() => setOptionsModal({ open: false, buyNow: false })}
+                                 onConfirm={handleOptionsConfirmed}
+                              />,
+                              document.body
+                           )}
                         </div>
                      )}
 
