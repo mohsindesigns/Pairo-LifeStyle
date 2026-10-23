@@ -10,9 +10,13 @@ const TiptapEditor = dynamic(() => import('@/components/admin/TiptapEditor'), { 
 import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
 import { Pencil, ExternalLink } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { getCategoryUrl } from "@/lib/routes";
+import { usePopup } from "@/context/PopupContext";
 
 export default function CategoryForm({ categoryId = null, type = "product" }) {
   const router = useRouter();
+  const { showConfirm } = usePopup();
+  const [trashing, setTrashing] = useState(false);
   const [loading, setLoading] = useState(categoryId ? true : false);
   const [saving, setSaving] = useState(false);
   const [availableItems, setAvailableItems] = useState([]);
@@ -164,6 +168,33 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       toast.error("Failed to save category. Check console.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Soft delete via the same API the list uses (mode=trash never hard-deletes).
+  const handleTrash = async () => {
+    if (!formData._id) return;
+    const ok = await showConfirm(
+      `Move "${formData.name || "this category"}" to the trash? You can restore it from the Trash view.`,
+      "Move to Trash",
+      { confirmText: "Move to Trash", danger: true }
+    );
+    if (!ok) return;
+    setTrashing(true);
+    try {
+      const res = await fetch(`/api/admin/categories?id=${formData._id}&mode=trash`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Category moved to trash.");
+        router.push(type === 'product' ? '/admin/categories' : '/admin/blogs/categories');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      toast.error("Error moving category to trash: " + (data.error || "Unknown error"));
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to move category to trash.");
+    } finally {
+      setTrashing(false);
     }
   };
 
@@ -490,7 +521,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                 {formData.slug && (
                   <div className="wp-misc-row">
                     <a
-                      href={`/${type === 'product' ? 'collections' : 'blog'}/${formData.slug}`}
+                      href={type === 'product' ? getCategoryUrl(formData.slug) : `/blog/${formData.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="wp-link"
@@ -510,6 +541,17 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                 >
                   Cancel
                 </button>
+                {formData._id && (
+                  <button
+                    type="button"
+                    onClick={handleTrash}
+                    disabled={trashing || saving}
+                    className="wp-link"
+                    style={{ background: "none", border: 0, padding: 0, marginLeft: 12, cursor: "pointer", color: "#b32d2e" }}
+                  >
+                    {trashing ? "Moving…" : "Move to Trash"}
+                  </button>
+                )}
                 <span className="wp-spacer" />
                 <button type="submit" disabled={saving} className="wp-btn wp-btn-primary">
                   {saving ? "Saving..." : (categoryId ? "Update" : "Publish")}

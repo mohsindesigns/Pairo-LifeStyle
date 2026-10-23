@@ -7,12 +7,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getCategoryUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
+import { buildCategoryDuplicate } from "@/app/api/admin/categories/helpers";
 
 export default function CategoryManager({ type = "product", title = "Categories" }) {
   const router = useRouter();
-  const { showConfirm } = usePopup();
+  const { showConfirm, showAlert } = usePopup();
   const [categories, setCategories] = useState([]);
+  const [trashedCategories, setTrashedCategories] = useState([]);
+  const [view, setView] = useState("all"); // "all" | "trash"
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
@@ -20,11 +24,16 @@ export default function CategoryManager({ type = "product", title = "Categories"
   const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/categories?type=${type}`);
-      const data = await res.json();
-      if (res.ok) {
-        setCategories(Array.isArray(data) ? data : []);
-      }
+      const [res, trashRes] = await Promise.all([
+        fetch(`/api/admin/categories?type=${type}`),
+        fetch(`/api/admin/categories?type=${type}&trash=true`),
+      ]);
+      const [data, trashData] = await Promise.all([
+        res.json().catch(() => []),
+        trashRes.json().catch(() => []),
+      ]);
+      if (res.ok) setCategories(Array.isArray(data) ? data : []);
+      if (trashRes.ok) setTrashedCategories(Array.isArray(trashData) ? trashData : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -38,12 +47,78 @@ export default function CategoryManager({ type = "product", title = "Categories"
     });
   }, [fetchCategories]);
 
+  const errorOf = async (res) => (await res.json().catch(() => ({}))).error || `Request failed (${res.status})`;
+
+  // Soft delete: mode=trash never hard-deletes, even if the item is already trashed.
+  const trashCategory = (id) => fetch(`/api/admin/categories?id=${id}&mode=trash`, { method: "DELETE" });
+  // Hard delete: the API only allows this for categories already in the trash.
+  const deletePermanently = (id) => fetch(`/api/admin/categories?id=${id}&mode=permanent`, { method: "DELETE" });
+  const restoreCategory = (id) => fetch("/api/admin/categories", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, isDeleted: false }),
+  });
+
+  // Products currently linked to a category (same source the editor uses).
+  // Blog posts hold a single category name, so duplicating their link would
+  // move them off the original category; blog copies start with no linked posts.
+  const fetchLinkedProductsMap = async () => {
+    if (type !== "product") return null;
+    try {
+      const res = await fetch("/api/admin/products?status=Published");
+      if (!res.ok) return null;
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.products || []);
+    } catch {
+      return null;
+    }
+  };
+
+  const duplicateOne = async (cat, products) => {
+    const linked = products
+      ? products.filter(p => (p.categories || []).map(String).includes(String(cat._id))).map(p => p._id)
+      : [];
+    const res = await fetch("/api/admin/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(buildCategoryDuplicate(cat, linked)),
+    });
+    if (!res.ok) throw new Error(await errorOf(res));
+  };
+
   const handleDelete = async (id) => {
-    const ok = await showConfirm("Are you sure you want to delete this category?");
+    const ok = await showConfirm("Move this category to the trash? You can restore it from the Trash view.", "Move to Trash", { confirmText: "Move to Trash" });
     if (!ok) return;
     try {
-      const res = await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
-      if (res.ok) fetchCategories();
+      const res = await trashCategory(id);
+      if (!res.ok) showAlert(await errorOf(res), "Could not move to trash", "error");
+      fetchCategories();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRestore = async (id) => {
+    try {
+      const res = await restoreCategory(id);
+      if (!res.ok) showAlert(await errorOf(res), "Could not restore", "error");
+      fetchCategories();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handlePermanentDelete = async (cat) => {
+    const ok = await showConfirm(
+      `Permanently delete "${cat.name}"? It will be removed from all products. This cannot be undone.`,
+      "Delete permanently",
+      { confirmText: "Delete permanently", danger: true }
+    );
+    if (!ok) return;
+    try {
+      const res = await deletePermanently(cat._id);
+      if (!res.ok) showAlert(await errorOf(res), "Could not delete", "error");
+      fetchCategories();
     } catch (err) {
       console.error(err);
     }
@@ -51,43 +126,61 @@ export default function CategoryManager({ type = "product", title = "Categories"
 
   const handleDuplicate = async (cat) => {
     try {
-      const { _id, ...rest } = cat;
-      const copy = {
-        ...rest,
-        name: `${cat.name} (Copy)`,
-        slug: `${cat.slug}-copy-${Math.floor(Math.random() * 1000)}`,
-        status: "Draft"
-      };
-      const res = await fetch("/api/admin/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(copy)
-      });
-      if (res.ok) fetchCategories();
+      await duplicateOne(cat, await fetchLinkedProductsMap());
     } catch (err) {
       console.error("Duplicate failed:", err);
+      showAlert(err.message || "Duplicate failed.", "Could not duplicate", "error");
     }
+    fetchCategories();
   };
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} categories?`);
-     if (ok) {
+     const isPermanent = bulkAction === "Delete Permanently";
+     const ok = await showConfirm(
+       isPermanent
+         ? `Permanently delete ${selectedIds.length} categories? They will be removed from all products. This cannot be undone.`
+         : `Apply "${bulkAction}" to ${selectedIds.length} categories?`,
+       isPermanent ? "Delete permanently" : undefined,
+       isPermanent ? { confirmText: "Delete permanently", danger: true } : {}
+     );
+     if (!ok) return;
+
+     const failures = [];
+     const products = bulkAction === "Duplicate" ? await fetchLinkedProductsMap() : null;
+     const source = view === "trash" ? trashedCategories : categories;
+     for (const id of selectedIds) {
+        const cat = source.find(c => c._id === id);
+        const label = cat?.name || id;
         try {
-           for (const id of selectedIds) {
-              if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
-                  await fetch(`/api/admin/categories?id=${id}`, { method: "DELETE" });
-              } else if (bulkAction === "Duplicate") {
-                  const cat = categories.find(c => c._id === id);
-                  if (cat) await handleDuplicate(cat);
-              }
-           }
-           setSelectedIds([]);
-           fetchCategories();
+           let res = null;
+           if (bulkAction === "Move to Trash") res = await trashCategory(id);
+           else if (bulkAction === "Restore") res = await restoreCategory(id);
+           else if (bulkAction === "Delete Permanently") res = await deletePermanently(id);
+           else if (bulkAction === "Duplicate" && cat) await duplicateOne(cat, products);
+           if (res && !res.ok) failures.push(`${label}: ${await errorOf(res)}`);
         } catch (err) {
-           console.error("Bulk action failed:", err);
+           failures.push(`${label}: ${err.message || "failed"}`);
         }
      }
+     setSelectedIds([]);
+     setBulkAction("Bulk actions");
+     await fetchCategories();
+     if (failures.length) {
+        showAlert(`${failures.length} of ${selectedIds.length} failed: ${failures.join("; ")}`, `${bulkAction} incomplete`, "error");
+     }
+  };
+
+  const switchView = (next) => {
+     setSelectedIds([]);
+     setBulkAction("Bulk actions");
+     setView(next);
+  };
+
+  // Search button / Enter apply immediately (typing also filters live).
+  const runSearch = (e) => {
+     e.preventDefault();
+     setSearchTerm(searchInput);
   };
 
   const toggleSelect = (id) => {
@@ -99,8 +192,8 @@ export default function CategoryManager({ type = "product", title = "Categories"
      else setSelectedIds(filteredCategories.map(c => c._id));
   };
 
-  const filteredCategories = categories.filter(c => 
-     c.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCategories = (view === "trash" ? trashedCategories : categories).filter(c => 
+     c.name?.toLowerCase().includes(searchTerm.trim().toLowerCase())
   );
 
   const newLink = type === 'product' ? '/admin/products/categories/new' : '/admin/blogs/categories/new';
@@ -115,18 +208,18 @@ export default function CategoryManager({ type = "product", title = "Categories"
         title={title}
         actions={<Link href={newLink} className="wp-btn">Add New</Link>}
         aside={
-          <div className="wp-search" role="search">
+          <form className="wp-search" role="search" onSubmit={runSearch}>
             <label htmlFor="category-search" className="sr-only">Search categories</label>
             <input
               id="category-search"
               type="search"
               className="wp-input"
               placeholder="Search categories..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); setSearchTerm(e.target.value); }}
             />
-            <button className="wp-btn">Search Categories</button>
-          </div>
+            <button type="submit" className="wp-btn">Search Categories</button>
+          </form>
         }
       />
 
@@ -149,18 +242,42 @@ export default function CategoryManager({ type = "product", title = "Categories"
         {/* Right column: list table */}
         <div className="wp-col-main">
           <div className="wp-subsub">
-            <span className="is-current">
-              All <span className="wp-count">({categories.length})</span>
-            </span>
+            {view === "all" ? (
+              <span className="is-current" aria-current="page">
+                All <span className="wp-count">({categories.length})</span>
+              </span>
+            ) : (
+              <button type="button" onClick={() => switchView("all")}>
+                All <span className="wp-count">({categories.length})</span>
+              </button>
+            )}
+            <span className="wp-sep">|</span>
+            {view === "trash" ? (
+              <span className="is-current" aria-current="page">
+                Trash <span className="wp-count">({trashedCategories.length})</span>
+              </span>
+            ) : (
+              <button type="button" onClick={() => switchView("trash")}>
+                Trash <span className="wp-count">({trashedCategories.length})</span>
+              </button>
+            )}
           </div>
 
           <div className="wp-toolbar">
             <label htmlFor="category-bulk-action" className="sr-only">Select bulk action</label>
             <select id="category-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
               <option>Bulk actions</option>
-              <option>Duplicate</option>
-              <option>Move to Trash</option>
-              <option>Delete Permanently</option>
+              {view === "trash" ? (
+                <>
+                  <option>Restore</option>
+                  <option>Delete Permanently</option>
+                </>
+              ) : (
+                <>
+                  <option>Duplicate</option>
+                  <option>Move to Trash</option>
+                </>
+              )}
             </select>
             <button onClick={handleBulkAction} className="wp-btn">Apply</button>
             <span className="wp-spacer" />
@@ -191,7 +308,7 @@ export default function CategoryManager({ type = "product", title = "Categories"
                 {loading ? (
                   <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>Loading...</td></tr>
                 ) : filteredCategories.length === 0 ? (
-                  <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>No categories found.</td></tr>
+                  <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>{view === "trash" ? "No categories found in Trash." : "No categories found."}</td></tr>
                 ) : (
                   filteredCategories.map((cat) => {
                     const status = cat.status || "Published";
@@ -210,12 +327,19 @@ export default function CategoryManager({ type = "product", title = "Categories"
                           <div className="wp-mobile-meta">
                             /{cat.slug} · {status}
                           </div>
-                          <div className="wp-row-actions">
-                            <Link href={getEditLink(cat._id)}>Edit</Link>
-                            <button type="button" onClick={() => handleDuplicate(cat)}>Duplicate</button>
-                            <button type="button" className="is-danger" onClick={() => handleDelete(cat._id)}>Trash</button>
-                            <Link href={getCategoryUrl(cat)} target="_blank">View</Link>
-                          </div>
+                          {view === "trash" ? (
+                            <div className="wp-row-actions">
+                              <button type="button" onClick={() => handleRestore(cat._id)}>Restore</button>
+                              <button type="button" className="is-danger" onClick={() => handlePermanentDelete(cat)}>Delete permanently</button>
+                            </div>
+                          ) : (
+                            <div className="wp-row-actions">
+                              <Link href={getEditLink(cat._id)}>Edit</Link>
+                              <button type="button" onClick={() => handleDuplicate(cat)}>Duplicate</button>
+                              <button type="button" className="is-danger" onClick={() => handleDelete(cat._id)}>Trash</button>
+                              <Link href={getCategoryUrl(cat)} target="_blank">View</Link>
+                            </div>
+                          )}
                         </td>
                         <td className="wp-hide-sm">
                           {cat.description ? (

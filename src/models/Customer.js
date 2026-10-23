@@ -4,6 +4,7 @@ const CustomerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  phone: { type: String, default: null },
   role: { type: String, default: 'user' },
   emailVerified: { type: Boolean, default: false },
   verificationToken: { type: String, default: null },

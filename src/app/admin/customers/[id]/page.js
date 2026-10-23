@@ -15,6 +15,12 @@ export default function CustomerDetail({ params }) {
 
   useEffect(() => {
     const fetchCustomer = async () => {
+      // Non-ObjectId ids (e.g. a stray /admin/customers/foo) can't exist: show "not found".
+      if (!/^[a-f0-9]{24}$/i.test(String(id || ""))) {
+        setCustomer(null);
+        setLoading(false);
+        return;
+      }
       try {
         const res = await fetch(`/api/admin/customers/${id}`);
         if (res.status === 403) {
@@ -123,7 +129,7 @@ export default function CustomerDetail({ params }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {customer.orders?.length === 0 ? (
+                  {!customer.orders?.length ? (
                     <tr><td colSpan={5} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>No orders placed by this customer yet.</td></tr>
                   ) : (
                     customer.orders?.map((order) => (
@@ -182,7 +188,7 @@ export default function CustomerDetail({ params }) {
 
           {/* Addresses */}
           <Postbox id="saved-addresses" title="Saved Addresses">
-            {customer.addresses?.length === 0 ? (
+            {!customer.addresses?.length ? (
               <p className="wp-empty">No addresses saved.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

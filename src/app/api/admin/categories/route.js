@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Category from "@/models/Category";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
+import { stripServerManagedFields, slugCandidates } from "./helpers";
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
@@ -78,6 +79,21 @@ export async function POST(req) {
     
     // Route Collision Detection
     const { validateSlug } = await import("@/lib/routes-server");
+
+    // Duplicate flow: pick the first free slug (base, base-2, ...) across live AND
+    // trashed categories of this type, so a duplicate never revives a trashed one.
+    if (data.uniqueSlug) {
+      let freeSlug = null;
+      for (const candidate of slugCandidates(data.slug || data.name)) {
+        const taken = await Category.exists({ slug: candidate, type });
+        if (taken) continue;
+        const check = await validateSlug(candidate);
+        if (check.valid) { freeSlug = candidate; break; }
+      }
+      if (!freeSlug) return NextResponse.json({ error: "Could not find a free slug for the copy." }, { status: 400 });
+      data.slug = freeSlug;
+    }
+
     const collisionCheck = await validateSlug(data.slug);
     if (!collisionCheck.valid) {
       return NextResponse.json({ error: collisionCheck.error }, { status: 400 });
@@ -108,7 +124,7 @@ export async function POST(req) {
           return NextResponse.json({ error: "A category with this slug already exists." }, { status: 400 });
        }
     } else {
-       category = await Category.create({ ...data, type });
+       category = await Category.create({ ...stripServerManagedFields(data), type });
        console.log("Created NEW category:", category._id, "with type:", category.type);
     }
 
@@ -196,7 +212,9 @@ export async function PUT(req) {
     const category = await Category.findByIdAndUpdate(id, data, { new: true });
 
     // Sync SizeChart assignment if changed
-    if (String(oldCategory.sizeChart || "") !== String(data.sizeChart || "")) {
+    // Partial payloads (e.g. restore from trash: { id, isDeleted: false }) must not
+    // clear the size chart / media usage, so only sync fields that were sent.
+    if (data.sizeChart !== undefined && String(oldCategory.sizeChart || "") !== String(data.sizeChart || "")) {
       const SizeChart = (await import("@/models/SizeChart")).default;
       
       // Clean up old size chart assignment
@@ -221,7 +239,7 @@ export async function PUT(req) {
     }
 
     // Handle Media Usage Tracking
-    if (oldCategory.image !== data.image) {
+    if (data.image !== undefined && oldCategory.image !== data.image) {
       const { trackMediaUsage, removeMediaUsage, findMediaByUrl } = await import("@/lib/mediaUsage");
       
       // Remove old usage
@@ -244,7 +262,7 @@ export async function PUT(req) {
       }
     }
     
-    if (oldCategory.banner !== data.banner) {
+    if (data.banner !== undefined && oldCategory.banner !== data.banner) {
       const { trackMediaUsage, removeMediaUsage, findMediaByUrl } = await import("@/lib/mediaUsage");
       
       if (oldCategory.banner) {
@@ -315,12 +333,23 @@ export async function DELETE(req) {
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
+  // mode=trash     -> soft delete only (idempotent, never hard-deletes)
+  // mode=permanent -> hard delete, only allowed for a category already in the trash
+  // (no mode)      -> legacy toggle used by the Trash page: trash, or hard-delete if already trashed
+  const mode = searchParams.get("mode");
 
   await dbConnect();
   try {
     const category = await Category.findById(id);
     if (!category) {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
+    if (mode === "trash" && category.isDeleted) {
+      return NextResponse.json({ message: "Category already in trash", category });
+    }
+    if (mode === "permanent" && !category.isDeleted) {
+      return NextResponse.json({ error: "Move the category to trash before deleting it permanently." }, { status: 409 });
     }
 
     if (category.isDeleted) {

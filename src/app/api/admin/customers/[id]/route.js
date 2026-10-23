@@ -20,7 +20,7 @@ export async function GET(req, { params }) {
     if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
     // Fetch all orders for this user
-    const orders = await Order.find({ "customer.userId": id }).sort({ createdAt: -1 }).lean();
+    const orders = await Order.find({ "customer.userId": id, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
 
     return NextResponse.json({
         ...customer,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Page, PageHeader, formatMoney, formatDate } from "@/components/admin/ui";
@@ -11,27 +11,71 @@ export default function AdminCustomers() {
   const { showConfirm } = usePopup();
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ total: 0, pages: 1, counts: { all: 0, active: 0 } });
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await fetch("/api/admin/customers");
+      const params = new URLSearchParams({ page: String(page), filter });
+      if (searchTerm) params.set("search", searchTerm);
+      const res = await fetch(`/api/admin/customers?${params}`);
       const data = await res.json();
-      if (res.ok) setCustomers(data);
+      if (res.ok) {
+        setCustomers(Array.isArray(data.customers) ? data.customers : []);
+        setMeta({
+          total: data.total || 0,
+          pages: data.pages || 1,
+          counts: data.counts || { all: 0, active: 0 },
+        });
+        if (data.page && data.page !== page) setPage(data.page);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, filter, searchTerm]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
       fetchCustomers();
     });
-  }, []);
+  }, [fetchCustomers]);
+
+  // Live search: apply the typed term after a short pause.
+  useEffect(() => {
+    const term = searchInput.trim();
+    if (term === searchTerm) return;
+    const t = setTimeout(() => {
+      setPage(1);
+      setSearchTerm(term);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput, searchTerm]);
+
+  // Search button / Enter: apply immediately.
+  const runSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    setSearchTerm(searchInput.trim());
+  };
+
+  const changeFilter = (next) => {
+    setSelectedIds([]);
+    setPage(1);
+    setFilter(next);
+  };
+
+  const goToPage = (next) => {
+    setSelectedIds([]);
+    setPage(Math.min(Math.max(1, next), meta.pages));
+  };
 
   const handleDelete = async (id) => {
     const ok = await showConfirm("Are you sure you want to move this customer to trash?");
@@ -44,25 +88,6 @@ export default function AdminCustomers() {
     }
   };
 
-  const handleDuplicate = async (customer) => {
-    try {
-      const { _id, createdAt, updatedAt, ...rest } = customer;
-      const copy = {
-        ...rest,
-        email: `copy-${Math.floor(Math.random() * 1000)}@${customer.email.split('@')[1]}`,
-        name: `${customer.name || 'Guest'} (Copy)`
-      };
-      const res = await fetch("/api/admin/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(copy)
-      });
-      if (res.ok) fetchCustomers();
-    } catch (err) {
-      console.error("Duplicate failed:", err);
-    }
-  };
-
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
      const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} customers?`);
@@ -71,9 +96,6 @@ export default function AdminCustomers() {
            for (const id of selectedIds) {
               if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
                   await fetch(`/api/admin/customers?id=${id}`, { method: "DELETE" });
-              } else if (bulkAction === "Duplicate") {
-                  const customer = customers.find(c => c._id === id);
-                  if (customer) await handleDuplicate(customer);
               }
            }
            setSelectedIds([]);
@@ -93,13 +115,11 @@ export default function AdminCustomers() {
      else setSelectedIds(filteredCustomers.map(c => c._id));
   };
 
-  const filteredCustomers = customers.filter(c => 
-    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filtering, search and paging happen server-side; this is the current page.
+  const filteredCustomers = customers;
 
   const allSelected = selectedIds.length > 0 && selectedIds.length === filteredCustomers.length;
-  const itemsLabel = `${filteredCustomers.length} item${filteredCustomers.length === 1 ? "" : "s"}`;
+  const itemsLabel = `${meta.total} item${meta.total === 1 ? "" : "s"}`;
   const initialsOf = (c) => {
     const source = (c.name || c.email || "?").trim();
     const parts = source.split(/\s+/).filter(Boolean);
@@ -132,26 +152,36 @@ export default function AdminCustomers() {
         title="Customers"
         actions={<Link href="/admin/customers/new" className="wp-btn">Add New</Link>}
         aside={
-          <div className="wp-search" role="search">
+          <form className="wp-search" role="search" onSubmit={runSearch}>
             <label htmlFor="customer-search" className="sr-only">Search customers</label>
             <input
               id="customer-search"
               type="search"
               className="wp-input"
               placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
             />
-            <button className="wp-btn">Search Customers</button>
-          </div>
+            <button type="submit" className="wp-btn">Search Customers</button>
+          </form>
         }
       />
 
       {/* Filter Links */}
       <div className="wp-subsub">
-        <span className="is-current">All <span className="wp-count">({customers.length})</span></span>
+        {filter === "all" ? (
+          <span className="is-current" aria-current="page">All <span className="wp-count">({meta.counts.all})</span></span>
+        ) : (
+          <button type="button" onClick={() => changeFilter("all")}>All <span className="wp-count">({meta.counts.all})</span></button>
+        )}
         <span className="wp-sep">|</span>
-        <button type="button">Active Customers</button>
+        {filter === "active" ? (
+          <span className="is-current" aria-current="page">Active Customers <span className="wp-count">({meta.counts.active})</span></span>
+        ) : (
+          <button type="button" onClick={() => changeFilter("active")} title="Customers with at least one non-cancelled order">
+            Active Customers <span className="wp-count">({meta.counts.active})</span>
+          </button>
+        )}
       </div>
 
       {/* Action Bar */}
@@ -159,7 +189,6 @@ export default function AdminCustomers() {
         <label htmlFor="customer-bulk-action" className="sr-only">Select bulk action</label>
         <select id="customer-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
           <option>Bulk actions</option>
-          <option>Duplicate</option>
           <option>Move to Trash</option>
           <option>Delete Permanently</option>
         </select>
@@ -202,7 +231,6 @@ export default function AdminCustomers() {
                           </div>
                           <div className="wp-row-actions">
                             <Link href={`/admin/customers/${c._id}`}>Edit</Link>
-                            <button type="button" onClick={() => handleDuplicate(c)}>Duplicate</button>
                             <button type="button" className="is-danger" onClick={() => handleDelete(c._id)}>Trash</button>
                             <Link href={`/admin/customers/${c._id}`}>View</Link>
                           </div>
@@ -228,9 +256,9 @@ export default function AdminCustomers() {
         <span className="wp-spacer" />
         <span className="wp-pages">
           {itemsLabel}
-          <button type="button" className="wp-pager" aria-label="Previous page"><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
-          <span>1 of 1</span>
-          <button type="button" className="wp-pager" aria-label="Next page"><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
+          <button type="button" className="wp-pager" aria-label="Previous page" disabled={loading || page <= 1} onClick={() => goToPage(page - 1)}><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
+          <span>{page} of {meta.pages}</span>
+          <button type="button" className="wp-pager" aria-label="Next page" disabled={loading || page >= meta.pages} onClick={() => goToPage(page + 1)}><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
         </span>
       </div>
     </Page>
