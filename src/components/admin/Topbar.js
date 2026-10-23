@@ -7,6 +7,24 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import { can } from "@/lib/rbac";
+
+// "+ New" menu: every module that has an Add screen, shown only to roles that may create it.
+const NEW_ITEMS = [
+  { label: "Product", href: "/admin/products/new", perm: "products.create" },
+  { label: "Post", href: "/admin/blogs/new", perm: "blogs.create" },
+  { label: "Page", href: "/admin/pages/new", perm: "pages.create" },
+  { label: "Order", href: "/admin/orders/new", perm: "orders.create" },
+  { label: "Customer", href: "/admin/customers/new", perm: "customers.edit" },
+  { label: "Product category", href: "/admin/products/categories/new", perm: "products.create" },
+  { label: "Post category", href: "/admin/blogs/categories/new", perm: "blogs.create" },
+  { label: "Size chart", href: "/admin/products/size-charts/new", perm: "products.create" },
+  { label: "Promotion", href: "/admin/promotions/new", perm: "promotions.manage" },
+  { label: "Media", href: "/admin/media", perm: "media.manage" },
+  { label: "Script", href: "/admin/settings/scripts/new", perm: "scripts.create" },
+  { label: "User", href: "/admin/settings/team/new", perm: "staff.create" },
+  { label: "Role", href: "/admin/settings/roles/new", perm: "staff.manage_roles" },
+];
 
 // Search: these words steer which product/page actions are shown, they are not matched against records.
 const COMMAND_WORDS = [
@@ -601,6 +619,8 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
   };
 
   // Shared admin-bar item look (WordPress #wpadminbar): 13px #f0f0f1, hover bg #2c3338 / text #72aee6
+  const newItems = NEW_ITEMS.filter((it) => can(session?.user, it.perm));
+
   const barItem = "flex items-center gap-1.5 h-11 md:h-8 px-2 md:px-[7px] text-[13px] leading-8 text-[#f0f0f1] no-underline hover:bg-[#2c3338] hover:text-[#72aee6] focus:outline-none focus-visible:bg-[#2c3338] focus-visible:text-[#72aee6] cursor-pointer shrink-0";
   const barItemActive = "bg-[#2c3338] text-[#72aee6]";
   const subItem = "flex items-center gap-2 w-full min-h-10 md:min-h-[26px] px-3 py-1 text-left text-[13px] leading-[1.4] text-[#f0f0f1] no-underline hover:text-[#72aee6] hover:bg-[#2c3338] focus:outline-none focus-visible:text-[#72aee6] cursor-pointer";
@@ -636,17 +656,19 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
         </Link>
 
         {/* + New (hover / keyboard focus opens the submenu, like WordPress) */}
-        <div className="relative h-full hidden sm:flex items-center group">
-          <Link href="/admin/products/new" className={`${barItem} group-hover:bg-[#2c3338] group-hover:text-[#72aee6] group-focus-within:bg-[#2c3338]`} aria-haspopup="true">
-            <Plus className="w-4 h-4 text-[#a7aaad] group-hover:text-[#72aee6]" aria-hidden="true" />
-            <span>New</span>
-          </Link>
-          <div className="hidden group-hover:block group-focus-within:block absolute top-full left-0 min-w-[160px] bg-[#2c3338] shadow-[0_3px_5px_rgba(0,0,0,0.2)] py-1.5 z-[110]">
-            <Link href="/admin/products/new" className={subItem}>Product</Link>
-            <Link href="/admin/blogs/new" className={subItem}>Post</Link>
-            <Link href="/admin/pages/new" className={subItem}>Page</Link>
+        {newItems.length > 0 && (
+          <div className="relative h-full hidden sm:flex items-center group">
+            <Link href={newItems[0].href} className={`${barItem} group-hover:bg-[#2c3338] group-hover:text-[#72aee6] group-focus-within:bg-[#2c3338]`} aria-haspopup="true">
+              <Plus className="w-4 h-4 text-[#a7aaad] group-hover:text-[#72aee6]" aria-hidden="true" />
+              <span>New</span>
+            </Link>
+            <div className="hidden group-hover:block group-focus-within:block absolute top-full left-0 min-w-[180px] bg-[#2c3338] shadow-[0_3px_5px_rgba(0,0,0,0.2)] py-1.5 z-[110]">
+              {newItems.map((it) => (
+                <Link key={it.href} href={it.href} className={subItem}>{it.label}</Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Right items: Search, Notifications & Account */}

@@ -6,8 +6,17 @@ import Link from "next/link";
 import { Page, PageHeader, Notice } from "@/components/admin/ui";
 import ScriptEditor from "@/components/admin/ScriptEditor";
 import { toast } from "react-hot-toast";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function EditScriptPage() {
+  return (
+    <RequirePermission permission="scripts.view">
+      <EditScript />
+    </RequirePermission>
+  );
+}
+
+function EditScript() {
   const { id } = useParams();
   const [script, setScript] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -80,6 +89,12 @@ export default function EditScriptPage() {
         <Link href="/admin/settings/scripts" className="wp-link">← Back to Scripts</Link>
         <span className="wp-muted" suppressHydrationWarning> · Version {script.version || 1} · Last updated {new Date(script.updatedAt).toLocaleString()}</span>
       </p>
+      {script.isDeleted && (
+        <Notice type="warning">
+          This script is in the Trash and will not load on the store. Restore it from the{" "}
+          <Link href="/admin/trash?tab=scripts" className="wp-link">Trash</Link> to use it again.
+        </Notice>
+      )}
       <ScriptEditor initialData={script} isEdit={true} />
     </Page>
   );

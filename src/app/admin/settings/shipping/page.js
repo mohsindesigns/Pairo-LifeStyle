@@ -10,6 +10,7 @@ import { Page, PageHeader, Notice } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import { COUNTRIES, countryName } from "@/lib/countries";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ShippingTaxTabs from "@/components/admin/settings/ShippingTaxTabs";
 import { normalizeMethodSettings } from "./methodSettings";
 
 // ─── Shared WordPress input styles ─────────────────────────────────────────────
@@ -61,25 +62,6 @@ function regionChips(matchRules) {
   });
 }
 
-// ─── Settings › Shipping / Tax tabs ────────────────────────────────────────────
-function NavTabs({ activeTab }) {
-  const tab = (href, key, label) => (
-    <Link
-      href={href}
-      className={`wp-tab ${activeTab === key ? "is-current" : ""}`}
-      aria-current={activeTab === key ? "page" : undefined}
-    >
-      {label}
-    </Link>
-  );
-  return (
-    <nav className="wp-tabs" aria-label="Shipping and tax settings">
-      {tab("/admin/settings/shipping", "shipping", "Shipping zones")}
-      {tab("/admin/settings/shipping/pickup-locations", "pickup-locations", "Pickup locations")}
-      {tab("/admin/settings/tax", "tax", "Tax")}
-    </nav>
-  );
-}
 
 // ─── Label-left form row ───────────────────────────────────────────────────────
 function FRow({ label, htmlFor, hint: hintText, children }) {
@@ -415,7 +397,7 @@ function StatusPill({ status }) {
 }
 
 // ─── Zone row(s) in the zones table ────────────────────────────────────────────
-function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabled, onMoveUp, onMoveDown, moveDisabled }) {
+function ZoneCard({ zone: initZone, onDelete, onUpdate, onDuplicate, dragHandle, deleteDisabled, onMoveUp, onMoveDown, moveDisabled }) {
   const { showConfirm } = usePopup();
   const [zone, setZone]               = useState(initZone);
   const [methods, setMethods]         = useState([]);
@@ -428,6 +410,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
   const [form, setForm]               = useState(initZone);
   const [savingZone, setSavingZone]   = useState(false);
   const [deletingMethod, setDM]       = useState(null);
+  const [duplicating, setDuplicating] = useState(null);
 
   const loadMethods = useCallback(async () => {
     if (!zone._id) return;
@@ -470,7 +453,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
   };
 
   const deleteMethod = async (mid) => {
-    const ok = await showConfirm("Are you sure you want to delete this shipping method?");
+    const ok = await showConfirm("Delete this shipping method? Customers in this zone will no longer see it at checkout. This cannot be undone.", "Delete shipping method", { confirmText: "Delete", danger: true });
     if (!ok) return;
     setDM(mid);
     try {
@@ -481,6 +464,25 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
       toast.success("Method deleted.");
     } catch (e) { toast.error(e.message); }
     finally { setDM(null); }
+  };
+
+  const duplicateMethod = async (mid) => {
+    setDuplicating(mid);
+    try {
+      const res = await fetch(`/api/admin/shipping/zones/${zone._id}/methods/${mid}/duplicate`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Duplicate failed (HTTP ${res.status}).`);
+      await loadMethods();
+      toast.success(`Created "${data.method.name}" (inactive).`);
+      setEM(data.method); setSMM(true);
+    } catch (e) { toast.error(e.message); }
+    finally { setDuplicating(null); }
+  };
+
+  const duplicateZone = async () => {
+    setDuplicating(zone._id);
+    try { await onDuplicate(zone._id); }
+    finally { setDuplicating(null); }
   };
 
   const providerLabel = { FLAT_RATE: "Flat Rate", FREE_SHIPPING: "Free Shipping", LOCAL_PICKUP: "Local Pickup" };
@@ -518,6 +520,13 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
           </div>
           <div className="wp-row-actions">
             <span><button type="button" onClick={() => { setForm(zone); setEditing(p => !p); expand(); }} className="max-[782px]:min-h-[40px]" title="Edit zone">Edit</button></span>
+            {!zone.isCatchAll && onDuplicate && (
+              <span>
+                <button type="button" onClick={duplicateZone} disabled={duplicating === zone._id} className="max-[782px]:min-h-[40px]" title="Copy this zone and its methods (created inactive)">
+                  {duplicating === zone._id ? "Duplicating…" : "Duplicate"}
+                </button>
+              </span>
+            )}
             <span>
               {deleteDisabled ? (
                 <span
@@ -659,6 +668,11 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
                             <div className="wp-row-actions">
                               <span><button type="button" onClick={() => { setEM(m); setSMM(true); }} className="max-[782px]:min-h-[40px]">Edit</button></span>
                               <span>
+                                <button type="button" onClick={() => duplicateMethod(m._id)} disabled={duplicating === m._id} className="max-[782px]:min-h-[40px]" title="Copy this method (created inactive)">
+                                  {duplicating === m._id ? "Duplicating…" : "Duplicate"}
+                                </button>
+                              </span>
+                              <span>
                                 <button type="button" onClick={() => deleteMethod(m._id)} disabled={deletingMethod === m._id} className="is-danger max-[782px]:min-h-[40px]">
                                   {deletingMethod === m._id ? "Deleting…" : "Delete"}
                                 </button>
@@ -704,9 +718,8 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
 }
 
 // ─── Add Zone Postbox ──────────────────────────────────────────────────────────
-function AddZoneForm({ onCreated }) {
+function AddZoneForm({ onCreated, open, setOpen }) {
   const blank = { name: "", description: "", priority: 0, sortOrder: 0, status: "Active", matchRules: [] };
-  const [open, setOpen] = useState(false);
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
 
@@ -724,16 +737,11 @@ function AddZoneForm({ onCreated }) {
     finally { setSaving(false); }
   };
 
-  if (!open) return (
-    <div className="wp-toolbar">
-      <button type="button" onClick={() => setOpen(true)} className="wp-btn wp-btn-primary">
-        <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add shipping zone
-      </button>
-    </div>
-  );
+  // Opened from the "Add shipping zone" button in the page header.
+  if (!open) return null;
 
   return (
-    <section className="wp-postbox" aria-labelledby="new-zone-title" style={{ marginTop: 12 }}>
+    <section id="new-zone" className="wp-postbox" aria-labelledby="new-zone-title" style={{ marginTop: 12, scrollMarginTop: 56 }}>
       <div className="wp-postbox-head"><h2 id="new-zone-title">New shipping zone</h2></div>
       <div className="wp-inside">
         <FRow label={<>Zone name <span className="text-[#d63638]">*</span></>} htmlFor="new-zone-name" hint="Give your zone a name, e.g. Local, or Europe.">
@@ -756,7 +764,7 @@ function AddZoneForm({ onCreated }) {
         <button type="button" onClick={create} disabled={saving} className="wp-btn wp-btn-primary">
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}{saving ? "Creating…" : "Create shipping zone"}
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="wp-btn">Cancel</button>
+        <button type="button" onClick={() => { setOpen(false); setForm(blank); }} className="wp-btn">Cancel</button>
       </div>
     </section>
   );
@@ -795,6 +803,26 @@ export default function ShippingSettingsPage() {
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const [reordering, setReordering] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const openAddZone = () => {
+    setAddOpen(true);
+    // Wait for the form to render, then bring it into view and focus the name field.
+    setTimeout(() => {
+      document.getElementById("new-zone")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("new-zone-name")?.focus({ preventScroll: true });
+    }, 50);
+  };
+
+  const handleDuplicate = async (id) => {
+    try {
+      const res = await fetch(`/api/admin/shipping/zones/${id}/duplicate`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Duplicate failed (HTTP ${res.status}).`);
+      setZones(p => [...p, data.zone]);
+      toast.success(`Created "${data.zone.name}" (inactive) with ${data.zone.methodCount} method${data.zone.methodCount === 1 ? "" : "s"}.`);
+    } catch (e) { toast.error(e.message); }
+  };
 
   useEffect(() => {
     (async () => {
@@ -847,7 +875,7 @@ export default function ShippingSettingsPage() {
   };
 
   const handleDelete = async (id) => {
-    const ok = await showConfirm("Delete this zone and ALL its shipping methods? This cannot be undone.");
+    const ok = await showConfirm("Delete this zone and ALL its shipping methods? This cannot be undone.", "Delete shipping zone", { confirmText: "Delete zone", danger: true });
     if (!ok) return;
     try {
       const res = await fetch(`/api/admin/shipping/zones?id=${id}`, { method: "DELETE" });
@@ -915,8 +943,15 @@ export default function ShippingSettingsPage() {
   return (
     <RequirePermission permission="settings.view">
     <Page>
-      <PageHeader title="Shipping" />
-      <NavTabs activeTab="shipping" />
+      <PageHeader
+        title="Shipping"
+        actions={shippingEnabled && !loading && (
+          <button type="button" onClick={openAddZone} className="wp-btn">
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />Add shipping zone
+          </button>
+        )}
+      />
+      <ShippingTaxTabs activeTab="shipping" />
 
       {/* ── 1. Enable / Disable ─────────────────────── */}
       <section className="wp-postbox" aria-labelledby="shipping-options-title">
@@ -981,7 +1016,7 @@ export default function ShippingSettingsPage() {
                   <tr>
                     <td colSpan={ZONE_COLS}>
                       <span className="wp-strong">No shipping zones configured.</span>{" "}
-                      <span className="wp-muted">Add a shipping zone below to start configuring shipping rates for your customers.</span>
+                      <span className="wp-muted">Use “Add shipping zone” above to start configuring shipping rates for your customers.</span>
                     </td>
                   </tr>
                 </tbody>
@@ -999,6 +1034,7 @@ export default function ShippingSettingsPage() {
                   <ZoneCard
                     zone={zone}
                     onDelete={handleDelete}
+                    onDuplicate={handleDuplicate}
                     onUpdate={updated => setZones(p => p.map(z => z._id === updated._id ? { ...z, ...updated } : z))}
                     deleteDisabled={zone.isCatchAll && catchAllCount <= 1}
                     onMoveUp={index > 0 ? () => moveZone(index, -1) : undefined}
@@ -1022,7 +1058,7 @@ export default function ShippingSettingsPage() {
             </table>
           </div>
 
-          <AddZoneForm onCreated={zone => setZones(p => [...p, zone])} />
+          <AddZoneForm open={addOpen} setOpen={setAddOpen} onCreated={zone => setZones(p => [...p, zone])} />
         </>
       )}
     </Page>

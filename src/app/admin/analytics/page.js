@@ -92,7 +92,7 @@ function SalesAnalytics() {
         ))}
       </div>
 
-      <div className="wp-cols">
+      <div className="wp-cols" style={{ rowGap: 0 }}>
         <div className="wp-col-main">
           <Postbox id="sales-30" title="Sales, last 30 days" aside="Daily">
             <figure style={{ margin: 0 }} aria-label={`Daily sales for the last 30 days: ${salesDays} days with sales, ${money(chartTotal)} in total`}>
@@ -137,14 +137,14 @@ function SalesAnalytics() {
                 <span className="wp-num wp-strong">{money(Math.round(product.revenue || 0), { decimals: 0 })}</span>
               </div>
             ))}
-            {stats.topProducts.length === 0 && <div className="wp-inside wp-empty">No sales data yet.</div>}
+            {stats.topProducts.length === 0 && <div className="wp-inside wp-empty" style={{ padding: "14px 12px" }}>No sales data yet.</div>}
           </Postbox>
         </div>
       </div>
 
       <Postbox id="variants" title="Best-selling variants" flush>
         {stats.variantInsights.length === 0 ? (
-          <div className="wp-inside wp-empty">Variant data will appear as orders are fulfilled.</div>
+          <div className="wp-inside wp-empty" style={{ padding: "14px 12px" }}>Variant data will appear as orders are fulfilled.</div>
         ) : (
           <div style={{ overflowX: "auto" }}>
             <table className="wp-list-table">
@@ -161,7 +161,7 @@ function SalesAnalytics() {
                   <tr key={i}>
                     <td className="wp-muted">{i + 1}</td>
                     <td className="wp-strong">{variant._id.name}</td>
-                    <td>{variant._id.variant}</td>
+                    <td>{variant._id.variant || <span className="wp-muted">—</span>}</td>
                     <td className="wp-num">
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
                         <span aria-hidden="true" className="wp-hide-sm" style={{ display: "inline-block", width: 80, height: 4, background: "#f0f0f1", borderRadius: 2 }}>

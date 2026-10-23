@@ -19,7 +19,7 @@ const CATCH_ALL_NAME = 'Locations not covered by your other zones';
 // Every store must always have exactly one zone with no coverage rules — it's
 // the fallback that catches addresses no other zone matches. Without it,
 // customers outside every defined zone silently see zero shipping options.
-async function ensureCatchAllZone() {
+async function createCatchAllIfMissing() {
   const existing = await ShippingZone.findOne({ matchRules: { $size: 0 } });
   if (existing) return existing;
 
@@ -32,6 +32,16 @@ async function ensureCatchAllZone() {
     status: 'Active',
     matchRules: [],
   });
+}
+
+// Concurrent GETs (e.g. two tabs, or React dev double-effects) used to each see "no catch-all"
+// and each create one. Share one in-flight check per server process.
+let catchAllPending = null;
+function ensureCatchAllZone() {
+  if (!catchAllPending) {
+    catchAllPending = createCatchAllIfMissing().finally(() => { catchAllPending = null; });
+  }
+  return catchAllPending;
 }
 
 export async function GET(req) {

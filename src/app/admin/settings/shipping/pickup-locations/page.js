@@ -8,30 +8,12 @@ import { Page, PageHeader } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import { COUNTRIES } from "@/lib/countries";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ShippingTaxTabs from "@/components/admin/settings/ShippingTaxTabs";
 
 // ─── Shared WordPress input styles (kept identical to the shipping/tax pages) ─
 const inp  = "wp-input wp-full";
 const sel  = "wp-select wp-full";
 
-// ─── Settings › Shipping / Tax tabs ────────────────────────────────────────────
-function NavTabs({ activeTab }) {
-  const tab = (href, key, label) => (
-    <Link
-      href={href}
-      className={`wp-tab ${activeTab === key ? "is-current" : ""}`}
-      aria-current={activeTab === key ? "page" : undefined}
-    >
-      {label}
-    </Link>
-  );
-  return (
-    <nav className="wp-tabs" aria-label="Shipping and tax settings">
-      {tab("/admin/settings/shipping", "shipping", "Shipping zones")}
-      {tab("/admin/settings/shipping/pickup-locations", "pickup-locations", "Pickup locations")}
-      {tab("/admin/settings/tax", "tax", "Tax")}
-    </nav>
-  );
-}
 
 // ─── Label-left form row ───────────────────────────────────────────────────────
 function FRow({ label, htmlFor, hint, children }) {
@@ -151,6 +133,21 @@ export default function PickupLocationsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing]     = useState(null);
   const [deleting, setDeleting]   = useState(null);
+  const [duplicating, setDuplicating] = useState(null);
+
+  const handleDuplicate = async (id) => {
+    setDuplicating(id);
+    try {
+      const res = await fetch(`/api/admin/shipping/pickup-locations/${id}/duplicate`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to duplicate pickup location.");
+      setLocations(p => [...p, data.location]);
+      toast.success(`Created "${data.location.name}" (inactive).`);
+      setEditing(data.location);
+      setShowModal(true);
+    } catch (e) { toast.error(e.message); }
+    finally { setDuplicating(null); }
+  };
 
   useEffect(() => {
     (async () => {
@@ -165,7 +162,7 @@ export default function PickupLocationsPage() {
   }, []);
 
   const handleDelete = async (id) => {
-    const ok = await showConfirm("Delete this pickup location? Shipping methods pointing to it will fall back to no specific location.");
+    const ok = await showConfirm("Delete this pickup location? Shipping methods pointing to it will fall back to no specific location. This cannot be undone.", "Delete pickup location", { confirmText: "Delete", danger: true });
     if (!ok) return;
     setDeleting(id);
     try {
@@ -189,7 +186,7 @@ export default function PickupLocationsPage() {
           </button>
         }
       />
-      <NavTabs activeTab="pickup-locations" />
+      <ShippingTaxTabs activeTab="pickup-locations" />
 
       <p className="wp-muted" style={{ margin: "0 0 10px", maxWidth: 900 }}>
         Add the store locations customers can pick up orders from, then attach one to a Local Pickup shipping
@@ -234,6 +231,11 @@ export default function PickupLocationsPage() {
                       </div>
                       <div className="wp-row-actions">
                         <span><button type="button" onClick={() => { setEditing(l); setShowModal(true); }} className="max-[782px]:min-h-[40px]">Edit</button></span>
+                        <span>
+                          <button type="button" onClick={() => handleDuplicate(l._id)} disabled={duplicating === l._id} className="max-[782px]:min-h-[40px]">
+                            {duplicating === l._id ? "Duplicating…" : "Duplicate"}
+                          </button>
+                        </span>
                         <span>
                           <button type="button" onClick={() => handleDelete(l._id)} disabled={deleting === l._id} className="is-danger max-[782px]:min-h-[40px]">
                             {deleting === l._id ? "Deleting…" : "Delete"}

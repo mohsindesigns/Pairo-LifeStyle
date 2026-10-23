@@ -11,6 +11,7 @@ import { usePopup } from "@/context/PopupContext";
 import { inp } from "@/components/admin/tax/taxStyles";
 import TaxRateRow from "@/components/admin/tax/TaxRateRow";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ShippingTaxTabs from "@/components/admin/settings/ShippingTaxTabs";
 
 const defaultSettings = {
   enabled: false,
@@ -25,26 +26,6 @@ const blankRow = () => ({
   rate: 0, name: "Tax", priority: 1, compound: false, shipping: true,
 });
 
-// ─── Settings › Shipping / Tax tabs ────────────────────────────────────────────
-// Kept in sync with the copy on the Shipping and Pickup locations pages.
-function NavTabs({ activeTab }) {
-  const tab = (href, key, label) => (
-    <Link
-      href={href}
-      className={`wp-tab ${activeTab === key ? "is-current" : ""}`}
-      aria-current={activeTab === key ? "page" : undefined}
-    >
-      {label}
-    </Link>
-  );
-  return (
-    <nav className="wp-tabs" aria-label="Shipping and tax settings">
-      {tab("/admin/settings/shipping", "shipping", "Shipping zones")}
-      {tab("/admin/settings/shipping/pickup-locations", "pickup", "Pickup locations")}
-      {tab("/admin/settings/tax", "tax", "Tax")}
-    </nav>
-  );
-}
 
 // ─── Label-left settings row ───────────────────────────────────────────────────
 function SettingsRow({ label, htmlFor, hint: hintText, children }) {
@@ -356,7 +337,7 @@ export default function TaxSettingsPage() {
     <RequirePermission permission="settings.view">
     <Page>
       <PageHeader title="Tax" />
-      <NavTabs activeTab="tax" />
+      <ShippingTaxTabs activeTab="tax" />
 
       {/* ── 1. Tax options ─────────────────────── */}
       <section className="wp-postbox" aria-labelledby="tax-options-title">

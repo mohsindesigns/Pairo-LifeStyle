@@ -45,6 +45,11 @@ const ScriptSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   priority: { type: Number, default: 10 }, // Lower = higher priority
 
+  // Trash (soft delete). Trashing also sets isActive=false, so storefront queries that load
+  // { isActive: true } never inject a trashed script.
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
+
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
   
@@ -61,4 +66,6 @@ ScriptSchema.index({ slug: 1 });
 ScriptSchema.index({ isActive: 1 });
 ScriptSchema.index({ location: 1 });
 
-export default mongoose.models.Script || mongoose.model('Script', ScriptSchema);
+// Re-register on reload (same pattern as ShippingZone) so schema changes apply in dev.
+delete mongoose.models.Script;
+export default mongoose.model('Script', ScriptSchema);

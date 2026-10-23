@@ -96,6 +96,10 @@ function LoadingRows({ rows = 4 }) {
   );
 }
 
+// Recent orders grid: 5 columns on desktop; on phones (<=782px, where .wp-hide-sm hides
+// Customer and Date) the remaining Order / Status / Total get their own 3-column template.
+const RECENT_GRID = "grid-cols-[minmax(0,1fr)_auto_minmax(72px,auto)] min-[783px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_minmax(0,1fr)_auto_minmax(80px,auto)]";
+
 export default function AdminDashboard() {
   // The saved range only exists in the browser; the server render and hydration use the default.
   const savedRange = useSyncExternalStore(subscribeToNothing, readSavedRange, () => null);
@@ -218,7 +222,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <div className="wp-cols">
+      <div className="wp-cols" style={{ rowGap: 0 }}>
         <div className="wp-col-main">
           {showSales && (
             <Postbox
@@ -243,10 +247,10 @@ export default function AdminDashboard() {
             <Postbox id="recent" title="Recent orders" aside={<Link className="wp-link" href="/admin/orders">View all orders</Link>} flush>
               {errors.orders ? <div className="wp-inside"><SectionError message={errors.orders} onRetry={retry} /></div>
                 : !orders ? <div className="wp-inside"><LoadingRows rows={5} /></div>
-                : orders.recent.length === 0 ? <div className="wp-inside wp-empty">No orders yet.</div>
+                : orders.recent.length === 0 ? <div className="wp-inside wp-empty" style={{ padding: "14px 12px" }}>No orders yet.</div>
                 : (
                   <div role="table" aria-label="Recent orders">
-                    <div role="row" className="wp-row is-head" style={{ gridTemplateColumns: "minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,1fr) auto minmax(80px,auto)" }}>
+                    <div role="row" className={`wp-row is-head ${RECENT_GRID}`}>
                       <span role="columnheader">Order</span>
                       <span role="columnheader" className="wp-hide-sm">Customer</span>
                       <span role="columnheader" className="wp-hide-sm">Date</span>
@@ -254,7 +258,7 @@ export default function AdminDashboard() {
                       <span role="columnheader" className="wp-num">Total</span>
                     </div>
                     {orders.recent.map((o, i) => (
-                      <div role="row" key={o._id} className={`wp-row ${i % 2 ? "is-alt" : ""}`} style={{ gridTemplateColumns: "minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,1fr) auto minmax(80px,auto)" }}>
+                      <div role="row" key={o._id} className={`wp-row ${RECENT_GRID} ${i % 2 ? "is-alt" : ""}`}>
                         <span role="cell" style={{ minWidth: 0 }}>
                           <Link className="wp-row-title" href={`/admin/orders/${o._id}`}>#{o.orderNumber}</Link>
                           <span className="wp-mobile-meta">{o.customer} · {formatDate(o.createdAt)}</span>
@@ -274,7 +278,7 @@ export default function AdminDashboard() {
             <Postbox id="top" title="Top sellers" aside={DASHBOARD_RANGES[range].label} flush>
               {errors.sales ? <div className="wp-inside"><SectionError message={errors.sales} onRetry={retry} /></div>
                 : !sales ? <div className="wp-inside"><LoadingRows /></div>
-                : sales.topSellers.length === 0 ? <div className="wp-inside wp-empty">No sales in this period.</div>
+                : sales.topSellers.length === 0 ? <div className="wp-inside wp-empty" style={{ padding: "14px 12px" }}>No sales in this period.</div>
                 : sales.topSellers.map((t, i) => (
                   <div key={`${t.productId}-${t.name}`} className={`wp-row ${i % 2 ? "is-alt" : ""}`} style={{ gridTemplateColumns: "40px minmax(0,1fr) auto minmax(90px,auto)" }}>
                     <span className="wp-thumb" aria-hidden="true">

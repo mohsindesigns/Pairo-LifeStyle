@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Page, PageHeader } from "@/components/admin/ui";
 import ScriptEditor from "@/components/admin/ScriptEditor";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function NewScriptPage() {
   return (
+    <RequirePermission permission="scripts.create">
     <Page>
       <PageHeader title="Add new script" />
       <p style={{ margin: "0 0 14px" }}>
@@ -12,5 +14,6 @@ export default function NewScriptPage() {
       </p>
       <ScriptEditor />
     </Page>
+    </RequirePermission>
   );
 }
