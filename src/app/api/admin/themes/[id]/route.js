@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import Theme from "@/models/Theme";
 import { can } from "@/lib/rbac";
 import { logAction } from "@/lib/audit";
+import mongoose from "mongoose";
 
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
@@ -12,6 +13,7 @@ export async function GET(req, { params }) {
   if (!can(session.user, "settings.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
+  if (!mongoose.isValidObjectId(id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await dbConnect();
   try {
     const theme = await Theme.findById(id).lean();
@@ -31,13 +33,25 @@ export async function PATCH(req, { params }) {
   await dbConnect();
   try {
     const data = await req.json();
+    if (!mongoose.isValidObjectId(id)) return NextResponse.json({ error: "Theme not found" }, { status: 404 });
     const before = await Theme.findById(id).lean();
-    
+    if (!before) return NextResponse.json({ error: "Theme not found" }, { status: 404 });
+
     if (before.isSystem) {
         return NextResponse.json({ error: "System themes cannot be modified. Duplicate to customize." }, { status: 403 });
     }
 
-    const theme = await Theme.findByIdAndUpdate(id, data, { new: true });
+    // Only editable fields; activation goes through POST { action: "ACTIVATE" } so exactly one theme stays active.
+    const update = {};
+    if (data?.config && typeof data.config === "object") update.config = data.config;
+    if (typeof data?.previewImage === "string") update.previewImage = data.previewImage;
+    if (data?.name !== undefined) {
+      const cleanName = typeof data.name === "string" ? data.name.trim() : "";
+      if (!cleanName || cleanName.length > 100) return NextResponse.json({ error: "Theme name is required (max 100 characters)" }, { status: 400 });
+      update.name = cleanName;
+    }
+
+    const theme = await Theme.findByIdAndUpdate(id, update, { new: true, runValidators: true });
     await logAction(req, session, 'UPDATE_THEME', 'theme', { before, after: theme });
     return NextResponse.json(theme);
   } catch (error) {
@@ -51,6 +65,7 @@ export async function DELETE(req, { params }) {
   if (!can(session.user, "settings.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
+  if (!mongoose.isValidObjectId(id)) return NextResponse.json({ error: "Theme not found" }, { status: 404 });
   await dbConnect();
   try {
     const theme = await Theme.findById(id);

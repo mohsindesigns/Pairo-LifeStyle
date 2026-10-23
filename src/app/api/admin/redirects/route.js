@@ -5,6 +5,10 @@ import dbConnect from "@/lib/db";
 import Redirect from "@/models/Redirect";
 import { can } from "@/lib/rbac";
 import { registerRedirect, normalizePath, isReservedPath } from "@/lib/redirect-resolver";
+import mongoose from "mongoose";
+
+const escapeRegex = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const parseStatus = (code) => (parseInt(code, 10) === 302 ? 302 : 301);
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
@@ -14,17 +18,18 @@ export async function GET(req) {
   await dbConnect();
   try {
     const { searchParams } = new URL(req.url);
-    const search = searchParams.get("search") || "";
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const search = (searchParams.get("search") || "").trim();
+    // Clamp paging so a bad query string can't produce NaN skips or unbounded reads.
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "10", 10) || 10));
     const skip = (page - 1) * limit;
 
     let query = {};
     if (search) {
       query = {
         $or: [
-          { oldPath: { $regex: search, $options: "i" } },
-          { newPath: { $regex: search, $options: "i" } }
+          { oldPath: { $regex: escapeRegex(search), $options: "i" } },
+          { newPath: { $regex: escapeRegex(search), $options: "i" } }
         ]
       };
     }
@@ -68,7 +73,10 @@ export async function POST(req) {
       return NextResponse.json({ error: "Cannot redirect from a reserved system path." }, { status: 400 });
     }
 
-    const record = await registerRedirect(sourceUrl, targetUrl, statusCode ? parseInt(statusCode, 10) : 301);
+    if (typeof sourceUrl !== "string" || typeof targetUrl !== "string") {
+      return NextResponse.json({ error: "Source path and target path must be text." }, { status: 400 });
+    }
+    const record = await registerRedirect(sourceUrl, targetUrl, parseStatus(statusCode));
     if (!record) {
       return NextResponse.json({ error: "Invalid redirect rule or circular loop detected." }, { status: 400 });
     }
@@ -91,10 +99,10 @@ export async function PUT(req) {
   try {
     const { _id, sourceUrl, targetUrl, statusCode } = await req.json();
 
-    if (!_id) {
+    if (!_id || !mongoose.isValidObjectId(_id)) {
       return NextResponse.json({ error: "Redirect ID is required for editing." }, { status: 400 });
     }
-    if (!sourceUrl || !targetUrl) {
+    if (!sourceUrl || !targetUrl || typeof sourceUrl !== "string" || typeof targetUrl !== "string") {
       return NextResponse.json({ error: "Source path and target path are required." }, { status: 400 });
     }
 
@@ -103,10 +111,23 @@ export async function PUT(req) {
       return NextResponse.json({ error: "Cannot redirect from a reserved system path." }, { status: 400 });
     }
 
+    // Normalize the target the same way registerRedirect does (path part only; query kept as typed).
+    const [targetPathOnly, targetQuery] = targetUrl.trim().split("?");
+    const cleanTarget = normalizePath(targetPathOnly);
+    const finalTarget = targetQuery ? `${cleanTarget}?${targetQuery}` : cleanTarget;
+    if (!cleanSource || !cleanTarget) {
+      return NextResponse.json({ error: "Source path and target path are required." }, { status: 400 });
+    }
+
     // Check circular redirect
-    const cleanTarget = normalizePath(targetUrl.split('?')[0]);
     if (cleanTarget === cleanSource) {
       return NextResponse.json({ error: "Source and target paths cannot be identical." }, { status: 400 });
+    }
+
+    // Direct loop: the target already redirects back to this source.
+    const loop = await Redirect.findOne({ oldPath: cleanTarget, _id: { $ne: _id } }).lean();
+    if (loop && normalizePath(String(loop.newPath || "").split("?")[0]) === cleanSource) {
+      return NextResponse.json({ error: "This would create a redirect loop." }, { status: 400 });
     }
 
     // Check duplicate oldPath (except for this record)
@@ -117,7 +138,7 @@ export async function PUT(req) {
 
     const record = await Redirect.findByIdAndUpdate(
       _id,
-      { oldPath: cleanSource, newPath: targetUrl, statusCode: statusCode ? parseInt(statusCode, 10) : 301 },
+      { oldPath: cleanSource, newPath: finalTarget, statusCode: parseStatus(statusCode) },
       { new: true, runValidators: true }
     );
 
@@ -127,6 +148,9 @@ export async function PUT(req) {
 
     return NextResponse.json({ success: true, item: record });
   } catch (error) {
+    if (error.code === 11000) {
+      return NextResponse.json({ error: "A redirect rule already exists for this source path." }, { status: 400 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -142,9 +166,13 @@ export async function DELETE(req) {
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: "No IDs provided." }, { status: 400 });
     }
+    const validIds = ids.filter((id) => mongoose.isValidObjectId(id));
+    if (validIds.length === 0) {
+      return NextResponse.json({ error: "No valid IDs provided." }, { status: 400 });
+    }
 
-    await Redirect.deleteMany({ _id: { $in: ids } });
-    return NextResponse.json({ success: true });
+    const { deletedCount } = await Redirect.deleteMany({ _id: { $in: validIds } });
+    return NextResponse.json({ success: true, deleted: deletedCount });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -30,6 +30,8 @@ import {
    GripVertical,
    ExternalLink,
    ArrowLeft,
+   ArrowUp,
+   ArrowDown,
    Save,
    FileText,
    CheckCircle2,
@@ -58,7 +60,7 @@ import dynamic from "next/dynamic";
 import { SECTION_SCHEMAS } from "@/lib/section-schemas";
 import { TEMPLATE_REGISTRY } from "@/lib/templates";
 import MediaPickerModal from "./MediaPickerModal";
-import { Page, PageHeader } from "./ui";
+import { Page, PageHeader, Notice } from "./ui";
 import SEOConfigPanel from "./SEOConfigPanel";
 import { useRBAC } from "@/hooks/useRBAC";
 import { planTemplateChange } from "./builder/templateChange";
@@ -151,6 +153,9 @@ const SectionMetaBox = ({
    onUpdate,
    onDelete,
    onDuplicate,
+   onMove,
+   isFirst,
+   isLast,
    onOpenMediaPicker,
    renderField
 }) => {
@@ -167,9 +172,9 @@ const SectionMetaBox = ({
 
    return (
       <div ref={setNodeRef} style={style} className={`bg-white border border-[#c3c4c7] mb-2 ${!section.enabled ? 'opacity-60' : ''}`}>
-         <div className={`flex items-center justify-between gap-1 px-1 sm:px-2 bg-white ${isExpanded ? 'border-b border-[#dcdcde]' : ''}`}>
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-               <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing min-w-[36px] min-h-[40px] flex items-center justify-center text-[#8c8f94] hover:text-[#2271b1] shrink-0" title="Drag to reorder">
+         <div className={`flex flex-wrap items-center justify-between gap-x-1 px-1 sm:px-2 bg-white ${isExpanded ? 'border-b border-[#dcdcde]' : ''}`}>
+            <div className="flex items-center gap-1 flex-1 min-w-[150px]">
+               <div {...attributes} {...listeners} style={{ touchAction: "none" }} className="cursor-grab active:cursor-grabbing min-w-[36px] min-h-[40px] flex items-center justify-center text-[#8c8f94] hover:text-[#2271b1] shrink-0" title="Drag to reorder" aria-label={`Drag to reorder ${schema.name} section`}>
                   <GripVertical className="w-4 h-4" aria-hidden="true" />
                </div>
                <div className="flex flex-wrap items-center gap-2 select-none cursor-pointer min-w-0 py-2" onClick={() => onToggleExpand(section.id)}>
@@ -178,7 +183,13 @@ const SectionMetaBox = ({
                </div>
             </div>
 
-            <div className="flex items-center shrink-0">
+            <div className="flex items-center shrink-0 ml-auto">
+               <button type="button" onClick={() => onMove(section.id, -1)} disabled={isFirst} aria-label={`Move ${schema.name} section up`} title="Move up" className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#646970] disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent">
+                  <ArrowUp className="w-4 h-4" aria-hidden="true" />
+               </button>
+               <button type="button" onClick={() => onMove(section.id, 1)} disabled={isLast} aria-label={`Move ${schema.name} section down`} title="Move down" className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#646970] disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent">
+                  <ArrowDown className="w-4 h-4" aria-hidden="true" />
+               </button>
                <button type="button" onClick={() => onUpdate(section.id, null, !section.enabled)} aria-label={section.enabled ? `Hide ${schema.name} section` : `Show ${schema.name} section`} title={section.enabled ? "Hide section" : "Show section"} className={`min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] ${section.enabled ? 'text-[#00a32a]' : 'text-[#8c8f94]'}`}>
                   {section.enabled ? <Eye className="w-4 h-4" aria-hidden="true" /> : <EyeOff className="w-4 h-4" aria-hidden="true" />}
                </button>
@@ -222,17 +233,12 @@ export default function PageForm({ pageId }) {
    const { can } = useRBAC();
    const [loading, setLoading] = useState(true);
    const [saving, setSaving] = useState(false);
-   const [activeFormTab, setActiveFormTab] = useState("content");
-
-   useEffect(() => {
-      if (typeof window !== 'undefined') {
-         const params = new URLSearchParams(window.location.search);
-         const tab = params.get("tab");
-         if (tab && (tab === "content" || tab === "seo")) {
-            setActiveFormTab(tab);
-         }
-      }
-   }, []);
+   // ?tab=seo opens the SEO tab. Read once on mount; the tabs only render after the page data loads,
+   // so the server/client initial values never reach the markup.
+   const [activeFormTab, setActiveFormTab] = useState(() => {
+      if (typeof window === "undefined") return "content";
+      return new URLSearchParams(window.location.search).get("tab") === "seo" ? "seo" : "content";
+   });
    const [page, setPage] = useState(null);
    const pageRef = useRef(null);
    useEffect(() => {
@@ -241,6 +247,10 @@ export default function PageForm({ pageId }) {
    const [expandedSectionId, setExpandedSectionId] = useState(null);
    const [mediaPicker, setMediaPicker] = useState({ open: false, onSelect: null });
    const [dynamicOptions, setDynamicOptions] = useState({ categories: [], products: [], blogs: [] });
+   // Add-section picker (a dialog, so it works on touch screens too) and the last save error.
+   const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
+   const [saveError, setSaveError] = useState("");
+   const [duplicating, setDuplicating] = useState(false);
 
    const sensors = useSensors(
       useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -266,7 +276,7 @@ export default function PageForm({ pageId }) {
 
             if (pageId && pageId !== "new") {
                const [pageRes, catsFetch, prodsFetch, blogsFetch] = results;
-               pageData = await pageRes.json();
+               pageData = pageRes.ok ? await pageRes.json() : null;
                catsRes = catsFetch;
                prodsRes = prodsFetch;
                blogsRes = blogsFetch;
@@ -313,6 +323,7 @@ export default function PageForm({ pageId }) {
             const catsList = Array.isArray(cats) ? cats : [];
             const blogsList = Array.isArray(blogs) ? blogs : [];
 
+            if (pageData && !Array.isArray(pageData.sections)) pageData.sections = [];
             if (pageData && pageData.sections && Array.isArray(pageData.sections)) {
                pageData.sections.forEach(s => {
                   if (s?.config?.productIds && Array.isArray(s.config.productIds)) {
@@ -343,14 +354,24 @@ export default function PageForm({ pageId }) {
    // `overrides` lets "Save Draft" force status: "Draft" regardless of the status select.
    const handleSave = async (e, overrides = {}) => {
       if (e) e.preventDefault();
+      const currentPage = pageRef.current || page;
+      if (!currentPage) return;
+      if (!String(currentPage.title || "").trim()) {
+         setSaveError("Please enter a title before saving.");
+         toast.error("Please enter a title before saving.");
+         return;
+      }
+      if (!currentPage.isSystem && !String(currentPage.slug || "").trim()) {
+         setSaveError("Please enter a permalink slug before saving.");
+         toast.error("Please enter a permalink slug before saving.");
+         return;
+      }
       setSaving(true);
+      setSaveError("");
       try {
-         const currentPage = pageRef.current || page;
-         if (!currentPage) return;
          // Strip immutable Mongoose fields that cause _id update errors
          const { _id, __v, createdAt, updatedAt, ...rest } = currentPage;
          const cleanPage = { ...rest, ...overrides };
-         console.log("[PageForm] Saving page seo:", cleanPage.seo);
 
          const isNew = pageId === "new" || !_id;
          const url = isNew ? "/api/admin/pages" : `/api/admin/pages/${pageId}`;
@@ -363,19 +384,20 @@ export default function PageForm({ pageId }) {
          });
          if (res.ok) {
             const savedData = await res.json();
-            setPage(savedData);
-            toast.success(overrides.status === "Draft" ? "Draft saved" : isNew ? "Page created successfully" : "Page updated successfully");
+            setPage(prev => ({ ...savedData, sections: Array.isArray(savedData.sections) ? savedData.sections : (prev?.sections || []) }));
+            toast.success(overrides.status === "Draft" ? "Draft saved" : isNew ? (savedData.status === "Published" ? "Page published" : "Page created") : "Page updated");
             if (isNew && savedData._id) {
                router.push(`/admin/pages/${savedData._id}`);
             }
          } else {
             const errData = await res.json().catch(() => ({}));
-            toast.error(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
-            console.error("[PageForm] Save failed:", errData);
+            const msg = errData.error || res.statusText || "Unknown error";
+            setSaveError(msg);
+            toast.error(`Save failed: ${msg}`);
          }
       } catch (err) {
+         setSaveError(`Failed to save changes: ${err.message}`);
          toast.error(`Failed to save changes: ${err.message}`);
-         console.error(err);
       } finally {
          setSaving(false);
       }
@@ -404,6 +426,42 @@ export default function PageForm({ pageId }) {
          toast.error(`Failed to move page to Trash: ${err.message}`);
          console.error(err);
       }
+   };
+
+   const handleDuplicate = async () => {
+      if (!page?._id) return;
+      setDuplicating(true);
+      try {
+         const res = await fetch(`/api/admin/pages/${page._id}/duplicate`, { method: "POST" });
+         const data = await res.json().catch(() => ({}));
+         if (res.ok && data?._id) {
+            toast.success("Page duplicated as a draft");
+            router.push(`/admin/pages/${data._id}`);
+         } else {
+            toast.error(data?.error || "Failed to duplicate page");
+         }
+      } catch (err) {
+         toast.error("Failed to duplicate page");
+      } finally {
+         setDuplicating(false);
+      }
+   };
+
+   // Move a section one place up (-1) or down (+1); the touch-friendly alternative to dragging.
+   const moveSection = (id, dir) => {
+      setPage(prev => {
+         const from = prev.sections.findIndex(s => s.id === id);
+         const to = from + dir;
+         if (from < 0 || to < 0 || to >= prev.sections.length) return prev;
+         return { ...prev, sections: arrayMove(prev.sections, from, to).map((s, i) => ({ ...s, order: i })) };
+      });
+   };
+
+   const addSection = (type) => {
+      const id = generateId();
+      setPage(prev => ({ ...prev, sections: [...prev.sections, { id, type, enabled: true, order: prev.sections.length, config: {} }] }));
+      setExpandedSectionId(id);
+      setSectionPickerOpen(false);
    };
 
    const handleTemplateChange = async (nextTemplate) => {
@@ -587,7 +645,7 @@ export default function PageForm({ pageId }) {
    if (loading) return (
       <Page>
          <PageHeader title={pageId === "new" ? "Add New Page" : "Edit Page"} />
-         <p className="wp-muted" role="status">Loading page editor…</p>
+         <p className="wp-muted" role="status" style={{ marginTop: 0 }}>Loading page editor…</p>
       </Page>
    );
 
@@ -620,13 +678,29 @@ export default function PageForm({ pageId }) {
    }
 
    const linkBtnStyle = { background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit" };
+   const isNewPage = pageId === "new" || !page._id;
+   const isTrashed = !!page.isDeleted;
+   const availableSections = Object.entries(SECTION_SCHEMAS).filter(([type]) => {
+      const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
+      return !templateConfig || !templateConfig.allowedSections || templateConfig.allowedSections.includes(type);
+   });
 
    return (
       <Page>
          <PageHeader
-            title={pageId === "new" ? "Add New Page" : "Edit Page"}
-            actions={<Link href="/admin/pages/new" className="wp-btn">Add New</Link>}
+            title={isNewPage ? "Add New Page" : "Edit Page"}
+            actions={can("pages.create") && !isNewPage ? <Link href="/admin/pages/new" className="wp-btn">Add New Page</Link> : null}
          />
+         {isTrashed && (
+            <Notice type="warning">
+               This page is in the Trash, so it can&apos;t be edited. Restore it from <Link href="/admin/pages?status=trash">Pages → Trash</Link> first.
+            </Notice>
+         )}
+         {saveError && (
+            <Notice type="error" onDismiss={() => setSaveError("")}>
+               <strong>Changes not saved.</strong> {saveError}
+            </Notice>
+         )}
          <form onSubmit={handleSave} className="wp-cols" style={{ paddingBottom: 40 }}>
             {/* Main Column */}
             <div className="wp-col-main">
@@ -706,32 +780,10 @@ export default function PageForm({ pageId }) {
                   <section className="wp-postbox" aria-labelledby="page-sections-title">
                      <div className="wp-postbox-head">
                         <h2 id="page-sections-title">Page Sections</h2>
-                        <div className="wp-postbox-aside relative group">
-                              <button type="button" className="wp-btn" aria-haspopup="true">
+                        <div className="wp-postbox-aside">
+                              <button type="button" className="wp-btn" aria-haspopup="dialog" onClick={() => setSectionPickerOpen(true)} disabled={isTrashed}>
                                  <Plus className="w-4 h-4" aria-hidden="true" /> Add Section
                               </button>
-                              <div className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto bg-white border border-[#c3c4c7] shadow-[0_3px_8px_rgba(0,0,0,0.15)] z-50 hidden group-hover:block group-focus-within:block py-1">
-                                 {Object.entries(SECTION_SCHEMAS)
-                                    .filter(([type]) => {
-                                       const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
-                                       return !templateConfig || !templateConfig.allowedSections || templateConfig.allowedSections.includes(type);
-                                    })
-                                    .map(([type, s]) => (
-                                       <button
-                                          key={type}
-                                          type="button"
-                                          onClick={() => {
-                                             const id = generateId();
-                                             const newSec = { id, type, enabled: true, order: page.sections.length, config: {} };
-                                             setPage({ ...page, sections: [...page.sections, newSec] });
-                                             setExpandedSectionId(id);
-                                          }}
-                                          className="w-full text-left px-3 min-h-[36px] text-[13px] text-[#1d2327] hover:bg-[#2271b1] hover:text-white focus:bg-[#2271b1] focus:text-white"
-                                       >
-                                          {s.name}
-                                       </button>
-                                    ))}
-                              </div>
                         </div>
                      </div>
                      <div className="wp-inside" style={{ background: "#f6f7f7" }}>
@@ -741,10 +793,13 @@ export default function PageForm({ pageId }) {
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                            <SortableContext items={page.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
                               <div>
-                                 {page.sections.map((s) => (
+                                 {page.sections.map((s, idx) => (
                                     <SectionMetaBox
                                        key={s.id}
                                        section={s}
+                                       isFirst={idx === 0}
+                                       isLast={idx === page.sections.length - 1}
+                                       onMove={moveSection}
                                        isExpanded={expandedSectionId === s.id}
                                        onToggleExpand={(id) => setExpandedSectionId(expandedSectionId === id ? null : id)}
                                        onUpdate={updateSection}
@@ -755,8 +810,13 @@ export default function PageForm({ pageId }) {
                                        }}
                                        onDuplicate={(sec) => {
                                           const id = generateId();
-                                          const newSec = { ...JSON.parse(JSON.stringify(sec)), id, order: page.sections.length };
-                                          setPage({ ...page, sections: [...page.sections, newSec] });
+                                          // The copy goes right below the original.
+                                          setPage(prev => {
+                                             const at = prev.sections.findIndex(x => x.id === sec.id);
+                                             const next = [...prev.sections];
+                                             next.splice(at + 1, 0, { ...JSON.parse(JSON.stringify(sec)), id });
+                                             return { ...prev, sections: next.map((x, i) => ({ ...x, order: i })) };
+                                          });
                                           setExpandedSectionId(id);
                                        }}
                                        onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })}
@@ -787,8 +847,10 @@ export default function PageForm({ pageId }) {
                <section className="wp-postbox" aria-labelledby="page-publish-title">
                   <div className="wp-postbox-head"><h2 id="page-publish-title">Publish</h2></div>
                   <div className="flex flex-wrap justify-between items-center gap-2" style={{ padding: "10px 12px 2px" }}>
-                     <button type="button" onClick={() => handleSave(null, { status: "Draft" })} disabled={saving} className="wp-btn">Save Draft</button>
-                     <Link href={page.slug === 'home' ? '/' : `/${page.slug}`} target="_blank" className="wp-btn">Preview</Link>
+                     <button type="button" onClick={() => handleSave(null, { status: "Draft" })} disabled={saving || isTrashed} className="wp-btn">Save Draft</button>
+                     {!isNewPage && page.slug && (
+                        <Link href={page.slug === 'home' ? '/' : `/${page.slug}`} target="_blank" rel="noopener noreferrer" className="wp-btn">{page.status === "Published" ? "View Page" : "Preview"}</Link>
+                     )}
                   </div>
                   <div className="wp-misc">
                      <div className="wp-misc-row">
@@ -837,21 +899,55 @@ export default function PageForm({ pageId }) {
                         <span className="wp-muted">Last Modified:</span>
                         <strong className="wp-strong">{page.updatedAt ? new Date(page.updatedAt).toLocaleDateString() : "Not saved yet"}</strong>
                      </div>
+                     {!isNewPage && can("pages.create") && !isTrashed && (
+                        <div className="wp-misc-row">
+                           <button type="button" onClick={handleDuplicate} disabled={duplicating} className="wp-link" style={{ ...linkBtnStyle, textDecoration: "underline", minHeight: 32 }}>
+                              {duplicating ? "Duplicating…" : "Duplicate this page"}
+                           </button>
+                        </div>
+                     )}
                   </div>
                   <div className="wp-box-foot">
-                     {!page.isSystem && pageId !== "new" && can("pages.delete") && (
-                        <button type="button" onClick={handleDelete} style={{ ...linkBtnStyle, color: "#b32d2e", textDecoration: "underline" }}>
+                     {!page.isSystem && !isNewPage && !isTrashed && can("pages.delete") && (
+                        <button type="button" onClick={handleDelete} style={{ ...linkBtnStyle, color: "#b32d2e", textDecoration: "underline", minHeight: 32 }}>
                            Move to Trash
                         </button>
                      )}
                      <span className="wp-spacer" />
-                     <button type="submit" disabled={saving} className="wp-btn wp-btn-primary" style={{ minHeight: 36 }}>
-                        {saving ? "Saving..." : "Update"}
+                     <button type="submit" disabled={saving || isTrashed} className="wp-btn wp-btn-primary">
+                        {saving ? "Saving..." : isNewPage ? (page.status === "Published" ? "Publish" : "Save") : "Update"}
                      </button>
                   </div>
                </section>
             </div>
          </form>
+
+         {sectionPickerOpen && (
+            <div className="wp-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setSectionPickerOpen(false); }} onKeyDown={(e) => { if (e.key === "Escape") setSectionPickerOpen(false); }}>
+               <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="page-add-section-title">
+                  <div className="wp-modal-head">
+                     <h2 id="page-add-section-title">Add section</h2>
+                     <button type="button" onClick={() => setSectionPickerOpen(false)} className="wp-notice-dismiss" aria-label="Close add section dialog"><X className="w-5 h-5" aria-hidden="true" /></button>
+                  </div>
+                  <div className="wp-modal-body">
+                     {availableSections.length === 0 ? (
+                        <p className="wp-muted m-0">No sections are available for this template.</p>
+                     ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                           {availableSections.map(([type, s]) => (
+                              <button key={type} type="button" onClick={() => addSection(type)} className="wp-btn justify-start text-left" style={{ minHeight: 40 }}>
+                                 <Plus className="w-4 h-4 shrink-0" aria-hidden="true" /> <span className="min-w-0 break-words">{s.name}</span>
+                              </button>
+                           ))}
+                        </div>
+                     )}
+                  </div>
+                  <div className="wp-modal-foot">
+                     <button type="button" onClick={() => setSectionPickerOpen(false)} className="wp-btn">Cancel</button>
+                  </div>
+               </div>
+            </div>
+         )}
 
          {mediaPicker.open && (
             <MediaPickerModal open={true} onClose={() => setMediaPicker({ open: false, onSelect: null })} onSelect={(sel) => { mediaPicker.onSelect(sel.url); setMediaPicker({ open: false, onSelect: null }); }} title="Asset Library" />

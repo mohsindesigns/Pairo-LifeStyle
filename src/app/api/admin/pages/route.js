@@ -44,6 +44,9 @@ export async function POST(req) {
         delete body.isDeleted;
         delete body.deletedAt;
         delete body.statusBeforeTrash;
+        // System pages are seeded, never created from the admin.
+        delete body.isSystem;
+        delete body._id;
         const { title, slug, template, sections } = body;
 
         if (!title || !slug) {

@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
-import { Page, PageHeader, Postbox, Skeleton } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Skeleton, Notice } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
+import { useRBAC } from "@/hooks/useRBAC";
 
 // Read a JSON error message from a failed response, falling back to `fallback`.
 async function errorMessage(res, fallback) {
@@ -29,7 +30,12 @@ async function errorMessage(res, fallback) {
 export default function AppearanceManagement() {
   const [themes, setThemes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [busyId, setBusyId] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [editingTheme, setEditingTheme] = useState(null);
+  const { can } = useRBAC();
+  const canManage = can("settings.manage");
   // JSON snapshot of the config when the customizer was opened (dirty check).
   const originalConfigRef = useRef(null);
   const { showConfirm, showPrompt } = usePopup();
@@ -54,12 +60,18 @@ export default function AppearanceManagement() {
 
   const fetchThemes = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
-      const res = await fetch("/api/admin/themes");
-      const data = await res.json();
-      if (res.ok) setThemes(data);
+      const res = await fetch("/api/admin/themes", { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && Array.isArray(data)) {
+        // Active theme first, then the user's own themes, then the built-in ones.
+        setThemes([...data].sort((a, b) => (b.isActive - a.isActive) || (a.isSystem - b.isSystem)));
+      } else {
+        setLoadError(data?.error || "Failed to load themes.");
+      }
     } catch (err) {
-      toast.error("Failed to load themes");
+      setLoadError("Failed to load themes. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -72,6 +84,7 @@ export default function AppearanceManagement() {
   }, [fetchThemes]);
 
   const activateTheme = async (id) => {
+    setBusyId(id);
     try {
       const res = await fetch("/api/admin/themes", {
         method: "POST",
@@ -86,32 +99,34 @@ export default function AppearanceManagement() {
       }
     } catch (err) {
       toast.error("Activation failed");
+    } finally {
+      setBusyId(null);
     }
   };
 
+  // The server copies the colours/fonts as an inactive, non-system theme with a unique "-copy" slug.
+  // Returns the new theme (or null) so "Duplicate to customize" can open it straight away.
   const duplicateTheme = async (theme, newName) => {
+    setBusyId(theme._id);
     try {
-      const { _id, isActive, isSystem, createdAt, updatedAt, ...configOnly } = theme;
-      const res = await fetch("/api/admin/themes", {
+      const res = await fetch(`/api/admin/themes/${theme._id}/duplicate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          ...configOnly, 
-          name: newName || `${theme.name} (Copy)`, 
-          slug: `${theme.slug}-copy-${Date.now()}`,
-          isActive: false,
-          isSystem: false
-        })
+        body: JSON.stringify(newName ? { name: newName } : {})
       });
       if (res.ok) {
+        const created = await res.json().catch(() => null);
         toast.success(newName ? "Theme created" : "Theme duplicated");
         fetchThemes();
-      } else {
-        toast.error(await errorMessage(res, "Duplication failed"));
+        return created;
       }
+      toast.error(await errorMessage(res, "Duplication failed"));
     } catch (err) {
       toast.error("Duplication failed");
+    } finally {
+      setBusyId(null);
     }
+    return null;
   };
 
   // "Add New Theme": a new theme is a named copy of the active (or default) theme.
@@ -144,6 +159,7 @@ export default function AppearanceManagement() {
       { confirmText: "Delete", danger: true }
     );
     if (!ok) return;
+    setBusyId(theme._id);
     try {
       const res = await fetch(`/api/admin/themes/${theme._id}`, { method: "DELETE" });
       if (res.ok) {
@@ -154,20 +170,30 @@ export default function AppearanceManagement() {
       }
     } catch (err) {
       toast.error("Delete failed");
+    } finally {
+      setBusyId(null);
     }
   };
 
+  const snapshot = (theme) => JSON.stringify({ name: theme.name, config: theme.config });
+
   const openCustomizer = (theme) => {
-    originalConfigRef.current = JSON.stringify(theme.config);
-    setEditingTheme(theme);
+    originalConfigRef.current = snapshot(theme);
+    setEditingTheme(JSON.parse(JSON.stringify(theme)));
+  };
+
+  // System themes are read-only: copy it, then open the copy in the customizer.
+  const duplicateAndCustomize = async () => {
+    const created = await duplicateTheme(editingTheme);
+    if (created?._id) openCustomizer(created);
   };
 
   const closeCustomizer = useCallback(async () => {
     if (!editingTheme) return;
-    const dirty = JSON.stringify(editingTheme.config) !== originalConfigRef.current;
+    const dirty = !editingTheme.isSystem && JSON.stringify({ name: editingTheme.name, config: editingTheme.config }) !== originalConfigRef.current;
     if (dirty) {
       const ok = await showConfirm(
-        "You have unsaved colour or font changes. Close the customizer and discard them?",
+        "You have unsaved changes to this theme. Close the customizer and discard them?",
         "Discard changes?",
         { confirmText: "Discard changes", danger: true }
       );
@@ -194,15 +220,20 @@ export default function AppearanceManagement() {
       toast.error("System themes cannot be modified. Please duplicate it first.");
       return;
     }
+    if (!String(editingTheme.name || "").trim()) {
+      toast.error("Theme name is required");
+      return;
+    }
 
+    setSaving(true);
     try {
       const res = await fetch(`/api/admin/themes`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingTheme._id, config: editingTheme.config })
+        body: JSON.stringify({ id: editingTheme._id, name: editingTheme.name.trim(), config: editingTheme.config })
       });
       if (res.ok) {
-        toast.success("Theme updated successfully");
+        toast.success(editingTheme.isActive ? "Theme updated — changes are live" : "Theme saved");
         fetchThemes();
         setEditingTheme(null);
       } else {
@@ -210,19 +241,14 @@ export default function AppearanceManagement() {
       }
     } catch (err) {
       toast.error("Failed to save changes");
+    } finally {
+      setSaving(false);
     }
   };
 
-  if (loading) return (
-    <Page>
-      <PageHeader title="Appearance" />
-      <div className="wp-postbox wp-inside space-y-3" aria-busy="true">
-        <span className="sr-only">Loading appearance settings...</span>
-        <Skeleton height={140} width="100%" />
-        <Skeleton height={20} width="40%" />
-      </div>
-    </Page>
-  );
+  const readOnly = !!editingTheme?.isSystem || !canManage;
+  const activeTheme = themes.find(t => t.isActive);
+  const swatchKeys = ["background", "foreground", "primary", "accent", "muted", "secondary"];
 
   const colorRow = (key, value) => (
     <div key={key} className="flex items-center gap-2 py-1.5 border-b border-[#f0f0f1] last:border-b-0">
@@ -233,8 +259,9 @@ export default function AppearanceManagement() {
       >
         <input
           type="color"
-          value={value}
+          value={/^#[0-9a-f]{6}$/i.test(value || "") ? value : "#000000"}
           onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, colors: {...editingTheme.config.colors, [key]: e.target.value}}})}
+          disabled={readOnly}
           aria-label={`${key} colour picker`}
           className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
         />
@@ -244,7 +271,8 @@ export default function AppearanceManagement() {
         type="text"
         value={value}
         onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, colors: {...editingTheme.config.colors, [key]: e.target.value}}})}
-        className="wp-input font-mono uppercase w-[96px] shrink-0"
+        readOnly={readOnly}
+        className="wp-input font-mono uppercase w-[110px] shrink-0"
         spellCheck={false}
       />
     </div>
@@ -254,115 +282,136 @@ export default function AppearanceManagement() {
     <RequirePermission permission="settings.view">
     <Page>
       <PageHeader
-        title="Appearance"
-        actions={<span className="wp-muted">Manage your site&apos;s visual identity</span>}
+        title="Themes"
+        actions={canManage && !loading && themes.length > 0 ? <button type="button" className="wp-btn" onClick={addNewTheme}>Add New Theme</button> : null}
       />
+      <p className="wp-muted" style={{ marginTop: 0, marginBottom: 16 }}>Themes set the colours and fonts of your public storefront. The admin dashboard is not affected.</p>
+
+      {loadError && (
+        <Notice type="error">
+          {loadError} <button type="button" className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit", textDecoration: "underline" }} onClick={fetchThemes}>Try again</button>
+        </Notice>
+      )}
+
       <div className="wp-cols">
 
         {/* Main Content: Theme List */}
         <div className="wp-col-main">
           <h2 className="sr-only">Themes</h2>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5" aria-busy="true">
+              <span className="sr-only">Loading themes…</span>
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} className="bg-white border border-[#c3c4c7]">
+                  <Skeleton height={120} width="100%" />
+                  <div className="p-3"><Skeleton height={16} width="60%" /><Skeleton height={32} width="80%" style={{ marginTop: 10 }} /></div>
+                </div>
+              ))}
+            </div>
+          ) : themes.length === 0 && !loadError ? (
+            <div className="bg-white border border-[#c3c4c7] p-6 text-center">
+              <p className="wp-muted" style={{ marginTop: 0 }}>No themes found.</p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {themes.map((theme) => (
-              <div
+            {themes.map((theme) => {
+              const c = theme.config?.colors || {};
+              const t = theme.config?.typography || {};
+              const busy = busyId === theme._id;
+              return (
+              <article
                 key={theme._id}
-                className={`bg-white border ${theme.isActive ? 'border-[#1d2327]' : 'border-[#c3c4c7]'} shadow-[0_1px_1px_rgba(0,0,0,0.04)] flex flex-col min-w-0`}
+                aria-label={`${theme.name}${theme.isActive ? " (active)" : ""}`}
+                className={`bg-white border ${theme.isActive ? 'border-[#2271b1] shadow-[0_0_0_1px_#2271b1]' : 'border-[#c3c4c7]'} flex flex-col min-w-0`}
               >
-                {/* Visual Preview Area (storefront colours) */}
-                <div className="aspect-[16/10] bg-[#f0f0f1] relative group border-b border-[#dcdcde]">
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-                    <div
-                      className="w-12 h-12 rounded-full border-2 border-white shadow-md mb-3"
-                      style={{ background: `linear-gradient(45deg, ${theme.config.colors.background} 50%, ${theme.config.colors.primary} 50%)` }}
-                      aria-hidden="true"
-                    />
-                    <span className="wp-muted">Heading font: {theme.config.typography.headingFont}</span>
+                {/* Preview: the theme's own colours and heading font */}
+                <button
+                  type="button"
+                  onClick={() => openCustomizer(theme)}
+                  className="block w-full p-0 border-0 border-b border-[#dcdcde] cursor-pointer text-left"
+                  style={{ backgroundColor: c.background || "#fff" }}
+                  aria-label={`${canManage && !theme.isSystem ? "Customize" : "Preview"} ${theme.name}`}
+                >
+                  <div className="px-4 pt-4 pb-3 min-h-[110px] flex flex-col justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate" style={{ color: c.foreground, fontFamily: t.headingFont, fontSize: 22, fontWeight: 700, lineHeight: 1.2 }}>Aa — {t.headingFont || "Default"}</div>
+                      <div className="truncate" style={{ color: c.foreground, opacity: 0.7, fontFamily: t.bodyFont, fontSize: 13, marginTop: 4 }}>Body: {t.bodyFont || "Default"}</div>
+                    </div>
+                    <div className="flex items-center gap-1.5" aria-hidden="true">
+                      {swatchKeys.map(k => (
+                        <span key={k} title={k} className="w-6 h-6 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: c[k] }} />
+                      ))}
+                      <span className="ml-auto h-7 px-3 rounded flex items-center text-[12px] font-semibold" style={{ backgroundColor: c.primary, color: c.background }}>Button</span>
+                    </div>
                   </div>
+                </button>
 
-                  {/* WP-Style Actions (always visible on touch, hover/focus on desktop) */}
-                  <div className="absolute inset-0 bg-white/90 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2 p-2">
-                     {!theme.isActive && (
-                        <button
-                          type="button"
-                          onClick={() => activateTheme(theme._id)}
-                          className="wp-btn"
-                          aria-label={`Activate ${theme.name}`}
-                        >
-                          Activate
-                        </button>
-                     )}
-                     <button
-                      type="button"
-                      onClick={() => openCustomizer(theme)}
-                      className="wp-btn wp-btn-primary"
-                      aria-label={`Customize ${theme.name}`}
-                     >
-                       Customize
-                     </button>
+                {/* Name, badges and actions */}
+                <div className="px-3 py-2.5 flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
+                    <h3 className="m-0 min-w-0 flex-1 text-[14px] font-semibold text-[#1d2327] break-words">{theme.name}</h3>
+                    {theme.isActive && <span className="wp-pill wp-pill-sm wp-st-published">Active</span>}
+                    {theme.isSystem && <span className="wp-pill wp-pill-sm wp-st-draft">Built-in</span>}
                   </div>
-                </div>
-
-                {/* Info Bar */}
-                <div className={`px-3 py-2 flex items-center gap-2 min-h-[48px] ${theme.isActive ? 'bg-[#1d2327] text-white' : 'bg-white'}`}>
-                  <h3 className={`flex-1 min-w-0 truncate m-0 text-[14px] font-semibold ${theme.isActive ? 'text-white' : 'text-[#1d2327]'}`}>
-                    {theme.isActive && <span className="font-normal">Active: </span>}{theme.name}
-                  </h3>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button type="button" onClick={() => duplicateTheme(theme)} className={`inline-flex items-center justify-center w-[30px] h-[30px] max-[782px]:w-10 max-[782px]:h-10 rounded-[3px] ${theme.isActive ? 'text-[#72aee6] hover:bg-white/10' : 'text-[#2271b1] hover:bg-[#f0f0f1]'}`} title="Duplicate" aria-label={`Duplicate ${theme.name}`}>
-                      <Copy className="w-4 h-4" aria-hidden="true" />
-                    </button>
-                    {!theme.isSystem && !theme.isActive && (
-                      <button type="button" onClick={() => deleteTheme(theme)} className="inline-flex items-center justify-center w-[30px] h-[30px] max-[782px]:w-10 max-[782px]:h-10 rounded-[3px] text-[#b32d2e] hover:bg-[#fcf0f1]" title="Delete" aria-label={`Delete ${theme.name}`}>
-                        <Trash2 className="w-4 h-4" aria-hidden="true" />
+                  {canManage && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!theme.isActive && (
+                        <button type="button" onClick={() => activateTheme(theme._id)} disabled={busy} className="wp-btn wp-btn-primary" aria-label={`Activate ${theme.name}`}>Activate</button>
+                      )}
+                      <button type="button" onClick={() => openCustomizer(theme)} disabled={busy} className="wp-btn" aria-label={`${theme.isSystem ? "Preview" : "Customize"} ${theme.name}`}>{theme.isSystem ? "Preview" : "Customize"}</button>
+                      <button type="button" onClick={() => duplicateTheme(theme)} disabled={busy} className="wp-btn" aria-label={`Duplicate ${theme.name}`}>
+                        <Copy className="w-4 h-4" aria-hidden="true" /> Duplicate
                       </button>
-                    )}
-                  </div>
+                      {!theme.isSystem && !theme.isActive && (
+                        <button type="button" onClick={() => deleteTheme(theme)} disabled={busy} className="wp-btn inline-flex items-center justify-center min-w-[40px]" style={{ color: "#b32d2e" }} title="Delete" aria-label={`Delete ${theme.name}`}>
+                          <Trash2 className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              </article>
+              );
+            })}
 
-            {/* Add New Placeholder */}
-            <button
-              type="button"
-              onClick={addNewTheme}
-              className="border-2 border-dashed border-[#c3c4c7] aspect-[16/10] flex flex-col items-center justify-center text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] focus-visible:border-[#2271b1] focus-visible:text-[#2271b1] transition-colors cursor-pointer p-3 bg-transparent w-full"
-            >
-               <Plus className="w-8 h-8 mb-2" aria-hidden="true" />
-               <span className="text-[14px] font-semibold">Add New Theme</span>
-            </button>
+            {canManage && themes.length > 0 && (
+              <button
+                type="button"
+                onClick={addNewTheme}
+                className="border-2 border-dashed border-[#c3c4c7] min-h-[180px] flex flex-col items-center justify-center text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] focus-visible:border-[#2271b1] focus-visible:text-[#2271b1] transition-colors cursor-pointer p-3 bg-transparent w-full"
+              >
+                 <Plus className="w-8 h-8 mb-2" aria-hidden="true" />
+                 <span className="text-[14px] font-semibold">Add New Theme</span>
+              </button>
+            )}
           </div>
+          )}
         </div>
 
         {/* Sidebar: Help & Info */}
         <div className="wp-col-side">
-          <Postbox title="About appearance">
-             <p className="mt-0 mb-3 leading-relaxed">
-               This screen allows you to manage the visual themes for your public storefront.
-               <strong> Note:</strong> Changes made here only affect the public website, not the admin dashboard.
-             </p>
-             <ul className="m-0 p-0 list-none space-y-1">
+          <Postbox title="Active theme">
+             <div className="wp-kv">
+                <span className="wp-kv-k wp-muted">Theme</span>
+                <span className="wp-kv-v break-words text-right">{loading ? "…" : activeTheme?.name || "Default"}</span>
+             </div>
+             <div className="wp-kv">
+                <span className="wp-kv-k wp-muted">Fonts</span>
+                <span className="wp-kv-v break-words text-right">{activeTheme ? `${activeTheme.config?.typography?.headingFont} / ${activeTheme.config?.typography?.bodyFont}` : "—"}</span>
+             </div>
+             <ul className="m-0 p-0 list-none" style={{ marginTop: 8 }}>
                 <li>
-                  <a href="/" target="_blank" rel="noopener noreferrer" className="wp-link flex items-center gap-2 min-h-[30px] hover:underline">
-                    <Eye className="w-3.5 h-3.5" aria-hidden="true" /> Preview your site
-                  </a>
-                </li>
-                <li>
-                  <a href="/" target="_blank" rel="noopener noreferrer" className="wp-link flex items-center gap-2 min-h-[30px] hover:underline">
+                  <a href="/" target="_blank" rel="noopener noreferrer" className="wp-link inline-flex items-center gap-2 min-h-[36px] hover:underline">
                     <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> Visit site
                   </a>
                 </li>
              </ul>
           </Postbox>
-
-          <Postbox title="Site identity">
-             <div className="wp-kv">
-                <span className="wp-kv-k wp-muted">Active theme</span>
-                <span className="wp-kv-v">{themes.find(t => t.isActive)?.name || 'Default'}</span>
-             </div>
-             <div className="wp-kv">
-                <span className="wp-kv-k wp-muted">Version</span>
-                <span className="wp-muted">1.0.0</span>
-             </div>
+          <Postbox title="About themes">
+             <p className="m-0 leading-relaxed">
+               Built-in themes can&apos;t be changed — duplicate one to make your own copy, then customize it.
+               The active theme can&apos;t be deleted; activate another theme first.
+             </p>
           </Postbox>
         </div>
       </div>
@@ -382,20 +431,50 @@ export default function AppearanceManagement() {
                           <X className="w-5 h-5" aria-hidden="true" />
                        </button>
                        <span className="flex-1" />
-                       <button
-                        type="button"
-                        onClick={saveThemeChanges}
-                        className="wp-btn wp-btn-primary"
-                       >
-                         Publish changes
-                       </button>
+                       {readOnly ? (
+                         canManage && (
+                           <button type="button" onClick={duplicateAndCustomize} disabled={busyId === editingTheme._id} className="wp-btn wp-btn-primary">
+                             Duplicate to customize
+                           </button>
+                         )
+                       ) : (
+                         <button
+                          type="button"
+                          onClick={saveThemeChanges}
+                          disabled={saving}
+                          className="wp-btn wp-btn-primary"
+                         >
+                           {saving ? "Saving…" : editingTheme.isActive ? "Publish changes" : "Save theme"}
+                         </button>
+                       )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto min-h-0">
                        <div className="px-4 py-3 bg-white border-b border-[#dcdcde]">
-                          <span className="wp-muted wp-small block">You are customizing</span>
-                          <h2 id="theme-customizer-title" className="m-0 text-[18px] font-semibold text-[#1d2327] truncate">{editingTheme.name}</h2>
+                          <span className="wp-muted wp-small block">{readOnly ? "You are previewing" : "You are customizing"}</span>
+                          <h2 id="theme-customizer-title" className="m-0 text-[18px] font-semibold text-[#1d2327] break-words">{editingTheme.name}</h2>
+                          {editingTheme.isActive && <span className="wp-pill wp-pill-sm wp-st-published" style={{ marginTop: 6 }}>Active — saving changes updates the live site</span>}
                        </div>
+                       {editingTheme.isSystem && (
+                          <div className="px-4 pt-3">
+                             <div className="wp-notice wp-notice-info" style={{ margin: 0 }}>
+                                <p>This is a built-in theme and can&apos;t be changed. Use <strong>Duplicate to customize</strong> to make your own copy.</p>
+                             </div>
+                          </div>
+                       )}
+                       {!readOnly && (
+                          <div className="px-4 py-3 bg-white border-b border-[#dcdcde] mt-3">
+                             <label className="wp-label" htmlFor="theme-name-input">Theme name</label>
+                             <input
+                               id="theme-name-input"
+                               type="text"
+                               maxLength={100}
+                               value={editingTheme.name || ""}
+                               onChange={(e) => setEditingTheme({ ...editingTheme, name: e.target.value })}
+                               className="wp-input wp-full"
+                             />
+                          </div>
+                       )}
 
                        {/* Colors */}
                        <section className="bg-white border-b border-[#dcdcde] mt-3" aria-labelledby="theme-colors-title">
@@ -420,6 +499,7 @@ export default function AppearanceManagement() {
                                   value={editingTheme.config.typography.headingFont}
                                   onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, typography: {...editingTheme.config.typography, headingFont: e.target.value}}})}
                                   className="wp-select wp-full"
+                                  disabled={readOnly}
                                 >
                                   {SUPPORTED_FONTS.map(font => (
                                     <option key={font} value={font}>{font}</option>
@@ -433,6 +513,7 @@ export default function AppearanceManagement() {
                                   value={editingTheme.config.typography.bodyFont}
                                   onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, typography: {...editingTheme.config.typography, bodyFont: e.target.value}}})}
                                   className="wp-select wp-full"
+                                  disabled={readOnly}
                                 >
                                   {SUPPORTED_FONTS.map(font => (
                                     <option key={font} value={font}>{font}</option>
@@ -446,6 +527,7 @@ export default function AppearanceManagement() {
                                   value={editingTheme.config.typography.headingScale}
                                   onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, typography: {...editingTheme.config.typography, headingScale: parseFloat(e.target.value)}}})}
                                   className="wp-select wp-full"
+                                  disabled={readOnly}
                                 >
                                   <option value="1.125">1.125x (Subtle)</option>
                                   <option value="1.200">1.200x (Minor Third)</option>
@@ -460,7 +542,7 @@ export default function AppearanceManagement() {
                  </div>
 
                  {/* Right: Live Preview Frame (storefront theme) */}
-                 <div className="flex-1 min-h-0 min-w-0 bg-[#dcdcde] p-2 sm:p-4 md:p-6 flex items-center justify-center">
+                 <div className="flex-1 min-h-[220px] min-w-0 bg-[#dcdcde] p-2 sm:p-4 md:p-6 flex items-center justify-center">
                     <div className="w-full h-full bg-white shadow-xl overflow-hidden flex flex-col border border-[#c3c4c7]">
                        <div className="bg-white border-b border-[#dcdcde] px-3 py-1.5 flex items-center justify-between shrink-0">
                           <div className="flex gap-1.5" aria-hidden="true">
@@ -479,26 +561,26 @@ export default function AppearanceManagement() {
                           />
                           
                           {/* Mini Header */}
-                          <div className="sticky top-0 z-10 border-b shadow-sm flex items-center justify-between px-8 py-4" style={{ backgroundColor: editingTheme.config.colors.card || editingTheme.config.colors.background, borderColor: editingTheme.config.colors.border }}>
+                          <div className="sticky top-0 z-10 border-b shadow-sm flex items-center justify-between gap-3 px-4 sm:px-8 py-3 sm:py-4" style={{ backgroundColor: editingTheme.config.colors.card || editingTheme.config.colors.background, borderColor: editingTheme.config.colors.border }}>
                              <div style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '18px', fontWeight: '900', letterSpacing: '-0.5px' }}>STOREFRONT</div>
-                             <div className="flex gap-6">
+                             <div className="flex gap-3 sm:gap-6">
                                 <span style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.bodyFont, fontSize: '13px', opacity: 0.8, cursor: 'pointer' }}>Home</span>
                                 <span style={{ color: editingTheme.config.colors.primary, fontFamily: editingTheme.config.typography.bodyFont, fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>Shop</span>
                                 <span style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.bodyFont, fontSize: '13px', opacity: 0.8, cursor: 'pointer' }}>About</span>
                              </div>
                           </div>
 
-                          <div className="p-12 max-w-2xl mx-auto space-y-16">
+                          <div className="p-5 sm:p-12 max-w-2xl mx-auto space-y-10 sm:space-y-16">
                              {/* Hero Section */}
                              <div className="space-y-6 text-center">
                                 <span style={{ color: editingTheme.config.colors.primary, fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: editingTheme.config.typography.bodyFont }}>New Collection</span>
-                                <h1 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '48px', lineHeight: '1.1', fontWeight: '800', letterSpacing: '-1px' }}>
+                                <h1 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: 'clamp(28px, 6vw, 48px)', lineHeight: '1.1', fontWeight: '800', letterSpacing: '-1px' }}>
                                   Experience Pure Luxury
                                 </h1>
                                 <p style={{ color: editingTheme.config.colors.foreground, opacity: 0.7, fontSize: '16px', lineHeight: '1.6', fontFamily: editingTheme.config.typography.bodyFont, maxWidth: '400px', margin: '0 auto' }}>
                                   This is a live simulation of your public storefront using the selected typography, colors, and borders.
                                 </p>
-                                <div className="pt-4 flex items-center justify-center gap-4">
+                                <div className="pt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
                                    <div className="h-11 px-8 rounded flex items-center justify-center font-bold text-[14px] cursor-pointer shadow-lg hover:opacity-90 transition-opacity" 
                                         style={{ backgroundColor: editingTheme.config.colors.primary, color: editingTheme.config.colors.background, fontFamily: editingTheme.config.typography.bodyFont }}>
                                       Shop Now
@@ -513,11 +595,11 @@ export default function AppearanceManagement() {
                              {/* Product Grid Simulation */}
                              <div className="space-y-6">
                                 <h2 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '24px', fontWeight: 'bold' }}>Featured Products</h2>
-                                <div className="grid grid-cols-2 gap-6">
+                                <div className="grid grid-cols-2 gap-3 sm:gap-6">
                                    {[1, 2].map((i) => (
                                      <div key={i} className="rounded-lg overflow-hidden border transition-transform hover:-translate-y-1" style={{ backgroundColor: editingTheme.config.colors.card || editingTheme.config.colors.background, borderColor: editingTheme.config.colors.border }}>
                                         <div className="aspect-[4/3] w-full" style={{ backgroundColor: editingTheme.config.colors.muted }}></div>
-                                        <div className="p-5 space-y-3">
+                                        <div className="p-3 sm:p-5 space-y-3">
                                            <h3 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '16px', fontWeight: 'bold' }}>Sample Product {i}</h3>
                                            <div className="flex items-center justify-between">
                                               <span style={{ color: editingTheme.config.colors.foreground, opacity: 0.7, fontFamily: editingTheme.config.typography.bodyFont, fontSize: '15px' }}>$199.00</span>

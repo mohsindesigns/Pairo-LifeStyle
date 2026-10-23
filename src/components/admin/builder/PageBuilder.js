@@ -32,6 +32,8 @@ import {
   Plus, 
   Save, 
   ArrowLeft, 
+  ArrowUp,
+  ArrowDown,
   Settings, 
   Globe, 
   GripVertical,
@@ -139,6 +141,9 @@ const SortableSection = ({
   onUpdate,
   onDelete,
   onDuplicate,
+  onMove,
+  isFirst,
+  isLast,
   onOpenMediaPicker,
   renderField
 }) => {
@@ -155,9 +160,9 @@ const SortableSection = ({
 
   return (
     <div ref={setNodeRef} style={style} className={`bg-white border border-[#c3c4c7] mb-2 ${!section.enabled ? 'opacity-60' : ''}`}>
-      <div className={`flex items-center justify-between gap-1 px-1 sm:px-2 bg-white ${isExpanded ? 'border-b border-[#dcdcde]' : ''}`}>
-        <div className="flex items-center gap-1 flex-1 min-w-0">
-          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing min-w-[36px] min-h-[40px] flex items-center justify-center text-[#8c8f94] hover:text-[#2271b1] shrink-0" title="Drag to reorder">
+      <div className={`flex flex-wrap items-center justify-between gap-x-1 px-1 sm:px-2 bg-white ${isExpanded ? 'border-b border-[#dcdcde]' : ''}`}>
+        <div className="flex items-center gap-1 flex-1 min-w-[150px]">
+          <div {...attributes} {...listeners} style={{ touchAction: "none" }} aria-label={`Drag to reorder ${schema.name} section`} className="cursor-grab active:cursor-grabbing min-w-[36px] min-h-[40px] flex items-center justify-center text-[#8c8f94] hover:text-[#2271b1] shrink-0" title="Drag to reorder">
             <GripVertical className="w-4 h-4" aria-hidden="true" />
           </div>
           <div className="flex flex-wrap items-center gap-2 select-none cursor-pointer min-w-0 py-2" onClick={() => onToggleExpand(section.id)}>
@@ -166,7 +171,13 @@ const SortableSection = ({
           </div>
         </div>
 
-        <div className="flex items-center shrink-0">
+        <div className="flex items-center shrink-0 ml-auto">
+           <button type="button" onClick={() => onMove(section.id, -1)} disabled={isFirst} className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#646970] disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent" title="Move up" aria-label={`Move ${schema.name} section up`}>
+              <ArrowUp className="w-4 h-4" aria-hidden="true" />
+           </button>
+           <button type="button" onClick={() => onMove(section.id, 1)} disabled={isLast} className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#646970] disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent" title="Move down" aria-label={`Move ${schema.name} section down`}>
+              <ArrowDown className="w-4 h-4" aria-hidden="true" />
+           </button>
            <button type="button" onClick={() => onUpdate(section.id, null, !section.enabled)} className={`min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] ${section.enabled ? 'text-[#00a32a]' : 'text-[#8c8f94]'}`} title={section.enabled ? "Disable" : "Enable"} aria-label={section.enabled ? `Hide ${schema.name} section` : `Show ${schema.name} section`}>
               {section.enabled ? <Eye className="w-4 h-4" aria-hidden="true" /> : <EyeOff className="w-4 h-4" aria-hidden="true" />}
            </button>
@@ -236,15 +247,12 @@ export default function PageBuilder({ initialPage }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("[PageBuilder] Fetching dynamic options...");
         const [catsRes, prodsRes, blogsRes] = await Promise.all([
           fetch("/api/admin/categories", { cache: "no-store" }),
           fetch("/api/admin/products", { cache: "no-store" }),
           fetch("/api/admin/blogs", { cache: "no-store" })
         ]);
-        console.log("[PageBuilder] Responses received status:", catsRes.status, prodsRes.status, blogsRes.status);
         const [cats, prods, blogs] = await Promise.all([catsRes.json(), prodsRes.json(), blogsRes.json()]);
-        console.log("[PageBuilder] Data parsed:", Array.isArray(cats) ? cats.length : typeof cats, Array.isArray(prods) ? prods.length : typeof prods, Array.isArray(blogs) ? blogs.length : typeof blogs);
         setDynamicOptions({
           categories: Array.isArray(cats) ? cats.map(c => ({ label: c.name, value: c._id })) : [],
           products: Array.isArray(prods) ? prods.map(p => ({ label: p.name, value: p._id })) : [],
@@ -365,7 +373,6 @@ export default function PageBuilder({ initialPage }) {
       case "multiselect":
         const selected = Array.isArray(value) ? value : [];
         const opts = field.options === 'categories' ? dynamicOptions.categories : field.options === 'products' ? dynamicOptions.products : field.options === 'blogs' ? dynamicOptions.blogs : field.options || [];
-        console.log("[PageBuilder] RENDER MULTISELECT:", field.name, "selected:", selected, "options count:", opts.length, "options:", opts);
         return (
           <div className="wp-checklist" style={{ maxHeight: 180, overflowY: "auto" }}>
             {opts.length === 0 && <span className="wp-muted">No options available</span>}
@@ -427,10 +434,25 @@ export default function PageBuilder({ initialPage }) {
 
   const duplicateSection = (section) => {
     const id = generateId();
-    const newSec = { ...JSON.parse(JSON.stringify(section)), id, order: page.sections.length };
-    setPage(prev => ({ ...prev, sections: [...prev.sections, newSec] }));
+    // The copy goes right below the original.
+    setPage(prev => {
+      const at = prev.sections.findIndex(x => x.id === section.id);
+      const next = [...prev.sections];
+      next.splice(at + 1, 0, { ...JSON.parse(JSON.stringify(section)), id });
+      return { ...prev, sections: next.map((x, i) => ({ ...x, order: i })) };
+    });
     setExpandedSections(prev => ({ ...prev, [id]: true }));
     toast.success("Section duplicated");
+  };
+
+  // Move a section one place up (-1) or down (+1); the touch-friendly alternative to dragging.
+  const moveSection = (id, dir) => {
+    setPage(prev => {
+      const from = prev.sections.findIndex(s => s.id === id);
+      const to = from + dir;
+      if (from < 0 || to < 0 || to >= prev.sections.length) return prev;
+      return { ...prev, sections: arrayMove(prev.sections, from, to).map((s, i) => ({ ...s, order: i })) };
+    });
   };
 
   const toggleExpand = (id) => setExpandedSections(prev => ({ ...prev, [id]: !prev[id] }));
@@ -458,7 +480,7 @@ export default function PageBuilder({ initialPage }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <a href={page.slug === 'home' ? '/' : `/${page.slug}`} target="_blank" className="wp-btn">
+          <a href={page.slug === 'home' ? '/' : `/${page.slug}`} target="_blank" rel="noopener noreferrer" className="wp-btn">
             <ExternalLink className="w-4 h-4" aria-hidden="true" /> Live Page
           </a>
           <button type="button" onClick={() => savePage(undefined, { manual: true })} disabled={isSaving} className="wp-btn wp-btn-primary">
@@ -483,8 +505,9 @@ export default function PageBuilder({ initialPage }) {
                          <label htmlFor="builder-slug" className="wp-label">URL slug</label>
                          <div className="flex items-center gap-1">
                             <span className="wp-muted" aria-hidden="true">/</span>
-                            <input id="builder-slug" type="text" value={page.slug} onChange={(e) => setPage({ ...page, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} className="wp-input flex-1 min-w-0" style={{ fontFamily: "monospace" }} />
+                            <input id="builder-slug" type="text" value={page.slug} readOnly={!!page.isSystem} aria-describedby={page.isSystem ? "builder-slug-locked" : undefined} onChange={(e) => setPage({ ...page, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} className="wp-input flex-1 min-w-0" style={{ fontFamily: "monospace" }} />
                          </div>
+                         {page.isSystem && <p id="builder-slug-locked" className="wp-desc">System page: the slug is locked.</p>}
                       </div>
                       <div className="wp-field sm:w-32" style={{ marginBottom: 0 }}>
                          <label htmlFor="builder-status" className="wp-label">Status</label>
@@ -515,8 +538,8 @@ export default function PageBuilder({ initialPage }) {
                                     <p className="wp-muted m-0">No sections added yet.</p>
                                  </div>
                               )}
-                              {page.sections.map((s) => (
-                                 <SortableSection key={s.id} section={s} isExpanded={expandedSections[s.id]} onToggleExpand={toggleExpand} onUpdate={updateSection} onDelete={async (id) => { if (await showConfirm("Are you sure you want to remove this section? This cannot be undone.", "Remove section", { confirmText: "Remove", danger: true })) setPage(p => ({ ...p, sections: p.sections.filter(x => x.id !== id) })); }} onDuplicate={duplicateSection} onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })} renderField={renderField} />
+                              {page.sections.map((s, idx) => (
+                                 <SortableSection key={s.id} section={s} isFirst={idx === 0} isLast={idx === page.sections.length - 1} onMove={moveSection} isExpanded={expandedSections[s.id]} onToggleExpand={toggleExpand} onUpdate={updateSection} onDelete={async (id) => { if (await showConfirm("Are you sure you want to remove this section? This cannot be undone.", "Remove section", { confirmText: "Remove", danger: true })) setPage(p => ({ ...p, sections: p.sections.filter(x => x.id !== id) })); }} onDuplicate={duplicateSection} onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })} renderField={renderField} />
                               ))}
                            </div>
                         </SortableContext>

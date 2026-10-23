@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Page, PageHeader, formatDate } from "@/components/admin/ui";
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
+import { paginate } from "@/lib/admin-products-utils";
 import { TEMPLATE_REGISTRY } from "@/lib/templates";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
 import { useRBAC } from "@/hooks/useRBAC";
 import RequirePermission from "@/components/admin/RequirePermission";
@@ -14,7 +15,6 @@ const VIEWS = ["all", "published", "draft", "trash"];
 
 export default function PagesManagementPage() {
   const { can } = useRBAC();
-  const router = useRouter();
   const { showConfirm } = usePopup();
   const [pages, setPages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,13 +23,17 @@ export default function PagesManagementPage() {
   const [bulkAction, setBulkAction] = useState("Bulk actions");
   // Status filter: all | published | draft | trash
   const [view, setView] = useState("all");
+  const [listPage, setListPage] = useState(1);
+  const [loadError, setLoadError] = useState("");
 
   const canEdit = can("pages.edit");
   const canCreate = can("pages.create");
   const canDelete = can("pages.delete");
+  const isTrash = view === "trash";
 
   const fetchPages = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       // scope=all returns trashed pages too, so the Trash view and its count come from one request.
       const res = await fetch("/api/admin/pages?scope=all", { cache: "no-store" });
@@ -38,13 +42,11 @@ export default function PagesManagementPage() {
         setPages(data);
       } else {
         setPages([]);
-        if (!res.ok) {
-          toast.error(data?.error || "Failed to load pages");
-        }
+        setLoadError(data?.error || "Failed to load pages.");
       }
     } catch (err) {
       setPages([]);
-      toast.error("Failed to load pages");
+      setLoadError("Failed to load pages. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -61,6 +63,7 @@ export default function PagesManagementPage() {
 
   const changeView = (next) => {
     setView(next);
+    setListPage(1);
     setSelectedIds([]);
     setBulkAction("Bulk actions");
   };
@@ -90,20 +93,9 @@ export default function PagesManagementPage() {
     return res.ok ? { ok: true } : { ok: false, error: await readError(res, "Failed to restore") };
   };
 
+  // The server copies the sections/SEO, picks a free "-copy" slug and saves the copy as a Draft.
   const duplicateRequest = async (page) => {
-    const { _id, createdAt, updatedAt, __v, isDeleted, deletedAt, statusBeforeTrash, ...rest } = page;
-    const copy = {
-      ...rest,
-      title: `${page.title} (Copy)`,
-      slug: `${page.slug}-copy-${Math.floor(Math.random() * 1000)}`,
-      status: "Draft",
-      isSystem: false
-    };
-    const res = await fetch("/api/admin/pages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(copy)
-    });
+    const res = await fetch(`/api/admin/pages/${page._id}/duplicate`, { method: "POST" });
     return res.ok ? { ok: true } : { ok: false, error: await readError(res, "Failed to duplicate page") };
   };
 
@@ -137,10 +129,7 @@ export default function PagesManagementPage() {
     runSingle(() => permanentDeleteRequest(page._id), "Page permanently deleted");
   };
 
-  const handleDuplicate = async (page) => {
-    if (page.isSystem) return toast.error("System pages cannot be duplicated");
-    runSingle(() => duplicateRequest(page), "Page duplicated");
-  };
+  const handleDuplicate = (page) => runSingle(() => duplicateRequest(page), "Page duplicated as a draft");
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
@@ -158,7 +147,12 @@ export default function PagesManagementPage() {
      const failures = [];
      for (const id of selectedIds) {
         const page = pages.find(p => p._id === id);
-        if (!page || page.isSystem) continue; // System pages are never trashed, deleted or bulk-duplicated
+        if (!page) continue;
+        // System pages can be duplicated, but never trashed or deleted.
+        if (page.isSystem && bulkAction !== "Duplicate") {
+           failures.push(`${page.title}: system pages can't be trashed or deleted`);
+           continue;
+        }
         try {
            let result;
            if (bulkAction === "Move to Trash") result = await trashRequest(id);
@@ -176,16 +170,21 @@ export default function PagesManagementPage() {
      setSelectedIds([]);
      setBulkAction("Bulk actions");
      fetchPages();
-     if (success > 0) toast.success(`${bulkAction}: ${success} page${success === 1 ? "" : "s"} done`);
-     if (failures.length > 0) toast.error(`${failures.length} failed — ${failures.join("; ")}`);
+     if (failures.length === 0) toast.success(`${bulkAction}: ${success} page${success === 1 ? "" : "s"} done`);
+     else toast.error(`${bulkAction}: ${success} done, ${failures.length} failed — ${failures.join("; ")}`, { duration: 8000 });
   };
 
-  const toggleSelect = (id, isSystem) => {
-     if (isSystem) return; // Prevent selecting system pages for bulk deletion
+  // System pages can only be selected in views where Duplicate is offered (never in the Trash).
+  const isSelectable = (p) => !p.isSystem || (!isTrash && canCreate);
+
+  const toggleSelect = (p) => {
+     if (!isSelectable(p)) return;
+     const id = p._id;
      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
   const allPages = Array.isArray(pages) ? pages : [];
+
   const livePages = allPages.filter(p => !p.isDeleted);
   const trashedPages = allPages.filter(p => p.isDeleted);
   const counts = {
@@ -194,26 +193,46 @@ export default function PagesManagementPage() {
     draft: livePages.filter(p => p.status !== 'Published').length,
     trash: trashedPages.length
   };
-  const isTrash = view === "trash";
-
   const viewPages = isTrash ? trashedPages
     : view === "published" ? livePages.filter(p => p.status === 'Published')
     : view === "draft" ? livePages.filter(p => p.status !== 'Published')
     : livePages;
 
-  const filteredPages = viewPages.filter(p => 
-    (p.title || "").toLowerCase().includes(search.toLowerCase()) ||
-    (p.slug || "").toLowerCase().includes(search.toLowerCase())
+  const term = search.trim().toLowerCase();
+  const filteredPages = viewPages.filter(p =>
+    !term ||
+    (p.title || "").toLowerCase().includes(term) ||
+    (p.slug || "").toLowerCase().includes(term)
   );
 
+  const { items: visiblePages, page: currentPage, totalPages } = paginate(filteredPages, listPage);
+  const selectableIds = visiblePages.filter(isSelectable).map(p => p._id);
+  const allSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.includes(id));
+
   const toggleSelectAll = () => {
-     const selectable = filteredPages.filter(p => !p.isSystem);
-     if (selectedIds.length === selectable.length) setSelectedIds([]);
-     else setSelectedIds(selectable.map(p => p._id));
+     if (allSelected) setSelectedIds(prev => prev.filter(id => !selectableIds.includes(id)));
+     else setSelectedIds(prev => [...new Set([...prev, ...selectableIds])]);
   };
 
-  const selectableCount = filteredPages.filter(p => !p.isSystem).length;
-  const allSelected = selectedIds.length > 0 && selectedIds.length === selectableCount;
+  const goToPage = (n) => {
+    setListPage(Math.min(Math.max(1, n), totalPages));
+    setSelectedIds([]);
+  };
+
+  const pagination = (
+    <div className="wp-pages">
+      <span>{filteredPages.length} {filteredPages.length === 1 ? "item" : "items"}</span>
+      {totalPages > 1 && (
+        <>
+          <button type="button" className="wp-pager" aria-label="First page" disabled={currentPage <= 1} onClick={() => goToPage(1)}><ChevronsLeft className="w-4 h-4" aria-hidden="true" /></button>
+          <button type="button" className="wp-pager" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
+          <span>{currentPage} of {totalPages}</span>
+          <button type="button" className="wp-pager" aria-label="Next page" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
+          <button type="button" className="wp-pager" aria-label="Last page" disabled={currentPage >= totalPages} onClick={() => goToPage(totalPages)}><ChevronsRight className="w-4 h-4" aria-hidden="true" /></button>
+        </>
+      )}
+    </div>
+  );
 
   // Bulk options depend on the view and on the user's permissions.
   const bulkOptions = isTrash
@@ -273,23 +292,30 @@ export default function PagesManagementPage() {
 
         <span className="wp-spacer" />
 
-        <div className="wp-search" role="search">
+        {/* Results filter live as you type; Search / Enter submits the same term */}
+        <form className="wp-search" role="search" onSubmit={(e) => { e.preventDefault(); goToPage(1); }}>
           <label htmlFor="pages-search" className="sr-only">Search pages</label>
           <input
             id="pages-search"
             type="search"
             placeholder="Search pages..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setListPage(1); setSelectedIds([]); }}
             className="wp-input"
           />
-          <button type="button" className="wp-btn">Search Pages</button>
-        </div>
+          <button type="submit" className="wp-btn">Search Pages</button>
+        </form>
       </div>
+
+      {loadError && (
+        <Notice type="error">
+          {loadError} <button type="button" className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit", textDecoration: "underline" }} onClick={fetchPages}>Try again</button>
+        </Notice>
+      )}
 
       <div className="wp-toolbar">
         <span className="wp-spacer" />
-        <div className="wp-pages"><span>{filteredPages.length} items</span></div>
+        {pagination}
       </div>
 
       {/* Data Table */}
@@ -298,11 +324,25 @@ export default function PagesManagementPage() {
           <thead>{headerRow}</thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="wp-muted">Loading pages…</td></tr>
+              [0, 1, 2, 3].map(i => (
+                <tr key={`sk-${i}`} aria-hidden="true">
+                  <td className="wp-check-col" />
+                  <td><Skeleton height={14} width="60%" /><Skeleton height={10} width="35%" style={{ marginTop: 8 }} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width="70%" /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width="50%" /></td>
+                  <td><Skeleton height={20} width={72} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width="60%" /></td>
+                </tr>
+              ))
             ) : filteredPages.length === 0 ? (
-              <tr><td colSpan={6} className="wp-muted">{isTrash ? "No pages found in Trash." : "No pages found."}</td></tr>
+              <tr>
+                <td colSpan={6} className="wp-muted">
+                  {term ? `No pages match “${search.trim()}”.` : isTrash ? "No pages found in Trash." : view === "draft" ? "No draft pages." : view === "published" ? "No published pages." : "No pages found."}
+                  {!term && !isTrash && view === "all" && canCreate && <> <Link href="/admin/pages/new">Add your first page</Link>.</>}
+                </td>
+              </tr>
             ) : (
-              filteredPages.map((p) => {
+              visiblePages.map((p) => {
                 const dateValue = p.updatedAt || p.createdAt;
                 const templateName = TEMPLATE_REGISTRY[p.template || "default"]?.name || p.template || "Default";
                 return (
@@ -310,10 +350,10 @@ export default function PagesManagementPage() {
                     <td className="wp-check-col">
                       <input
                         type="checkbox"
-                        aria-label={p.isSystem ? `${p.title} is a system page and cannot be selected` : `Select ${p.title}`}
+                        aria-label={isSelectable(p) ? `Select ${p.title}` : `${p.title} is a system page and cannot be selected`}
                         checked={selectedIds.includes(p._id)}
-                        onChange={() => toggleSelect(p._id, p.isSystem)}
-                        disabled={p.isSystem}
+                        onChange={() => toggleSelect(p)}
+                        disabled={!isSelectable(p)}
                       />
                     </td>
                     <td style={{ minWidth: 0, wordBreak: "break-word" }}>
@@ -336,13 +376,9 @@ export default function PagesManagementPage() {
                       ) : (
                         <div className="wp-row-actions">
                           {canEdit && <span><Link href={`/admin/pages/${p._id}`}>Edit</Link></span>}
-                          {!p.isSystem && (
-                            <>
-                              {canCreate && <span><button type="button" onClick={() => handleDuplicate(p)}>Duplicate</button></span>}
-                              {canDelete && <span><button type="button" onClick={() => deletePage(p._id, p.isSystem)} className="is-danger">Trash</button></span>}
-                            </>
-                          )}
-                          <span><Link href={p.slug === 'home' ? '/' : `/${p.slug}`} target="_blank">View</Link></span>
+                          {canCreate && <span><button type="button" onClick={() => handleDuplicate(p)}>Duplicate</button></span>}
+                          {canDelete && !p.isSystem && <span><button type="button" onClick={() => deletePage(p._id, p.isSystem)} className="is-danger">Trash</button></span>}
+                          <span><Link href={p.slug === 'home' ? '/' : `/${p.slug}`} target="_blank" rel="noopener noreferrer">{p.status === "Published" ? "View" : "Preview"}</Link></span>
                         </div>
                       )}
                     </td>
@@ -363,6 +399,13 @@ export default function PagesManagementPage() {
           <tfoot>{headerRow}</tfoot>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="wp-toolbar" style={{ marginTop: 8 }}>
+          <span className="wp-spacer" />
+          {pagination}
+        </div>
+      )}
     </Page>
     </RequirePermission>
   );
