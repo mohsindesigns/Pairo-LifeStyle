@@ -6,24 +6,46 @@ import Link from "next/link";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
+
+// Search: these words steer which product/page actions are shown, they are not matched against records.
+const COMMAND_WORDS = [
+  "edit", "modify", "change", "update",
+  "price", "pricing", "sale", "cost", "regular",
+  "seo", "meta", "search", "google",
+  "stock", "inventory", "quantity", "qty", "manage",
+  "variant", "variants", "color", "colors", "size", "sizes",
+  "faq", "faqs", "question", "questions", "answer",
+  "stat", "stats", "statistics", "analytics",
+  "add", "new", "create", "delete", "remove"
+];
+const SEARCH_DEBOUNCE_MS = 250;
+
+// Size-confirmation mailbox sync: at most once per interval across all open admin tabs.
+const NOTIFICATION_POLL_MS = 35000;
+const SIZE_SYNC_MIN_GAP_MS = 30000; // a little under the poll interval so timer jitter never skips a tick
+const SIZE_SYNC_KEY = "admin_size_sync_at";
+
+function claimSizeSyncSlot() {
+  try {
+    const last = Number(localStorage.getItem(SIZE_SYNC_KEY)) || 0;
+    const now = Date.now();
+    if (now - last < SIZE_SYNC_MIN_GAP_MS) return false;
+    localStorage.setItem(SIZE_SYNC_KEY, String(now));
+    return true;
+  } catch {
+    return true; // storage unavailable: fall back to syncing from this tab
+  }
+}
 
 export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
   const { data: session } = useSession();
   const router = useRouter();
+  const { showConfirm } = usePopup();
   const [showProfile, setShowProfile] = useState(false);
 
-  // Spotlight Search Index State
-  const [products, setProducts] = useState([]);
-  const [pages, setPages] = useState([]);
-  const [blogs, setBlogs] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [discounts, setDiscounts] = useState([]);
-  const [affiliates, setAffiliates] = useState([]);
-  const [promotions, setPromotions] = useState([]);
-  const [reviews, setReviews] = useState([]);
-  const [scripts, setScripts] = useState([]);
+  // Spotlight Search: results for the last fetched query key (see /api/admin/search)
+  const [searchData, setSearchData] = useState({ key: "", results: {} });
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -73,74 +95,39 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchSafely = async (url) => {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return [];
-      return await res.json();
-    } catch (e) {
-      console.error(`Failed to fetch ${url}`, e);
-      return [];
-    }
-  };
+  // Search words (minus command words) + whether the "home seo" shortcut is wanted.
+  // The key identifies one server query; results are only used when they match it.
+  const searchKey = useMemo(() => {
+    const queryWords = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    const words = queryWords.filter(w => !COMMAND_WORDS.includes(w));
+    if (words.length === 0) return "";
+    const q = searchQuery.toLowerCase();
+    const home = q.includes("home") && q.includes("seo") ? "1" : "0";
+    return `${home}|${words.join(" ")}`;
+  }, [searchQuery]);
 
-  // Load Search Indexes
+  // Lazy, debounced search: nothing is fetched until the admin types a real search word.
   useEffect(() => {
-    const fetchSearchData = async () => {
+    if (!searchKey) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      const [home, q] = [searchKey.slice(0, 1), searchKey.slice(2)];
       try {
-        const [prodsRes, pagesRes, blogsRes, catsRes, custsRes, ordersRes, discRes, affRes, promoRes, revsRes, scriptsRes] = await Promise.all([
-          fetchSafely("/api/admin/products"),
-          fetchSafely("/api/admin/pages"),
-          fetchSafely("/api/admin/blogs"),
-          fetchSafely("/api/admin/categories"),
-          fetchSafely("/api/admin/customers"),
-          fetchSafely("/api/admin/orders"),
-          fetchSafely("/api/admin/discounts"),
-          fetchSafely("/api/admin/affiliates/list"),
-          fetchSafely("/api/admin/promotions"),
-          fetchSafely("/api/admin/reviews"),
-          fetchSafely("/api/admin/scripts")
-        ]);
-
-        if (Array.isArray(prodsRes)) setProducts(prodsRes);
-        else if (prodsRes?.success && Array.isArray(prodsRes.products)) setProducts(prodsRes.products);
-
-        if (Array.isArray(pagesRes)) setPages(pagesRes);
-        else if (pagesRes?.success && Array.isArray(pagesRes.pages)) setPages(pagesRes.pages);
-
-        if (Array.isArray(blogsRes)) setBlogs(blogsRes);
-        else if (blogsRes?.success && Array.isArray(blogsRes.blogs)) setBlogs(blogsRes.blogs);
-
-        if (Array.isArray(catsRes)) setCategories(catsRes);
-        else if (catsRes?.success && Array.isArray(catsRes.categories)) setCategories(catsRes.categories);
-
-        if (Array.isArray(custsRes)) setCustomers(custsRes);
-        else if (custsRes?.success && Array.isArray(custsRes.customers)) setCustomers(custsRes.customers);
-
-        if (Array.isArray(ordersRes)) setOrders(ordersRes);
-        else if (ordersRes?.success && Array.isArray(ordersRes.orders)) setOrders(ordersRes.orders);
-
-        if (Array.isArray(discRes)) setDiscounts(discRes);
-        else if (discRes?.success && Array.isArray(discRes.discounts)) setDiscounts(discRes.discounts);
-        else if (discRes?.success && Array.isArray(discRes.coupons)) setDiscounts(discRes.coupons);
-
-        if (Array.isArray(affRes)) setAffiliates(affRes);
-        else if (affRes?.success && Array.isArray(affRes.affiliates)) setAffiliates(affRes.affiliates);
-
-        if (Array.isArray(promoRes)) setPromotions(promoRes);
-        else if (promoRes?.success && Array.isArray(promoRes.promotions)) setPromotions(promoRes.promotions);
-
-        if (Array.isArray(revsRes)) setReviews(revsRes);
-        else if (revsRes?.success && Array.isArray(revsRes.reviews)) setReviews(revsRes.reviews);
-
-        if (Array.isArray(scriptsRes)) setScripts(scriptsRes);
-        else if (scriptsRes?.success && Array.isArray(scriptsRes.scripts)) setScripts(scriptsRes.scripts);
+        const res = await fetch(`/api/admin/search?q=${encodeURIComponent(q)}${home === "1" ? "&home=1" : ""}`, { signal: controller.signal });
+        const data = res.ok ? await res.json() : null;
+        setSearchData({ key: searchKey, results: data?.success && data.results ? data.results : {} });
       } catch (err) {
-        console.error("Failed to load search indexes", err);
+        if (err?.name !== "AbortError") {
+          console.error("Admin search failed", err);
+          setSearchData({ key: searchKey, results: {} });
+        }
       }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
     };
-    fetchSearchData();
-  }, []);
+  }, [searchKey]);
 
   // Fetch Notifications
   const fetchNotifications = async () => {
@@ -149,9 +136,11 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
         fetch("/api/admin/orders?status=Pending").then(r => r.json().catch(() => ({}))),
         fetch("/api/admin/affiliates/requests").then(r => r.json().catch(() => ({}))),
         fetch("/api/admin/products").then(r => r.json().catch(() => ([]))),
-        // Check the support mailbox for new size-confirmation replies (server throttles this), then list unread threads
-        fetch("/api/admin/size-confirmations/sync", { method: "POST" })
-          .catch(() => null)
+        // Check the support mailbox for new size-confirmation replies (server throttles this; we also
+        // only sync from one visible tab per interval), then list unread threads
+        (document.visibilityState === "visible" && claimSizeSyncSlot()
+          ? fetch("/api/admin/size-confirmations/sync", { method: "POST" }).catch(() => null)
+          : Promise.resolve(null))
           .then(() => fetch("/api/admin/size-confirmations?unread=1"))
           .then(r => r.json().catch(() => ({})))
           .catch(() => ({}))
@@ -164,15 +153,16 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
           const last = c.replies?.[c.replies.length - 1];
           const who = c.customerName || c.customerEmail;
           const excerpt = (last?.text || "").replace(/\s+/g, " ").slice(0, 80);
+          // Includes reply count so a new reply on a dismissed thread notifies again
+          const noticeId = `size-${c._id}-${c.replies?.length || 0}`;
           list.push({
-            // Includes reply count so a new reply on a dismissed thread notifies again
-            id: `size-${c._id}-${c.replies?.length || 0}`,
+            id: noticeId,
             type: "info",
             label: "Size Reply",
             text: `${who} replied about Order #${c.orderNumber}${excerpt ? `: "${excerpt}${(last?.text || "").length > 80 ? "…" : ""}"` : "."}`,
             actions: [
               { label: "View", href: `/admin/orders/${c.orderId}` },
-              { label: "Mark read", action: () => handleSizeReplyRead(c._id) }
+              { label: "Mark read", action: () => handleSizeReplyRead(c._id, noticeId) }
             ]
           });
         });
@@ -186,7 +176,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
             label: "Order",
             text: `Order #${order.orderNumber} is pending confirmation.`,
             actions: [
-              { label: "Confirm", action: () => handleOrderAction(order._id, "Confirmed") },
+              { label: "Confirm", action: () => handleOrderConfirm(order._id, order.orderNumber) },
               { label: "View", href: `/admin/orders/${order._id}` }
             ]
           });
@@ -201,8 +191,8 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
             label: "Affiliate",
             text: `Request from ${app.name} is pending review.`,
             actions: [
-              { label: "Approve", action: () => handleAffiliateAction(app._id, "Approve") },
-              { label: "Reject", action: () => handleAffiliateAction(app._id, "Reject") }
+              { label: "Approve", action: () => handleAffiliateAction(app._id, "Approve", app.name) },
+              { label: "Reject", action: () => handleAffiliateAction(app._id, "Reject", app.name) }
             ]
           });
         });
@@ -229,48 +219,99 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 35000);
-    return () => clearInterval(interval);
+    // Poll only while this tab is visible; refresh as soon as it becomes visible again.
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    }, NOTIFICATION_POLL_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
-  const handleOrderAction = async (id, status) => {
+  // Notice action handlers return true on success, so the notice is only marked read then.
+
+  // Advances a Pending order to Confirmed only (one step, never skips). Re-checks the live
+  // status first so a stale notice can't move an order that has already progressed.
+  const handleOrderConfirm = async (id, orderNumber) => {
+    const ok = await showConfirm(
+      `Mark Order #${orderNumber} as Confirmed?`,
+      "Confirm order",
+      { confirmText: "Confirm order" }
+    );
+    if (!ok) return false;
     setUpdatingId(`order-${id}`);
     try {
+      const current = await fetch(`/api/admin/orders/${id}`).then(r => (r.ok ? r.json() : null)).catch(() => null);
+      if (!current?.order) {
+        toast.error("Failed to load order. Please try again.");
+        return false;
+      }
+      if (current.order.status !== "Pending") {
+        toast.error(`Order #${orderNumber} is already ${current.order.status}.`);
+        await fetchNotifications();
+        return false;
+      }
       const res = await fetch(`/api/admin/orders/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status: "Confirmed" })
       });
       if (res.ok) {
-        toast.success(`Order status updated to ${status}!`);
+        toast.success("Order status updated to Confirmed!");
         await fetchNotifications();
-      } else {
-        toast.error("Failed to update order.");
+        return true;
       }
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || "Failed to update order.");
+      return false;
     } catch (err) {
       console.error(err);
+      toast.error("Failed to update order.");
+      return false;
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const handleSizeReplyRead = async (confirmationId) => {
-    setUpdatingId(`size-${confirmationId}`);
+  const handleSizeReplyRead = async (confirmationId, noticeId) => {
+    setUpdatingId(noticeId);
     try {
-      await fetch(`/api/admin/size-confirmations/${confirmationId}`, {
+      const res = await fetch(`/api/admin/size-confirmations/${confirmationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "markRead" })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to mark reply as read.");
+        return false;
+      }
       await fetchNotifications();
+      return true;
     } catch (err) {
       console.error(err);
+      toast.error("Failed to mark reply as read.");
+      return false;
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const handleAffiliateAction = async (applicationId, action) => {
+  const handleAffiliateAction = async (applicationId, action, name) => {
+    const isApprove = action === "Approve";
+    const ok = await showConfirm(
+      isApprove
+        ? `Approve the affiliate application from ${name}?`
+        : `Reject the affiliate application from ${name}?`,
+      isApprove ? "Approve application" : "Reject application",
+      isApprove ? { confirmText: "Approve" } : { confirmText: "Reject", danger: true }
+    );
+    if (!ok) return false;
     setUpdatingId(`affiliate-${applicationId}`);
     try {
       const res = await fetch("/api/admin/affiliates/requests", {
@@ -279,14 +320,17 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
         body: JSON.stringify({ applicationId, action })
       });
       if (res.ok) {
-        toast.success(`Affiliate application ${action === 'Approve' ? 'approved' : 'rejected'} successfully!`);
+        toast.success(`Affiliate application ${isApprove ? 'approved' : 'rejected'} successfully!`);
         await fetchNotifications();
-      } else {
-        const data = await res.json();
-        toast.error(`Failed: ${data.error || "Unknown error"}`);
+        return true;
       }
+      const data = await res.json().catch(() => ({}));
+      toast.error(`Failed: ${data.error || "Unknown error"}`);
+      return false;
     } catch (err) {
       console.error(err);
+      toast.error("Failed to update affiliate application.");
+      return false;
     } finally {
       setUpdatingId(null);
     }
@@ -367,279 +411,160 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
     const isFaqs = queryWords.includes("faq") || queryWords.includes("faqs") || queryWords.includes("question") || queryWords.includes("questions") || queryWords.includes("answer");
     const isStats = queryWords.includes("stat") || queryWords.includes("stats") || queryWords.includes("statistics") || queryWords.includes("analytics");
 
-    const commandWords = [
-      "edit", "modify", "change", "update",
-      "price", "pricing", "sale", "cost", "regular",
-      "seo", "meta", "search", "google",
-      "stock", "inventory", "quantity", "qty", "manage",
-      "variant", "variants", "color", "colors", "size", "sizes",
-      "faq", "faqs", "question", "questions", "answer",
-      "stat", "stats", "statistics", "analytics",
-      "add", "new", "create", "delete", "remove"
-    ];
-
-    const searchWords = queryWords.filter(w => !commandWords.includes(w));
+    const searchWords = queryWords.filter(w => !COMMAND_WORDS.includes(w));
     const results = [];
+    // Server results for the current query (empty while the debounced request is in flight)
+    const found = searchKey && searchData.key === searchKey ? searchData.results : {};
+    const list = (key) => (Array.isArray(found[key]) ? found[key] : []);
 
     if (searchWords.length > 0) {
       // 1. Products matches
-      products.forEach(p => {
-        const nameLower = p.name.toLowerCase();
-        const skuLower = (p.sku || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w) || skuLower.includes(w));
+      list("products").forEach(p => {
+        const hasCommand = isPrice || isStock || isVariants || isSeo || isFaqs || isStats;
 
-        if (matchesAll) {
-          const hasCommand = isPrice || isStock || isVariants || isSeo || isFaqs || isStats;
-
-          if (!hasCommand || isEdit) {
-            results.push({
-              category: "Products",
-              title: `Edit Details: "${p.name}"`,
-              href: `/admin/products/${p._id}`,
-              desc: `Update description, image settings and categories`
-            });
-          }
-          if (isPrice || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit Price: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=pricing`,
-              desc: `Update Regular price & Sale price`
-            });
-          }
-          if (isStock || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit Stock: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=stock`,
-              desc: `Manage stock inventory size and tracking settings`
-            });
-          }
-          if (isVariants || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit Variants: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=variants`,
-              desc: `Configure color swatches, size configurations and variable engines`
-            });
-          }
-          if (isSeo || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit SEO: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=seo`,
-              desc: `Set page focus keywords and description`
-            });
-          }
-          if (isFaqs || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit FAQs: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=faqs`,
-              desc: `Manage product FAQs`
-            });
-          }
-          if (isStats || !hasCommand) {
-            results.push({
-              category: "Products",
-              title: `Edit Badges: "${p.name}"`,
-              href: `/admin/products/${p._id}?focus=stats`,
-              desc: `Manage custom highlight bullets`
-            });
-          }
+        if (!hasCommand || isEdit) {
+          results.push({
+            category: "Products",
+            title: `Edit Details: "${p.title}"`,
+            href: p.href,
+            desc: `Update description, image settings and categories`
+          });
+        }
+        if (isPrice || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit Price: "${p.title}"`,
+            href: `${p.href}?focus=pricing`,
+            desc: `Update Regular price & Sale price`
+          });
+        }
+        if (isStock || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit Stock: "${p.title}"`,
+            href: `${p.href}?focus=stock`,
+            desc: `Manage stock inventory size and tracking settings`
+          });
+        }
+        if (isVariants || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit Variants: "${p.title}"`,
+            href: `${p.href}?focus=variants`,
+            desc: `Configure color swatches, size configurations and variable engines`
+          });
+        }
+        if (isSeo || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit SEO: "${p.title}"`,
+            href: `${p.href}?focus=seo`,
+            desc: `Set page focus keywords and description`
+          });
+        }
+        if (isFaqs || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit FAQs: "${p.title}"`,
+            href: `${p.href}?focus=faqs`,
+            desc: `Manage product FAQs`
+          });
+        }
+        if (isStats || !hasCommand) {
+          results.push({
+            category: "Products",
+            title: `Edit Badges: "${p.title}"`,
+            href: `${p.href}?focus=stats`,
+            desc: `Manage custom highlight bullets`
+          });
         }
       });
 
       // 2. Pages matches
-      pages.forEach(pg => {
-        const titleLower = pg.title.toLowerCase();
-        const matchesAll = searchWords.every(w => titleLower.includes(w));
-
-        if (matchesAll) {
-          const hasCommand = isSeo;
-          if (!hasCommand) {
-            results.push({
-              category: "Pages",
-              title: `Edit Sections: "${pg.title}"`,
-              href: `/admin/pages/${pg._id}?tab=content`,
-              desc: `Configure templates and layout elements`
-            });
-          }
-          if (isSeo || !hasCommand) {
-            results.push({
-              category: "Pages",
-              title: `Edit SEO: "${pg.title}"`,
-              href: `/admin/pages/${pg._id}?tab=seo`,
-              desc: `Manage search engine tags and custom snippets`
-            });
-          }
+      list("pages").forEach(pg => {
+        if (!isSeo) {
+          results.push({
+            category: "Pages",
+            title: `Edit Sections: "${pg.title}"`,
+            href: `${pg.href}?tab=content`,
+            desc: `Configure templates and layout elements`
+          });
         }
+        results.push({
+          category: "Pages",
+          title: `Edit SEO: "${pg.title}"`,
+          href: `${pg.href}?tab=seo`,
+          desc: `Manage search engine tags and custom snippets`
+        });
       });
 
       // Specific custom match for "home seo"
-      const homeMatches = searchQuery.toLowerCase().includes("home") && searchQuery.toLowerCase().includes("seo");
-      if (homeMatches) {
-        const homePage = pages.find(p => p.slug === "home" || p.slug === "" || p.title.toLowerCase() === "home");
-        if (homePage) {
-          results.unshift({
-            category: "Shortcut",
-            title: `Configure Homepage SEO`,
-            href: `/admin/pages/${homePage._id}?tab=seo`,
-            desc: `Direct navigation to home page SEO suite`
-          });
-        }
+      const homePage = list("homePage")[0];
+      if (homePage) {
+        results.unshift({
+          category: "Shortcut",
+          title: `Configure Homepage SEO`,
+          href: homePage.href,
+          desc: `Direct navigation to home page SEO suite`
+        });
       }
 
       // 3. Blogs matches
-      blogs.forEach(b => {
-        const titleLower = b.title.toLowerCase();
-        const matchesAll = searchWords.every(w => titleLower.includes(w));
-
-        if (matchesAll) {
-          const hasCommand = isSeo;
-          if (!hasCommand) {
-            results.push({
-              category: "Blogs",
-              title: `Edit Post: "${b.title}"`,
-              href: `/admin/blogs/${b._id}?tab=content`,
-              desc: `Update article body text, visual sections, and categories`
-            });
-          }
-          if (isSeo || !hasCommand) {
-            results.push({
-              category: "Blogs",
-              title: `Edit Blog SEO: "${b.title}"`,
-              href: `/admin/blogs/${b._id}?tab=seo`,
-              desc: `Update keywords and meta info for this article`
-            });
-          }
+      list("blogs").forEach(b => {
+        if (!isSeo) {
+          results.push({
+            category: "Blogs",
+            title: `Edit Post: "${b.title}"`,
+            href: `${b.href}?tab=content`,
+            desc: `Update article body text, visual sections, and categories`
+          });
         }
+        results.push({
+          category: "Blogs",
+          title: `Edit Blog SEO: "${b.title}"`,
+          href: `${b.href}?tab=seo`,
+          desc: `Update keywords and meta info for this article`
+        });
       });
 
       // 4. Categories matches
-      categories.forEach(cat => {
-        const nameLower = cat.name.toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Categories",
-            title: `Edit Category: "${cat.name}"`,
-            href: `/admin/products/categories/${cat._id}`,
-            desc: `Configure subcategories and banner tags`
-          });
-        }
+      list("categories").forEach(cat => {
+        results.push({ category: "Categories", title: `Edit Category: "${cat.title}"`, href: cat.href, desc: `Configure subcategories and banner tags` });
       });
 
       // 5. Customers matches
-      customers.forEach(cust => {
-        const nameLower = (cust.name || "").toLowerCase();
-        const emailLower = (cust.email || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w) || emailLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Customers",
-            title: `Edit Customer: "${cust.name || cust.email}"`,
-            href: `/admin/customers/${cust._id}`,
-            desc: `Inspect and edit customer records`
-          });
-        }
+      list("customers").forEach(cust => {
+        results.push({ category: "Customers", title: `Edit Customer: "${cust.title}"`, href: cust.href, desc: `Inspect and edit customer records` });
       });
 
       // 6. Orders matches
-      orders.forEach(order => {
-        const orderNumStr = String(order.orderNumber);
-        const custNameLower = (order.shippingAddress?.fullName || "").toLowerCase();
-        const custEmailLower = (order.customer?.email || "").toLowerCase();
-        const matchesAll = searchWords.every(w => orderNumStr.includes(w) || custNameLower.includes(w) || custEmailLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Orders",
-            title: `Edit Order: #${order.orderNumber} (${order.shippingAddress?.fullName || "Guest"})`,
-            href: `/admin/orders/${order._id}`,
-            desc: `Confirm, fulfill, or edit items`
-          });
-        }
+      list("orders").forEach(order => {
+        results.push({ category: "Orders", title: `Edit Order: ${order.title}`, href: order.href, desc: `Confirm, fulfill, or edit items` });
       });
 
       // 7. Coupons matches
-      discounts.forEach(d => {
-        const codeLower = (d.code || "").toLowerCase();
-        const matchesAll = searchWords.every(w => codeLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Coupons",
-            title: `Manage Coupon: "${d.code}"`,
-            href: `/admin/discounts?search=${d.code}`,
-            desc: `Edit limitations, value or expiration`
-          });
-        }
+      list("discounts").forEach(d => {
+        results.push({ category: "Coupons", title: `Manage Coupon: "${d.title}"`, href: d.href, desc: `Edit limitations, value or expiration` });
       });
 
       // 8. Affiliates matches
-      affiliates.forEach(aff => {
-        const nameLower = (aff.name || "").toLowerCase();
-        const emailLower = (aff.email || "").toLowerCase();
-        const codeLower = (aff.code || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w) || emailLower.includes(w) || codeLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Affiliates",
-            title: `Edit Partner: "${aff.name} (${aff.code})"`,
-            href: `/admin/affiliates?view=list&search=${aff.code || aff.email}`,
-            desc: `Update commission shares and review performance`
-          });
-        }
+      list("affiliates").forEach(aff => {
+        results.push({ category: "Affiliates", title: `Edit Partner: "${aff.title}"`, href: aff.href, desc: `Update commission shares and review performance` });
       });
 
       // 9. Promotions matches
-      promotions.forEach(promo => {
-        const nameLower = (promo.name || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Promotions",
-            title: `Edit Promotion: "${promo.name}"`,
-            href: `/admin/promotions/${promo._id}`,
-            desc: `Configure dynamic cart/checkout deals`
-          });
-        }
+      list("promotions").forEach(promo => {
+        results.push({ category: "Promotions", title: `Edit Promotion: "${promo.title}"`, href: promo.href, desc: `Configure dynamic cart/checkout deals` });
       });
 
       // 10. Reviews matches
-      reviews.forEach(rev => {
-        const authorLower = (rev.author || "").toLowerCase();
-        const contentLower = (rev.content || "").toLowerCase();
-        const matchesAll = searchWords.every(w => authorLower.includes(w) || contentLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Reviews",
-            title: `Manage Review by "${rev.author}"`,
-            href: `/admin/reviews?search=${rev.author}`,
-            desc: `Approve, reply, delete or shadow-ban review`
-          });
-        }
+      list("reviews").forEach(rev => {
+        results.push({ category: "Reviews", title: `Manage Review by "${rev.title}"`, href: rev.href, desc: `Approve, reply, delete or shadow-ban review` });
       });
 
       // 11. Custom Scripts matches
-      scripts.forEach(sc => {
-        const nameLower = (sc.name || "").toLowerCase();
-        const matchesAll = searchWords.every(w => nameLower.includes(w));
-
-        if (matchesAll) {
-          results.push({
-            category: "Scripts",
-            title: `Edit Script: "${sc.name}"`,
-            href: `/admin/settings/scripts/${sc._id}`,
-            desc: `Edit injected pixel/code`
-          });
-        }
+      list("scripts").forEach(sc => {
+        results.push({ category: "Scripts", title: `Edit Script: "${sc.title}"`, href: sc.href, desc: `Edit injected pixel/code` });
       });
     }
 
@@ -664,7 +589,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
     }
 
     return results;
-  }, [searchQuery, products, pages, blogs, categories, customers, orders, discounts, affiliates, promotions, reviews, scripts]);
+  }, [searchQuery, searchKey, searchData]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && searchResults.length > 0) {
@@ -950,8 +875,8 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
                                 type="button"
                                 disabled={isUpdating}
                                 onClick={async () => {
-                                  dismissNotice(notice.id);
-                                  await act.action();
+                                  const succeeded = await act.action();
+                                  if (succeeded) dismissNotice(notice.id);
                                 }}
                                 className="inline-flex items-center min-h-10 md:min-h-0 bg-transparent border-0 p-0 text-[13px] text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer disabled:opacity-60 disabled:cursor-default"
                               >

@@ -17,6 +17,7 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e) => {
@@ -36,6 +37,7 @@ export default function AdminLoginPage() {
         password,
         loginType: "staff",
         turnstileToken,
+        rememberMe: rememberMe ? "true" : "false",
         redirect: false,
       });
 
@@ -158,6 +160,8 @@ export default function AdminLoginPage() {
               <input
                 type="checkbox"
                 id="remember"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
                 className="w-4 h-4 m-0 accent-[#2271b1] border-[#8c8f94] rounded-[4px] focus:outline-none focus-visible:shadow-[0_0_0_2px_#2271b1]"
               />
               Remember Me
