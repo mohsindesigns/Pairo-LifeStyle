@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
-import { X, Copy, Check, CreditCard, AlertTriangle } from "lucide-react";
+import { X, Copy, Check, CreditCard, AlertTriangle, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
@@ -9,7 +9,8 @@ import RequirePermission from "@/components/admin/RequirePermission";
 import ProductSelector from "@/components/admin/discounts/ProductSelector";
 import CategorySelector from "@/components/admin/discounts/CategorySelector";
 import CouponViewModal from "@/components/admin/discounts/CouponViewModal";
-import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
+import { paginate } from "@/lib/admin-products-utils";
 import { deriveCustomerEmailsString, buildDuplicatePayload, isValidUsageLimitInput } from "@/components/admin/discounts/couponUtils";
 
 const EMPTY_FORM = {
@@ -108,6 +109,7 @@ function CouponsContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
+  const [page, setPage] = useState(1);
   
   // Notice Banners
   const [errorNotice, setErrorNotice] = useState("");
@@ -212,6 +214,7 @@ function CouponsContent() {
   // Applies a search term now (Search button / Enter) and clears the selection.
   const applySearch = (term) => {
     setSelectedIds([]);
+    setPage(1);
     if (term === searchQuery) fetchDiscounts();
     else setSearchQuery(term);
   };
@@ -221,6 +224,7 @@ function CouponsContent() {
     if (searchInput === searchQuery) return;
     const t = setTimeout(() => {
       setSelectedIds([]);
+      setPage(1);
       setSearchQuery(searchInput);
     }, 350);
     return () => clearTimeout(t);
@@ -367,12 +371,14 @@ function CouponsContent() {
   };
 
   const handleDelete = async (id, isPermanently = false) => {
-    const ok = await showConfirm(`Are you sure you want to ${isPermanently ? 'permanently delete' : 'trash'} this coupon?`);
+    const ok = isPermanently
+      ? await showConfirm("Permanently delete this coupon? This cannot be undone.", "Delete permanently", { confirmText: "Delete permanently", danger: true })
+      : await showConfirm("Move this coupon to Trash? It stops working at checkout right away. You can restore it from the Trash.", "Move to Trash", { confirmText: "Move to Trash" });
     if (!ok) return;
     setErrorNotice("");
     setSuccessNotice("");
     try {
-      const res = await fetch(`/api/admin/discounts?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/discounts?id=${id}${isPermanently ? "&permanent=1" : ""}`, { method: "DELETE" });
       const data = await res.json();
       if (res.ok) {
         setSuccessNotice(isPermanently ? "Coupon permanently deleted." : "Coupon moved to trash.");
@@ -417,7 +423,9 @@ function CouponsContent() {
     setSuccessNotice("");
     
     const count = selectedIds.length;
-    const ok = await showConfirm(`Apply "${bulkAction}" to ${count} coupon(s)?`);
+    const ok = bulkAction === "Delete Permanently"
+      ? await showConfirm(`Permanently delete ${count} coupon${count === 1 ? "" : "s"}? This cannot be undone.`, "Delete permanently", { confirmText: "Delete permanently", danger: true })
+      : await showConfirm(`Apply "${bulkAction}" to ${count} coupon${count === 1 ? "" : "s"}?`, "Bulk action");
     if (ok) {
       try {
         let successCount = 0;
@@ -435,7 +443,7 @@ function CouponsContent() {
                 lastError = data.error;
               }
             } else if (bulkAction === "Delete Permanently") {
-              const res = await fetch(`/api/admin/discounts?id=${id}`, { method: "DELETE" });
+              const res = await fetch(`/api/admin/discounts?id=${id}&permanent=1`, { method: "DELETE" });
               if (res.ok) successCount++;
               else {
                 failCount++;
@@ -477,11 +485,10 @@ function CouponsContent() {
           }
         }
 
-        if (successCount > 0) {
-          setSuccessNotice(`Successfully processed ${successCount} coupon(s).`);
-        }
-        if (failCount > 0) {
-          setErrorNotice(`Failed to process ${failCount} coupon(s). Last error: ${lastError}`);
+        if (failCount === 0) {
+          setSuccessNotice(`${bulkAction}: ${successCount} coupon${successCount === 1 ? "" : "s"} done.`);
+        } else {
+          setErrorNotice(`${bulkAction}: ${successCount} done, ${failCount} failed.${lastError ? ` Last error: ${lastError}` : ""}`);
         }
 
         setSelectedIds([]);
@@ -579,11 +586,18 @@ function CouponsContent() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  // Select-all is based on the rows currently visible, not on counts.
-  const allVisibleSelected = discounts.length > 0 && discounts.every(d => selectedIds.includes(d._id));
+  // Client-side pages; select-all covers the rows on the current page only.
+  const { items: pageDiscounts, page: currentPage, totalPages } = paginate(discounts, page);
+  const visibleIds = pageDiscounts.map(d => d._id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+  const someVisibleSelected = visibleIds.some(id => selectedIds.includes(id));
   const toggleSelectAll = () => {
-    if (allVisibleSelected) setSelectedIds([]);
-    else setSelectedIds(discounts.map(d => d._id));
+    if (allVisibleSelected) setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+    else setSelectedIds(prev => [...new Set([...prev, ...visibleIds])]);
+  };
+  const goToPage = (n) => {
+    setPage(Math.min(Math.max(1, n), totalPages));
+    setSelectedIds([]);
   };
 
   const formatDate = (dateString) => {
@@ -999,6 +1013,7 @@ function CouponsContent() {
           type="checkbox"
           aria-label="Select all coupons"
           checked={allVisibleSelected}
+          ref={(el) => { if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected; }}
           onChange={toggleSelectAll}
         />
       </th>
@@ -1014,6 +1029,17 @@ function CouponsContent() {
   );
 
   const linkBtnStyle = { background: "none", border: 0, padding: 0, cursor: "pointer", textAlign: "left" };
+
+  const pagination = (
+    <div className="wp-pages">
+      <span>{discounts.length} {discounts.length === 1 ? "item" : "items"}</span>
+      <button type="button" className="wp-pager" aria-label="First page" disabled={currentPage <= 1} onClick={() => goToPage(1)}><ChevronsLeft className="w-4 h-4" /></button>
+      <button type="button" className="wp-pager" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}><ChevronLeft className="w-4 h-4" /></button>
+      <span>{currentPage} of {totalPages}</span>
+      <button type="button" className="wp-pager" aria-label="Next page" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}><ChevronRight className="w-4 h-4" /></button>
+      <button type="button" className="wp-pager" aria-label="Last page" disabled={currentPage >= totalPages} onClick={() => goToPage(totalPages)}><ChevronsRight className="w-4 h-4" /></button>
+    </div>
+  );
 
   // ── Coupons List View ──
   return (
@@ -1058,7 +1084,7 @@ function CouponsContent() {
               role="tab"
               aria-selected={statusFilter === f.key}
               className={`max-[782px]:min-h-10 ${statusFilter === f.key ? "is-current" : ""}`}
-              onClick={() => { setStatusFilter(f.key); setSelectedIds([]); }}
+              onClick={() => { setStatusFilter(f.key); setSelectedIds([]); setPage(1); setBulkAction("Bulk actions"); }}
             >
               {f.key} <span className="wp-count">({f.count || 0})</span>
             </button>
@@ -1117,9 +1143,7 @@ function CouponsContent() {
 
       <div className="wp-toolbar">
         <span className="wp-spacer" />
-        <span className="wp-pages">
-          {discounts.length} item{discounts.length === 1 ? "" : "s"}
-        </span>
+        {pagination}
       </div>
 
       {/* Coupon List Table */}
@@ -1128,11 +1152,16 @@ function CouponsContent() {
           <thead>{headerRow}</thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="wp-muted">Loading coupons…</td></tr>
-            ) : discounts.length === 0 ? (
-              <tr><td colSpan={9} className="wp-muted">No coupons found.</td></tr>
+              <tr><td colSpan={9}><span className="sr-only">Loading coupons…</span><Skeleton height={14} /><Skeleton height={14} width="70%" style={{ marginTop: 8 }} /></td></tr>
+            ) : pageDiscounts.length === 0 ? (
+              <tr><td colSpan={9} className="wp-muted">
+                {searchQuery ? "No coupons match your search."
+                  : statusFilter === "Trash" ? "Trash is empty."
+                  : statusFilter === "All" ? "No coupons yet. Use \u201cAdd coupon\u201d to create one."
+                  : "No coupons in this view."}
+              </td></tr>
             ) : (
-              discounts.map((d) => {
+              pageDiscounts.map((d) => {
                 const isSelected = selectedIds.includes(d._id);
                 const isQuickEditing = quickEditingId === d._id;
                 const cStatus = getCouponStatus(d);
@@ -1374,6 +1403,11 @@ function CouponsContent() {
           </tbody>
           <tfoot>{headerRow}</tfoot>
         </table>
+      </div>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pagination}
       </div>
 
       {/* ── Modals ── */}

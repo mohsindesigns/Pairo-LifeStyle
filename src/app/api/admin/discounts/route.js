@@ -334,6 +334,7 @@ export async function PUT(req) {
     // Handle Restore
     if (body.restore) {
       discount.isDeleted = false;
+      discount.deletedAt = null;
       const stripeState = await syncDiscountToStripe(discount);
       Object.assign(discount, stripeState);
       await discount.save();
@@ -521,20 +522,31 @@ export async function DELETE(req) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Missing coupon ID." }, { status: 400 });
 
+    const permanent = searchParams.get("permanent") === "1";
+
     const discount = await Discount.findById(id);
     if (!discount) return NextResponse.json({ error: "Coupon not found." }, { status: 404 });
 
-    if (discount.isDeleted) {
-      // Hard delete if already soft-deleted
+    if (permanent) {
+      // Permanent delete only from the Trash, so a live coupon can't be destroyed in one step.
+      if (!discount.isDeleted) {
+        return NextResponse.json({ error: "Move the coupon to Trash before deleting it permanently." }, { status: 409 });
+      }
+      await deactivateDiscountStripeCode(discount);
       await Discount.findByIdAndDelete(id);
       return NextResponse.json({ success: true, message: "Coupon permanently deleted." });
-    } else {
-      // Soft delete
-      discount.isDeleted = true;
-      await deactivateDiscountStripeCode(discount);
-      await discount.save();
-      return NextResponse.json({ success: true, message: "Coupon moved to Trash." });
     }
+
+    if (discount.isDeleted) {
+      return NextResponse.json({ success: true, message: "Coupon is already in Trash." });
+    }
+
+    // Soft delete (move to Trash)
+    discount.isDeleted = true;
+    discount.deletedAt = new Date();
+    await deactivateDiscountStripeCode(discount);
+    await discount.save();
+    return NextResponse.json({ success: true, message: "Coupon moved to Trash." });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

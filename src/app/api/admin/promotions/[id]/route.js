@@ -1,4 +1,5 @@
 import { getServerSession } from "next-auth";
+import mongoose from "mongoose";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
@@ -34,6 +35,10 @@ export async function GET(req, { params }) {
   }
 
   const { id } = await params;
+  // A malformed id (e.g. a mistyped URL) is "not found", not a server error.
+  if (!mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+  }
   await dbConnect();
   try {
     const promotion = await Promotion.findById(id);
@@ -56,6 +61,10 @@ export async function PUT(req, { params }) {
   }
 
   const { id } = await params;
+  // A malformed id (e.g. a mistyped URL) is "not found", not a server error.
+  if (!mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+  }
   await dbConnect();
   try {
     const data = await req.json();
@@ -103,6 +112,10 @@ export async function PATCH(req, { params }) {
   }
 
   const { id } = await params;
+  // A malformed id (e.g. a mistyped URL) is "not found", not a server error.
+  if (!mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+  }
   await dbConnect();
   try {
     const data = await req.json();
@@ -142,6 +155,10 @@ export async function DELETE(req, { params }) {
   }
 
   const { id } = await params;
+  // A malformed id (e.g. a mistyped URL) is "not found", not a server error.
+  if (!mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+  }
   await dbConnect();
   const adminName = session.user.name || session.user.email;
   try {
@@ -156,7 +173,7 @@ export async function DELETE(req, { params }) {
         return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
       }
       if (existing.adminStatus !== 'Archived') {
-        return NextResponse.json({ error: "Move the promotion to Trash before deleting it permanently." }, { status: 409 });
+        return NextResponse.json({ error: "Archive the promotion before deleting it permanently." }, { status: 409 });
       }
 
       await deactivatePromotionStripeCode(existing);

@@ -18,6 +18,9 @@ const AffiliateSchema = new mongoose.Schema({
 
   isVerified: { type: Boolean, default: false }, // Email verification flag
   isDeleted: { type: Boolean, default: false, index: true }, // GDPR soft deletes
+  deletedAt: { type: Date, default: null },
+  // Status the affiliate had when moved to the Trash (trashing suspends them), restored on Restore.
+  statusBeforeTrash: { type: String, enum: ['Active', 'Suspended'], default: null },
   
   address: {
     country: String,

@@ -3,9 +3,23 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
-import { Page, PageHeader, formatDate } from "@/components/admin/ui";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { paginate } from "@/lib/admin-products-utils";
+
+// Status views. "Archived" is the promotions' trash: archived promotions never run, can be
+// restored (as a Draft) and only an archived promotion can be deleted permanently.
+const VIEWS = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active", status: "Active" },
+  { key: "scheduled", label: "Scheduled", status: "Scheduled" },
+  { key: "paused", label: "Paused", status: "Paused" },
+  { key: "draft", label: "Drafts", status: "Draft" },
+  { key: "expired", label: "Expired", status: "Expired" },
+  { key: "archived", label: "Archived" },
+];
 
 async function errorFrom(res, fallback) {
   const body = await res.json().catch(() => null);
@@ -16,8 +30,10 @@ export default function PromotionsDashboard() {
   const { showConfirm } = usePopup();
   const [allPromotions, setAllPromotions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [view, setView] = useState("all"); // all, running, paused, expired, trash
+  const [view, setView] = useState("all"); // see VIEWS
+  const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
 
@@ -28,11 +44,15 @@ export default function PromotionsDashboard() {
       // view and the summary below exclude them.
       const res = await fetch("/api/admin/promotions?includeArchived=1");
       const data = await res.json().catch(() => null);
-      if (res.ok && Array.isArray(data)) setAllPromotions(data);
-      else toast.error(data?.error || "Failed to load promotions");
+      if (res.ok && Array.isArray(data)) {
+        setAllPromotions(data);
+        setLoadError("");
+      } else {
+        setLoadError(data?.error || "Failed to load promotions.");
+      }
     } catch (err) {
       console.error("Failed to fetch promotions:", err);
-      toast.error("Failed to load promotions");
+      setLoadError("Failed to load promotions.");
     } finally {
       setLoading(false);
     }
@@ -69,20 +89,8 @@ export default function PromotionsDashboard() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ adminStatus: "Draft" })
   });
-  const duplicatePromotion = (promo) => {
-    const { _id, id: _virtualId, status: _status, ...rest } = promo;
-    const copy = {
-      ...rest,
-      title: `${promo.title} (Copy)`,
-      code: promo.code ? `${promo.code}_COPY` : undefined,
-      adminStatus: "Draft",
-    };
-    return fetch("/api/admin/promotions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(copy)
-    });
-  };
+  // Server copies it as a Draft with a unique "<CODE>-COPY[-N]" code and zeroed usage.
+  const duplicatePromotion = (id) => fetch(`/api/admin/promotions/${id}/duplicate`, { method: "POST" });
 
   const runSingle = async (request, successMsg, failMsg) => {
     try {
@@ -100,9 +108,9 @@ export default function PromotionsDashboard() {
   };
 
   const handleArchive = async (id) => {
-    const ok = await showConfirm("Move this promotion to Trash? It will stop running and no longer be visible to customers.", "Move to Trash", { confirmText: "Move to Trash" });
+    const ok = await showConfirm("Archive this promotion? It stops running right away. You can restore it later from the Archived view.", "Archive promotion", { confirmText: "Archive" });
     if (!ok) return;
-    await runSingle(() => archivePromotion(id), "Promotion moved to Trash", "Failed to move promotion to Trash");
+    await runSingle(() => archivePromotion(id), "Promotion archived", "Failed to archive promotion");
   };
 
   const handleRestore = (id) =>
@@ -115,7 +123,7 @@ export default function PromotionsDashboard() {
   };
 
   const handleDuplicate = (promo) =>
-    runSingle(() => duplicatePromotion(promo), "Promotion duplicated as a draft", "Failed to duplicate promotion");
+    runSingle(() => duplicatePromotion(promo._id), "Promotion duplicated as a draft", "Failed to duplicate promotion");
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
@@ -129,15 +137,14 @@ export default function PromotionsDashboard() {
      for (const id of selectedIds) {
         try {
            let res = null;
-           if (bulkAction === "Move to Trash") {
+           if (bulkAction === "Archive") {
               res = await archivePromotion(id);
            } else if (bulkAction === "Restore") {
               res = await restorePromotion(id);
            } else if (isPermanent) {
               res = await deletePromotionPermanently(id);
            } else if (bulkAction === "Duplicate") {
-              const promo = allPromotions.find(p => p._id === id);
-              if (promo) res = await duplicatePromotion(promo);
+              res = await duplicatePromotion(id);
            }
            if (res?.ok) done++;
            else failed++;
@@ -156,40 +163,69 @@ export default function PromotionsDashboard() {
      setView(next);
      setSelectedIds([]);
      setBulkAction("Bulk actions");
+     setPage(1);
   };
 
   const toggleSelect = (id) => {
      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
+  const promotions = allPromotions.filter(p => p.adminStatus !== "Archived");
+  const archivedPromotions = allPromotions.filter(p => p.adminStatus === "Archived");
+  const isArchivedView = view === "archived";
+
+  const countFor = (v) =>
+    v.key === "all" ? promotions.length
+      : v.key === "archived" ? archivedPromotions.length
+      : promotions.filter(p => p.status === v.status).length;
+
+  const term = searchTerm.trim().toLowerCase();
+  const viewStatus = VIEWS.find(v => v.key === view)?.status;
+  const filteredPromotions = (isArchivedView ? archivedPromotions : promotions).filter(p => {
+    const matchesSearch = !term ||
+                          p.title?.toLowerCase().includes(term) ||
+                          p.code?.toLowerCase().includes(term);
+    return matchesSearch && (!viewStatus || p.status === viewStatus);
+  });
+
+  const { items: pagePromotions, page: currentPage, totalPages } = paginate(filteredPromotions, page);
+  const visibleIds = pagePromotions.map(p => p._id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+  const someSelected = visibleIds.some(id => selectedIds.includes(id));
+
   const toggleSelectAll = () => {
-     if (selectedIds.length === filteredPromotions.length) setSelectedIds([]);
-     else setSelectedIds(filteredPromotions.map(p => p._id));
+     if (allSelected) setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+     else setSelectedIds(prev => [...new Set([...prev, ...visibleIds])]);
   };
 
-  const promotions = allPromotions.filter(p => p.adminStatus !== "Archived");
-  const trashedPromotions = allPromotions.filter(p => p.adminStatus === "Archived");
-
-  const filteredPromotions = (view === "trash" ? trashedPromotions : promotions).filter(p => {
-    const term = searchTerm.trim().toLowerCase();
-    const matchesSearch = p.title?.toLowerCase().includes(term) ||
-                          p.code?.toLowerCase().includes(term);
-    
-    if (view === "running") return matchesSearch && p.status === "Active";
-    if (view === "paused") return matchesSearch && p.status === "Paused";
-    if (view === "expired") return matchesSearch && p.status === "Expired";
-    return matchesSearch;
-  });
+  const goToPage = (n) => {
+    setPage(Math.min(Math.max(1, n), totalPages));
+    setSelectedIds([]);
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
       case 'Active': return 'wp-st-published';
+      case 'Scheduled': return 'wp-st-shipped';
       case 'Paused': return 'wp-st-confirmed';
       case 'Expired': return 'wp-st-cancelled';
+      case 'Exhausted': return 'wp-st-cancelled';
       case 'Draft': return 'wp-st-draft';
+      case 'Archived': return 'wp-st-draft';
       default: return '';
     }
   };
+
+  const pagination = (
+    <div className="wp-pages">
+      <span>{filteredPromotions.length} {filteredPromotions.length === 1 ? "item" : "items"}</span>
+      <button type="button" className="wp-pager" aria-label="First page" disabled={currentPage <= 1} onClick={() => goToPage(1)}><ChevronsLeft className="w-4 h-4" /></button>
+      <button type="button" className="wp-pager" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}><ChevronLeft className="w-4 h-4" /></button>
+      <span>{currentPage} of {totalPages}</span>
+      <button type="button" className="wp-pager" aria-label="Next page" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}><ChevronRight className="w-4 h-4" /></button>
+      <button type="button" className="wp-pager" aria-label="Last page" disabled={currentPage >= totalPages} onClick={() => goToPage(totalPages)}><ChevronsRight className="w-4 h-4" /></button>
+    </div>
+  );
 
   const scheduleText = (p) =>
     `${p.startDate ? formatDate(p.startDate) : 'Always'} → ${p.endDate ? formatDate(p.endDate) : 'Indefinite'}`;
@@ -200,7 +236,8 @@ export default function PromotionsDashboard() {
         <input
           type="checkbox"
           aria-label="Select all promotions"
-          checked={selectedIds.length > 0 && selectedIds.length === filteredPromotions.length}
+          checked={allSelected}
+          ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
           onChange={toggleSelectAll}
         />
       </th>
@@ -217,8 +254,8 @@ export default function PromotionsDashboard() {
     <RequirePermission permission="promotions.view">
     <Page>
       <PageHeader
-        title="Discounts & Coupons"
-        actions={<Link href="/admin/promotions/new" className="wp-btn">Add new discount</Link>}
+        title="Promotions & BOGO"
+        actions={<Link href="/admin/promotions/new" className="wp-btn">Add new promotion</Link>}
       />
 
       {/* Summary */}
@@ -241,27 +278,26 @@ export default function PromotionsDashboard() {
         </div>
       </div>
 
+      {loadError && (
+        <Notice type="error" onDismiss={() => setLoadError("")}>{loadError}</Notice>
+      )}
+
       {/* Status filter links */}
       <div className="wp-subsub" role="tablist" aria-label="Filter promotions by status">
-        <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-current" : undefined} onClick={() => changeView("all")}>
-          All <span className="wp-count">({promotions.length})</span>
-        </button>
-        <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={view === "running"} className={view === "running" ? "is-current" : undefined} onClick={() => changeView("running")}>
-          Running <span className="wp-count">({promotions.filter(p => p.status === "Active").length})</span>
-        </button>
-        <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={view === "paused"} className={view === "paused" ? "is-current" : undefined} onClick={() => changeView("paused")}>
-          Paused <span className="wp-count">({promotions.filter(p => p.status === "Paused").length})</span>
-        </button>
-        <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={view === "expired"} className={view === "expired" ? "is-current" : undefined} onClick={() => changeView("expired")}>
-          Expired <span className="wp-count">({promotions.filter(p => p.status === "Expired").length})</span>
-        </button>
-        <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={view === "trash"} className={view === "trash" ? "is-current" : undefined} onClick={() => changeView("trash")}>
-          Trash <span className="wp-count">({trashedPromotions.length})</span>
-        </button>
+        {VIEWS.map((v, i) => (
+          <React.Fragment key={v.key}>
+            {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === v.key}
+              className={`max-[782px]:min-h-10 ${view === v.key ? "is-current" : ""}`}
+              onClick={() => changeView(v.key)}
+            >
+              {v.label} <span className="wp-count">({countFor(v)})</span>
+            </button>
+          </React.Fragment>
+        ))}
       </div>
 
       {/* Toolbar */}
@@ -274,7 +310,7 @@ export default function PromotionsDashboard() {
           onChange={(e) => setBulkAction(e.target.value)}
         >
           <option>Bulk actions</option>
-          {view === "trash" ? (
+          {isArchivedView ? (
             <>
               <option>Restore</option>
               <option>Delete Permanently</option>
@@ -282,11 +318,11 @@ export default function PromotionsDashboard() {
           ) : (
             <>
               <option>Duplicate</option>
-              <option>Move to Trash</option>
+              <option>Archive</option>
             </>
           )}
         </select>
-        <button type="button" onClick={handleBulkAction} className="wp-btn">Apply</button>
+        <button type="button" onClick={handleBulkAction} disabled={selectedIds.length === 0 || bulkAction === "Bulk actions"} className="wp-btn">Apply</button>
 
         <span className="wp-spacer" />
 
@@ -295,7 +331,7 @@ export default function PromotionsDashboard() {
           role="search"
           // Filtering is live and synchronous, so submitting (button or Enter) just applies
           // the current term without reloading the page.
-          onSubmit={(e) => { e.preventDefault(); setSearchTerm((t) => t.trim()); }}
+          onSubmit={(e) => { e.preventDefault(); setSearchTerm((t) => t.trim()); setPage(1); setSelectedIds([]); }}
         >
           <label htmlFor="promotions-search" className="sr-only">Search promotions</label>
           <input
@@ -303,11 +339,16 @@ export default function PromotionsDashboard() {
             type="search"
             placeholder="Search campaigns..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); setSelectedIds([]); }}
             className="wp-input"
           />
           <button type="submit" className="wp-btn">Search promotions</button>
         </form>
+      </div>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pagination}
       </div>
 
       {/* Data Table */}
@@ -316,11 +357,16 @@ export default function PromotionsDashboard() {
           <thead>{headerRow}</thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="wp-muted">Loading campaigns…</td></tr>
-            ) : filteredPromotions.length === 0 ? (
-              <tr><td colSpan={7} className="wp-muted">No promotions found matching filters.</td></tr>
+              <tr><td colSpan={7}><span className="sr-only">Loading promotions…</span><Skeleton height={14} /><Skeleton height={14} width="70%" style={{ marginTop: 8 }} /></td></tr>
+            ) : pagePromotions.length === 0 ? (
+              <tr><td colSpan={7} className="wp-muted">
+                {term ? "No promotions match your search."
+                  : isArchivedView ? "No archived promotions."
+                  : view === "all" ? "No promotions yet. Use \u201cAdd new promotion\u201d to create one."
+                  : "No promotions in this view."}
+              </td></tr>
             ) : (
-              filteredPromotions.map((p) => (
+              pagePromotions.map((p) => (
                 <tr key={p._id} className={selectedIds.includes(p._id) ? "is-selected" : undefined}>
                   <td className="wp-check-col">
                     <input
@@ -338,7 +384,7 @@ export default function PromotionsDashboard() {
                     <div className="wp-mobile-meta">
                       {scheduleText(p)} · Used {p.analytics?.timesUsed || 0}
                     </div>
-                    {view === "trash" ? (
+                    {isArchivedView ? (
                       <div className="wp-row-actions">
                         <span><button type="button" onClick={() => handleRestore(p._id)}>Restore</button></span>
                         <span><button type="button" onClick={() => handleDeletePermanently(p._id)} className="is-danger">Delete permanently</button></span>
@@ -352,7 +398,7 @@ export default function PromotionsDashboard() {
                             {p.adminStatus === 'Active' ? 'Pause' : 'Activate'}
                           </button>
                         </span>
-                        <span><button type="button" onClick={() => handleArchive(p._id)} className="is-danger">Move to Trash</button></span>
+                        <span><button type="button" onClick={() => handleArchive(p._id)} className="is-danger">Archive</button></span>
                       </div>
                     )}
                   </td>
@@ -375,6 +421,11 @@ export default function PromotionsDashboard() {
           </tbody>
           <tfoot>{headerRow}</tfoot>
         </table>
+      </div>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pagination}
       </div>
     </Page>
     </RequirePermission>

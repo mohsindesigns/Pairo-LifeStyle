@@ -5,12 +5,14 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
-import { Eye, X, ExternalLink, FileText } from "lucide-react";
+import { Eye, X, ExternalLink, FileText, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { paginate } from "@/lib/admin-products-utils";
+import { joinReasons } from "@/app/api/admin/affiliates/list/trash-utils";
 
 const AFFILIATE_TABS = ["overview", "requests", "list", "links", "orders", "conversions", "commissions", "payouts", "analytics", "settings"];
 
 export default function AffiliatesManagerClient() {
-  const { showConfirm } = usePopup();
+  const { showConfirm, showAlert } = usePopup();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -28,6 +30,9 @@ export default function AffiliatesManagerClient() {
   // States
   const [applications, setApplications] = useState([]);
   const [affiliates, setAffiliates] = useState([]);
+  const [trashedAffiliates, setTrashedAffiliates] = useState([]);
+  const [listPage, setListPage] = useState(1);
+  const [appPage, setAppPage] = useState(1);
   const [payouts, setPayouts] = useState([]);
   const [settings, setSettings] = useState({
     defaultCommissionRate: 5,
@@ -41,8 +46,8 @@ export default function AffiliatesManagerClient() {
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [selectedAffiliate, setSelectedAffiliate] = useState(null);
   const [selectedPayout, setSelectedPayout] = useState(null);
-  const [confirmDeleteAffiliate, setConfirmDeleteAffiliate] = useState(null);
-  const [deletingAffiliateId, setDeletingAffiliateId] = useState(null);
+  // Affiliate / application id with a request in flight (disables its row actions)
+  const [busyId, setBusyId] = useState(null);
   // Review Application inputs
   const [reviewAction, setReviewAction] = useState("Approve");
   const [rejectionReason, setRejectionReason] = useState("");
@@ -117,7 +122,7 @@ export default function AffiliatesManagerClient() {
     try {
       const [reqsRes, affsRes, paysRes, settsRes, ovRes, actRes, promoRes] = await Promise.all([
         fetch("/api/admin/affiliates/requests").then(r => r.json()),
-        fetch("/api/admin/affiliates/list").then(r => r.json()),
+        fetch("/api/admin/affiliates/list?includeTrashed=1").then(r => r.json()),
         fetch("/api/admin/affiliates/payouts").then(r => r.json()),
         fetch("/api/admin/affiliates/settings").then(r => r.json()),
         fetch("/api/admin/affiliates/overview").then(r => r.json()).catch(() => ({})),
@@ -126,7 +131,10 @@ export default function AffiliatesManagerClient() {
       ]);
 
       if (reqsRes.success) setApplications(reqsRes.applications);
-      if (affsRes.success) setAffiliates(affsRes.affiliates);
+      if (affsRes.success) {
+        setAffiliates(affsRes.affiliates);
+        setTrashedAffiliates(affsRes.trashed || []);
+      }
       if (paysRes.success) setPayouts(paysRes.payouts);
       if (settsRes.success) setSettings(settsRes.settings);
       if (ovRes.success) setOverviewStats(ovRes);
@@ -270,23 +278,78 @@ export default function AffiliatesManagerClient() {
     } finally {
       setSubmittingEdit(false);    }
   };
-  const handleDeleteAffiliate = async (affiliateId) => {
-    setDeletingAffiliateId(affiliateId);
+  // Runs one row request; returns true on success. Errors are toasted.
+  const runRowRequest = async (id, request, successMsg) => {
+    setBusyId(id);
     try {
-      const res = await fetch(`/api/admin/affiliates/list?id=${affiliateId}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete affiliate.");
-
-      toast.success("Affiliate and all associated records deleted successfully.");
-      setConfirmDeleteAffiliate(null);
-      loadData();
+      const res = await request();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Request failed.");
+      toast.success(data.message || successMsg);
+      await loadData();
+      return true;
     } catch (err) {
       toast.error(err.message);
+      return false;
     } finally {
-      setDeletingAffiliateId(null);
+      setBusyId(null);
     }
+  };
+
+  const handleToggleAffiliateStatus = async (aff) => {
+    const next = aff.status === "Active" ? "Suspended" : "Active";
+    if (next === "Suspended" && !(await showConfirm(
+      `Suspend ${aff.name}? They are signed out, can't log in, and their referral links and coupon stop earning until you activate them again.`,
+      "Suspend affiliate",
+      { confirmText: "Suspend", danger: true }
+    ))) return;
+    await runRowRequest(aff._id, () => fetch("/api/admin/affiliates/list", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ affiliateId: aff._id, __v: aff.__v, status: next })
+    }), next === "Active" ? "Affiliate activated." : "Affiliate suspended.");
+  };
+
+  const handleTrashAffiliate = async (aff) => {
+    if (!(await showConfirm(
+      `Move ${aff.name} to the Trash? The account is suspended (no login, no new commissions). Commissions, payouts and history are kept, and you can restore it later.`,
+      "Move to Trash",
+      { confirmText: "Move to Trash" }
+    ))) return;
+    await runRowRequest(aff._id, () => fetch(`/api/admin/affiliates/list?id=${aff._id}`, { method: "DELETE" }), "Affiliate moved to Trash.");
+  };
+
+  const handleRestoreAffiliate = (aff) =>
+    runRowRequest(aff._id, () => fetch("/api/admin/affiliates/list", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ affiliateId: aff._id, action: "restore" })
+    }), "Affiliate restored.");
+
+  const handleDeleteAffiliatePermanently = async (aff) => {
+    if (aff.deleteBlockers?.length) {
+      await showAlert(
+        `${aff.name} has ${joinReasons(aff.deleteBlockers)}. That financial history must be kept, so this affiliate stays in the Trash (suspended) instead of being deleted.`,
+        "Can't delete permanently"
+      );
+      return;
+    }
+    if (!(await showConfirm(
+      `Permanently delete ${aff.name}? This cannot be undone.`,
+      "Delete permanently",
+      { confirmText: "Delete permanently", danger: true }
+    ))) return;
+    await runRowRequest(aff._id, () => fetch(`/api/admin/affiliates/list?id=${aff._id}&permanent=1`, { method: "DELETE" }), "Affiliate deleted permanently.");
+  };
+
+  const handleDeleteApplication = async (app) => {
+    if (!(await showConfirm(
+      `Delete the application from ${app.name}? This cannot be undone.${app.status === "Approved" ? " Their affiliate account is not affected." : ""}`,
+      "Delete application",
+      { confirmText: "Delete", danger: true }
+    ))) return;
+    const ok = await runRowRequest(app._id, () => fetch(`/api/admin/affiliates/requests?id=${app._id}`, { method: "DELETE" }), "Application deleted.");
+    if (ok && viewingApplication?._id === app._id) setViewingApplication(null);
   };
 
   const handlePayoutProcess = async (e) => {
@@ -399,8 +462,9 @@ export default function AffiliatesManagerClient() {
   };
 
   // Every way of opening the review dialog initialises all review fields from this application.
-  const openReviewApplication = (app) => {
+  const openReviewApplication = (app, action = "Approve") => {
     resetReviewForm(app);
+    setReviewAction(action);
     setSelectedApplication(app);
   };
 
@@ -886,6 +950,7 @@ export default function AffiliatesManagerClient() {
             app.address?.country?.toLowerCase().includes(q);
           return matchesStatus && matchesSearch;
         });
+        const { items: pageApps, page: appCurrentPage, totalPages: appTotalPages } = paginate(filteredApps, appPage);
         const counts = {
           All: applications.length,
           Pending: applications.filter(a => a.status === "Pending").length,
@@ -899,17 +964,18 @@ export default function AffiliatesManagerClient() {
                 label="Filter applications by status"
                 options={["All", "Pending", "Approved", "Rejected"]}
                 value={appStatusFilter}
-                onChange={setAppStatusFilter}
+                onChange={(v) => { setAppStatusFilter(v); setAppPage(1); }}
                 counts={counts}
               />
               <SearchBox
                 id="aff-apps-search"
                 label="Search applications"
                 value={appSearchQuery}
-                onChange={setAppSearchQuery}
+                onChange={(v) => { setAppSearchQuery(v); setAppPage(1); }}
                 placeholder="Name, email, phone, country…"
               />
             </div>
+            <Pager total={filteredApps.length} page={appCurrentPage} totalPages={appTotalPages} onPage={setAppPage} />
             <div className="wp-table-box mt-2">
               <table className="wp-list-table">
                 <thead>
@@ -930,7 +996,7 @@ export default function AffiliatesManagerClient() {
                       </td>
                     </tr>
                   ) : (
-                    filteredApps.map(app => (
+                    pageApps.map(app => (
                       <tr key={app._id}>
                         <td style={{ wordBreak: "break-word" }}>
                           <button type="button" className="wp-row-title text-left" onClick={() => setViewingApplication(app)}>
@@ -941,10 +1007,14 @@ export default function AffiliatesManagerClient() {
                             {app.email}{app.address?.country ? ` · ${app.address.country}` : ""}
                           </div>
                           <div className="wp-row-actions">
-                            <span><button type="button" onClick={() => setViewingApplication(app)}>View details</button></span>
+                            <span><button type="button" className="max-[782px]:min-h-10" onClick={() => setViewingApplication(app)}>View details</button></span>
                             {app.status === 'Pending' && (
-                              <span><button type="button" onClick={() => openReviewApplication(app)}>Review</button></span>
+                              <>
+                                <span><button type="button" className="max-[782px]:min-h-10" onClick={() => openReviewApplication(app, "Approve")}>Approve</button></span>
+                                <span><button type="button" className="max-[782px]:min-h-10" onClick={() => openReviewApplication(app, "Reject")}>Reject</button></span>
+                              </>
                             )}
+                            <span><button type="button" className="is-danger max-[782px]:min-h-10" disabled={busyId === app._id} onClick={() => handleDeleteApplication(app)}>Delete</button></span>
                           </div>
                         </td>
                         <td className="wp-hide-sm" style={{ wordBreak: "break-all" }}>
@@ -983,38 +1053,48 @@ export default function AffiliatesManagerClient() {
 
       {/* Tab: Affiliates List */}
       {activeTab === "list" && (() => {
-        const filteredAffs = affiliates.filter(aff => {
-          const matchesStatus = listStatusFilter === "All" || aff.status === listStatusFilter;
-          const q = listSearchQuery.trim().toLowerCase();
+        const isTrashView = listStatusFilter === "Trash";
+        const q = listSearchQuery.trim().toLowerCase();
+        const filteredAffs = (isTrashView ? trashedAffiliates : affiliates).filter(aff => {
+          const matchesStatus = isTrashView || listStatusFilter === "All" || aff.status === listStatusFilter;
           return matchesStatus && (!q ||
             aff.name?.toLowerCase().includes(q) ||
             aff.email?.toLowerCase().includes(q) ||
             aff.referralCode?.toLowerCase().includes(q) ||
             aff.couponCode?.toLowerCase().includes(q));
         });
+        const { items: pageAffs, page: listCurrentPage, totalPages: listTotalPages } = paginate(filteredAffs, listPage);
+        const rateLabel = (aff) => aff.commissionType === "Fixed" ? `$${aff.commissionRate ?? 0} (Fixed)` : `${aff.commissionRate ?? 0}%`;
         return (
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <FilterLinks
                 label="Filter affiliates by status"
-                options={["All", "Active", "Suspended"]}
+                options={["All", "Active", "Suspended", "Trash"]}
                 counts={{
                   All: affiliates.length,
                   Active: affiliates.filter(a => a.status === "Active").length,
                   Suspended: affiliates.filter(a => a.status === "Suspended").length,
+                  Trash: trashedAffiliates.length,
                 }}
                 value={listStatusFilter}
-                onChange={setListStatusFilter}
+                onChange={(v) => { setListStatusFilter(v); setListPage(1); }}
               />
               <SearchBox
                 id="aff-list-search"
                 label="Search affiliates"
                 value={listSearchQuery}
-                onChange={setListSearchQuery}
+                onChange={(v) => { setListSearchQuery(v); setListPage(1); }}
                 placeholder="Search affiliates…"
               />
             </div>
-            <div className="wp-table-box mt-2">
+            {isTrashView && trashedAffiliates.length > 0 && (
+              <p className="wp-desc" style={{ margin: "8px 0 0" }}>
+                Trashed affiliates are suspended: they can&rsquo;t log in and their links and coupons don&rsquo;t earn. An affiliate with commissions, payouts or referred orders is kept here for your records and can&rsquo;t be deleted permanently.
+              </p>
+            )}
+            <Pager total={filteredAffs.length} page={listCurrentPage} totalPages={listTotalPages} onPage={setListPage} />
+            <div className="wp-table-box">
               <table className="wp-list-table">
                 <thead>
                   <tr>
@@ -1028,36 +1108,64 @@ export default function AffiliatesManagerClient() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAffs.length === 0 ? (
+                  {pageAffs.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="wp-muted">No affiliates match filter.</td>
+                      <td colSpan="7" className="wp-muted">
+                        {q ? "No affiliates match your search."
+                          : isTrashView ? "Trash is empty."
+                          : listStatusFilter === "All" ? "No affiliates yet. Approve an application to add one."
+                          : "No affiliates in this view."}
+                      </td>
                     </tr>
                   ) : (
-                    filteredAffs.map(aff => (
-                      <tr key={aff._id}>
-                        <td style={{ wordBreak: "break-word" }}>
-                          <button type="button" className="wp-row-title text-left" onClick={() => openEditAffiliate(aff)}>
-                            {aff.name}
-                          </button>
-                          <div className="wp-muted wp-small">{aff.email}</div>
-                          <div className="wp-mobile-meta">
-                            {aff.referralCode} · {aff.commissionType === "Fixed" ? `$${aff.commissionRate} (Fixed)` : `${aff.commissionRate}%`}
-                          </div>
-                          <div className="wp-row-actions">
-                            <span><button type="button" onClick={() => openEditAffiliate(aff)}>Edit</button></span>
-                            <span><button type="button" className="is-danger" onClick={() => setConfirmDeleteAffiliate(aff)}>Delete</button></span>
-                          </div>
-                        </td>
-                        <td className="wp-hide-sm font-mono wp-strong">{aff.referralCode}</td>
-                        <td className="wp-hide-sm font-mono wp-muted">{aff.couponCode || "—"}</td>
-                        <td className="wp-hide-sm">
-                          {aff.commissionType === "Fixed" ? `$${aff.commissionRate} (Fixed)` : `${aff.commissionRate}%`}
-                        </td>
-                        <td className="wp-num wp-strong">{formatMoney(aff.balance ?? 0)}</td>
-                        <td className="wp-num wp-hide-sm wp-muted">{formatMoney(aff.lifetimeEarnings ?? 0)}</td>
-                        <td><AffPill status={aff.status} /></td>
-                      </tr>
-                    ))
+                    pageAffs.map(aff => {
+                      const busy = busyId === aff._id;
+                      return (
+                        <tr key={aff._id}>
+                          <td style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                            {isTrashView ? (
+                              <span className="wp-row-title">{aff.name}</span>
+                            ) : (
+                              <button type="button" className="wp-row-title text-left" onClick={() => openEditAffiliate(aff)}>
+                                {aff.name}
+                              </button>
+                            )}
+                            <div className="wp-muted wp-small">{aff.email}</div>
+                            <div className="wp-mobile-meta">
+                              {aff.referralCode} · {rateLabel(aff)}
+                            </div>
+                            <div className="wp-row-actions">
+                              {isTrashView ? (
+                                <>
+                                  <span><button type="button" className="max-[782px]:min-h-10" disabled={busy} onClick={() => handleRestoreAffiliate(aff)}>Restore</button></span>
+                                  {aff.deleteBlockers?.length ? (
+                                    <span><button type="button" className="max-[782px]:min-h-10" onClick={() => handleDeleteAffiliatePermanently(aff)} title={`Kept: ${aff.deleteBlockers.join(", ")}`}>Why can&rsquo;t I delete?</button></span>
+                                  ) : (
+                                    <span><button type="button" className="is-danger max-[782px]:min-h-10" disabled={busy} onClick={() => handleDeleteAffiliatePermanently(aff)}>Delete permanently</button></span>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <span><button type="button" className="max-[782px]:min-h-10" onClick={() => openEditAffiliate(aff)}>Edit</button></span>
+                                  <span>
+                                    <button type="button" className="max-[782px]:min-h-10" disabled={busy} onClick={() => handleToggleAffiliateStatus(aff)}>
+                                      {aff.status === "Active" ? "Suspend" : "Activate"}
+                                    </button>
+                                  </span>
+                                  <span><button type="button" className="is-danger max-[782px]:min-h-10" disabled={busy} onClick={() => handleTrashAffiliate(aff)}>Trash</button></span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                          <td className="wp-hide-sm font-mono wp-strong" style={{ wordBreak: "break-all" }}>{aff.referralCode}</td>
+                          <td className="wp-hide-sm font-mono wp-muted" style={{ wordBreak: "break-all" }}>{aff.couponCode || "—"}</td>
+                          <td className="wp-hide-sm">{rateLabel(aff)}</td>
+                          <td className="wp-num wp-strong">{formatMoney(aff.balance ?? 0)}</td>
+                          <td className="wp-num wp-hide-sm wp-muted">{formatMoney(aff.lifetimeEarnings ?? 0)}</td>
+                          <td><AffPill status={isTrashView ? "Trashed" : aff.status} /></td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -2066,39 +2174,6 @@ export default function AffiliatesManagerClient() {
         </div>
       )}
 
-      {/* Modal: Delete Affiliate Confirmation */}
-      {confirmDeleteAffiliate && (
-        <div className="wp-modal-backdrop">
-          <div className="wp-modal" role="alertdialog" aria-modal="true" aria-labelledby="aff-del-title" aria-describedby="aff-del-desc" style={{ maxWidth: 480 }}>
-            <div className="wp-modal-head">
-              <h2 id="aff-del-title">Delete affiliate account?</h2>
-              <CloseButton onClick={() => setConfirmDeleteAffiliate(null)} />
-            </div>
-            <div className="wp-modal-body" id="aff-del-desc">
-              <p className="m-0 mb-2">
-                Are you sure you want to permanently delete <strong>{confirmDeleteAffiliate.name}</strong> ({confirmDeleteAffiliate.referralCode})?
-              </p>
-              <p className="wp-desc" style={{ margin: 0 }}>
-                This action will permanently delete all associated clicks, payouts, ledger entries, and commissions. This cannot be undone.
-              </p>
-            </div>
-            <div className="wp-modal-foot">
-              <button type="button" onClick={() => setConfirmDeleteAffiliate(null)} className="wp-btn">
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteAffiliate(confirmDeleteAffiliate._id)}
-                disabled={deletingAffiliateId === confirmDeleteAffiliate._id}
-                className="wp-btn"
-                style={DANGER_SOLID}
-              >
-                {deletingAffiliateId === confirmDeleteAffiliate._id ? "Deleting…" : "Delete permanently"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </Page>
   );
 }
@@ -2116,6 +2191,7 @@ const PILL_CLASS = {
   Paid: "wp-st-paid",
   Rejected: "wp-st-failed",
   Suspended: "wp-st-failed",
+  Trashed: "wp-st-draft",
 };
 
 function AffPill({ status }) {
@@ -2153,17 +2229,36 @@ function FilterLinks({ label, options, value, onChange, counts }) {
 }
 
 function SearchBox({ id, label, value, onChange, placeholder }) {
+  // Filters live while typing; Enter / Search just keeps the term (no page reload).
   return (
-    <div className="wp-search">
+    <form className="wp-search" role="search" onSubmit={(e) => { e.preventDefault(); onChange(value.trim()); }}>
       <label htmlFor={id} className="sr-only">{label}</label>
       <input
         id={id}
-        type="text"
+        type="search"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="wp-input w-[280px]"
+        className="wp-input w-[240px]"
       />
+      <button type="submit" className="wp-btn">Search</button>
+    </form>
+  );
+}
+
+function Pager({ total, page, totalPages, onPage }) {
+  const go = (n) => onPage(Math.min(Math.max(1, n), totalPages));
+  return (
+    <div className="wp-toolbar">
+      <span className="wp-spacer" />
+      <div className="wp-pages">
+        <span>{total} {total === 1 ? "item" : "items"}</span>
+        <button type="button" className="wp-pager" aria-label="First page" disabled={page <= 1} onClick={() => go(1)}><ChevronsLeft className="w-4 h-4" /></button>
+        <button type="button" className="wp-pager" aria-label="Previous page" disabled={page <= 1} onClick={() => go(page - 1)}><ChevronLeft className="w-4 h-4" /></button>
+        <span>{page} of {totalPages}</span>
+        <button type="button" className="wp-pager" aria-label="Next page" disabled={page >= totalPages} onClick={() => go(page + 1)}><ChevronRight className="w-4 h-4" /></button>
+        <button type="button" className="wp-pager" aria-label="Last page" disabled={page >= totalPages} onClick={() => go(totalPages)}><ChevronsRight className="w-4 h-4" /></button>
+      </div>
     </div>
   );
 }

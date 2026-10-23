@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import Link from "next/link";
-import { Page, PageHeader, Postbox } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
 import usePromotionEditor from "@/components/admin/promotions/usePromotionEditor";
 import RuleGroupBlock from "@/components/admin/promotions/RuleBuilder/RuleGroupBlock";
 import ActionBlock from "@/components/admin/promotions/ActionBuilder/ActionBlock";
@@ -26,8 +26,9 @@ export default function PromotionEditor({ isNew = false } = {}) {
   } = usePromotionEditor();
   
   const [loading, setLoading] = useState(id !== "new");
+  // "notfound" when the id doesn't exist (or is malformed), otherwise an error message.
+  const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [validation, setValidation] = useState({ isValid: true, errors: [], warnings: [] });
   const [revisionCount, setRevisionCount] = useState(null);
 
   const [products, setProducts] = useState([]);
@@ -56,30 +57,39 @@ export default function PromotionEditor({ isNew = false } = {}) {
   };
 
   useEffect(() => {
-    if (id && id !== "new") {
-      fetch(`/api/admin/promotions/${id}`)
-        .then(res => res.json())
-        .then(data => {
-          setFormData(data);
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error("Load failed:", err);
-          setLoading(false);
-        });
-    } else {
-      setLoading(false);
-    }
+    if (!id || id === "new") return;
+    let active = true;
+    fetch(`/api/admin/promotions/${id}`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!active) return;
+        if (res.status === 404) {
+          setLoadError("notfound");
+        } else if (!res.ok || !data || typeof data !== "object") {
+          setLoadError(data?.error || "Failed to load this promotion.");
+        } else {
+          // Older records may lack actions/conditions; the editor needs both shapes.
+          setFormData({
+            ...data,
+            actions: Array.isArray(data.actions) ? data.actions : [],
+            conditions: data.conditions && typeof data.conditions === "object" ? data.conditions : {},
+            usageLimits: data.usageLimits || { maxTotalUses: null, maxUsesPerCustomer: 1 },
+          });
+        }
+      })
+      .catch(err => {
+        console.error("Load failed:", err);
+        if (active) setLoadError("Failed to load this promotion.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
   }, [id, setFormData]);
 
-  useEffect(() => {
-    const results = Validator.validate(formData);
-    Promise.resolve().then(() => {
-      setValidation(results);
-    });
-  }, [formData]);
+  const validation = useMemo(() => Validator.validate(formData), [formData]);
 
-  const handleSave = async () => {
+  const handleSave = async ({ asDraft = false } = {}) => {
     if (!validation.isValid) {
         toast.error("Please fix the errors before saving.");
         return;
@@ -97,7 +107,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, priority: priority.value })
+        body: JSON.stringify({ ...formData, priority: priority.value, ...(asDraft ? { adminStatus: "Draft" } : {}) })
       });
 
       if (res.ok) {
@@ -109,6 +119,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
           setFormData(saved);
           toast.error(`Saved, but Stripe sync failed: ${saved.stripeSyncError || "unknown error"}`);
         } else {
+          toast.success(asDraft ? "Promotion saved as a draft" : "Promotion saved");
           router.push("/admin/promotions");
         }
       } else {
@@ -125,7 +136,40 @@ export default function PromotionEditor({ isNew = false } = {}) {
 
   const priorityCheck = parsePriority(formData.priority);
 
-  if (loading) return <div className="wp-page"><p className="wp-muted">Loading promotion…</p></div>;
+  if (loading) {
+    return (
+      <Page>
+        <PageHeader title="Edit Promotion" />
+        <div className="wp-postbox">
+          <div className="wp-inside space-y-3">
+            <span className="sr-only">Loading promotion…</span>
+            <Skeleton height={34} />
+            <Skeleton height={14} width="60%" />
+            <Skeleton height={14} />
+            <Skeleton height={14} width="80%" />
+          </div>
+        </div>
+      </Page>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <RequirePermission permission="promotions.view">
+      <Page>
+        <PageHeader
+          title="Edit Promotion"
+          actions={<Link href="/admin/promotions" className="wp-btn">All promotions</Link>}
+        />
+        <Notice type="error">
+          {loadError === "notfound"
+            ? "This promotion was not found. It may have been deleted permanently, or the link is wrong."
+            : loadError}
+        </Notice>
+      </Page>
+      </RequirePermission>
+    );
+  }
 
   return (
     <RequirePermission permission="promotions.manage">
@@ -144,6 +188,11 @@ export default function PromotionEditor({ isNew = false } = {}) {
 
         {/* Main column */}
         <div className="wp-col-main">
+          {formData.adminStatus === "Archived" && id !== "new" && (
+            <Notice type="warning">
+              This promotion is archived and does not run. Restore it from the Archived list, or change its status in the Publish box and save.
+            </Notice>
+          )}
           <div className="wp-field">
             <label htmlFor="promo-title" className="sr-only">Promotion title</label>
             <input
@@ -295,15 +344,23 @@ export default function PromotionEditor({ isNew = false } = {}) {
             flush
             footer={
               <>
-                <Link href="/admin/promotions" className="wp-link" style={{ color: "var(--wp-danger)" }}>Cancel changes</Link>
+                <Link href="/admin/promotions" className="wp-link" style={{ color: "var(--wp-danger)" }}>Cancel</Link>
                 <span className="wp-spacer" />
                 <button
                   type="button"
-                  onClick={handleSave}
+                  onClick={() => handleSave({ asDraft: true })}
+                  disabled={saving || !validation.isValid}
+                  className="wp-btn"
+                >
+                  Save Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSave()}
                   disabled={saving || !validation.isValid}
                   className="wp-btn wp-btn-primary"
                 >
-                  {saving ? "Saving..." : "Save Campaign"}
+                  {saving ? "Saving…" : formData.adminStatus === "Active" ? "Publish" : "Save"}
                 </button>
               </>
             }
