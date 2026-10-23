@@ -12,7 +12,7 @@ import { SiteProvider } from "@/context/SiteContext";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import ScriptLoader from "@/components/common/ScriptLoader";
 import ThemeStyle from "@/components/common/ThemeStyle";
-import { Toaster } from "react-hot-toast";
+import ClientToaster from "@/components/common/ClientToaster";
 import { PopupProvider } from "@/context/PopupContext";
 import { cache, Suspense } from "react";
 import CookieConsent from "@/components/common/CookieConsent";
@@ -327,7 +327,7 @@ export default async function RootLayout({ children }) {
           <ScriptLoader location="body_top" />
         <AuthProvider>
           <PopupProvider>
-            <Toaster position="top-right" />
+            <ClientToaster position="top-right" />
             <CookieConsent />
             <Suspense fallback={null}>
               <AffiliateTracker />
