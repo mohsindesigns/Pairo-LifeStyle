@@ -113,6 +113,8 @@ export default function CategorySelector({
             placeholder="Search categories..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            // Filtering is live; Enter must not submit the surrounding coupon form.
+            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
             className="wp-input wp-full"
             style={{ marginBottom: 8 }}
           />

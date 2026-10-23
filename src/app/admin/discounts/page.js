@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from "react";
+import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { X, Copy, Check, CreditCard, AlertTriangle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -10,20 +10,7 @@ import ProductSelector from "@/components/admin/discounts/ProductSelector";
 import CategorySelector from "@/components/admin/discounts/CategorySelector";
 import CouponViewModal from "@/components/admin/discounts/CouponViewModal";
 import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
-
-// Prefers the real specificCustomerEmails field; falls back to deriving from populated
-// specificCustomers (ObjectId refs with .email) for any coupon saved before that field
-// existed. Used everywhere a discount's customer-restriction list needs to become the
-// comma-separated string the form/duplicate payloads work with.
-function deriveCustomerEmailsString(discount) {
-  if (discount.specificCustomerEmails && discount.specificCustomerEmails.length > 0) {
-    return discount.specificCustomerEmails.join(", ");
-  }
-  if (discount.specificCustomers && discount.specificCustomers.length > 0) {
-    return discount.specificCustomers.map(c => typeof c === 'object' ? c.email : c).join(", ");
-  }
-  return "";
-}
+import { deriveCustomerEmailsString, buildDuplicatePayload, isValidUsageLimitInput } from "@/components/admin/discounts/couponUtils";
 
 const EMPTY_FORM = {
   code: "",
@@ -51,15 +38,22 @@ const EMPTY_FORM = {
 
 function ShareCouponModal({ discount, onClose }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
   if (!discount) return null;
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const link = `${origin}/promo/${encodeURIComponent(discount.code)}`;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  const handleCopy = async () => {
+    setCopyError("");
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+      setCopyError("Could not copy the link. Select it and copy it manually.");
+    }
   };
 
   return (
@@ -89,6 +83,9 @@ function ShareCouponModal({ discount, onClose }) {
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
+          {copyError && (
+            <p role="alert" className="wp-desc" style={{ color: "#b32d2e", margin: "6px 0 0" }}>{copyError}</p>
+          )}
         </div>
       </div>
     </div>
@@ -106,6 +103,8 @@ function CouponsContent() {
   const [stats, setStats] = useState({ allCount: 0, activeCount: 0, expiredCount: 0, trashCount: 0 });
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All"); // All, Active, Expired, Trash
+  // searchInput = what's typed; searchQuery = the applied search the list is fetched with.
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
@@ -150,9 +149,9 @@ function CouponsContent() {
     setFormData({
       code: discount.code || "",
       type: discount.type || "percentage",
-      value: discount.value || "",
-      minPurchase: discount.minPurchase || "",
-      usageLimit: discount.usageLimit || "",
+      value: discount.value ?? "",
+      minPurchase: discount.minPurchase ?? "",
+      usageLimit: discount.usageLimit ?? "",
       unlimitedUsage: !discount.usageLimit,
       usagePerUserLimit: discount.usagePerUserLimit !== undefined && discount.usagePerUserLimit !== null ? discount.usagePerUserLimit.toString() : "",
       unlimitedPerCustomer: discount.usagePerUserLimit === undefined || discount.usagePerUserLimit === null,
@@ -165,7 +164,7 @@ function CouponsContent() {
       specificProducts: prodIds,
       specificCategories: catIds,
       maxDiscountAmount: discount.maxDiscountAmount !== undefined && discount.maxDiscountAmount !== null ? discount.maxDiscountAmount.toString() : "",
-      minQuantity: discount.minQuantity || "",
+      minQuantity: discount.minQuantity ?? "",
       excludeSaleItems: !!discount.excludeSaleItems,
       specificCustomerEmails: deriveCustomerEmailsString(discount),
       oneRedemptionPerDevice: !!discount.oneRedemptionPerDevice
@@ -174,7 +173,13 @@ function CouponsContent() {
     setShowForm(true);
   }, []);
 
+  // Only the latest list request may update state: each fetch aborts the previous one,
+  // so slow responses for an older search/filter can't overwrite newer results.
+  const listAbortRef = useRef(null);
   const fetchDiscounts = useCallback(async () => {
+    listAbortRef.current?.abort();
+    const controller = new AbortController();
+    listAbortRef.current = controller;
     setErrorNotice("");
     try {
       const queryParams = new URLSearchParams({
@@ -182,21 +187,44 @@ function CouponsContent() {
       });
       if (searchQuery) queryParams.set("search", searchQuery);
 
-      const res = await fetch(`/api/admin/discounts?${queryParams.toString()}`);
+      const res = await fetch(`/api/admin/discounts?${queryParams.toString()}`, { signal: controller.signal });
       const data = await res.json();
+      if (controller.signal.aborted) return;
       if (res.ok) {
-        setDiscounts(data.discounts || []);
+        const list = data.discounts || [];
+        setDiscounts(list);
+        // Keep the selection limited to rows that are still visible.
+        const visible = new Set(list.map(d => d._id));
+        setSelectedIds(prev => prev.filter(id => visible.has(id)));
         if (data.stats) setStats(data.stats);
       } else {
         setErrorNotice(data.error || "Failed to load coupons.");
       }
     } catch (err) {
+      if (controller.signal.aborted || err?.name === "AbortError") return;
       console.error(err);
       setErrorNotice("Error connecting to server.");
     } finally {
-      setLoading(false);
+      if (listAbortRef.current === controller) setLoading(false);
     }
   }, [statusFilter, searchQuery]);
+
+  // Applies a search term now (Search button / Enter) and clears the selection.
+  const applySearch = (term) => {
+    setSelectedIds([]);
+    if (term === searchQuery) fetchDiscounts();
+    else setSearchQuery(term);
+  };
+
+  // Live search: apply the typed term after the user pauses typing (~350ms).
+  useEffect(() => {
+    if (searchInput === searchQuery) return;
+    const t = setTimeout(() => {
+      setSelectedIds([]);
+      setSearchQuery(searchInput);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput, searchQuery]);
 
   // Load catalog data
   useEffect(() => {
@@ -228,52 +256,41 @@ function CouponsContent() {
 
   // Fetch discounts on filter/search change
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const queryParams = new URLSearchParams({
-          status: statusFilter,
-        });
-        if (searchQuery) queryParams.set("search", searchQuery);
+    Promise.resolve().then(fetchDiscounts);
+    return () => listAbortRef.current?.abort();
+  }, [fetchDiscounts]);
 
-        const res = await fetch(`/api/admin/discounts?${queryParams.toString()}`);
-        if (!active) return;
-        const data = await res.json();
-        if (res.ok) {
-          setDiscounts(data.discounts || []);
-          if (data.stats) setStats(data.stats);
-        } else {
-          setErrorNotice(data.error || "Failed to load coupons.");
-        }
-      } catch (err) {
-        console.error(err);
-        if (active) setErrorNotice("Error connecting to server.");
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [statusFilter, searchQuery]);
-
-  // Handle URL actions (?action=new or ?action=edit&id=...)
+  // Handle URL actions (?action=new or ?action=edit&id=...) once per URL action, then
+  // drop the query param so later list refreshes don't re-open / reset the form.
+  const handledUrlActionRef = useRef(null);
   useEffect(() => {
     const action = searchParams.get("action");
     const editId = searchParams.get("id");
+    if (!action) {
+      handledUrlActionRef.current = null;
+      return;
+    }
+    const key = `${action}:${editId || ""}`;
+    if (handledUrlActionRef.current === key) return;
     if (action === "new") {
+      handledUrlActionRef.current = key;
       Promise.resolve().then(() => {
         setEditingDiscountId(null);
         setFormData({ ...EMPTY_FORM });
         setShowForm(true);
       });
+      router.replace("/admin/discounts");
     } else if (action === "edit" && editId && discounts.length > 0) {
       const target = discounts.find(d => d._id === editId);
       if (target) {
+        handledUrlActionRef.current = key;
         Promise.resolve().then(() => {
           handleStartFullEdit(target);
         });
+        router.replace("/admin/discounts");
       }
     }
-  }, [searchParams, discounts, handleStartFullEdit]);
+  }, [searchParams, discounts, handleStartFullEdit, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -306,7 +323,7 @@ function CouponsContent() {
       });
       const data = await res.json();
       if (res.ok) {
-        setSuccessNotice(`Coupon "${data.code}" created successfully.`);
+        setSuccessNotice(`Coupon "${data.code}" ${editingDiscountId ? "updated" : "created"} successfully.`);
         if (data.stripeSyncStatus === "error") {
           setErrorNotice(`Stripe sync failed: ${data.stripeSyncError || "unknown error"}`);
         }
@@ -326,16 +343,8 @@ function CouponsContent() {
     setErrorNotice("");
     setSuccessNotice("");
     try {
-      const { _id, usageCount, createdAt, updatedAt, specificCustomers, specificCustomerEmails, notifiedCustomerEmails, redeemedFingerprints, ...rest } = discount;
-      const copy = {
-        ...rest,
-        code: `${discount.code}_COPY_${Math.floor(Math.random() * 1000)}`,
-        specificProducts: Array.isArray(discount.specificProducts) ? discount.specificProducts.map(p => typeof p === 'object' && p?._id ? String(p._id) : String(p)) : [],
-        specificCategories: Array.isArray(discount.specificCategories) ? discount.specificCategories.map(c => typeof c === 'object' && c?._id ? String(c._id) : String(c)) : [],
-        // A duplicate is a brand new coupon — carries over who it's restricted to, but not
-        // who's already been notified (notifiedCustomerEmails deliberately left out of `rest`).
-        specificCustomerEmails: deriveCustomerEmailsString({ specificCustomerEmails, specificCustomers })
-      };
+      // Only editable fields; the copy is inactive and the server picks a unique CODE-COPY code.
+      const copy = buildDuplicatePayload(discount);
       const res = await fetch("/api/admin/discounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -448,14 +457,7 @@ function CouponsContent() {
             } else if (bulkAction === "Duplicate") {
               const d = discounts.find(x => x._id === id);
               if (d) {
-                const { _id, usageCount, createdAt, updatedAt, specificCustomers, specificCustomerEmails, notifiedCustomerEmails, redeemedFingerprints, ...rest } = d;
-                const copy = {
-                  ...rest,
-                  code: `${d.code}_COPY_${Math.floor(Math.random() * 1000)}`,
-                  specificProducts: Array.isArray(d.specificProducts) ? d.specificProducts.map(p => typeof p === 'object' && p?._id ? String(p._id) : String(p)) : [],
-                  specificCategories: Array.isArray(d.specificCategories) ? d.specificCategories.map(c => typeof c === 'object' && c?._id ? String(c._id) : String(c)) : [],
-                  specificCustomerEmails: deriveCustomerEmailsString({ specificCustomerEmails, specificCustomers })
-                };
+                const copy = buildDuplicatePayload(d);
                 const res = await fetch("/api/admin/discounts", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -505,9 +507,9 @@ function CouponsContent() {
     setQuickEditData({
       code: discount.code,
       type: discount.type,
-      value: discount.value,
-      minPurchase: discount.minPurchase || "",
-      usageLimit: discount.usageLimit || "",
+      value: discount.value ?? "",
+      minPurchase: discount.minPurchase ?? "",
+      usageLimit: discount.usageLimit ?? "",
       unlimitedUsage: !discount.usageLimit,
       startDate: discount.startDate ? new Date(discount.startDate).toISOString().split("T")[0] : "",
       endDate: discount.endDate ? new Date(discount.endDate).toISOString().split("T")[0] : "",
@@ -520,7 +522,7 @@ function CouponsContent() {
       usagePerUserLimit: discount.usagePerUserLimit !== undefined && discount.usagePerUserLimit !== null ? discount.usagePerUserLimit.toString() : "",
       unlimitedPerCustomer: discount.usagePerUserLimit === undefined || discount.usagePerUserLimit === null,
       maxDiscountAmount: discount.maxDiscountAmount !== undefined && discount.maxDiscountAmount !== null ? discount.maxDiscountAmount.toString() : "",
-      minQuantity: discount.minQuantity || "",
+      minQuantity: discount.minQuantity ?? "",
       excludeSaleItems: !!discount.excludeSaleItems,
       specificCustomerEmails: deriveCustomerEmailsString(discount),
       oneRedemptionPerDevice: !!discount.oneRedemptionPerDevice
@@ -530,6 +532,10 @@ function CouponsContent() {
   const handleQuickEditSubmit = async (id) => {
     setErrorNotice("");
     setSuccessNotice("");
+    if (!quickEditData.unlimitedUsage && !isValidUsageLimitInput(quickEditData.usageLimit)) {
+      setErrorNotice("Total limit must be a whole number of 1 or more (leave blank for unlimited).");
+      return;
+    }
     try {
       const specificProducts = Array.isArray(quickEditData.specificProducts)
         ? quickEditData.specificProducts.map(p => typeof p === 'object' && p?._id ? String(p._id) : String(p)).filter(Boolean)
@@ -573,8 +579,10 @@ function CouponsContent() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
+  // Select-all is based on the rows currently visible, not on counts.
+  const allVisibleSelected = discounts.length > 0 && discounts.every(d => selectedIds.includes(d._id));
   const toggleSelectAll = () => {
-    if (selectedIds.length === discounts.length) setSelectedIds([]);
+    if (allVisibleSelected) setSelectedIds([]);
     else setSelectedIds(discounts.map(d => d._id));
   };
 
@@ -990,7 +998,7 @@ function CouponsContent() {
         <input
           type="checkbox"
           aria-label="Select all coupons"
-          checked={discounts.length > 0 && selectedIds.length === discounts.length}
+          checked={allVisibleSelected}
           onChange={toggleSelectAll}
         />
       </th>
@@ -1091,15 +1099,15 @@ function CouponsContent() {
 
         <span className="wp-spacer" />
 
-        <form role="search" onSubmit={(e) => { e.preventDefault(); fetchDiscounts(); }} className="wp-search">
+        <form role="search" onSubmit={(e) => { e.preventDefault(); applySearch(searchInput); }} className="wp-search">
           <label htmlFor="coupons-search" className="sr-only">Search coupons</label>
           <input
             id="coupons-search"
             type="search"
             placeholder="Search coupons..."
             className="wp-input"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
           <button type="submit" className="wp-btn">
             Search coupons
@@ -1193,6 +1201,8 @@ function CouponsContent() {
                               <input
                                 id="qe-coupon-limit"
                                 type="number"
+                                min="1"
+                                step="1"
                                 placeholder="Unlimited"
                                 disabled={quickEditData.unlimitedUsage}
                                 className="wp-input wp-full"

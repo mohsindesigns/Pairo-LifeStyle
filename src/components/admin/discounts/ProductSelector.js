@@ -207,6 +207,8 @@ export default function ProductSelector({
                   placeholder="Search products by title or SKU..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  // Filtering is live; Enter must not submit the surrounding coupon form.
+                  onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
                   className="wp-input flex-1 min-w-0"
                   autoFocus
                 />

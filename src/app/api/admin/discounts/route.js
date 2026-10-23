@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { can } from "@/lib/rbac";
 import { syncDiscountToStripe, deactivateDiscountStripeCode } from "@/lib/discountStripeSync";
 import { sendCouponAssignedEmail } from "@/lib/email";
+import { copyCodeCandidate } from "@/components/admin/discounts/couponUtils";
 
 // Verify session is staff AND (when a permission is given) holds that permission.
 // Coupons live under the "promotions" permission module — previously any staff role
@@ -182,10 +183,26 @@ export async function POST(req) {
       return NextResponse.json({ error: "Code and value are required fields." }, { status: 400 });
     }
 
-    const codeUpper = body.code.toUpperCase().trim();
+    let codeUpper = String(body.code).toUpperCase().trim();
+    const isDuplicate = body.duplicate === true;
+
+    if (isDuplicate) {
+      // Duplicate: derive a unique "<CODE>-COPY", "<CODE>-COPY-2", … code here on the
+      // server (checked against every coupon, including Trash) instead of trusting a
+      // client-made random suffix.
+      let found = null;
+      for (let n = 1; n <= 100; n++) {
+        const candidate = copyCodeCandidate(codeUpper, n);
+        if (!(await Discount.exists({ code: candidate }))) { found = candidate; break; }
+      }
+      if (!found) {
+        return NextResponse.json({ error: `Could not find a free copy code for "${codeUpper}".` }, { status: 400 });
+      }
+      codeUpper = found;
+    }
 
     // Check uniqueness (across all, including Trash, due to DB index uniqueness constraints)
-    const existing = await Discount.findOne({ code: codeUpper });
+    const existing = isDuplicate ? null : await Discount.findOne({ code: codeUpper });
     if (existing) {
       if (existing.isDeleted) {
         return NextResponse.json({ error: `Coupon code "${codeUpper}" already exists in Trash. Please restore or permanently delete it first.` }, { status: 400 });
@@ -232,7 +249,9 @@ export async function POST(req) {
     const specificCustomerEmails = parseEmailList(body.specificCustomerEmails);
     const specificCustomers = await resolveCustomerIds(specificCustomerEmails);
 
-    // Sanitize values to prevent CastErrors
+    // Sanitize values to prevent CastErrors. Only admin-editable fields are read from the
+    // body — server-managed fields (isDeleted, usageCount, stripe* sync fields,
+    // notifiedCustomerEmails, redeemedFingerprints, timestamps) are never taken from it.
     const data = {
       code: codeUpper,
       type: body.type || "percentage",
@@ -241,7 +260,8 @@ export async function POST(req) {
       usageLimit: (body.usageLimit && body.usageLimit !== "") ? Number(body.usageLimit) : null,
       startDate,
       endDate: expiryDate,
-      isActive: body.isActive !== undefined ? body.isActive : true,
+      // A duplicate always starts inactive so it can't go live (or email customers) by accident.
+      isActive: isDuplicate ? false : (body.isActive !== undefined ? !!body.isActive : true),
       firstOrderOnly: body.firstOrderOnly !== undefined ? !!body.firstOrderOnly : false,
       userRegistrationRequired: body.userRegistrationRequired !== undefined ? !!body.userRegistrationRequired : false,
       newsletterSubscribedOnly: body.newsletterSubscribedOnly !== undefined ? !!body.newsletterSubscribedOnly : false,

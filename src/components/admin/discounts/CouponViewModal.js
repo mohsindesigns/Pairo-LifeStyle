@@ -12,12 +12,19 @@ export default function CouponViewModal({
   onShare,
 }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
   if (!discount) return null;
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(discount.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  const handleCopyCode = async () => {
+    setCopyError("");
+    try {
+      await navigator.clipboard.writeText(discount.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+      setCopyError("Could not copy the code.");
+    }
   };
 
   const isExpired = discount.endDate && new Date(discount.endDate) < new Date();
@@ -111,6 +118,9 @@ export default function CouponViewModal({
             >
               {copied ? <Check className="w-5 h-5" aria-hidden="true" style={{ color: "#2f6f1a" }} /> : <Copy className="w-5 h-5" aria-hidden="true" />}
             </button>
+            {copyError && (
+              <span role="alert" className="wp-small" style={{ color: "#b32d2e" }}>{copyError}</span>
+            )}
             {onShare && (
               <button
                 type="button"
@@ -268,7 +278,7 @@ export default function CouponViewModal({
               {rule(discount.excludeSaleItems, "Exclude sale items")}
               {rule(discount.oneRedemptionPerDevice, "1 redemption per device/IP")}
 
-              {discount.maxDiscountAmount && (
+              {Number(discount.maxDiscountAmount) > 0 && (
                 <div className="wp-kv">
                   <span className="wp-kv-k">Max discount cap</span>
                   <span className="wp-kv-v">${Number(discount.maxDiscountAmount).toFixed(2)}</span>
