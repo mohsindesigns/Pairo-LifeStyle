@@ -10,6 +10,47 @@ import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
+// WordPress media modal: near full-screen, grey preview pane, 300px details sidebar.
+const MEDIA_MODAL_CSS = `
+.admin-dashboard-container .media-modal-backdrop { padding: 30px; z-index: 100000; }
+.admin-dashboard-container .media-modal { max-width: none; width: 100%; height: calc(100dvh - 60px); max-height: none; display: flex; flex-direction: column; overflow: hidden; }
+.media-modal-head { display: flex; align-items: center; justify-content: space-between; height: 50px; padding-left: 16px; border-bottom: 1px solid #dcdcde; flex: none; }
+.media-modal-head h2 { font-size: 22px !important; font-weight: 600 !important; margin: 0; color: #1d2327; }
+.media-modal-nav { display: flex; height: 100%; }
+.media-modal-nav button { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: none; border: 0; border-left: 1px solid #dcdcde; color: #787c82; cursor: pointer; }
+.media-modal-nav button:hover:not(:disabled), .media-modal-nav button:focus-visible { color: #2271b1; background: #f6f7f7; }
+.media-modal-nav button:disabled { color: #dcdcde; cursor: default; }
+.media-modal-content { display: flex; flex: 1; min-height: 0; }
+.media-modal-preview { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: #f0f0f1; overflow: auto; }
+.media-modal-preview img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 0 0 1px rgba(0,0,0,.1); background: #fff; }
+.media-modal-sidebar { width: 336px; flex: none; overflow-y: auto; padding: 0 16px 16px; background: #f6f7f7; border-left: 1px solid #dcdcde; font-size: 13px; color: #3c434a; }
+.media-modal-info { padding: 16px 0 12px; border-bottom: 1px solid #dcdcde; line-height: 1.6; }
+.media-modal-info p { margin: 0; }
+.media-modal-fields { padding-top: 12px; }
+.media-setting { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+.media-setting > label { flex: 0 0 30%; text-align: right; padding-top: 6px; color: #646970; font-size: 12px; }
+.media-setting-ctrl { flex: 1; min-width: 0; }
+.admin-dashboard-container .media-setting-ctrl .wp-input, .admin-dashboard-container .media-setting-ctrl .wp-textarea { width: 100% !important; max-width: none !important; }
+.media-setting-ctrl .wp-hint { margin: 4px 0 0; font-size: 12px; }
+.media-save-status { min-height: 18px; margin: 0 0 0 calc(30% + 8px); display: flex; align-items: center; gap: 4px; color: #646970; font-size: 12px; }
+.media-modal-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; padding-top: 12px; margin-top: 8px; border-top: 1px solid #dcdcde; font-size: 13px; }
+.media-modal-actions a, .media-modal-actions button { text-decoration: none !important; }
+.media-modal-actions a:hover, .media-modal-actions button:hover { text-decoration: underline !important; }
+.media-modal-actions a { color: #2271b1; }
+.media-modal-actions a:hover { color: #135e96; }
+@media (max-width: 782px) {
+  .admin-dashboard-container .media-modal-backdrop { padding: 0; }
+  .admin-dashboard-container .media-modal { height: 100dvh; }
+  .media-modal-head h2 { font-size: 18px !important; }
+  .media-modal-content { flex-direction: column; overflow-y: auto; }
+  .media-modal-preview { flex: none; min-height: 220px; max-height: 45vh; }
+  .media-modal-sidebar { width: auto; border-left: 0; border-top: 1px solid #dcdcde; overflow: visible; }
+  .media-setting { flex-direction: column; align-items: stretch; gap: 4px; }
+  .media-setting > label { text-align: left; padding-top: 0; flex: none; }
+  .media-save-status { margin-left: 0; }
+}
+`;
+
 export default function AdminMedia() {
   const { showConfirm, showAlert } = usePopup();
   const [items, setItems]           = useState([]);
@@ -30,6 +71,8 @@ export default function AdminMedia() {
   const [uploading, setUploading]   = useState(false);
   const [dragOver, setDragOver]     = useState(false);
   const [copied, setCopied]         = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const savedTimer = useRef(null);
   const [counts, setCounts]         = useState({ library: 0, trash: 0 });
   const [loadError, setLoadError]   = useState("");
   const fileInputRef = useRef(null);
@@ -142,8 +185,13 @@ export default function AdminMedia() {
     }
   };
 
-  const saveMetadata = async () => {
-    if (!editItem) return;
+  const isDirty = () => !!editItem && !!detailItem && editItem._id === detailItem._id &&
+    ["title", "altText", "caption"].some(k => (editItem[k] || "") !== (detailItem[k] || ""));
+
+  // Fields save when you leave them (like WordPress), so there's no separate save button.
+  const saveMetadata = async ({ quiet = false } = {}) => {
+    if (!editItem) return true;
+    if (quiet && !isDirty()) return true;
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/media/${editItem._id}`, {
@@ -156,15 +204,49 @@ export default function AdminMedia() {
         setItems(prev => prev.map(i => i._id === editItem._id ? data.media : i));
         setDetailItem(data.media);
         setEditItem({ ...data.media });
-        toast.success("Media details saved.");
-      } else {
-        toast.error(data?.error || "Failed to save media details.");
+        if (quiet) {
+          setSavedFlash(true);
+          clearTimeout(savedTimer.current);
+          savedTimer.current = setTimeout(() => setSavedFlash(false), 2000);
+        } else toast.success("Media details saved.");
+        return true;
       }
+      toast.error(data?.error || "Failed to save media details.");
+      return false;
     } catch (e) {
       console.error(e);
       toast.error("Failed to save media details.");
+      return false;
     } finally { setSaving(false); }
   };
+
+  // Leaving the dialog (close or prev/next) saves any field still being typed in first.
+  const closeDetail = async () => {
+    if (isDirty() && !(await saveMetadata({ quiet: true }))) return;
+    setDetailItem(null);
+  };
+  const openSibling = async (item) => {
+    if (!item) return;
+    if (isDirty() && !(await saveMetadata({ quiet: true }))) return;
+    setDetailItem(item);
+    setEditItem({ ...item });
+  };
+  // Keyboard, as in WordPress: Esc closes, left/right arrows step (not while typing in a field)
+  const keyHandler = useRef(null);
+  useEffect(() => { keyHandler.current = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeDetail(); return; }
+    if (saving || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || "")) return;
+    const idx = items.findIndex(i => i._id === detailItem?._id);
+    if (e.key === "ArrowLeft" && idx > 0) openSibling(items[idx - 1]);
+    if (e.key === "ArrowRight" && idx >= 0 && idx < items.length - 1) openSibling(items[idx + 1]);
+  }; });
+  const detailOpen = !!detailItem;
+  useEffect(() => {
+    if (!detailOpen) return;
+    const onKey = (e) => keyHandler.current?.(e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [detailOpen]);
 
   const usageNote = (item) =>
     item?.usageCount > 0 ? ` It is recorded as used in ${item.usageCount} place${item.usageCount === 1 ? "" : "s"}.` : "";
@@ -318,6 +400,13 @@ export default function AdminMedia() {
     border: "1px solid", borderColor: active ? "#2271b1" : "transparent", background: active ? "#fff" : "transparent",
     color: active ? "#1d2327" : "#787c82", borderRadius: 3, cursor: "pointer",
   });
+
+  const detailIdx = detailItem ? items.findIndex(i => i._id === detailItem._id) : -1;
+  const prevItem = detailIdx > 0 ? items[detailIdx - 1] : null;
+  const nextItem = detailIdx >= 0 && detailIdx < items.length - 1 ? items[detailIdx + 1] : null;
+  const isImage = !detailItem?.mimeType || detailItem.mimeType.startsWith("image/");
+  const editable = !!editItem && !!detailItem && !detailItem.isDeleted;
+  const linkBtn = { background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit", textDecoration: "underline" };
 
   return (
     <RequirePermission permission="media.manage">
@@ -535,33 +624,44 @@ export default function AdminMedia() {
         </div>
       )}
 
-      {/* ── Attachment Details ── */}
+      {/* ── Attachment details (WordPress media modal: preview left, details sidebar right,
+           fields save as you leave them, prev/next arrows step through the library) ── */}
       {detailItem && (
-        <div className="wp-modal-backdrop">
-          <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="media-detail-title" style={{ maxWidth: 960 }}>
-            <div className="wp-modal-head">
+        <div className="wp-modal-backdrop media-modal-backdrop">
+          <div className="wp-modal media-modal" role="dialog" aria-modal="true" aria-labelledby="media-detail-title">
+            <div className="media-modal-head">
               <h2 id="media-detail-title">Attachment details</h2>
-              <button type="button" onClick={() => setDetailItem(null)} aria-label="Close dialog" className="wp-btn" style={{ border: 0, background: "none", color: "#646970", minWidth: 40, minHeight: 40 }}><X className="w-5 h-5" aria-hidden="true" /></button>
+              <div className="media-modal-nav">
+                <button type="button" aria-label="Previous media item" disabled={!prevItem || saving} onClick={() => openSibling(prevItem)}><ChevronLeft className="w-5 h-5" aria-hidden="true" /></button>
+                <button type="button" aria-label="Next media item" disabled={!nextItem || saving} onClick={() => openSibling(nextItem)}><ChevronRight className="w-5 h-5" aria-hidden="true" /></button>
+                <button type="button" aria-label="Close dialog" onClick={closeDetail}><X className="w-5 h-5" aria-hidden="true" /></button>
+              </div>
             </div>
-            <div className="flex flex-col md:flex-row" style={{ minWidth: 0 }}>
+            <div className="media-modal-content">
               {/* Preview */}
-              <div className="flex items-center justify-center md:flex-1" style={{ background: "#f0f0f1", padding: 16, minHeight: 240, minWidth: 0 }}>
-                <img src={detailItem.url} alt="" style={{ maxWidth: "100%", maxHeight: "60vh", objectFit: "contain", boxShadow: "0 0 0 1px rgba(0,0,0,0.08)" }} />
+              <div className="media-modal-preview">
+                {isImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={detailItem.url} alt="" />
+                ) : (
+                  <div className="wp-muted" style={{ textAlign: "center" }}><ImageIcon className="w-12 h-12" aria-hidden="true" style={{ margin: "0 auto 8px" }} />{detailItem.filename}</div>
+                )}
               </div>
 
-              <div className="md:w-[360px] shrink-0" style={{ padding: 16, background: "#f6f7f7", borderLeft: "1px solid #dcdcde", minWidth: 0 }}>
-                {/* File Info */}
-                <div className="wp-small" style={{ color: "#3c434a", paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #dcdcde" }}>
-                  <p className="wp-strong" style={{ margin: "0 0 6px", wordBreak: "break-all" }}>{detailItem.filename}</p>
-                  <p style={{ margin: 0 }}><span className="wp-muted">Uploaded on:</span> {new Date(detailItem.createdAt).toLocaleDateString()}</p>
-                  {detailItem.width && <p style={{ margin: 0 }}><span className="wp-muted">Dimensions:</span> {detailItem.width} by {detailItem.height} pixels</p>}
-                  {detailItem.fileSize && <p style={{ margin: 0 }}><span className="wp-muted">File size:</span> {(detailItem.fileSize/1024).toFixed(0)} KB</p>}
-                  <p style={{ margin: 0 }}>
-                    <span className="wp-muted">Used in:</span>{" "}
+              {/* Details sidebar */}
+              <div className="media-modal-sidebar">
+                <div className="media-modal-info">
+                  <p><strong>Uploaded on:</strong> {new Date(detailItem.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}</p>
+                  <p><strong>File name:</strong> <span style={{ wordBreak: "break-all" }}>{detailItem.filename}</span></p>
+                  {detailItem.mimeType && <p><strong>File type:</strong> {detailItem.mimeType}</p>}
+                  {detailItem.fileSize ? <p><strong>File size:</strong> {(detailItem.fileSize/1024).toFixed(0)} KB</p> : null}
+                  {detailItem.width ? <p><strong>Dimensions:</strong> {detailItem.width} by {detailItem.height} pixels</p> : null}
+                  <p>
+                    <strong>Used in:</strong>{" "}
                     {detailItem.usageCount > 0 ? `${detailItem.usageCount} place${detailItem.usageCount === 1 ? "" : "s"}` : "Not recorded as used"}
                   </p>
                   {detailItem.usageRefs?.length > 0 && (
-                    <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                    <ul style={{ margin: "2px 0 0", paddingLeft: 18 }}>
                       {detailItem.usageRefs.slice(0, 5).map((r, i) => (
                         <li key={i} style={{ wordBreak: "break-word" }}>{r.label || `${r.entityType} — ${r.fieldName}`}</li>
                       ))}
@@ -569,71 +669,67 @@ export default function AdminMedia() {
                     </ul>
                   )}
                   {detailItem.isDeleted && detailItem.deletedAt && (
-                    <p style={{ margin: 0 }}><span className="wp-muted">Trashed on:</span> {new Date(detailItem.deletedAt).toLocaleDateString()}</p>
+                    <p><strong>Trashed on:</strong> {new Date(detailItem.deletedAt).toLocaleDateString()}</p>
                   )}
                 </div>
 
-                {/* Editable Fields */}
-                {editItem && !detailItem.isDeleted && (
-                  <div>
+                {editable && (
+                  <div className="media-modal-fields">
                     {[
-                      { key: 'altText', label: 'Alternative Text', placeholder: 'Describe for accessibility...' },
+                      { key: 'altText', label: 'Alternative Text', hint: 'Describe the purpose of the image. Leave empty if the image is purely decorative.' },
                       { key: 'title', label: 'Title' },
                       { key: 'caption', label: 'Caption', type: 'textarea' },
                     ].map(field => (
-                      <div key={field.key} className="wp-frow">
-                        <label htmlFor={`media-field-${field.key}`} className="wp-flabel" style={{ width: 110 }}>{field.label}</label>
-                        {field.type === 'textarea' ? (
-                          <textarea id={`media-field-${field.key}`} rows={3} value={editItem[field.key] || ''} onChange={e => setEditItem(p => ({...p, [field.key]: e.target.value}))}
-                            className="wp-textarea" style={{ flex: "1 1 180px", minWidth: 0 }} />
-                        ) : (
-                          <input id={`media-field-${field.key}`} value={editItem[field.key] || ''} onChange={e => setEditItem(p => ({...p, [field.key]: e.target.value}))}
-                            placeholder={field.placeholder} className="wp-input" style={{ flex: "1 1 180px", minWidth: 0 }} />
-                        )}
+                      <div key={field.key} className="media-setting">
+                        <label htmlFor={`media-field-${field.key}`}>{field.label}</label>
+                        <div className="media-setting-ctrl">
+                          {field.type === 'textarea' ? (
+                            <textarea id={`media-field-${field.key}`} rows={3} className="wp-textarea" value={editItem[field.key] || ''}
+                              onChange={e => setEditItem(p => ({...p, [field.key]: e.target.value}))} onBlur={() => saveMetadata({ quiet: true })} />
+                          ) : (
+                            <input id={`media-field-${field.key}`} className="wp-input" value={editItem[field.key] || ''}
+                              onChange={e => setEditItem(p => ({...p, [field.key]: e.target.value}))} onBlur={() => saveMetadata({ quiet: true })} />
+                          )}
+                          {field.hint && <p className="wp-hint">{field.hint}</p>}
+                        </div>
                       </div>
                     ))}
-                    <div className="wp-frow">
-                      <label htmlFor="media-field-url" className="wp-flabel" style={{ width: 110 }}>File URL</label>
-                      <input id="media-field-url" readOnly value={detailItem.url} className="wp-input" style={{ flex: "1 1 180px", minWidth: 0 }} onFocus={e => e.target.select()} />
+                    <div className="media-setting">
+                      <label htmlFor="media-field-url">File URL</label>
+                      <div className="media-setting-ctrl">
+                        <input id="media-field-url" readOnly value={detailItem.url} className="wp-input" onFocus={e => e.target.select()} />
+                        <button type="button" onClick={() => copyUrl(detailItem.url)} className="wp-btn wp-btn-sm" style={{ marginTop: 6 }}>
+                          {copied ? <><Check className="w-4 h-4" aria-hidden="true" /> Copied!</> : "Copy URL to clipboard"}
+                        </button>
+                        <span className="sr-only" role="status">{copied ? "URL copied to clipboard" : ""}</span>
+                      </div>
                     </div>
-                    <div className="wp-frow">
-                      <span className="wp-flabel" style={{ width: 110 }} aria-hidden="true" />
-                      <button type="button" onClick={() => copyUrl(detailItem.url)} className="wp-btn">
-                        {copied ? <><Check className="w-4 h-4" aria-hidden="true" /> Copied</> : "Copy URL"}
-                      </button>
-                      <span className="sr-only" role="status">{copied ? "URL copied to clipboard" : ""}</span>
-                    </div>
+                    <p className="media-save-status" role="status" aria-live="polite">
+                      {saving ? <><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Saving…</> : savedFlash ? "Saved." : ""}
+                    </p>
                   </div>
                 )}
 
-                {/* Actions */}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-2" style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #dcdcde" }}>
+                {/* Action links, WordPress style */}
+                <div className="media-modal-actions">
+                  <a href={detailItem.url} target="_blank" rel="noopener noreferrer">View media file</a>
+                  <span className="wp-sep" aria-hidden="true">|</span>
+                  <a href={detailItem.url} download={detailItem.filename || true}>Download file</a>
+                  <span className="wp-sep" aria-hidden="true">|</span>
                   {detailItem.isDeleted ? (
                     <>
-                      <button type="button" onClick={() => restore(detailItem._id)} className="wp-btn">
-                        <RotateCcw className="w-4 h-4" aria-hidden="true" /> Restore
-                      </button>
-                      <button type="button" onClick={() => permanentDelete(detailItem._id)} style={{ background: "none", border: 0, padding: 0, color: "#b32d2e", textDecoration: "underline", cursor: "pointer", minHeight: 30 }}>
-                        Delete permanently
-                      </button>
+                      <button type="button" onClick={() => restore(detailItem._id)} style={{ ...linkBtn, color: "#2271b1" }}>Restore</button>
+                      <span className="wp-sep" aria-hidden="true">|</span>
+                      <button type="button" onClick={() => permanentDelete(detailItem._id)} style={{ ...linkBtn, color: "#b32d2e" }}>Delete permanently</button>
                     </>
                   ) : (
-                    <button type="button" onClick={() => softDelete(detailItem._id)} style={{ background: "none", border: 0, padding: 0, color: "#b32d2e", textDecoration: "underline", cursor: "pointer", minHeight: 30 }}>
-                      Move to Trash
-                    </button>
+                    <button type="button" onClick={() => softDelete(detailItem._id)} style={{ ...linkBtn, color: "#b32d2e" }}>Move to Trash</button>
                   )}
                 </div>
               </div>
             </div>
-            {editItem && !detailItem.isDeleted && (
-              <div className="wp-modal-foot">
-                <button type="button" onClick={() => setDetailItem(null)} className="wp-btn">Close</button>
-                <button type="button" onClick={saveMetadata} disabled={saving} className="wp-btn wp-btn-primary">
-                  {saving ? "Saving..." : "Update Metadata"}
-                </button>
-              </div>
-            )}
           </div>
+          <style>{MEDIA_MODAL_CSS}</style>
         </div>
       )}
 
