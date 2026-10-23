@@ -96,6 +96,20 @@ function TextRow({ label, description, value, onChange, placeholder, textarea })
   );
 }
 
+/* ── STORE CURRENCY ───────────────────────────────────────────── */
+// Card payments (Stripe) are charged in USD, so USD is the only value that keeps reports,
+// shipping rates and checkout in the same currency; others are listed for when that changes.
+const STORE_CURRENCIES = [
+  ['USD', 'US Dollar ($)'],
+  ['EUR', 'Euro (€)'],
+  ['GBP', 'British Pound (£)'],
+  ['CAD', 'Canadian Dollar (CA$)'],
+  ['AUD', 'Australian Dollar (A$)'],
+  ['AED', 'UAE Dirham (AED)'],
+  ['PKR', 'Pakistani Rupee (Rs)'],
+];
+const CHECKOUT_CURRENCY = 'USD';
+
 /* ── SOCIAL PLATFORMS ─────────────────────────────────────────── */
 const SOCIALS = [
   { key: 'facebook', label: 'Facebook', Icon: Users },
@@ -117,6 +131,10 @@ function GeneralTab({ config, onChange, onGoToTab }) {
     ...config,
     commerce: { ...(config.commerce || {}), paymentMethods: { cardEnabled: true, codEnabled: true, ...pm, [k]: v } }
   });
+  const storeCurrency = config.commerce?.storeCurrency || CHECKOUT_CURRENCY;
+  const currencyOptions = STORE_CURRENCIES.some(([c]) => c === storeCurrency)
+    ? STORE_CURRENCIES
+    : [...STORE_CURRENCIES, [storeCurrency, storeCurrency]];
   const cardEnabled = pm.cardEnabled !== false;
   const codEnabled = pm.codEnabled !== false;
   return (
@@ -143,7 +161,7 @@ function GeneralTab({ config, onChange, onGoToTab }) {
         <TextRow label="WhatsApp Chat URL" value={b.whatsappUrl} onChange={v => set('whatsappUrl', v)} placeholder="https://wa.me/..." description="Direct WhatsApp chat link." />
       </Postbox>
 
-      <Postbox title="Search engines and checkout">
+      <Postbox title="Store, search engines and checkout">
         <div className="wp-frow">
           <span className="wp-flabel">Search engine visibility</span>
           <div style={ctrlWrap}>
@@ -158,6 +176,25 @@ function GeneralTab({ config, onChange, onGoToTab }) {
             </label>
           </div>
           <p className="wp-hint">Discourage search engines from indexing this site (applies noindex, nofollow globally).</p>
+        </div>
+        <div className="wp-frow">
+          <label className="wp-flabel" htmlFor="site-store-currency">Store currency</label>
+          <div style={ctrlWrap}>
+            <select
+              id="site-store-currency"
+              className="wp-select"
+              value={storeCurrency}
+              onChange={e => onChange({ ...config, commerce: { ...(config.commerce || {}), storeCurrency: e.target.value } })}
+            >
+              {currencyOptions.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+            </select>
+            {storeCurrency !== CHECKOUT_CURRENCY && (
+              <div className="wp-notice wp-notice-warning" role="alert" style={{ marginTop: 8, maxWidth: 560 }}>
+                <p>Checkout charges cards in {CHECKOUT_CURRENCY}, so orders are recorded in {CHECKOUT_CURRENCY}. With {storeCurrency} selected, reports will label those {CHECKOUT_CURRENCY} amounts as {storeCurrency}. Keep this on {CHECKOUT_CURRENCY} unless checkout is changed too.</p>
+              </div>
+            )}
+          </div>
+          <p className="wp-hint">Used for money in analytics, reports and shipping rates. Card payments are charged in US Dollars.</p>
         </div>
         <fieldset className="wp-frow m-0 border-0 p-0 py-2">
           <legend className="sr-only">Payment Methods</legend>

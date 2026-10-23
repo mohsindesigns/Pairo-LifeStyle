@@ -15,11 +15,7 @@ const countLabel = (e) => (!e || e.status === "loading" ? "…" : e.status === "
 // Page-local layout for the grouped section tabs (admin-ui.css has no show-on-phone helper).
 const TAB_CSS = `
 .trash-tabs-sm { display: none; }
-.trash-tabs-lg { margin: 6px 0 10px; border-top: 1px solid #f0f0f1; }
-.trash-group { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; border-bottom: 1px solid #f0f0f1; }
-.trash-group-label { flex: 0 0 72px; font-size: 12px; font-weight: 600; color: #646970; text-transform: uppercase; letter-spacing: .02em; }
-.trash-group .wp-subsub { margin: 0; flex: 1; min-width: 0; }
-.trash-group .wp-subsub button.trash-empty { color: #8c8f94; }
+.trash-tabs-lg { margin: 4px 0 8px; }
 @media (max-width: 782px) {
   .trash-tabs-lg { display: none; }
   .trash-tabs-sm { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 10px; }
@@ -87,7 +83,14 @@ export default function AdminTrash() {
   const [page, setPage] = useState(1);
   const loadSeq = useRef({});
 
-  const current = modules.find((m) => m.key === active) || modules[0] || null;
+  const stillLoading = modules.some((m) => !data[m.key] || data[m.key].status === "loading");
+  // Sections with trashed items (or a load error), plus the one being viewed
+  const nonEmpty = modules.filter((m) => {
+    const e = data[m.key];
+    return m.key === active || (e && (e.status === "error" || (e.status === "ok" && e.docs.length > 0)));
+  });
+  // Until a section is picked, show the first one that has something in it
+  const current = modules.find((m) => m.key === active) || nonEmpty[0] || modules[0] || null;
 
   const loadModule = useCallback(async (mod) => {
     const seq = (loadSeq.current[mod.key] || 0) + 1;
@@ -263,7 +266,7 @@ export default function AdminTrash() {
         </td>
       )}
       <th scope="col">{current.key === "orders" ? "Order" : "Title"}</th>
-      <th scope="col" className="wp-hide-sm">Details</th>
+      <th scope="col" className="wp-hide-sm" style={{ width: "22%" }}>Details</th>
       {hasDates && <th scope="col" className="wp-hide-sm" style={{ width: 140 }}>Trashed</th>}
     </tr>
   );
@@ -294,33 +297,25 @@ export default function AdminTrash() {
         </select>
       </div>
 
-      {/* Desktop: WP status links, one wrapping row per group. */}
+      {/* Desktop: one row of WP status links, only for sections that have something in the Trash. */}
       <div className="trash-tabs-lg" role="tablist" aria-label="Trash by section">
-        {groups.map((g) => (
-          <div key={g.key} className="trash-group">
-            <span className="trash-group-label">{g.label}</span>
-            <div className="wp-subsub">
-              {g.modules.map((m, i) => {
-                const isCur = m.key === current.key;
-                const n = countLabel(data[m.key]);
-                return (
-                  <span key={m.key} style={{ display: "inline-flex", alignItems: "center" }}>
-                    {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={isCur}
-                      className={[isCur ? "is-current" : "", n === 0 && !isCur ? "trash-empty" : ""].filter(Boolean).join(" ") || undefined}
-                      onClick={() => selectTab(m.key)}
-                    >
-                      {m.label} <span className="wp-count">({n})</span>
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
+        {nonEmpty.length === 0 ? (
+          <p className="wp-muted" style={{ margin: "4px 0" }}>{stillLoading ? "Loading…" : "The Trash is empty."}</p>
+        ) : (
+          <div className="wp-subsub">
+            {nonEmpty.map((m, i) => {
+              const isCur = m.key === current.key;
+              return (
+                <span key={m.key} style={{ display: "inline-flex", alignItems: "center" }}>
+                  {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+                  <button type="button" role="tab" aria-selected={isCur} className={isCur ? "is-current" : undefined} onClick={() => selectTab(m.key)}>
+                    {m.label} <span className="wp-count">({countLabel(data[m.key])})</span>
+                  </button>
+                </span>
+              );
+            })}
           </div>
-        ))}
+        )}
       </div>
 
       {entry?.status === "error" && (
