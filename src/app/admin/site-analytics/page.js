@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { usePathname, useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
 import RequirePermission from "@/components/admin/RequirePermission";
-import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
 import {
   BarChart3,
   FileText,
@@ -195,7 +195,8 @@ const fmtDuration = (ms) => {
 const fmtWhen = (value) => (value
   ? new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
   : "—");
-const fmtMoney = (v) => `$${Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Money is formatted in the store currency (from the API payload; USD when unknown).
+const moneyFormatter = (currency) => (v) => formatMoney(Number(v) || 0, currency || "USD");
 const fmtNum = (v) => (Number(v) || 0).toLocaleString();
 const pctText = (v) => `${Number(v || 0)}%`;
 let regionNames = null;
@@ -333,7 +334,7 @@ function BarRows({ rows = [], valueKey, labelKey, format = (v) => v }) {
   );
 }
 
-function describeEvent(e) {
+function describeEvent(e, currency) {
   if (e.name === "click") {
     return {
       type: "click",
@@ -372,7 +373,7 @@ function describeEvent(e) {
   }
   if (e.name === "add_to_cart" || e.name === "purchase" || e.name === "begin_checkout") {
     const names = (e.items || []).map((i) => i.item_name).filter(Boolean).join(", ");
-    const val = e.value ? ` · ${e.currency || "$"}${Number(e.value).toFixed(2)}` : "";
+    const val = e.value ? ` · ${formatMoney(Number(e.value), e.currency || currency || "USD")}` : "";
     return {
       type: "ecommerce",
       icon: ShoppingBag,
@@ -390,7 +391,7 @@ function describeEvent(e) {
   };
 }
 
-function JourneyPanel({ visitorId, onClose }) {
+function JourneyPanel({ visitorId, onClose, currency }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedSessions, setExpandedSessions] = useState({});
@@ -710,7 +711,7 @@ function JourneyPanel({ visitorId, onClose }) {
                                     </div>
                                     <div className="space-y-1.5">
                                       {pv.activity.map((act, aIdx) => {
-                                        const parsed = describeEvent(act);
+                                        const parsed = describeEvent(act, currency);
                                         const ActIcon = parsed.icon;
                                         return (
                                           <div
@@ -745,7 +746,7 @@ function JourneyPanel({ visitorId, onClose }) {
                           <div className="wp-muted wp-small">Other session events ({unassigned.length})</div>
                           <div className="space-y-1">
                             {unassigned.map((e, idx) => {
-                              const parsed = describeEvent(e);
+                              const parsed = describeEvent(e, currency);
                               const ActIcon = parsed.icon;
                               return (
                                 <div key={idx} className="flex items-center gap-2 text-[#1d2327] wp-small min-w-0">
@@ -814,53 +815,53 @@ function FilterSelect({ label, paramKey, value, onChange, options = [] }) {
   );
 }
 
+const LIVE_POLL_MS = 15000;
+
+// Path form /admin/site-analytics/<tab> (the [tab] route) → tab key.
+const tabFromPath = (pathname) => {
+  const m = /^\/admin\/site-analytics\/([^/?#]+)/.exec(pathname || "");
+  return m ? decodeURIComponent(m[1]) : null;
+};
+
+// URL → params with defaults (tab from the query, else the path segment, else overview; range 30).
+function paramsFromLocation(pathTab, search) {
+  const p = new URLSearchParams(search || "");
+  if (pathTab && !p.get("tab")) p.set("tab", pathTab);
+  if (!p.get("range") && !(p.get("from") && p.get("to"))) p.set("range", "30");
+  if (!p.get("tab")) p.set("tab", "overview");
+  return p;
+}
+
 function SiteAnalyticsView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams();
 
   // Unified client-side params state (initializes from URL, updates instantaneously with zero reload)
-  const [paramsState, setParamsState] = useState(() => {
-    const p = new URLSearchParams(searchParams.toString());
-    if (params?.tab && !p.get("tab")) {
-      p.set("tab", params.tab);
-    }
-    if (!p.get("range") && !(p.get("from") && p.get("to"))) {
-      p.set("range", "30");
-    }
-    if (!p.get("tab")) {
-      p.set("tab", "overview");
-    }
-    return p;
-  });
+  const [paramsState, setParamsState] = useState(() => paramsFromLocation(params?.tab, searchParams.toString()));
 
   const tab = paramsState.get("tab") || "overview";
   const hasCustom = Boolean(paramsState.get("from") && paramsState.get("to"));
-  const query = (() => {
-    const q = new URLSearchParams(paramsState.toString());
-    return q.toString();
-  })();
+  const query = paramsState.toString();
 
-  // Listen to browser Back/Forward navigation
+  // Browser Back/Forward: restore tab + filters from the URL (query form, or the /site-analytics/[tab] path form).
   useEffect(() => {
     const onPopState = () => {
-      const p = new URLSearchParams(window.location.search);
-      if (!p.get("tab")) p.set("tab", "overview");
-      if (!p.get("range") && !(p.get("from") && p.get("to"))) p.set("range", "30");
-      setParamsState(p);
+      setParamsState(paramsFromLocation(tabFromPath(window.location.pathname), window.location.search));
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const [data, setData] = useState(null);
-  const [isFetching, setIsFetching] = useState(false);
-  const [error, setError] = useState(false);
+  // Responses are cached by their full query (tab + every filter + dates). Only an exact match is
+  // ever shown; anything else shows the loading state until its own response arrives.
+  const [cache, setCache] = useState({});
+  const [settledRequest, setSettledRequest] = useState(null); // `${query}|${refreshKey}` of the last finished request
+  const [fetchError, setFetchError] = useState(null); // { key: query, message }
   const [options, setOptions] = useState(null);
   const [journeyId, setJourneyId] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
-  const cacheRef = useRef({});
 
   useEffect(() => {
     fetch("/api/admin/site-analytics?tab=options")
@@ -869,23 +870,10 @@ function SiteAnalyticsView() {
       .catch(() => {});
   }, []);
 
-  // Fetch data with in-memory caching and silent background revalidation (Stale-While-Revalidate)
+  // Fetch (or silently revalidate) the current query. Errors are always recorded against the query.
   useEffect(() => {
     let cancelled = false;
-
-    // 1. If already in memory cache, display IMMEDIATELY (0ms delay, ZERO flicker)
-    if (cacheRef.current[query]) {
-      setData(cacheRef.current[query]);
-      setError(false);
-    } else {
-      // If switching tabs, check if we have data for this tab from any query
-      const match = Object.values(cacheRef.current).find((d) => d._tab === tab);
-      if (match) {
-        setData(match);
-      }
-    }
-
-    setIsFetching(true);
+    const requestKey = `${query}|${refreshKey}`;
     fetch(`/api/admin/site-analytics?${query}`)
       .then((r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -893,46 +881,75 @@ function SiteAnalyticsView() {
       })
       .then((j) => {
         if (cancelled) return;
-        if (j.success) {
-          const payload = { ...j.data, _tab: j.tab };
-          cacheRef.current[query] = payload;
-          setData(payload);
-          setError(false);
-        } else {
-          setError(true);
-        }
+        if (!j.success) throw new Error(j.error || "Request failed");
+        const payload = { ...j.data, _tab: j.tab, _currency: j.currency };
+        setCache((c) => ({ ...c, [query]: payload }));
+        setFetchError((e) => (e && e.key === query ? null : e));
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error("Site analytics fetch error:", err);
-        if (!cancelled && !cacheRef.current[query]) setError(true);
+        setFetchError({ key: query, message: err?.message || "Request failed" });
       })
       .finally(() => {
-        if (!cancelled) setIsFetching(false);
+        if (!cancelled) setSettledRequest(requestKey);
       });
 
     return () => { cancelled = true; };
-  }, [query, refreshKey, tab]);
+  }, [query, refreshKey]);
 
+  const isFetching = settledRequest !== `${query}|${refreshKey}`;
 
-  // Update parameters seamlessly with zero page reload
-  const setParams = useCallback((updates) => {
-    setParamsState((prev) => {
-      const next = new URLSearchParams(prev.toString());
-      for (const [k, v] of Object.entries(updates)) {
-        if (v === null || v === undefined || v === "" || v === "all") {
-          next.delete(k);
-        } else {
-          next.set(k, v);
-        }
+  // Live tab: poll every 15 seconds while the tab is active and the page is visible.
+  useEffect(() => {
+    if (tab !== "live") return undefined;
+    let timer = null;
+    const start = () => {
+      if (!timer) timer = setInterval(() => setRefreshKey((k) => k + 1), LIVE_POLL_MS);
+    };
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        setRefreshKey((k) => k + 1);
+        start();
+      } else {
+        stop();
       }
-      if (typeof window !== "undefined") {
-        const queryStr = next.toString();
-        const newUrl = queryStr ? `/admin/site-analytics?${queryStr}` : `/admin/site-analytics`;
+    };
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [tab]);
+
+  // Update parameters with zero page reload. A tab change pushes a history entry (so Back returns
+  // to the previous tab); filter changes replace the current one. URL form matches the sidebar link.
+  const setParams = useCallback((updates) => {
+    const next = new URLSearchParams(paramsState.toString());
+    for (const [k, v] of Object.entries(updates)) {
+      if (v === null || v === undefined || v === "" || v === "all") {
+        next.delete(k);
+      } else {
+        next.set(k, v);
+      }
+    }
+    if (!next.get("tab")) next.set("tab", "overview");
+    if (next.toString() === paramsState.toString()) return;
+    if (typeof window !== "undefined") {
+      const newUrl = `/admin/site-analytics?${next.toString()}`;
+      if (next.get("tab") !== paramsState.get("tab")) {
+        window.history.pushState(null, "", newUrl);
+      } else {
         window.history.replaceState(null, "", newUrl);
       }
-      return next;
-    });
-  }, []);
+    }
+    setParamsState(next);
+  }, [paramsState]);
 
   const onFilter = (key, value) => setParams({ [key]: value });
   const rangeValue = hasCustom ? "custom" : (paramsState.get("range") || "30");
@@ -983,7 +1000,12 @@ function SiteAnalyticsView() {
   const pinCategory = (row) => setParams({ category: row.category });
   const pinPriceBand = (row) => setParams({ priceBand: row.key });
 
+  const data = cache[query] || null;
   const isReady = Boolean(data && data._tab === tab);
+  const queryError = fetchError && fetchError.key === query ? fetchError : null;
+  const currency = data?._currency || options?.currency || "USD";
+  const fmtMoney = moneyFormatter(currency);
+  const retry = () => setRefreshKey((k) => k + 1);
 
   return (
     <>
@@ -1276,18 +1298,25 @@ function SiteAnalyticsView() {
         )}
       </div>
 
-      {/* Only show full loading block when there is NO data in cache yet */}
-      {!isReady && !data && isFetching && !error && (
+      {/* No data for this exact query yet: loading, then data or an error */}
+      {!isReady && (!queryError || isFetching) && (
         <LoadingBlock />
       )}
-      {error && !data && (
+      {!isReady && queryError && !isFetching && (
         <Notice type="error">
-          Failed to load this view. Please try refreshing.
+          Failed to load this view.{" "}
+          <button type="button" className="wp-btn" onClick={retry}>Retry</button>
+        </Notice>
+      )}
+      {isReady && queryError && (
+        <Notice type="warning">
+          Couldn&apos;t refresh this view, so the data shown may be out of date.{" "}
+          <button type="button" className="wp-btn" onClick={retry} disabled={isFetching}>Retry</button>
         </Notice>
       )}
 
       {/* Keep active tab rendered and smooth during background updates */}
-      {isReady && tab === "overview" && <OverviewTab data={data} />}
+      {isReady && tab === "overview" && <OverviewTab data={data} currency={currency} />}
       {isReady && tab === "pages" && (
         <div>
           <DataTable
@@ -1746,7 +1775,7 @@ function SiteAnalyticsView() {
         />
       )}
 
-      {journeyId && <JourneyPanel visitorId={journeyId} onClose={() => setJourneyId(null)} />}
+      {journeyId && <JourneyPanel visitorId={journeyId} onClose={() => setJourneyId(null)} currency={currency} />}
     </>
   );
 }
@@ -1935,7 +1964,8 @@ function TrackingFeaturesMatrix() {
   );
 }
 
-function OverviewTab({ data }) {
+function OverviewTab({ data, currency }) {
+  const fmtMoney = moneyFormatter(currency);
   const k = data.kpis;
   const maxSessions = Math.max(1, ...data.daily.map((d) => d.sessions));
   const funnelBase = data.funnel[0]?.sessions || 0;

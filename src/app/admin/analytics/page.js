@@ -2,11 +2,20 @@
 
 import { useState, useEffect } from "react";
 import RequirePermission from "@/components/admin/RequirePermission";
-import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
 
 const STAT_LABELS = ["Total revenue", "Total orders", "Average order value", "Sales, last 30 days"];
 
+// The whole screen (including its loading/error states and the fetch) sits behind the permission.
 export default function AdminAnalyticsPage() {
+  return (
+    <RequirePermission permission="analytics.view">
+      <SalesAnalytics />
+    </RequirePermission>
+  );
+}
+
+function SalesAnalytics() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,18 +69,21 @@ export default function AdminAnalyticsPage() {
   const topRevenueMax = Math.max(0, ...stats.topProducts.map((p) => Number(p.revenue) || 0));
   const variantUnitsMax = Math.max(0, ...stats.variantInsights.slice(0, 5).map((v) => Number(v.unitsSold) || 0));
   const chartTotal = stats.salesByDay.reduce((s, d) => s + (Number(d.revenue) || 0), 0);
+  const salesDays = stats.salesByDay.filter((d) => Number(d.revenue) > 0).length;
+  const maxRevenue = Math.max(0, ...stats.salesByDay.map((d) => Number(d.revenue) || 0));
+  const currency = stats.currency || "USD";
+  const money = (v, opts) => formatMoney(Number(v) || 0, currency, opts);
 
   return (
-    <RequirePermission permission="analytics.view">
     <Page>
       <PageHeader title="Store analytics" />
 
       <div className="wp-stats">
         {[
-          { label: STAT_LABELS[0], value: `$${overall.totalRevenue.toLocaleString()}` },
+          { label: STAT_LABELS[0], value: money(overall.totalRevenue) },
           { label: STAT_LABELS[1], value: overall.totalOrders },
-          { label: STAT_LABELS[2], value: `$${Math.round(overall.avgOrderValue || 0).toLocaleString()}` },
-          { label: STAT_LABELS[3], value: `$${last30.revenue.toLocaleString()}` },
+          { label: STAT_LABELS[2], value: money(Math.round(overall.avgOrderValue || 0), { decimals: 0 }) },
+          { label: STAT_LABELS[3], value: money(last30.revenue) },
         ].map((item, i) => (
           <div key={i} className="wp-stat">
             <div className="wp-stat-label">{item.label}</div>
@@ -83,16 +95,18 @@ export default function AdminAnalyticsPage() {
       <div className="wp-cols">
         <div className="wp-col-main">
           <Postbox id="sales-30" title="Sales, last 30 days" aside="Daily">
-            <figure style={{ margin: 0 }} aria-label={`Daily sales for the last 30 days: ${stats.salesByDay.length} days with sales, $${chartTotal.toLocaleString()} in total`}>
+            <figure style={{ margin: 0 }} aria-label={`Daily sales for the last 30 days: ${salesDays} days with sales, ${money(chartTotal)} in total`}>
               <div className="wp-chart" style={stats.salesByDay.length > 31 ? { gap: 1 } : undefined}>
                 {stats.salesByDay.map((day, i) => {
-                  const maxRevenue = Math.max(...stats.salesByDay.map(d => d.revenue)) || 1;
-                  const height = (day.revenue / maxRevenue) * 100;
-                  const tip = `${new Date(day._id).toLocaleDateString()}: $${day.revenue.toLocaleString()}`;
+                  const revenue = Number(day.revenue) || 0;
+                  // Zero days render as an empty (grey, minimum-height) bar, like the dashboard chart.
+                  const height = revenue > 0 && maxRevenue ? Math.max(1, (revenue / maxRevenue) * 100) : 0;
+                  // _id is a UTC "YYYY-MM-DD" day; format it in UTC so it doesn't shift a day in local time.
+                  const tip = `${new Date(day._id).toLocaleDateString(undefined, { timeZone: "UTC" })}: ${money(revenue)}`;
                   return (
                     <div key={i} className="wp-bar-col" tabIndex={0} aria-label={tip}>
                       <span className="wp-bar-tip">{tip}</span>
-                      <div className="wp-bar" style={{ height: `${Math.max(height, 5)}%` }} />
+                      <div className={`wp-bar ${revenue > 0 ? "" : "is-empty"}`} style={{ height: revenue > 0 ? `${height}%` : "2px" }} />
                     </div>
                   );
                 })}
@@ -120,7 +134,7 @@ export default function AdminAnalyticsPage() {
                     <span style={{ display: "block", height: 4, borderRadius: 2, background: "#2271b1", width: `${topRevenueMax ? ((Number(product.revenue) || 0) / topRevenueMax) * 100 : 0}%` }} />
                   </span>
                 </span>
-                <span className="wp-num wp-strong">${Math.round(product.revenue).toLocaleString()}</span>
+                <span className="wp-num wp-strong">{money(Math.round(product.revenue || 0), { decimals: 0 })}</span>
               </div>
             ))}
             {stats.topProducts.length === 0 && <div className="wp-inside wp-empty">No sales data yet.</div>}
@@ -164,6 +178,5 @@ export default function AdminAnalyticsPage() {
         )}
       </Postbox>
     </Page>
-    </RequirePermission>
   );
 }

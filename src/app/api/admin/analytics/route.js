@@ -4,9 +4,36 @@ import Order from "@/models/Order";
 import Product from "@/models/Product";
 import Customer from "@/models/Customer";
 import Blog from "@/models/Blog";
+import SiteConfig from "@/models/SiteConfig";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { can } from "@/lib/rbac";
+
+const DAY_MS = 86400000;
+
+// Store currency: the configured store currency, else the most recent order's currency, else USD.
+async function resolveStoreCurrency() {
+  const config = await SiteConfig.findOne({ key: "main" }).select("commerce.storeCurrency").lean();
+  if (config?.commerce?.storeCurrency) return config.commerce.storeCurrency;
+  const order = await Order.findOne({ isDeleted: { $ne: true }, "financials.currency": { $nin: [null, ""] } })
+    .sort({ createdAt: -1 })
+    .select("financials.currency")
+    .lean();
+  return order?.financials?.currency || "USD";
+}
+
+// Every UTC day from `since` through `until` (inclusive), with 0 for days that had no sales.
+// $dateToString groups by UTC day, so the keys are built in UTC to match.
+function fillSalesByDay(rows = [], since, until) {
+  const byDay = new Map(rows.map((r) => [r._id, r]));
+  const out = [];
+  const start = Date.UTC(since.getUTCFullYear(), since.getUTCMonth(), since.getUTCDate());
+  for (let t = start; t <= until.getTime(); t += DAY_MS) {
+    const key = new Date(t).toISOString().slice(0, 10);
+    out.push(byDay.get(key) || { _id: key, revenue: 0, orders: 0 });
+  }
+  return out;
+}
 
 export async function GET(req) {
   try {
@@ -26,7 +53,7 @@ export async function GET(req) {
     const sevenDaysAgo = new Date(new Date().setDate(now.getDate() - 7));
 
     // Run all queries in parallel for performance
-    const [stats, totalProducts, totalUsers, totalBlogs, recentOrders, statusBreakdown] = await Promise.all([
+    const [stats, totalProducts, totalUsers, totalBlogs, recentOrders, statusBreakdown, currency] = await Promise.all([
 
       // 1. Order Aggregation
       Order.aggregate([
@@ -124,13 +151,20 @@ export async function GET(req) {
         { $match: { isDeleted: { $ne: true } } },
         { $group: { _id: "$status", count: { $count: {} } } },
         { $sort: { count: -1 } }
-      ])
+      ]),
+
+      // 7. Store currency for formatting money on the client
+      resolveStoreCurrency()
     ]);
+
+    const facets = stats[0] || {};
 
     return NextResponse.json({
       success: true,
       data: {
-        ...stats[0],
+        ...facets,
+        salesByDay: fillSalesByDay(facets.salesByDay, thirtyDaysAgo, now),
+        currency,
         totalProducts,
         totalCustomers: totalUsers,
         totalBlogs,

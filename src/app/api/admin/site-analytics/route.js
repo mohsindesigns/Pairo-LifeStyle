@@ -11,6 +11,7 @@ import AnalyticsPageView from "@/models/AnalyticsPageView";
 import AnalyticsEvent from "@/models/AnalyticsEvent";
 import Order from "@/models/Order";
 import Customer from "@/models/Customer";
+import SiteConfig from "@/models/SiteConfig";
 
 const DEVICES = ["desktop", "mobile", "tablet"];
 const SEGMENTS = ["customer", "guest"];
@@ -1083,6 +1084,17 @@ const TABS = {
   speed,
 };
 
+// Store currency: the configured store currency, else the most recent order's currency, else USD.
+async function resolveStoreCurrency() {
+  const config = await SiteConfig.findOne({ key: "main" }).select("commerce.storeCurrency").lean();
+  if (config?.commerce?.storeCurrency) return config.commerce.storeCurrency;
+  const order = await Order.findOne({ isDeleted: { $ne: true }, "financials.currency": { $nin: [null, ""] } })
+    .sort({ createdAt: -1 })
+    .select("financials.currency")
+    .lean();
+  return order?.financials?.currency || "USD";
+}
+
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) {
@@ -1097,16 +1109,20 @@ export async function GET(req) {
     const sp = new URL(req.url).searchParams;
     const tab = sp.get("tab") || "overview";
 
-    if (tab === "options") return NextResponse.json({ success: true, data: await options() });
+    if (tab === "options") {
+      const [data, currency] = await Promise.all([options(), resolveStoreCurrency()]);
+      return NextResponse.json({ success: true, data: { ...data, currency } });
+    }
 
     const handler = TABS[tab];
     if (!handler) return NextResponse.json({ error: "Unknown tab" }, { status: 400 });
 
     const filters = parseFilters(sp);
-    const data = await handler(filters);
+    const [data, currency] = await Promise.all([handler(filters), resolveStoreCurrency()]);
     return NextResponse.json({
       success: true,
       tab,
+      currency,
       filters: { since: filters.since, until: filters.until },
       data,
     });
