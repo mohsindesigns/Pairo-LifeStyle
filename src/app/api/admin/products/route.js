@@ -5,7 +5,7 @@ import Product from "@/models/Product";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 import { trackMediaUsage, removeMediaUsage, findMediaByUrl } from "@/lib/mediaUsage";
-import { copySlugCandidate, restoreStatus } from "@/lib/admin-products-utils";
+import { copySlugCandidate, restoreStatus, slugify, uniqueSlug } from "@/lib/admin-products-utils";
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
@@ -47,9 +47,9 @@ export async function GET(req) {
     // Status counts for the admin list's All / Published / Drafts / Trash links
     if (searchParams.get("counts") === "true") {
       const [all, published, draft, trash] = await Promise.all([
-        Product.countDocuments({ isDeleted: false }),
-        Product.countDocuments({ isDeleted: false, status: "Published" }),
-        Product.countDocuments({ isDeleted: false, status: "Draft" }),
+        Product.countDocuments({ isDeleted: { $ne: true } }),
+        Product.countDocuments({ isDeleted: { $ne: true }, status: "Published" }),
+        Product.countDocuments({ isDeleted: { $ne: true }, status: "Draft" }),
         Product.countDocuments({ isDeleted: true }),
       ]);
       return NextResponse.json({ all, published, draft, trash });
@@ -60,12 +60,13 @@ export async function GET(req) {
       return NextResponse.json(product);
     }
 
-    let query = { isDeleted };
+    // Live lists also include legacy products that have no isDeleted field at all
+    let query = isDeleted ? { isDeleted: true } : { isDeleted: { $ne: true } };
 
     if (status) query.status = status;
     
     const products = await Product.find(query)
-      .select('name slug price compareAtPrice status sku stock manageStock lowStockThreshold productType image images categories primaryCategory createdAt isDeleted')
+      .select('name slug price compareAtPrice status sku stock manageStock lowStockThreshold productType image images categories primaryCategory createdAt updatedAt deletedAt isDeleted')
       .sort({ createdAt: -1 })
       .lean();
     return NextResponse.json(products);
@@ -88,7 +89,7 @@ export async function POST(req) {
     if (data.duplicateOf) {
       const source = await Product.findById(data.duplicateOf).lean();
       if (!source) return NextResponse.json({ error: "Product to duplicate not found" }, { status: 404 });
-      const { _id, __v, createdAt, updatedAt, statusBeforeTrash, rating, reviewCount, ratingBreakdown, id: legacyId, ...rest } = source;
+      const { _id, __v, createdAt, updatedAt, statusBeforeTrash, deletedAt, rating, reviewCount, ratingBreakdown, id: legacyId, ...rest } = source;
       let attempt = 1;
       let copySlug = copySlugCandidate(source.slug, attempt);
       // Checked against ALL products (trashed included) — the slug index is unique.
@@ -103,6 +104,7 @@ export async function POST(req) {
         slugManuallyEdited: false,
         status: "Draft",
         isDeleted: false,
+        deletedAt: null,
       });
       return NextResponse.json(copy, { status: 201 });
     }
@@ -116,21 +118,14 @@ export async function POST(req) {
       if (Array.isArray(productData[key])) productData[key] = productData[key].filter(Boolean);
     }
 
-    // Generate slug cleanly
-    let slug = productData.slug;
-    if (!slug && productData.name) {
-      slug = productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    }
-    if (!slug) slug = "product";
-    
-    // Ensure uniqueness without appending suffixes unless a duplicate exists
-    let finalSlug = slug;
-    let counter = 1;
-    while (await Product.findOne({ slug: finalSlug, isDeleted: { $ne: true } })) {
-      finalSlug = `${slug}-${counter}`;
-      counter++;
-    }
-    productData.slug = finalSlug;
+    // Unique slug (suffix only on a clash). Checked against ALL products: a trashed product
+    // still holds its slug in the unique index, so skipping trashed ones made the create fail.
+    productData.slug = await uniqueSlug(
+      slugify(productData.slug) || slugify(productData.name) || "product",
+      (candidate) => Product.exists({ slug: candidate })
+    );
+    delete productData.isDeleted;
+    delete productData.deletedAt;
 
     const product = await Product.create(productData);
 
@@ -181,8 +176,6 @@ export async function PUT(req) {
     const rawBody = await req.json();
     const { id, _id, __v, createdAt, updatedAt, ...data } = rawBody;
 
-    console.log("[Products PUT] Updating product:", id, "with seo:", data.seo);
-
     // Strip empty-string ObjectId fields — Mongoose cannot cast "" to ObjectId
     if (!data.primaryCategory) delete data.primaryCategory;
     // An empty size chart means "none": clear it, but only when the field was actually sent
@@ -204,6 +197,18 @@ export async function PUT(req) {
     if (isRestore) {
       const raw = await Product.findById(id).select("statusBeforeTrash").lean();
       data.status = restoreStatus(raw?.statusBeforeTrash);
+      data.deletedAt = null;
+    }
+    // Trashing goes through DELETE; never let a plain save flip the trash flag on
+    if (data.isDeleted === true && !oldProduct.isDeleted) delete data.isDeleted;
+
+    // A sent slug (editor, Quick Edit) is normalised and kept unique across ALL products —
+    // the unique index would otherwise reject the save with a raw duplicate-key error.
+    if ("slug" in data) {
+      const wanted = slugify(data.slug) || slugify(data.name ?? oldProduct.name) || "product";
+      data.slug = wanted === oldProduct.slug
+        ? wanted
+        : await uniqueSlug(wanted, (candidate) => Product.exists({ slug: candidate, _id: { $ne: id } }));
     }
 
     // Use $set so nested objects (seo, narrative, etc.) are properly merged
@@ -212,7 +217,6 @@ export async function PUT(req) {
       // Clear the trash marker (not a schema field, hence strict:false on this one $unset only)
       await Product.updateOne({ _id: id }, { $unset: { statusBeforeTrash: 1 } }, { strict: false });
     }
-    console.log("[Products PUT] Saved seo:", product?.seo);
 
     // Sync SizeChart assignment if changed
     const sizeChartChanged = 
@@ -302,7 +306,7 @@ export async function DELETE(req) {
     // statusBeforeTrash is not in the Product schema, hence strict:false.
     const product = await Product.findByIdAndUpdate(
       id,
-      { $set: { isDeleted: true, statusBeforeTrash: existing.status || "Draft" } },
+      { $set: { isDeleted: true, deletedAt: new Date(), statusBeforeTrash: existing.status || "Draft" } },
       { new: true, strict: false }
     );
     return NextResponse.json(product);

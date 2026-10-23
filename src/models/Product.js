@@ -111,7 +111,8 @@ const ProductSchema = new mongoose.Schema({
 
   // Meta
   productType: { type: String, enum: ['simple', 'variable', 'gifting'], default: 'simple' },
-  isDeleted: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null }, // when the product was moved to trash
   rating: { type: Number, default: 0 },
   reviewCount: { type: Number, default: 0 },
   ratingBreakdown: {

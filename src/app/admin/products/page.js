@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Image as ImageIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
-import { Page, PageHeader, formatDate } from "@/components/admin/ui";
+import { Page, PageHeader, Notice, Skeleton, formatDate, formatMoney } from "@/components/admin/ui";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
@@ -14,6 +14,8 @@ export default function AdminProducts() {
   const { showConfirm } = usePopup();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [bulkRunning, setBulkRunning] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All categories");
   const [selectedStock, setSelectedStock] = useState("All stock");
@@ -51,7 +53,9 @@ export default function AdminProducts() {
     }
   }, []);
 
+  const requestRef = useRef(0);
   const fetchProducts = useCallback(async () => {
+    const reqId = ++requestRef.current; // only the newest request may update the list
     setLoading(true);
     try {
       let url = "/api/admin/products";
@@ -61,16 +65,18 @@ export default function AdminProducts() {
       
       const res = await fetch(url);
       const data = await res.json();
+      if (reqId !== requestRef.current) return;
       if (res.ok) {
          setProducts(Array.isArray(data) ? data : []);
+         setLoadError("");
       } else {
-         toast.error(data?.error || "Failed to load products");
+         setLoadError(data?.error || "Failed to load products");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load products");
+      if (reqId === requestRef.current) setLoadError("Failed to load products");
     } finally {
-      setLoading(false);
+      if (reqId === requestRef.current) setLoading(false);
     }
     fetchCounts();
   }, [view, fetchCounts]);
@@ -94,7 +100,7 @@ export default function AdminProducts() {
     if (!(await showConfirm("Move this product to trash?", "Move to Trash"))) return;
     try {
       const res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
-      if (res.ok) fetchProducts();
+      if (res.ok) { toast.success("Product moved to trash"); fetchProducts(); }
       else toast.error(await errorFrom(res, "Failed to move product to trash"));
     } catch (err) {
       console.error(err);
@@ -110,7 +116,7 @@ export default function AdminProducts() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, isDeleted: false })
       });
-      if (res.ok) fetchProducts();
+      if (res.ok) { toast.success("Product restored"); fetchProducts(); }
       else toast.error(await errorFrom(res, "Failed to restore product"));
     } catch (err) {
       console.error(err);
@@ -119,10 +125,10 @@ export default function AdminProducts() {
   };
 
   const handlePermanentDeleteProduct = async (id, name) => {
-    if (!(await showConfirm(`Are you sure you want to permanently delete "${name}"? This cannot be undone.`, "Permanently Delete"))) return;
+    if (!(await showConfirm(`Are you sure you want to permanently delete "${name}"? This cannot be undone.`, "Delete permanently", { confirmText: "Delete permanently", danger: true }))) return;
     try {
       const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
-      if (res.ok) fetchProducts();
+      if (res.ok) { toast.success("Product permanently deleted"); fetchProducts(); }
       else toast.error(await errorFrom(res, "Failed to delete product"));
     } catch (err) {
       console.error(err);
@@ -156,8 +162,18 @@ export default function AdminProducts() {
   };
 
   const handleBulkAction = async () => {
-     if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (!(await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`, "Bulk Action"))) return;
+     if (bulkAction === "Bulk actions") { toast.error("Choose a bulk action first"); return; }
+     if (selectedIds.length === 0) { toast.error("Select at least one product"); return; }
+     const isPermanent = bulkAction === "Delete Permanently";
+     const confirmed = await showConfirm(
+        isPermanent
+           ? `Permanently delete ${selectedIds.length} product${selectedIds.length === 1 ? "" : "s"}? This cannot be undone.`
+           : `Apply "${bulkAction}" to ${selectedIds.length} product${selectedIds.length === 1 ? "" : "s"}?`,
+        isPermanent ? "Delete permanently" : "Bulk action",
+        isPermanent ? { confirmText: "Delete permanently", danger: true } : { confirmText: bulkAction }
+     );
+     if (!confirmed) return;
+     setBulkRunning(true);
      let ok = 0;
      let failed = 0;
      for (const id of selectedIds) {
@@ -167,7 +183,13 @@ export default function AdminProducts() {
               res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
            } else if (bulkAction === "Duplicate") {
               res = await duplicateProduct(id);
-           } else if (bulkAction === "Delete Permanently") {
+           } else if (bulkAction === "Restore") {
+              res = await fetch("/api/admin/products", {
+                 method: "PUT",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ id, isDeleted: false })
+              });
+           } else if (isPermanent) {
               res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
            }
            if (res?.ok) ok++;
@@ -177,10 +199,12 @@ export default function AdminProducts() {
            failed++;
         }
      }
+     setBulkRunning(false);
      setSelectedIds([]);
+     setBulkAction("Bulk actions");
      fetchProducts();
-     if (failed === 0) toast.success(`${bulkAction}: ${ok} item${ok === 1 ? "" : "s"} done`);
-     else toast.error(`${bulkAction}: ${ok} succeeded, ${failed} failed`);
+     if (failed === 0) toast.success(`${bulkAction}: ${ok} done`);
+     else toast.error(`${bulkAction}: ${ok} done, ${failed} failed`);
   };
 
   const handleToggleStatus = async (p) => {
@@ -231,7 +255,11 @@ export default function AdminProducts() {
         body: JSON.stringify({ ...quickEditData, price: parsed.value, id: quickEditId })
       });
       if (res.ok) {
+        const saved = await res.json().catch(() => ({}));
         toast.success("Product updated");
+        if (saved?.slug && quickEditData.slug && saved.slug !== quickEditData.slug) {
+          toast(`Slug saved as "${saved.slug}" (the one entered was taken or not URL-safe).`);
+        }
         setQuickEditId(null);
         fetchProducts();
       } else {
@@ -249,6 +277,19 @@ export default function AdminProducts() {
      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
+  // Deep links from other screens: /admin/products?category=<id>&status=published|draft|trash
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get("category");
+    const status = (params.get("status") || "").toLowerCase();
+    const viewFromStatus = { published: "published", draft: "draft", drafts: "draft", trash: "trash", all: "all" }[status];
+    Promise.resolve().then(() => {
+      if (category) setSelectedCategory(category);
+      if (viewFromStatus) setView(viewFromStatus);
+    });
+  }, []);
+
   useEffect(() => {
     Promise.resolve().then(() => {
       fetchProducts();
@@ -261,11 +302,10 @@ export default function AdminProducts() {
     const skuMatch = p.sku?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSearch = nameMatch || skuMatch;
     
-    const matchesCategory = selectedCategory === "All categories" || 
-                            p.categories?.some(catId => {
-                               const cat = categories.find(c => c._id === catId);
-                               return cat?.name === selectedCategory;
-                            });
+    // selectedCategory holds a category id (so ?category=<id> links work), or "All categories"
+    const matchesCategory = selectedCategory === "All categories" ||
+                            p.categories?.some(catId => String(catId) === selectedCategory) ||
+                            String(p.primaryCategory || "") === selectedCategory;
 
     const matchesStock = selectedStock === "All stock" ||
                          (selectedStock === "In stock" && (!p.manageStock || p.stock > (p.lowStockThreshold || 5))) ||
@@ -297,6 +337,17 @@ export default function AdminProducts() {
     setBulkAction("Bulk actions");
     resetPaging();
   };
+
+  const filtersActive = searchTerm.trim() || selectedCategory !== "All categories" || selectedStock !== "All stock" || selectedType !== "All types";
+  const emptyText = filtersActive
+    ? "No products match your search or filters."
+    : view === "trash"
+      ? "No products in the Trash."
+      : view === "draft"
+        ? "No draft products."
+        : view === "published"
+          ? "No published products."
+          : "No products yet. Click “Add new product” to create the first one.";
 
   const stockClass = (p) =>
     !p.manageStock
@@ -345,10 +396,10 @@ export default function AdminProducts() {
       <th scope="col">Name</th>
       <th scope="col" className="wp-hide-sm">SKU</th>
       <th scope="col" className="wp-hide-sm">Stock</th>
-      <th scope="col" className="wp-hide-sm">Price</th>
+      <th scope="col" className="wp-hide-sm wp-num">Price</th>
       <th scope="col" className="wp-hide-sm">Categories</th>
       <th scope="col">Status</th>
-      <th scope="col" className="wp-hide-sm">Date</th>
+      <th scope="col" className="wp-hide-sm">{view === "trash" ? "Trashed" : "Date"}</th>
     </tr>
   );
 
@@ -390,7 +441,10 @@ export default function AdminProducts() {
         >
           <option>Bulk actions</option>
           {view === "trash" ? (
-            <option>Delete Permanently</option>
+            <>
+              <option>Restore</option>
+              <option>Delete Permanently</option>
+            </>
           ) : (
             <>
               <option>Move to Trash</option>
@@ -398,8 +452,8 @@ export default function AdminProducts() {
             </>
           )}
         </select>
-        <button type="button" onClick={handleBulkAction} className="wp-btn">
-          Apply
+        <button type="button" onClick={handleBulkAction} disabled={bulkRunning} className="wp-btn">
+          {bulkRunning ? "Applying…" : "Apply"}
         </button>
 
         <label htmlFor="products-filter-category" className="sr-only">Filter by category</label>
@@ -410,7 +464,10 @@ export default function AdminProducts() {
           onChange={(e) => { setSelectedCategory(e.target.value); resetPaging(); }}
         >
           <option>All categories</option>
-          {categories.map(cat => <option key={cat._id} value={cat.name}>{cat.name}</option>)}
+          {categories.map(cat => <option key={cat._id} value={String(cat._id)}>{cat.name}</option>)}
+          {selectedCategory !== "All categories" && !categories.some(c => String(c._id) === selectedCategory) && (
+            <option value={selectedCategory}>Linked category</option>
+          )}
         </select>
 
         <label htmlFor="products-filter-stock" className="sr-only">Filter by stock status</label>
@@ -462,6 +519,13 @@ export default function AdminProducts() {
         </form>
       </div>
 
+      {loadError && (
+        <Notice type="error" onDismiss={() => setLoadError("")}>
+          {loadError}.{" "}
+          <button type="button" className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={fetchProducts}>Try again</button>
+        </Notice>
+      )}
+
       <div className="wp-toolbar">
         <span className="wp-spacer" />
         {pagination}
@@ -472,10 +536,22 @@ export default function AdminProducts() {
         <table className="wp-list-table">
           <thead>{headerRow}</thead>
           <tbody>
-            {loading ? (
-              <tr><td colSpan={9} className="wp-muted">Loading products…</td></tr>
+            {loading && products.length === 0 ? (
+              [0, 1, 2, 3, 4].map((i) => (
+                <tr key={`sk-${i}`} aria-hidden="true">
+                  <td className="wp-check-col" />
+                  <td><Skeleton height={40} width={40} /></td>
+                  <td><Skeleton height={14} width="60%" /><Skeleton height={12} width="40%" style={{ marginTop: 6 }} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width={60} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width={70} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width={60} style={{ marginLeft: "auto" }} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width="70%" /></td>
+                  <td><Skeleton height={22} width={70} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width={80} /></td>
+                </tr>
+              ))
             ) : pageProducts.length === 0 ? (
-              <tr><td colSpan={9} className="wp-muted">No products found.</td></tr>
+              <tr><td colSpan={9} className="wp-empty" style={{ padding: "14px 10px" }}>{emptyText}</td></tr>
             ) : (
               pageProducts.map((p) => (
                 <tr key={p._id} className={selectedIds.includes(p._id) ? "is-selected" : undefined}>
@@ -498,7 +574,7 @@ export default function AdminProducts() {
                       {p.sku ? `SKU: ${p.sku} · ` : ""}
                       <span className={stockClass(p)}>{stockLabel(p)}</span>
                       {" · "}
-                      <span className="wp-strong">${p.price?.toFixed(2)}</span>
+                      <span className="wp-strong">{formatMoney(p.price)}</span>
                     </div>
                     <div className="wp-row-actions">
                       <span className="is-muted">ID: {String(p._id).slice(-6)}</span>
@@ -525,28 +601,29 @@ export default function AdminProducts() {
                     </div>
                   </td>
                   <td className="wp-hide-sm wp-muted" style={{ wordBreak: "break-all" }}>{p.sku || "—"}</td>
-                  <td className="wp-hide-sm">
+                  <td className="wp-hide-sm" style={{ whiteSpace: "nowrap" }}>
                     <span className={stockClass(p)}>{stockLabel(p)}</span>
                   </td>
-                  <td className="wp-hide-sm">
-                    <span className="wp-price"><ins>${p.price?.toFixed(2)}</ins></span>
+                  <td className="wp-hide-sm wp-num" style={{ whiteSpace: "nowrap" }}>
+                    <span className="wp-price"><ins>{formatMoney(p.price)}</ins></span>
                   </td>
                   <td className="wp-hide-sm">
-                    {p.categories?.length > 0 ? (
-                      p.categories.map((catId, idx) => {
-                        const cat = categories.find(c => c._id === catId);
-                        return (
-                          <React.Fragment key={catId}>
-                            <span className="wp-link">{cat?.name || "—"}</span>
-                            {idx < p.categories.length - 1 && ", "}
-                          </React.Fragment>
-                        );
-                      })
-                    ) : (
-                      <span className="wp-muted">—</span>
-                    )}
+                    {(() => {
+                      // Only categories that still exist (a deleted category id is skipped)
+                      const known = (p.categories || []).map(catId => categories.find(c => c._id === catId)).filter(Boolean);
+                      if (known.length === 0) return <span className="wp-muted">—</span>;
+                      return known.map((cat, idx) => (
+                        <React.Fragment key={cat._id}>
+                          <span className="wp-link">{cat.name}</span>
+                          {idx < known.length - 1 && ", "}
+                        </React.Fragment>
+                      ));
+                    })()}
                   </td>
                   <td>
+                    {view === "trash" ? (
+                      <span className="wp-pill wp-st-draft">Trash</span>
+                    ) : (
                     <button
                       type="button"
                       onClick={() => handleToggleStatus(p)}
@@ -557,9 +634,10 @@ export default function AdminProducts() {
                     >
                       {p.status}
                     </button>
+                    )}
                   </td>
-                  <td className="wp-hide-sm wp-muted">
-                    {formatDate(p.createdAt)}
+                  <td className="wp-hide-sm wp-muted" style={{ whiteSpace: "nowrap" }}>
+                    {formatDate(view === "trash" ? (p.deletedAt || p.updatedAt || p.createdAt) : p.createdAt)}
                   </td>
                 </tr>
               ))

@@ -66,7 +66,7 @@ import SEOConfigPanel from "./SEOConfigPanel";
 import MediaPickerModal from "./MediaPickerModal";
 import GallerySorter from "./GallerySorter";
 import Link from "next/link";
-import { Page, PageHeader, Postbox } from "./ui";
+import { Page, PageHeader, Postbox, Notice } from "./ui";
 import { getSwatchBackground } from "@/lib/swatchRenderer";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
@@ -395,6 +395,11 @@ export default function ProductForm({ productId = null }) {
           if (res.ok) {
              const savedProduct = await res.json();
              if (asDraft) setFormData(prev => ({ ...prev, status: "Draft" }));
+             // The server keeps slugs unique (adds -1, -2… on a clash): show the slug actually saved
+             if (savedProduct?.slug && savedProduct.slug !== finalSlug) {
+                setFormData(prev => ({ ...prev, slug: savedProduct.slug }));
+                toast(`That permalink was taken, so it was saved as "${savedProduct.slug}".`);
+             }
              toast.success(asDraft ? "Draft saved." : productId ? "Product updated successfully!" : "Product created successfully!");
              if (!productId && savedProduct._id) {
                 router.push(`/admin/products/${savedProduct._id}`);
@@ -427,6 +432,24 @@ export default function ProductForm({ productId = null }) {
       } catch (err) {
          console.error(err);
          toast.error("Failed to move product to trash");
+      }
+   };
+
+   // Restore a trashed product straight from its edit screen (server puts back its old status)
+   const handleRestore = async () => {
+      if (!productId) return;
+      try {
+         const res = await fetch("/api/admin/products", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: productId, isDeleted: false })
+         });
+         const data = await res.json().catch(() => ({}));
+         if (!res.ok) throw new Error(data?.error || "Failed to restore product");
+         setFormData(prev => ({ ...prev, isDeleted: false, deletedAt: null, status: data.status || prev.status }));
+         toast.success("Product restored.");
+      } catch (err) {
+         toast.error(err.message || "Failed to restore product");
       }
    };
 
@@ -548,18 +571,12 @@ export default function ProductForm({ productId = null }) {
                      >
                         Retry Connection / Reload
                      </button>
-                     <a
-                        href="/admin-login"
-                        className="wp-btn"
-                     >
+                     <Link href="/admin-login" className="wp-btn">
                         Log In to Admin Panel
-                     </a>
-                     <a
-                        href="/admin/products"
-                        className="wp-link"
-                     >
+                     </Link>
+                     <Link href="/admin/products" className="wp-link">
                         ← Back to Products List
-                     </a>
+                     </Link>
                   </div>
                </div>
             </div>
@@ -583,6 +600,12 @@ export default function ProductForm({ productId = null }) {
             title={productId ? "Edit Product" : "Add New Product"}
             actions={productId ? <Link href="/admin/products/new" className="wp-btn">Add New</Link> : null}
          />
+         {productId && formData.isDeleted && (
+            <Notice type="warning">
+               This product is in the Trash and hidden from the store.{" "}
+               <button type="button" onClick={handleRestore} className="wp-link" style={linkBtnStyle}>Restore it</button>
+            </Notice>
+         )}
          <form onSubmit={handleSubmit} className="wp-cols">
             {/* Main Column */}
             <div className="wp-col-main">
@@ -720,7 +743,9 @@ export default function ProductForm({ productId = null }) {
                {activeFormTab === "content" ? (
                   <>
                      {/* Long Description editor */}
-                     <div className="wp-postbox" role="group" aria-label="Product description" style={{ overflow: "hidden" }}>
+                     {/* No overflow:hidden here: it would trap the editor's sticky toolbar inside this box
+                         (offset by the admin-bar height, covering the first lines of text) */}
+                     <div className="wp-postbox" role="group" aria-label="Product description">
                         <TiptapEditor
                            content={formData.description}
                            onChange={(html) => setFormData(prev => ({ ...prev, description: html }))}
@@ -1667,7 +1692,7 @@ export default function ProductForm({ productId = null }) {
                </div>
 
                {/* Short Description (always mounted, independent of the Content/SEO tabs) */}
-               <div style={{ marginTop: 20 }}>
+               <div>
                   <Postbox title="Product short description" id="pf-short-desc">
                      <TiptapEditor
                         content={formData.shortDescription}
@@ -1717,7 +1742,7 @@ export default function ProductForm({ productId = null }) {
                      </div>
                   </div>
                   <div className="wp-box-foot">
-                     {productId && <button type="button" onClick={handleTrash} style={dangerLinkStyle}>Move to Trash</button>}
+                     {productId && !formData.isDeleted && <button type="button" onClick={handleTrash} style={dangerLinkStyle}>Move to Trash</button>}
                      <span className="wp-spacer" />
                      <button type="submit" disabled={saving} className="wp-btn wp-btn-primary" style={{ minHeight: 36 }}>
                         {saving ? "Saving..." : (productId ? "Update" : "Publish")}

@@ -5,6 +5,7 @@ import Product from "@/models/Product";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 import { registerRedirect } from "@/lib/redirect-resolver";
+import { slugify, uniqueSlug } from "@/lib/admin-products-utils";
 
 // GET single product with relations
 export async function GET(req, { params }) {
@@ -51,13 +52,10 @@ export async function PUT(req, { params }) {
     }
     if (!slug) slug = oldProduct.slug || "product";
 
-    // Ensure uniqueness without appending suffixes unless a duplicate exists
-    let finalSlug = slug;
-    let counter = 1;
-    while (await Product.findOne({ slug: finalSlug, _id: { $ne: id }, isDeleted: { $ne: true } })) {
-      finalSlug = `${slug}-${counter}`;
-      counter++;
-    }
+    // Unique across ALL products (trashed ones still hold their slug in the unique index)
+    const finalSlug = slugify(slug) === oldProduct.slug
+      ? oldProduct.slug
+      : await uniqueSlug(slugify(slug) || "product", (candidate) => Product.exists({ slug: candidate, _id: { $ne: id } }));
     data.slug = finalSlug;
 
     // Register redirect if slug or primary category changed
@@ -136,7 +134,7 @@ export async function DELETE(req, { params }) {
       // Remember the pre-trash status so a restore can put it back (not a schema field → strict:false).
       const trashed = await Product.findByIdAndUpdate(
         id,
-        { $set: { isDeleted: true, status: 'Draft', statusBeforeTrash: product.status || 'Draft' } },
+        { $set: { isDeleted: true, deletedAt: new Date(), status: 'Draft', statusBeforeTrash: product.status || 'Draft' } },
         { new: true, strict: false }
       );
       return NextResponse.json({ message: "Product moved to trash", product: trashed });

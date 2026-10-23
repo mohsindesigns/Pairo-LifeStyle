@@ -71,3 +71,88 @@ export function copySlugCandidate(baseSlug, attempt) {
 export function restoreStatus(statusBeforeTrash) {
   return statusBeforeTrash === "Published" || statusBeforeTrash === "Draft" ? statusBeforeTrash : "Draft";
 }
+
+/** Lower-case URL slug from any text ("" when nothing usable is left). */
+export function slugify(text) {
+  return String(text || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+/**
+ * First free slug for `base`: base, base-1, base-2, …  `isTaken(slug)` (sync or async) says whether
+ * another document already holds it. Trashed products still hold their slug (the index is unique),
+ * so callers must check against every product, not just live ones.
+ */
+export async function uniqueSlug(base, isTaken, maxAttempts = 1000) {
+  const root = slugify(base) || "product";
+  let candidate = root;
+  for (let n = 1; n <= maxAttempts; n++) {
+    if (!(await isTaken(candidate))) return candidate;
+    candidate = `${root}-${n}`;
+  }
+  return `${root}-${Date.now().toString(36)}`;
+}
+
+/** Escapes user text for use inside a RegExp / Mongo $regex. */
+export function escapeRegex(text) {
+  return String(text ?? "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// ---------- Product Process (singleton doc with an ordered list of steps) ----------
+
+/** Re-numbers `order` to match array position. */
+export function reindexSteps(steps = []) {
+  return steps.map((s, i) => ({ ...s, order: i }));
+}
+
+/** Copy of a step placed right after it: new id, "(Copy)" heading. */
+export function duplicateStepIn(steps = [], id, makeId) {
+  const idx = steps.findIndex((s) => s.id === id);
+  if (idx === -1) return steps;
+  const source = { ...steps[idx] };
+  delete source._id; // a fresh sub-document id is assigned on save
+  const copy = { ...source, id: makeId(), heading: `${source.heading || "Step"} (Copy)` };
+  const next = [...steps.slice(0, idx + 1), copy, ...steps.slice(idx + 1)];
+  return reindexSteps(next);
+}
+
+/** Moves a step into the trash list (stamped with deletedAt) and re-indexes the live steps. */
+export function trashStepIn(steps = [], trashed = [], id, now = new Date()) {
+  const step = steps.find((s) => s.id === id);
+  if (!step) return { steps, trashed };
+  return {
+    steps: reindexSteps(steps.filter((s) => s.id !== id)),
+    trashed: [{ ...step, deletedAt: now.toISOString() }, ...trashed],
+  };
+}
+
+/** Puts a trashed step back at the end of the live list. */
+export function restoreStepIn(steps = [], trashed = [], id) {
+  const step = trashed.find((s) => s.id === id);
+  if (!step) return { steps, trashed };
+  const rest = { ...step };
+  delete rest.deletedAt;
+  delete rest._id;
+  return {
+    steps: reindexSteps([...steps, rest]),
+    trashed: trashed.filter((s) => s.id !== id),
+  };
+}
+
+/**
+ * Validates the live steps before saving. Returns an error message naming the first bad step,
+ * or null. Each live step needs a heading and an image (both are shown on every product page).
+ */
+export function validateProcessSteps(steps = []) {
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i] || {};
+    const heading = String(s.heading || "").trim();
+    const label = `Step ${i + 1}${heading ? ` ("${heading}")` : ""}`;
+    if (!heading) return `${label} needs a heading.`;
+    if (!String(s.image || "").trim()) return `${label} needs an image.`;
+  }
+  return null;
+}
