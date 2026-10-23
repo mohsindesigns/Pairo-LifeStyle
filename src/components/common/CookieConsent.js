@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Cookie, X, Shield } from "lucide-react";
 
 export default function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
+  // Shopper-facing only: never cover the admin or the admin login.
+  const pathname = usePathname() || "";
+  const isAdminArea = pathname.startsWith("/admin");
 
   useEffect(() => {
     // Check if user has already made a choice
@@ -26,7 +30,7 @@ export default function CookieConsent() {
     setIsVisible(false);
   };
 
-  if (!isVisible) return null;
+  if (!isVisible || isAdminArea) return null;
 
   return (
     <div className="fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-500">

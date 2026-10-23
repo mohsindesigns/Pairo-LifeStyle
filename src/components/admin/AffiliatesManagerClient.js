@@ -9,7 +9,7 @@ import { Eye, X, ExternalLink, FileText } from "lucide-react";
 
 const AFFILIATE_TABS = ["overview", "requests", "list", "links", "orders", "conversions", "commissions", "payouts", "analytics", "settings"];
 
-export default function AffiliatesManagerClient({ userSession }) {
+export default function AffiliatesManagerClient() {
   const { showConfirm } = usePopup();
   const searchParams = useSearchParams();
   const router = useRouter();
