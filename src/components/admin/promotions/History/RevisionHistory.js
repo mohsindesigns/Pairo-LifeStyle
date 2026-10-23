@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { History, RotateCcw, Clock, User, ChevronDown, ChevronUp } from 'lucide-react';
+import { usePopup } from "@/context/PopupContext";
 
 export default function RevisionHistory({ promotionId, onRollback }) {
+  const { showConfirm } = usePopup();
   const [revisions, setRevisions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -28,7 +30,7 @@ export default function RevisionHistory({ promotionId, onRollback }) {
   }, [promotionId, fetchRevisions]);
 
   const handleRestore = async (version) => {
-    if (!confirm(`Are you sure you want to rollback to Version ${version}? Current unsaved changes will be lost.`)) return;
+    if (!(await showConfirm(`Are you sure you want to rollback to Version ${version}? Current unsaved changes will be lost.`, "Restore revision", { confirmText: "Restore" }))) return;
     try {
         const res = await fetch(`/api/admin/promotions/${promotionId}/revisions`, {
             method: 'POST',

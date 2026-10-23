@@ -41,6 +41,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import MediaPickerModal from './MediaPickerModal';
+import { usePopup } from '@/context/PopupContext';
 
 // --- CUSTOM FONT SIZE EXTENSION ---
 const FontSize = Extension.create({
@@ -119,6 +120,7 @@ const Iframe = Node.create({
 });
 
 const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) => {
+  const { showPrompt, showConfirm } = usePopup();
   if (!editor) return null;
 
   const btnClass = (active) => `p-2 rounded-[2px] border border-transparent hover:border-[#c3c4c7] hover:bg-white transition-all ${active ? 'bg-white border-[#c3c4c7] shadow-sm text-[#2271b1]' : 'text-gray-600'}`;
@@ -170,9 +172,9 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
     }
   };
 
-  const insertLink = () => {
+  const insertLink = async () => {
     const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('Enter URL (relative /page for internal, or https:// for external):', previousUrl);
+    const url = await showPrompt('Enter URL (relative /page for internal, or https:// for external):', previousUrl || '', 'Insert link');
     
     if (url === null) return;
 
@@ -181,7 +183,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
       return;
     }
 
-    const openInNewTab = window.confirm('Open link in a new tab?');
+    const openInNewTab = await showConfirm('Open link in a new tab?', 'Link target', { confirmText: 'New tab', cancelText: 'Same tab' });
     if (openInNewTab) {
       editor.chain().focus().extendMarkRange('link').setLink({ href: url, target: '_blank', rel: 'noopener' }).run();
     } else {
@@ -189,8 +191,8 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
     }
   };
 
-  const insertVideo = () => {
-    const url = window.prompt('Enter YouTube or Vimeo URL or Iframe source URL:');
+  const insertVideo = async () => {
+    const url = await showPrompt('Enter YouTube or Vimeo URL or Iframe source URL:', '', 'Embed video');
     if (!url) return;
 
     let embedUrl = url;

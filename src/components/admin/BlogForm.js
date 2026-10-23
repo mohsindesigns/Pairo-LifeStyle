@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usePopup } from "@/context/PopupContext";
 import { 
    ChevronLeft, 
    Save, 
@@ -21,6 +22,7 @@ import { toast } from "react-hot-toast";
 
 export default function BlogForm({ blogId }) {
    const router = useRouter();
+   const { showConfirm } = usePopup();
    const [loading, setLoading] = useState(blogId ? true : false);
    const [saving, setSaving] = useState(false);
    const [activeFormTab, setActiveFormTab] = useState("content");
@@ -126,7 +128,7 @@ export default function BlogForm({ blogId }) {
 
    const handleTrash = async () => {
       if (!blogId) return;
-      if (!confirm("Are you sure you want to move this post to trash?")) return;
+      if (!(await showConfirm("Are you sure you want to move this post to trash?", "Move to trash", { confirmText: "Move to trash", danger: true }))) return;
       try {
          const res = await fetch(`/api/admin/blogs?id=${blogId}`, {
             method: "DELETE"

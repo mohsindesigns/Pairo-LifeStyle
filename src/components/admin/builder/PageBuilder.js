@@ -18,6 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import * as LucideIcons from "lucide-react";
+import { usePopup } from "@/context/PopupContext";
 import dynamic from "next/dynamic";
 
 const QuillEditor = dynamic(() => import("@/components/admin/QuillEditor"), { ssr: false });
@@ -212,6 +213,7 @@ const SortableSection = ({
 };
 
 export default function PageBuilder({ initialPage }) {
+  const { showConfirm } = usePopup();
   // Fill fields the page never stored with the section's built-in content so the admin can see and edit it.
   const [hydratedInitial] = useState(() => hydratePageDefaults(initialPage));
   const [page, setPage] = useState(hydratedInitial);
@@ -490,7 +492,7 @@ export default function PageBuilder({ initialPage }) {
                                </div>
                             )}
                             {page.sections.map((s) => (
-                               <SortableSection key={s.id} section={s} isExpanded={expandedSections[s.id]} onToggleExpand={toggleExpand} onUpdate={updateSection} onDelete={(id) => { if(confirm("Are you sure you want to remove this section? This cannot be undone.")) setPage(p => ({ ...p, sections: p.sections.filter(x => x.id !== id) })); }} onDuplicate={duplicateSection} onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })} renderField={renderField} />
+                               <SortableSection key={s.id} section={s} isExpanded={expandedSections[s.id]} onToggleExpand={toggleExpand} onUpdate={updateSection} onDelete={async (id) => { if (await showConfirm("Are you sure you want to remove this section? This cannot be undone.", "Remove section", { confirmText: "Remove", danger: true })) setPage(p => ({ ...p, sections: p.sections.filter(x => x.id !== id) })); }} onDuplicate={duplicateSection} onOpenMediaPicker={(cb) => setMediaPicker({ open: true, onSelect: cb })} renderField={renderField} />
                             ))}
                          </div>
                       </SortableContext>

@@ -3,10 +3,12 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { Users, CheckSquare, Coins, Settings, Eye, X, ExternalLink, RefreshCw, BarChart2, Link2, ShoppingCart, MousePointerClick, DollarSign, CreditCard, TrendingUp, AlertCircle } from "lucide-react";
 
 export default function AffiliatesManagerClient({ userSession }) {
+  const { showConfirm } = usePopup();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState("requests");
   const [loading, setLoading] = useState(true);
@@ -1300,7 +1302,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (!confirm(`Deactivate "${p.title || p.name}"?`)) return;
+                          if (!(await showConfirm(`Deactivate "${p.title || p.name}"?`, "Deactivate promotion", { confirmText: "Deactivate", danger: true }))) return;
                           const r = await fetch("/api/admin/promotions", {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
@@ -1319,7 +1321,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                     type="button"
                     disabled={disablingPromos}
                     onClick={async () => {
-                      if (!confirm("Deactivate ALL automatic promotions? This will stop all surprise discounts.")) return;
+                      if (!(await showConfirm("Deactivate ALL automatic promotions? This will stop all surprise discounts.", "Deactivate all", { confirmText: "Deactivate all", danger: true }))) return;
                       setDisablingPromos(true);
                       const r = await fetch("/api/admin/promotions", { method: "DELETE" });
                       const d = await r.json();

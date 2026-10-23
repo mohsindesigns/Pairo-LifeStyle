@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { usePopup } from "@/context/PopupContext";
 import {
    ChevronDown,
    ChevronUp,
@@ -213,6 +214,7 @@ const SectionMetaBox = ({
 
 export default function PageForm({ pageId }) {
    const router = useRouter();
+   const { showConfirm } = usePopup();
    const [loading, setLoading] = useState(true);
    const [saving, setSaving] = useState(false);
    const [activeFormTab, setActiveFormTab] = useState("content");
@@ -377,7 +379,7 @@ export default function PageForm({ pageId }) {
          toast.error("System pages cannot be deleted");
          return;
       }
-      if (!confirm("Are you sure you want to delete this page? This action cannot be undone.")) {
+      if (!(await showConfirm("Are you sure you want to delete this page? This action cannot be undone.", "Delete page", { confirmText: "Delete", danger: true }))) {
          return;
       }
       try {

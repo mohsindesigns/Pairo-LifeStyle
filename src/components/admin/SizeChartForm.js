@@ -18,12 +18,14 @@ import {
   HelpCircle
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { usePopup } from "@/context/PopupContext";
 
 const inputClass =
   "border border-[#8c8f94] bg-white text-[13px] px-3 py-2 rounded-[3px] outline-none focus:border-[#2271b1] w-full";
 
 export default function SizeChartForm({ initialId = null }) {
   const router = useRouter();
+  const { showPrompt, showConfirm } = usePopup();
   const isNew = !initialId;
 
   // Form states
@@ -109,8 +111,8 @@ export default function SizeChartForm({ initialId = null }) {
   };
 
   // Dynamic Spreadsheet Actions
-  const handleAddColumn = () => {
-    const colName = prompt("Enter column header name:");
+  const handleAddColumn = async () => {
+    const colName = await showPrompt("Enter column header name:", "", "Add column");
     if (!colName || !colName.trim()) return;
 
     if (columns.some(col => col.toLowerCase() === colName.trim().toLowerCase())) {
@@ -122,18 +124,18 @@ export default function SizeChartForm({ initialId = null }) {
     toast.success("Column added");
   };
 
-  const handleDeleteColumn = (index) => {
+  const handleDeleteColumn = async (index) => {
     if (columns.length <= 1) {
       return toast.error("You must keep at least one column.");
     }
-    if (!confirm(`Delete column "${columns[index]}"? all data in this column will be lost.`)) return;
+    if (!(await showConfirm(`Delete column "${columns[index]}"? All data in this column will be lost.`, "Delete column", { confirmText: "Delete", danger: true }))) return;
 
     setColumns(prev => prev.filter((_, i) => i !== index));
     setRows(prev => prev.map(row => row.filter((_, i) => i !== index)));
   };
 
-  const handleRenameColumn = (index, currentName) => {
-    const newName = prompt("Rename column header:", currentName);
+  const handleRenameColumn = async (index, currentName) => {
+    const newName = await showPrompt("Rename column header:", currentName, "Rename column");
     if (!newName || !newName.trim() || newName.trim() === currentName) return;
 
     if (columns.some((col, i) => i !== index && col.toLowerCase() === newName.trim().toLowerCase())) {
