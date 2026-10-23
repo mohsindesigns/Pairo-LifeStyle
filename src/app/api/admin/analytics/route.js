@@ -30,6 +30,7 @@ export async function GET(req) {
 
       // 1. Order Aggregation
       Order.aggregate([
+        { $match: { isDeleted: { $ne: true } } },
         {
           $facet: {
             overall: [
@@ -113,13 +114,14 @@ export async function GET(req) {
       Blog.countDocuments({ isDeleted: { $ne: true } }),
 
       // 5. Recent 5 Orders
-      Order.find()
+      Order.find({ isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .limit(5)
         .select("orderNumber status createdAt financials customer shippingAddress"),
 
       // 6. Order Status Breakdown
       Order.aggregate([
+        { $match: { isDeleted: { $ne: true } } },
         { $group: { _id: "$status", count: { $count: {} } } },
         { $sort: { count: -1 } }
       ])

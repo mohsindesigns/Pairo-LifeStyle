@@ -7,7 +7,7 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
 import InvoiceTemplate from "@/components/admin/InvoiceTemplate";
-import { Page, PageHeader, Postbox, Notice, StatusPill } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice, StatusPill, formatMoney } from "@/components/admin/ui";
 import { can } from "@/lib/rbac";
 import { formatCurrency } from "@/lib/currency";
 import { usePopup } from "@/context/PopupContext";
@@ -322,6 +322,63 @@ export default function OrderDetailPage() {
     );
   };
 
+  // "Process Refund" on a Cancelled order. A paid Stripe order goes through the
+  // refund endpoint (full remaining balance, same server-side checks as the Refund
+  // form); that endpoint marks the order Refunded once fully refunded. Anything
+  // else (unpaid / non-Stripe / already fully refunded) only changes the status.
+  const processCancelledRefund = async () => {
+    const stripeRefundable =
+      order?.payment?.provider === 'stripe' &&
+      !!order.payment?.stripePaymentIntentId &&
+      (order.payment?.status === 'Paid' || order.payment?.status === 'Partially Refunded') &&
+      remainingRefundable > 0;
+
+    if (!stripeRefundable) {
+      const ok = await showConfirm(
+        `No payment will be refunded — this order has no captured Stripe payment left to refund. The order status will just be set to Refunded.`,
+        "Mark order as Refunded?",
+        { confirmText: "Mark as Refunded" }
+      );
+      if (ok) updateStatus('Refunded');
+      return;
+    }
+
+    if (!canRefund) {
+      toast.error("You don't have permission to issue refunds.");
+      return;
+    }
+
+    const amountText = formatMoney(remainingRefundable, currencyCode);
+    const ok = await showConfirm(
+      `${amountText} will be refunded to the customer via Stripe, and the order will be marked Refunded. This cannot be undone.`,
+      `Refund ${amountText}?`,
+      { confirmText: `Refund ${amountText}`, danger: true }
+    );
+    if (!ok) return;
+
+    setUpdating(true);
+    try {
+      // No amount sent: the server refunds the full remaining refundable balance.
+      const res = await fetch(`/api/admin/orders/${id}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        toast.error(data.error || "Refund failed.");
+        return;
+      }
+      setOrder(data.order);
+      toast.success(`Refund of ${amountText} issued via Stripe.`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Refund failed. Please try again.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const renderCancelRefundButton = () => {
     if (!order) return null;
     if (order.status === 'Refunded') {
@@ -332,7 +389,7 @@ export default function OrderDetailPage() {
       return (
         <button
           type="button"
-          onClick={() => updateStatus('Refunded')}
+          onClick={processCancelledRefund}
           disabled={updating}
           className="wp-btn"
         >
@@ -617,7 +674,7 @@ export default function OrderDetailPage() {
                               </div>
                             ))}
                           <div className="wp-mobile-meta">
-                            ${(item.priceAtPurchase || 0).toLocaleString()} × {item.quantity || 1}
+                            {formatMoney(item.priceAtPurchase, currencyCode)} × {item.quantity || 1}
                           </div>
 
                           {/* Made to Measure */}
@@ -703,7 +760,7 @@ export default function OrderDetailPage() {
                                       <img src={sel.image} alt={sel.name} style={{ width: 24, height: 24, objectFit: "cover", border: "1px solid #dcdcde", flex: "none" }} />
                                     )}
                                     <span className="wp-strong">{sel.name}</span>
-                                    {sel.priceDelta > 0 && <span className="wp-muted">+${Number(sel.priceDelta).toLocaleString()}</span>}
+                                    {sel.priceDelta > 0 && <span className="wp-muted">+{formatMoney(Number(sel.priceDelta), currencyCode)}</span>}
                                     {sel.artwork?.url ? (
                                       <a href={sel.artwork.url} target="_blank" rel="noopener noreferrer" className="wp-link" style={{ wordBreak: "break-all" }}>
                                         {sel.artwork.name || "View logo"}
@@ -720,11 +777,11 @@ export default function OrderDetailPage() {
                       </div>
                     </td>
                     <td className="wp-num wp-hide-sm">
-                      ${(item.priceAtPurchase || 0).toLocaleString()}
+                      {formatMoney(item.priceAtPurchase, currencyCode)}
                     </td>
                     <td className="wp-num wp-hide-sm">× {item.quantity || 1}</td>
                     <td className="wp-num wp-strong">
-                      ${((item.priceAtPurchase || 0) * (item.quantity || 1)).toLocaleString()}
+                      {formatMoney((item.priceAtPurchase || 0) * (item.quantity || 1), currencyCode)}
                     </td>
                   </tr>
                 ))}
@@ -735,9 +792,9 @@ export default function OrderDetailPage() {
             {/* Totals */}
             <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px", borderTop: "1px solid #dcdcde" }}>
               <div style={{ width: "100%", maxWidth: 300 }}>
-                {totalRow("Items subtotal:", `$${(order.financials?.subtotal || 0).toLocaleString()}`)}
+                {totalRow("Items subtotal:", formatMoney(order.financials?.subtotal, currencyCode))}
                 {order.financials?.discountTotal && Number(order.financials.discountTotal) > 0
-                  ? totalRow("Promo discount:", `-$${(Number(order.financials.discountTotal)).toLocaleString()}`, { color: "#2f6f1a" })
+                  ? totalRow("Promo discount:", `-${formatMoney(Number(order.financials.discountTotal), currencyCode)}`, { color: "#2f6f1a" })
                   : null}
                 {order.financials?.affiliateDiscountAmount && Number(order.financials.affiliateDiscountAmount) > 0
                   ? totalRow(
@@ -747,18 +804,18 @@ export default function OrderDetailPage() {
                           <> ({order.financials.affiliateDiscountValue}%)</>
                         )}:
                       </>,
-                      `-$${(Number(order.financials.affiliateDiscountAmount)).toFixed(2)}`,
+                      `-${formatMoney(Number(order.financials.affiliateDiscountAmount), currencyCode)}`,
                       { color: "#2f6f1a" }
                     )
                   : null}
                 {totalRow(
                   "Shipping:",
                   order.financials?.shippingCost > 0
-                    ? `$${order.financials.shippingCost.toLocaleString()}`
+                    ? formatMoney(order.financials.shippingCost, currencyCode)
                     : 'Free'
                 )}
-                {order.financials?.tax > 0 && totalRow("Tax:", `$${order.financials.tax.toLocaleString()}`)}
-                {totalRow("Order total:", `$${(order.financials?.total || 0).toLocaleString()}`, { strong: true })}
+                {order.financials?.tax > 0 && totalRow("Tax:", formatMoney(order.financials.tax, currencyCode))}
+                {totalRow("Order total:", formatMoney(order.financials?.total, currencyCode), { strong: true })}
               </div>
             </div>
 
@@ -1025,18 +1082,18 @@ export default function OrderDetailPage() {
                   <span className="wp-kv-v" style={{ color: "#2f6f1a" }}>
                     {order.financials.affiliateDiscountType === 'Percentage'
                       ? `${order.financials.affiliateDiscountValue}%`
-                      : `$${order.financials.affiliateDiscountValue}`}
+                      : formatMoney(Number(order.financials.affiliateDiscountValue), currencyCode)}
                     {' '}off
                     {order.financials.affiliateDiscountAmount > 0 && (
                       <span className="wp-small" style={{ fontWeight: 400, marginLeft: 4 }}>
-                        (saved ${Number(order.financials.affiliateDiscountAmount).toFixed(2)})
+                        (saved {formatMoney(Number(order.financials.affiliateDiscountAmount), currencyCode)})
                       </span>
                     )}
                   </span>
                 </div>
               )}
               <p className="wp-desc">
-                Commission calculation uses original subtotal (${(order.financials?.subtotal || 0).toLocaleString()}) before discounts.
+                Commission calculation uses original subtotal ({formatMoney(order.financials?.subtotal, currencyCode)}) before discounts.
               </p>
             </Postbox>
           )}
@@ -1121,7 +1178,7 @@ export default function OrderDetailPage() {
                 </div>
                 <div className="wp-kv">
                   <span className="wp-kv-k wp-muted">State</span>
-                  <span className="wp-kv-v">{order.customer.ipLocation.state || order.customer.ipLocation.region || "—"}</span>
+                  <span className="wp-kv-v">{order.customer.ipLocation.state || "—"}</span>
                 </div>
                 <div className="wp-kv">
                   <span className="wp-kv-k wp-muted">County</span>
@@ -1134,10 +1191,10 @@ export default function OrderDetailPage() {
                     {order.customer.ipLocation.countryCode ? ` (${order.customer.ipLocation.countryCode})` : ""}
                   </span>
                 </div>
-                {(order.customer.ipLocation.postal || order.customer.ipLocation.zip) && (
+                {order.customer.ipLocation.postal && (
                   <div className="wp-kv">
                     <span className="wp-kv-k wp-muted">Postal / Zip</span>
-                    <span className="wp-kv-v font-mono">{order.customer.ipLocation.postal || order.customer.ipLocation.zip}</span>
+                    <span className="wp-kv-v font-mono">{order.customer.ipLocation.postal}</span>
                   </div>
                 )}
                 {order.customer.ipLocation.isp && (

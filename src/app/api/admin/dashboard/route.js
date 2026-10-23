@@ -38,7 +38,7 @@ function parseWindow(searchParams) {
 
 async function salesTotals(from, to) {
   const [row] = await Order.aggregate([
-    { $match: { createdAt: { $gte: from, $lt: to }, status: { $nin: NOT_SALES } } },
+    { $match: { createdAt: { $gte: from, $lt: to }, status: { $nin: NOT_SALES }, isDeleted: { $ne: true } } },
     { $group: { _id: null, gross: { $sum: "$financials.total" }, orders: { $sum: 1 } } },
   ]);
   return { gross: row?.gross || 0, orders: row?.orders || 0 };
@@ -49,7 +49,7 @@ async function salesSection(w) {
     salesTotals(w.from, w.to),
     salesTotals(w.prevFrom, w.prevTo),
     Order.aggregate([
-      { $match: { createdAt: { $gte: w.from, $lt: w.to }, status: { $nin: NOT_SALES } } },
+      { $match: { createdAt: { $gte: w.from, $lt: w.to }, status: { $nin: NOT_SALES }, isDeleted: { $ne: true } } },
       {
         $group: {
           _id: { $dateToString: { format: BUCKET_FORMATS[w.unit], date: "$createdAt", timezone: w.tz } },
@@ -59,7 +59,7 @@ async function salesSection(w) {
       },
     ]),
     Order.aggregate([
-      { $match: { createdAt: { $gte: w.from, $lt: w.to }, status: { $nin: NOT_SALES } } },
+      { $match: { createdAt: { $gte: w.from, $lt: w.to }, status: { $nin: NOT_SALES }, isDeleted: { $ne: true } } },
       { $unwind: "$items" },
       {
         $group: {
@@ -92,12 +92,12 @@ async function salesSection(w) {
 
 async function ordersSection() {
   const [recent, statusRows] = await Promise.all([
-    Order.find()
+    Order.find({ isDeleted: { $ne: true } })
       .sort({ createdAt: -1 })
       .limit(6)
       .select("orderNumber status createdAt financials.total financials.currency shippingAddress.fullName customer.email payment.status")
       .lean(),
-    Order.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    Order.aggregate([{ $match: { isDeleted: { $ne: true } } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
   ]);
   return {
     recent: recent.map((o) => ({
@@ -235,7 +235,7 @@ async function glanceSection(user) {
       Product.countDocuments({ status: "Draft", isDeleted: { $ne: true } }).then((n) => ["draftProducts", n])
     );
   }
-  if (can(user, "orders.view")) entries.push(Order.estimatedDocumentCount().then((n) => ["orders", n]));
+  if (can(user, "orders.view")) entries.push(Order.countDocuments({ isDeleted: { $ne: true } }).then((n) => ["orders", n]));
   if (can(user, "customers.view")) entries.push(Customer.countDocuments({ role: { $ne: "admin" } }).then((n) => ["customers", n]));
   if (can(user, "blogs.view")) entries.push(Blog.countDocuments({ isDeleted: { $ne: true } }).then((n) => ["posts", n]));
   if (can(user, "pages.view")) entries.push(Page.estimatedDocumentCount().then((n) => ["pages", n]));

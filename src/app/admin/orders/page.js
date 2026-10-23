@@ -1,15 +1,32 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Page, PageHeader, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
+// "Completed" = Delivered (an order that reached its final, successful status).
+const STATUS_TABS = [
+  { value: "all", label: "All" },
+  { value: "Processing", label: "Processing" },
+  { value: "Delivered", label: "Completed" },
+  { value: "Cancelled", label: "Cancelled" },
+  { value: "affiliate", label: "Affiliate Orders" },
+  { value: "trash", label: "Trash" },
+];
+
+async function readError(res, fallback) {
+  try {
+    const data = await res.json();
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function AdminOrdersPage() {
-  const router = useRouter();
   const { showConfirm } = usePopup();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,97 +34,178 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [referralFilter, setReferralFilter] = useState("all");
   const [pagination, setPagination] = useState({ total: 0, pages: 1, currentPage: 1 });
-  
+  const [counts, setCounts] = useState(null);
+
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
+  const searchTimer = useRef(null);
+
+  const isTrash = statusFilter === "trash";
 
   const fetchOrders = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/orders?page=${page}&status=${statusFilter}&search=${search}`);
+      const params = new URLSearchParams({ page: String(page), search });
+      if (statusFilter === "trash") params.set("trash", "true");
+      else if (statusFilter === "affiliate") params.set("affiliateOnly", "true");
+      else params.set("status", statusFilter);
+      if (referralFilter !== "all") params.set("referral", referralFilter);
+
+      const res = await fetch(`/api/admin/orders?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         setOrders(data.orders);
+        setSelectedIds([]); // selection only ever refers to the rows currently shown
         setPagination(data.pagination);
+        setCounts(data.counts || null);
       }
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter]);
+  }, [search, statusFilter, referralFilter]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    searchTimer.current = setTimeout(() => {
       fetchOrders(1);
     }, 500);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(searchTimer.current);
   }, [fetchOrders]);
 
-  const handleDelete = async (id) => {
-    const ok = await showConfirm("Are you sure you want to delete this order permanently?");
-    if (!ok) return;
-    const previousOrders = orders;
-    setOrders(prev => prev.filter(o => o._id !== id));
-    
-    const deletePromise = fetch(`/api/admin/orders?id=${id}`, { method: "DELETE" })
-      .then(async (res) => {
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to delete order.");
-        }
-        fetchOrders(pagination.currentPage);
-      });
+  const runSearchNow = (e) => {
+    e?.preventDefault();
+    clearTimeout(searchTimer.current);
+    fetchOrders(1);
+  };
 
-    toast.promise(deletePromise, {
-      loading: 'Deleting order...',
-      success: 'Order deleted successfully.',
-      error: (err) => {
-        setOrders(previousOrders);
-        return err.message || 'Failed to delete order.';
-      }
+  const reloadCurrentPage = () => {
+    // If the last item on a page was removed, step back a page.
+    const page = orders.length <= 1 && pagination.currentPage > 1 ? pagination.currentPage - 1 : pagination.currentPage;
+    fetchOrders(page);
+  };
+
+  // --- single-order requests (throw on failure) ---
+  const trashOrder = async (id) => {
+    const res = await fetch(`/api/admin/orders?id=${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to move order to trash."));
+  };
+
+  const deleteOrderPermanently = async (id) => {
+    const res = await fetch(`/api/admin/orders?id=${id}&permanent=true`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to delete order."));
+  };
+
+  const restoreOrder = async (id) => {
+    const res = await fetch("/api/admin/orders", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, isDeleted: false }),
+    });
+    if (!res.ok) throw new Error(await readError(res, "Failed to restore order."));
+  };
+
+  const duplicateOrder = async (order) => {
+    const { _id, createdAt, updatedAt, orderNumber, isDeleted, deletedAt, ...rest } = order;
+    const copy = {
+      ...rest,
+      orderNumber: `COPY-${orderNumber || Math.floor(Math.random() * 1000)}`,
+      status: "Pending"
+    };
+    const res = await fetch("/api/admin/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(copy)
+    });
+    if (!res.ok) throw new Error(await readError(res, "Failed to duplicate order."));
+  };
+
+  // --- row actions ---
+  const runRowAction = async (action, messages) => {
+    const p = action().then(() => reloadCurrentPage());
+    toast.promise(p, {
+      loading: messages.loading,
+      success: messages.success,
+      error: (err) => err.message || messages.error,
+    });
+    try { await p; } catch { /* surfaced via toast */ }
+  };
+
+  const handleTrash = (order) => runRowAction(() => trashOrder(order._id), {
+    loading: "Moving order to trash...",
+    success: `Order #${order.orderNumber} moved to the Trash.`,
+    error: "Failed to move order to trash.",
+  });
+
+  const handleRestore = (order) => runRowAction(() => restoreOrder(order._id), {
+    loading: "Restoring order...",
+    success: `Order #${order.orderNumber} restored.`,
+    error: "Failed to restore order.",
+  });
+
+  const handleDeletePermanently = async (order) => {
+    const ok = await showConfirm(
+      `Order #${order.orderNumber} will be deleted permanently. This cannot be undone.`,
+      "Delete permanently?",
+      { confirmText: "Delete Permanently", danger: true }
+    );
+    if (!ok) return;
+    runRowAction(() => deleteOrderPermanently(order._id), {
+      loading: "Deleting order...",
+      success: "Order deleted permanently.",
+      error: "Failed to delete order.",
     });
   };
 
+  const handleDuplicate = (order) => runRowAction(() => duplicateOrder(order), {
+    loading: "Duplicating order...",
+    success: "Order duplicated.",
+    error: "Failed to duplicate order.",
+  });
 
-  const handleDuplicate = async (order) => {
-    try {
-      const { _id, createdAt, updatedAt, orderNumber, ...rest } = order;
-      const copy = {
-        ...rest,
-        orderNumber: `COPY-${orderNumber || Math.floor(Math.random() * 1000)}`,
-        status: "Pending"
-      };
-      const res = await fetch("/api/admin/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(copy)
-      });
-      if (res.ok) fetchOrders(pagination.currentPage);
-    } catch (err) {
-      console.error("Duplicate failed:", err);
-    }
+  // --- bulk actions ---
+  const BULK_LABELS = {
+    Duplicate: { verb: "duplicated", run: (id) => duplicateOrder(orders.find(o => o._id === id)) },
+    "Move to Trash": { verb: "moved to the Trash", run: trashOrder },
+    Restore: { verb: "restored", run: restoreOrder },
+    "Delete Permanently": { verb: "deleted permanently", run: deleteOrderPermanently },
   };
 
   const handleBulkAction = async () => {
-     if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} orders?`);
-     if (ok) {
-        try {
-           for (const id of selectedIds) {
-              if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
-                  await fetch(`/api/admin/orders?id=${id}`, { method: "DELETE" });
-              } else if (bulkAction === "Duplicate") {
-                  const order = orders.find(o => o._id === id);
-                  if (order) await handleDuplicate(order);
-              }
-           }
-           setSelectedIds([]);
-           fetchOrders(pagination.currentPage);
-        } catch (err) {
-           console.error("Bulk action failed:", err);
-        }
-     }
+    const def = BULK_LABELS[bulkAction];
+    if (!def || selectedIds.length === 0) return;
+
+    const n = selectedIds.length;
+    const ok = bulkAction === "Delete Permanently"
+      ? await showConfirm(
+          `${n} order${n === 1 ? "" : "s"} will be deleted permanently. This cannot be undone.`,
+          "Delete permanently?",
+          { confirmText: "Delete Permanently", danger: true }
+        )
+      : await showConfirm(`Apply "${bulkAction}" to ${n} order${n === 1 ? "" : "s"}?`);
+    if (!ok) return;
+
+    let succeeded = 0;
+    const failures = [];
+    for (const id of selectedIds) {
+      const order = orders.find(o => o._id === id);
+      try {
+        if (!order) throw new Error("Order is no longer in the list.");
+        await def.run(id);
+        succeeded++;
+      } catch (err) {
+        failures.push(`#${order?.orderNumber || id}: ${err.message}`);
+      }
+    }
+
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    fetchOrders(pagination.currentPage);
+
+    if (succeeded > 0) toast.success(`${succeeded} order${succeeded === 1 ? "" : "s"} ${def.verb}.`);
+    if (failures.length > 0) {
+      toast.error(`${failures.length} failed — ${failures.slice(0, 5).join("; ")}${failures.length > 5 ? "; …" : ""}`, { duration: 8000 });
+    }
   };
 
   const toggleSelect = (id) => {
@@ -119,19 +217,8 @@ export default function AdminOrdersPage() {
      else setSelectedIds(displayedOrders.map(o => o._id));
   };
 
-  const displayedOrders = orders.filter(order => {
-    if (referralFilter === "referred") return !!order.affiliateReferralCode;
-    if (referralFilter === "non-referred") return !order.affiliateReferralCode;
-    return true;
-  });
-
-  const STATUS_TABS = [
-    { value: "all", label: "All" },
-    { value: "Processing", label: "Processing" },
-    { value: "Completed", label: "Completed" },
-    { value: "Cancelled", label: "Cancelled" },
-    { value: "Affiliate", label: "Affiliate Orders" },
-  ];
+  // Referral filtering happens server-side so the item count and pagination stay correct.
+  const displayedOrders = orders;
 
   const PAYMENT_CLASS = {
     Paid: "wp-st-paid",
@@ -198,10 +285,10 @@ export default function AdminOrdersPage() {
               type="button"
               className={statusFilter === tab.value ? "is-current" : undefined}
               aria-current={statusFilter === tab.value ? "page" : undefined}
-              onClick={() => setStatusFilter(tab.value)}
+              onClick={() => { setStatusFilter(tab.value); setBulkAction("Bulk actions"); }}
             >
               {tab.label}{" "}
-              <span className="wp-count">({statusFilter === tab.value ? pagination.total : "-"})</span>
+              <span className="wp-count">({counts ? (counts[tab.value] ?? 0) : "-"})</span>
             </button>
           </span>
         ))}
@@ -216,8 +303,14 @@ export default function AdminOrdersPage() {
           onChange={(e) => setBulkAction(e.target.value)}
         >
           <option>Bulk actions</option>
-          <option>Duplicate</option>
-          <option>Move to Trash</option>
+          {isTrash ? (
+            <option>Restore</option>
+          ) : (
+            <>
+              <option>Duplicate</option>
+              <option>Move to Trash</option>
+            </>
+          )}
           <option>Delete Permanently</option>
         </select>
         <button type="button" onClick={handleBulkAction} className="wp-btn">
@@ -235,7 +328,7 @@ export default function AdminOrdersPage() {
           <option value="non-referred">Non-referred</option>
         </select>
         <span className="wp-spacer" />
-        <div className="wp-search" role="search">
+        <form className="wp-search" role="search" onSubmit={runSearchNow}>
           <label htmlFor="orders-search" className="sr-only">Search orders</label>
           <input
             id="orders-search"
@@ -245,10 +338,10 @@ export default function AdminOrdersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <button type="button" className="wp-btn">
+          <button type="submit" className="wp-btn">
             Search Orders
           </button>
-        </div>
+        </form>
       </div>
 
       <div className="wp-table-box">
@@ -295,9 +388,18 @@ export default function AdminOrdersPage() {
                         <StatusPill status={order.status} small /> · {formatDate(order.createdAt)}
                       </div>
                       <div className="wp-row-actions">
-                        <Link href={`/admin/orders/${order._id}`}>View</Link>
-                        <button type="button" onClick={() => handleDuplicate(order)}>Duplicate</button>
-                        <button type="button" className="is-danger" onClick={() => handleDelete(order._id)}>Trash</button>
+                        {isTrash ? (
+                          <>
+                            <button type="button" onClick={() => handleRestore(order)}>Restore</button>
+                            <button type="button" className="is-danger" onClick={() => handleDeletePermanently(order)}>Delete Permanently</button>
+                          </>
+                        ) : (
+                          <>
+                            <Link href={`/admin/orders/${order._id}`}>View</Link>
+                            <button type="button" onClick={() => handleDuplicate(order)}>Duplicate</button>
+                            <button type="button" className="is-danger" onClick={() => handleTrash(order)}>Trash</button>
+                          </>
+                        )}
                       </div>
                     </td>
                     <td className="wp-hide-sm">
