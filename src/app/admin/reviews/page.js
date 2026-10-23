@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Star, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
-import { Page, PageHeader } from "@/components/admin/ui";
+import { Page, PageHeader, Notice, Skeleton } from "@/components/admin/ui";
 
 // Helper to format date like WordPress: YYYY/MM/DD at hh:mm am/pm
 const formatDate = (dateString) => {
@@ -45,7 +45,11 @@ export default function AdminReviewsPage() {
   // Filters & Search
   const [statusFilter, setStatusFilter] = useState("All");
   const [ratingFilter, setRatingFilter] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // what is typed
+  const [searchQuery, setSearchQuery] = useState(""); // what is searched (debounced / on submit)
+  const searchTimer = useRef(null);
+  const [loadError, setLoadError] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   
@@ -83,6 +87,7 @@ export default function AdminReviewsPage() {
   // Fetch reviews list from API
   const fetchReviews = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const queryParams = new URLSearchParams({
         page,
@@ -103,19 +108,39 @@ export default function AdminReviewsPage() {
           setStats(data.stats);
         }
       } else {
-        toast.error("Failed to load reviews");
+        const data = await res.json().catch(() => ({}));
+        setReviews([]);
+        setLoadError(data.error || "Failed to load reviews.");
       }
     } catch (err) {
       console.error(err);
-      toast.error("Error loading reviews");
+      setReviews([]);
+      setLoadError("Failed to load reviews. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   }, [page, statusFilter, ratingFilter, searchQuery, dateFrom, dateTo]);
 
   useEffect(() => {
-    fetchReviews();
+    Promise.resolve().then(fetchReviews);
   }, [fetchReviews]);
+
+  // Anything that changes what is listed goes back to page 1 and drops the selection
+  const resetPaging = () => { setPage(1); setSelectedIds([]); };
+
+  // Live search (debounced) while typing; Search / Enter searches immediately
+  const handleSearchInput = (val) => {
+    setSearchInput(val);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => { setSearchQuery(val.trim()); resetPaging(); }, 400);
+  };
+  const submitSearch = (e) => {
+    e.preventDefault();
+    clearTimeout(searchTimer.current);
+    setSearchQuery(searchInput.trim());
+    resetPaging();
+  };
+  useEffect(() => () => clearTimeout(searchTimer.current), []);
 
   // Bulk action submission
   const handleBulkAction = async () => {
@@ -133,11 +158,16 @@ export default function AdminReviewsPage() {
       bulkAction === "delete_permanently" ? "permanently delete" :
       bulkAction === "restore" ? "restore" : bulkAction;
 
-    const ok = await showConfirm(`Are you sure you want to ${actionText} ${selectedIds.length} review(s)?`);
+    const n = selectedIds.length;
+    const isPermanent = bulkAction === "delete_permanently";
+    const ok = isPermanent
+      ? await showConfirm(`Permanently delete ${n} review${n === 1 ? "" : "s"}? This cannot be undone.`, "Delete Permanently", { confirmText: "Delete Permanently", danger: true })
+      : await showConfirm(`Are you sure you want to ${actionText} ${n} review${n === 1 ? "" : "s"}?`, "Bulk action", { confirmText: "Apply" });
     if (!ok) {
       return;
     }
 
+    setBulkBusy(true);
     try {
       const res = await fetch("/api/admin/reviews", {
         method: "POST",
@@ -146,7 +176,11 @@ export default function AdminReviewsPage() {
       });
 
       if (res.ok) {
-        toast.success(`Bulk action '${actionText}' executed successfully`);
+        const data = await res.json().catch(() => ({}));
+        const done = Number(data.modifiedCount ?? n);
+        const failed = Math.max(0, n - done);
+        if (failed === 0 || !isPermanent) toast.success(`${actionText[0].toUpperCase()}${actionText.slice(1)}: ${n} review${n === 1 ? "" : "s"} done.`);
+        else toast.error(`Permanently delete: ${done} done, ${failed} failed.`);
         setSelectedIds([]);
         setBulkAction("");
         fetchReviews();
@@ -157,16 +191,18 @@ export default function AdminReviewsPage() {
     } catch (err) {
       console.error(err);
       toast.error("Connection error");
+    } finally {
+      setBulkBusy(false);
     }
   };
 
   // Selection helpers
+  const visibleIds = reviews.map(r => r._id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+  const someSelected = visibleIds.some(id => selectedIds.includes(id));
   const toggleSelectAll = () => {
-    if (selectedIds.length === reviews.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(reviews.map(r => r._id));
-    }
+    if (allSelected) setSelectedIds([]);
+    else setSelectedIds(visibleIds);
   };
 
   const toggleSelectOne = (id) => {
@@ -199,7 +235,7 @@ export default function AdminReviewsPage() {
 
   // Move review to trash (soft-delete)
   const handleTrashSingle = async (reviewId) => {
-    const ok = await showConfirm("Are you sure you want to move this review to Trash?");
+    const ok = await showConfirm("Move this review to the Trash? It will be hidden from the product page until restored.", "Move to Trash", { confirmText: "Move to Trash" });
     if (ok) {
       try {
         const res = await fetch(`/api/admin/reviews/${reviewId}`, {
@@ -209,10 +245,12 @@ export default function AdminReviewsPage() {
           toast.success("Review moved to Trash");
           fetchReviews();
         } else {
-          toast.error("Failed to move review to Trash");
+          const data = await res.json().catch(() => ({}));
+          toast.error(data.error || "Failed to move review to Trash");
         }
       } catch (err) {
         console.error(err);
+        toast.error("Connection error");
       }
     }
   };
@@ -229,16 +267,18 @@ export default function AdminReviewsPage() {
         toast.success("Review restored to Pending moderation");
         fetchReviews();
       } else {
-        toast.error("Failed to restore review");
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to restore review");
       }
     } catch (err) {
       console.error(err);
+      toast.error("Connection error");
     }
   };
 
   // Permanently delete review
   const handleDeletePermanentlySingle = async (reviewId) => {
-    const ok = await showConfirm("Are you sure you want to PERMANENTLY delete this review? This action is irreversible.");
+    const ok = await showConfirm("Permanently delete this review? This cannot be undone.", "Delete Permanently", { confirmText: "Delete Permanently", danger: true });
     if (ok) {
       try {
         const res = await fetch(`/api/admin/reviews/${reviewId}`, {
@@ -248,29 +288,33 @@ export default function AdminReviewsPage() {
           toast.success("Review permanently deleted");
           fetchReviews();
         } else {
-          toast.error("Failed to delete review permanently");
+          const data = await res.json().catch(() => ({}));
+          toast.error(data.error || "Failed to delete review permanently");
         }
       } catch (err) {
         console.error(err);
+        toast.error("Connection error");
       }
     }
   };
 
   // Submit admin reply (inline reply form)
-  const handleInlineReplySubmit = async (reviewId) => {
-    if (!inlineReplyText.trim()) {
+  // remove=true clears the existing staff reply
+  const handleInlineReplySubmit = async (reviewId, remove = false) => {
+    if (!remove && !inlineReplyText.trim()) {
       toast.error("Please enter a reply message");
       return;
     }
+    if (remove && !(await showConfirm("Remove the reply from this review?", "Remove reply", { confirmText: "Remove reply", danger: true }))) return;
     try {
       const res = await fetch(`/api/admin/reviews/${reviewId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ replyComment: inlineReplyText.trim() })
+        body: JSON.stringify({ replyComment: remove ? "" : inlineReplyText.trim() })
       });
 
       if (res.ok) {
-        toast.success("Reply submitted successfully");
+        toast.success(remove ? "Reply removed" : "Reply saved");
         setReplyingId(null);
         setInlineReplyText("");
         fetchReviews();
@@ -406,7 +450,7 @@ export default function AdminReviewsPage() {
         ) : (
           <span><button type="button" onClick={() => handleModerateSingle(review._id, "Approved")} style={{ color: "#007017" }}>Approve</button></span>
         )}
-        <span><button type="button" onClick={() => { setReplyingId(review._id); setInlineReplyText(""); setQuickEditingId(null); }}>Reply</button></span>
+        <span><button type="button" onClick={() => { setReplyingId(review._id); setInlineReplyText(review.replies?.[0]?.comment || ""); setQuickEditingId(null); }}>{review.replies?.length ? "Edit reply" : "Reply"}</button></span>
         <span><button type="button" onClick={() => handleStartQuickEdit(review)}>Quick Edit</button></span>
         <span><button type="button" onClick={() => handleOpenEditDialog(review)}>Edit</button></span>
         {review.status === "Spam" ? (
@@ -449,7 +493,7 @@ export default function AdminReviewsPage() {
           type="button"
           className="wp-pager"
           disabled={page <= 1}
-          onClick={() => setPage(page - 1)}
+          onClick={() => { setPage(page - 1); setSelectedIds([]); }}
           aria-label="Previous page"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -459,15 +503,13 @@ export default function AdminReviewsPage() {
           type="button"
           className="wp-pager"
           disabled={page >= pagination.totalPages}
-          onClick={() => setPage(page + 1)}
+          onClick={() => { setPage(page + 1); setSelectedIds([]); }}
           aria-label="Next page"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     );
-
-  const allSelected = selectedIds.length === reviews.length;
 
   return (
     <RequirePermission permission="reviews.view">
@@ -484,7 +526,7 @@ export default function AdminReviewsPage() {
               role="tab"
               aria-selected={statusFilter === t.key}
               className={statusFilter === t.key ? "is-current" : undefined}
-              onClick={() => { setStatusFilter(t.key); setPage(1); }}
+              onClick={() => { setStatusFilter(t.key); setBulkAction(""); resetPaging(); }}
             >
               {t.label} <span className="wp-count">({t.count || 0})</span>
             </button>
@@ -516,7 +558,7 @@ export default function AdminReviewsPage() {
             </>
           )}
         </select>
-        <button type="button" onClick={handleBulkAction} disabled={selectedIds.length === 0} className="wp-btn">
+        <button type="button" onClick={handleBulkAction} disabled={selectedIds.length === 0 || bulkBusy} className="wp-btn">
           Apply
         </button>
 
@@ -524,7 +566,7 @@ export default function AdminReviewsPage() {
         <select
           id="reviews-rating"
           value={ratingFilter}
-          onChange={e => { setRatingFilter(e.target.value); setPage(1); }}
+          onChange={e => { setRatingFilter(e.target.value); resetPaging(); }}
           className="wp-select"
         >
           <option value="">All ratings</option>
@@ -540,7 +582,7 @@ export default function AdminReviewsPage() {
           id="reviews-date-from"
           type="date"
           value={dateFrom}
-          onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+          onChange={e => { setDateFrom(e.target.value); resetPaging(); }}
           max={dateTo || undefined}
           className="wp-input"
         />
@@ -550,14 +592,14 @@ export default function AdminReviewsPage() {
           id="reviews-date-to"
           type="date"
           value={dateTo}
-          onChange={e => { setDateTo(e.target.value); setPage(1); }}
+          onChange={e => { setDateTo(e.target.value); resetPaging(); }}
           min={dateFrom || undefined}
           className="wp-input"
         />
         {(dateFrom || dateTo) && (
           <button
             type="button"
-            onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
+            onClick={() => { setDateFrom(""); setDateTo(""); resetPaging(); }}
             className="wp-btn"
           >
             Clear dates
@@ -566,18 +608,26 @@ export default function AdminReviewsPage() {
 
         <span className="wp-spacer" />
 
-        <div className="wp-search" role="search">
+        <form className="wp-search" role="search" onSubmit={submitSearch}>
           <label htmlFor="reviews-search" className="sr-only">Search reviews</label>
           <input
             id="reviews-search"
             type="search"
             placeholder="Search reviews..."
-            value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+            value={searchInput}
+            onChange={e => handleSearchInput(e.target.value)}
             className="wp-input"
           />
-        </div>
+          <button type="submit" className="wp-btn">Search reviews</button>
+        </form>
       </div>
+
+      {loadError && (
+        <Notice type="error">
+          {loadError}{" "}
+          <button type="button" onClick={fetchReviews} style={{ background: "none", border: 0, padding: 0, color: "#2271b1", textDecoration: "underline", cursor: "pointer" }}>Try again</button>
+        </Notice>
+      )}
 
       {pagination.totalPages > 1 && (
         <div className="wp-toolbar">
@@ -596,6 +646,7 @@ export default function AdminReviewsPage() {
                   type="checkbox"
                   aria-label="Select all reviews"
                   checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
                   onChange={toggleSelectAll}
                 />
               </th>
@@ -607,9 +658,15 @@ export default function AdminReviewsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="wp-muted">Loading reviews…</td></tr>
+              [0, 1, 2].map(i => (
+                <tr key={i}><td colSpan={5}><Skeleton height={18} width={i === 1 ? "60%" : "85%"} /></td></tr>
+              ))
             ) : reviews.length === 0 ? (
-              <tr><td colSpan={5} className="wp-muted">No reviews found.</td></tr>
+              <tr><td colSpan={5} className="wp-muted">
+                {searchQuery || ratingFilter || dateFrom || dateTo
+                  ? "No reviews match your filters."
+                  : statusFilter === "Trash" ? "No reviews in the Trash." : "No reviews found."}
+              </td></tr>
             ) : (
               reviews.map(review => {
                 const isSelected = selectedIds.includes(review._id);
@@ -815,11 +872,16 @@ export default function AdminReviewsPage() {
                           />
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
                             <button type="button" onClick={() => handleInlineReplySubmit(review._id)} className="wp-btn wp-btn-primary">
-                              Submit Reply
+                              {review.replies?.length ? "Update Reply" : "Submit Reply"}
                             </button>
                             <button type="button" onClick={() => setReplyingId(null)} className="wp-btn">
                               Cancel
                             </button>
+                            {review.replies?.length > 0 && (
+                              <button type="button" onClick={() => handleInlineReplySubmit(review._id, true)} className="wp-btn" style={{ color: "#b32d2e", borderColor: "#b32d2e" }}>
+                                Remove Reply
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}

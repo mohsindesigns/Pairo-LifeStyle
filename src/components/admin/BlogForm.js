@@ -17,7 +17,13 @@ export default function BlogForm({ blogId }) {
    const { showConfirm } = usePopup();
    const [loading, setLoading] = useState(blogId ? true : false);
    const [saving, setSaving] = useState(false);
-   const [activeFormTab, setActiveFormTab] = useState("content");
+   const [busy, setBusy] = useState(false);
+   // ?tab=seo opens the SEO tab directly
+   const [activeFormTab, setActiveFormTab] = useState(() => {
+      if (typeof window === "undefined") return "content";
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      return tab === "seo" ? "seo" : "content";
+   });
    const [editSlug, setEditSlug] = useState(false);
    const [editorMode, setEditorMode] = useState("visual");
    const [formData, setFormData] = useState({
@@ -138,15 +144,72 @@ export default function BlogForm({ blogId }) {
       }
    };
 
-   useEffect(() => {
-      if (typeof window !== 'undefined') {
-         const params = new URLSearchParams(window.location.search);
-         const tab = params.get("tab");
-         if (tab && (tab === "content" || tab === "seo")) {
-            setActiveFormTab(tab);
+   // A trashed post can be restored (its previous status comes back) or deleted for good
+   const handleRestore = async () => {
+      if (!blogId) return;
+      setBusy(true);
+      try {
+         const res = await fetch("/api/admin/blogs", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: blogId, isDeleted: false })
+         });
+         const data = await res.json().catch(() => ({}));
+         if (res.ok) {
+            setFormData(prev => ({ ...prev, isDeleted: false, status: data?.status || prev.status }));
+            toast.success("Post restored from the Trash.");
+         } else {
+            toast.error(data?.error || "Failed to restore the post.");
          }
+      } catch (err) {
+         console.error(err);
+         toast.error("Failed to restore the post.");
+      } finally {
+         setBusy(false);
       }
-   }, []);
+   };
+
+   const handlePermanentDelete = async () => {
+      if (!blogId) return;
+      if (!(await showConfirm(`Permanently delete "${formData.title}"? This cannot be undone.`, "Delete Permanently", { confirmText: "Delete Permanently", danger: true }))) return;
+      setBusy(true);
+      try {
+         const res = await fetch(`/api/admin/blogs?id=${blogId}&permanent=true`, { method: "DELETE" });
+         if (res.ok) {
+            toast.success("Post permanently deleted.");
+            router.push("/admin/blogs");
+         } else {
+            const data = await res.json().catch(() => ({}));
+            toast.error(data?.error || "Failed to delete the post.");
+         }
+      } catch (err) {
+         console.error(err);
+         toast.error("Failed to delete the post.");
+      } finally {
+         setBusy(false);
+      }
+   };
+
+   const handleDuplicate = async () => {
+      if (!blogId) return;
+      setBusy(true);
+      try {
+         const res = await fetch(`/api/admin/blogs/${blogId}/duplicate`, { method: "POST" });
+         const data = await res.json().catch(() => ({}));
+         if (res.ok && data?._id) {
+            toast.success("Post duplicated as a draft. Unsaved changes here were not copied.");
+            router.push(`/admin/blogs/${data._id}`);
+         } else {
+            toast.error(data?.error || "Failed to duplicate the post.");
+         }
+      } catch (err) {
+         console.error(err);
+         toast.error("Failed to duplicate the post.");
+      } finally {
+         setBusy(false);
+      }
+   };
+
 
    // overrides: fields forced for this save only (e.g. "Save Draft" forces status Draft)
    const handleSubmit = async (e, overrides = null) => {
@@ -157,7 +220,6 @@ export default function BlogForm({ blogId }) {
          // Strip immutable Mongoose fields that cause _id update errors
          const { _id, __v, createdAt, updatedAt, ...cleanData } = overrides ? { ...formData, ...overrides } : formData;
          const payload = blogId ? { ...cleanData, id: blogId } : cleanData;
-         console.log("[BlogForm] Submitting seo:", payload.seo);
          const res = await fetch("/api/admin/blogs", {
             method,
             headers: { "Content-Type": "application/json" },
@@ -168,14 +230,13 @@ export default function BlogForm({ blogId }) {
             if (overrides) setFormData(prev => ({ ...prev, ...overrides }));
             toast.success(overrides?.status === "Draft"
                ? "Draft saved."
-               : (blogId ? "Blog post updated successfully!" : "Blog post created successfully!"));
+               : (blogId ? "Post updated." : "Post published."));
             if (!blogId && savedBlog._id) {
                router.push(`/admin/blogs/${savedBlog._id}`);
             }
          } else {
             const errData = await res.json().catch(() => ({}));
             toast.error(`Save failed: ${errData.error || res.statusText || "Unknown error"}`);
-            console.error("[BlogForm] Save failed:", errData);
          }
       } catch (err) {
          console.error(err);
@@ -207,18 +268,12 @@ export default function BlogForm({ blogId }) {
                       >
                          Retry Connection / Reload
                       </button>
-                      <a
-                         href="/admin-login"
-                         className="wp-btn"
-                      >
+                      <Link href="/admin-login" className="wp-btn">
                          Log In to Admin Panel
-                      </a>
-                      <a
-                         href="/admin/blogs"
-                         className="wp-link"
-                      >
+                      </Link>
+                      <Link href="/admin/blogs" className="wp-link">
                          ← Back to Blogs List
-                      </a>
+                      </Link>
                    </div>
                 </div>
              </div>
@@ -234,9 +289,18 @@ export default function BlogForm({ blogId }) {
     <Page>
       <PageHeader
          title={blogId ? "Edit Post" : "Add New Post"}
-         actions={<Link href="/admin/blogs/new" className="wp-btn">Add New Post</Link>}
+         actions={blogId ? <Link href="/admin/blogs/new" className="wp-btn">Add New Post</Link> : null}
       />
-         <form onSubmit={handleSubmit} className="wp-cols">
+      {blogId && formData.isDeleted && (
+         <div className="wp-notice wp-notice-warning" role="status">
+            <p>
+               This post is in the Trash and is not shown on the site.{" "}
+               <button type="button" onClick={handleRestore} disabled={busy} className="wp-link" style={{ ...linkBtnStyle, textDecoration: "underline" }}>Restore it</button>
+            </p>
+         </div>
+      )}
+         {/* New posts: the primary button publishes. Existing posts: it saves with the chosen status. */}
+         <form onSubmit={(e) => handleSubmit(e, blogId ? null : { status: "Published" })} className="wp-cols">
             {/* Main Column */}
             <div className="wp-col-main">
                <div style={{ marginBottom: 20 }}>
@@ -252,17 +316,21 @@ export default function BlogForm({ blogId }) {
                   <div className="wp-small flex flex-wrap items-center gap-1.5 min-w-0" style={{ marginTop: 8, color: "#3c434a", wordBreak: "break-all" }}>
                      <span className="wp-strong">Permalink:</span>
                      <span className="wp-muted">pairo.store/blog/</span>
-                     <label htmlFor="blog-slug-input" className="sr-only">Permalink slug</label>
-                     <input
-                        id="blog-slug-input"
-                        readOnly={!editSlug}
-                        className={editSlug ? "wp-input" : undefined}
-                        style={editSlug
-                           ? { minHeight: 28, minWidth: 140, maxWidth: "100%" }
-                           : { border: 0, background: "transparent", pointerEvents: "none", padding: 0, color: "#1d2327", fontWeight: 600, minWidth: 0, maxWidth: "100%", width: `${Math.min(220, Math.max(60, (formData.slug || "").length * 8.5))}px` }}
-                        value={formData.slug}
-                        onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                     />
+                     {editSlug ? (
+                        <>
+                           <label htmlFor="blog-slug-input" className="sr-only">Permalink slug</label>
+                           <input
+                              id="blog-slug-input"
+                              className="wp-input"
+                              style={{ minHeight: 28, minWidth: 140, maxWidth: "100%" }}
+                              value={formData.slug}
+                              onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                           />
+                        </>
+                     ) : (
+                        // Shown as text so long slugs wrap instead of being cut off
+                        <span className="wp-strong" style={{ color: "#1d2327", minWidth: 0, wordBreak: "break-all" }}>{formData.slug || "—"}</span>
+                     )}
                      {!editSlug ? (
                         <button
                            type="button"
@@ -528,7 +596,15 @@ export default function BlogForm({ blogId }) {
                   </div>
                   <div className="wp-box-foot">
                      {blogId ? (
-                        <button type="button" onClick={handleTrash} style={dangerLinkStyle}>Move to Trash</button>
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                           {formData.isDeleted ? (
+                              <button type="button" onClick={handlePermanentDelete} disabled={busy} style={dangerLinkStyle}>Delete Permanently</button>
+                           ) : (
+                              <button type="button" onClick={handleTrash} disabled={busy} style={dangerLinkStyle}>Move to Trash</button>
+                           )}
+                           <span aria-hidden="true" style={{ color: "#a7aaad" }}>|</span>
+                           <button type="button" onClick={handleDuplicate} disabled={busy} style={{ ...linkBtnStyle, textDecoration: "underline" }}>Duplicate</button>
+                        </span>
                      ) : null}
                      <span className="wp-spacer" />
                      <button
@@ -537,7 +613,7 @@ export default function BlogForm({ blogId }) {
                         className="wp-btn wp-btn-primary"
                         style={{ minHeight: 36 }}
                      >
-                        {saving ? "Publishing..." : (blogId ? "Update" : "Publish")}
+                        {saving ? "Saving…" : (blogId ? "Update" : "Publish")}
                      </button>
                   </div>
                </section>

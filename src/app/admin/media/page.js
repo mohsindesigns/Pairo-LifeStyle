@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Search, LayoutGrid, List, Upload, Trash2, RotateCcw,
-  X, Check, Loader2, Image as ImageIcon, AlertTriangle, ChevronLeft, ChevronRight
+  X, Check, Loader2, Image as ImageIcon, ChevronLeft, ChevronRight
 } from "lucide-react";
-import { Page, PageHeader } from "@/components/admin/ui";
+import { Page, PageHeader, Notice } from "@/components/admin/ui";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
@@ -26,15 +26,29 @@ export default function AdminMedia() {
   const [detailItem, setDetailItem] = useState(null);
   const [editItem, setEditItem]     = useState(null);
   const [saving, setSaving]         = useState(false);
+  const [bulkBusy, setBulkBusy]     = useState(false);
   const [uploading, setUploading]   = useState(false);
   const [dragOver, setDragOver]     = useState(false);
   const [copied, setCopied]         = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [counts, setCounts]         = useState({ library: 0, trash: 0 });
+  const [loadError, setLoadError]   = useState("");
   const fileInputRef = useRef(null);
   const searchTimeout = useRef(null);
 
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/media?counts=true&_t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCounts({ library: data.library || 0, trash: data.trash || 0 });
+      }
+    } catch (e) { console.error(e); }
+  }, []);
+
   const fetchMedia = useCallback(async (q, t = "library") => {
     setLoading(true);
+    setLoadError("");
+    fetchCounts();
     try {
       const params = new URLSearchParams({
         search: q.search || "", page: String(q.page || 1), limit: "30", trash: (t === "trash").toString(),
@@ -42,13 +56,18 @@ export default function AdminMedia() {
       });
       const res = await fetch(`/api/admin/media?${params}`);
       const data = await res.json();
-      if (data.success) { setItems(data.items); setPagination(data.pagination); }
-    } catch (e) { console.error(e); }
+      if (res.ok && data.success) { setItems(data.items); setPagination(data.pagination); }
+      else { setItems([]); setLoadError(data?.error || "Failed to load media."); }
+    } catch (e) {
+      console.error(e);
+      setItems([]);
+      setLoadError("Failed to load media. Check your connection and try again.");
+    }
     finally { setLoading(false); }
-  }, []);
+  }, [fetchCounts]);
 
   useEffect(() => {
-    fetchMedia(query, tab);
+    Promise.resolve().then(() => fetchMedia(query, tab));
   }, [tab, query, fetchMedia]);
 
   // Re-fetch the current view (same type, sort, search and page)
@@ -62,6 +81,13 @@ export default function AdminMedia() {
     setSelected(new Set());
     setDetailItem(null);
     setTab(t);
+  };
+
+  // Search button / Enter: search immediately instead of waiting for the debounce
+  const submitSearch = (e) => {
+    e.preventDefault();
+    clearTimeout(searchTimeout.current);
+    setQuery(q => ({ ...q, search, page: 1 }));
   };
 
   const handleSearch = (val) => {
@@ -93,8 +119,10 @@ export default function AdminMedia() {
     Array.from(files).forEach(f => formData.append("file", f));
     try {
       const res = await fetch("/api/admin/media/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => ({}));
+      const uploaded = data?.uploaded?.length ?? data?.count ?? 0;
+      if (res.ok && data.success) {
+        if (uploaded) toast.success(`${uploaded} file${uploaded === 1 ? "" : "s"} uploaded.`);
         clearTimeout(searchTimeout.current);
         setSearch("");
         setSelected(new Set());
@@ -104,7 +132,14 @@ export default function AdminMedia() {
         setTab("library");
       }
       if (data.errors?.length) toast.error(data.errors.map(e => `${e.file}: ${e.error}`).join('\n'));
-    } finally { setUploading(false); }
+      else if (!res.ok || !data.success) toast.error(data?.error || "Upload failed.");
+    } catch (e) {
+      console.error(e);
+      toast.error("Upload failed. Check your connection and try again.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const saveMetadata = async () => {
@@ -116,17 +151,31 @@ export default function AdminMedia() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: editItem.title, altText: editItem.altText, caption: editItem.caption, tags: editItem.tags }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
         setItems(prev => prev.map(i => i._id === editItem._id ? data.media : i));
         setDetailItem(data.media);
         setEditItem({ ...data.media });
+        toast.success("Media details saved.");
+      } else {
+        toast.error(data?.error || "Failed to save media details.");
       }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to save media details.");
     } finally { setSaving(false); }
   };
 
+  const usageNote = (item) =>
+    item?.usageCount > 0 ? ` It is recorded as used in ${item.usageCount} place${item.usageCount === 1 ? "" : "s"}.` : "";
+
   const softDelete = async (id) => {
-    const ok = await showConfirm("Are you sure you want to move this file to trash?");
+    const item = items.find(i => i._id === id) || detailItem;
+    const ok = await showConfirm(
+      `Move this file to the Trash?${usageNote(item)} The file stays available until it is deleted permanently, so pages using it keep working.`,
+      "Move to Trash",
+      { confirmText: "Move to Trash" }
+    );
     if (!ok) return;
     const previousItems = items;
     setItems(prev => prev.filter(item => item._id !== id));
@@ -151,16 +200,21 @@ export default function AdminMedia() {
     });
   };
 
-  // Confirmation is the in-page "Permanently Delete?" dialog (deleteConfirm) — no second prompt here.
   const permanentDelete = async (id) => {
+    const item = items.find(i => i._id === id) || detailItem;
+    const ok = await showConfirm(
+      `Permanently delete "${item?.filename || "this file"}"? The file is erased from storage and this cannot be undone.${item?.usageCount > 0 ? ` It is recorded as used in ${item.usageCount} place${item.usageCount === 1 ? "" : "s"}; those image fields will be cleared.` : ""}`,
+      "Delete Permanently",
+      { confirmText: "Delete Permanently", danger: true }
+    );
+    if (!ok) return;
     const previousItems = items;
     setItems(prev => prev.filter(item => item._id !== id));
     setDetailItem(null);
-    setDeleteConfirm(null);
 
     const promise = fetch(`/api/admin/media/${id}?permanent=true`, { method: "DELETE" })
       .then(async (res) => {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(data.error || "Failed to delete file permanently.");
         }
@@ -207,29 +261,45 @@ export default function AdminMedia() {
     });
   };
 
-  const bulkSoftDelete = async () => {
+  // Bulk actions: Library -> Move to Trash; Trash -> Restore / Delete permanently
+  const runBulk = async (kind) => {
     const ids = [...selected];
-    if (ids.length === 0) return;
-    const ok = await showConfirm(
-      `Move ${ids.length} file${ids.length === 1 ? "" : "s"} to trash?`,
-      "Move to Trash",
-      { confirmText: "Move to Trash", danger: true }
-    );
-    if (!ok) return;
-    const results = await Promise.all(ids.map(async (id) => {
-      try {
-        const res = await fetch(`/api/admin/media/${id}`, { method: "DELETE" });
-        return res.ok;
-      } catch { return false; }
-    }));
+    if (ids.length === 0) { toast.error("Select at least one file."); return; }
+    const n = `${ids.length} file${ids.length === 1 ? "" : "s"}`;
+    const cfg = {
+      trash:     { msg: `Move ${n} to the Trash?`, title: "Move to Trash", opts: { confirmText: "Move to Trash" }, done: "moved to the Trash",
+                   req: (id) => fetch(`/api/admin/media/${id}`, { method: "DELETE" }) },
+      restore:   { msg: null, done: "restored",
+                   req: (id) => fetch(`/api/admin/media/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restore: true }) }) },
+      permanent: { msg: `Permanently delete ${n}? The files are erased from storage and this cannot be undone. Image fields that still point to them will be cleared.`, title: "Delete Permanently", opts: { confirmText: "Delete Permanently", danger: true }, done: "deleted permanently",
+                   req: (id) => fetch(`/api/admin/media/${id}?permanent=true`, { method: "DELETE" }) },
+    }[kind];
+    if (cfg.msg && !(await showConfirm(cfg.msg, cfg.title, cfg.opts))) return;
+    setBulkBusy(true);
+    const results = [];
+    for (const id of ids) {
+      try { results.push((await cfg.req(id)).ok); } catch { results.push(false); }
+    }
+    setBulkBusy(false);
     const succeeded = results.filter(Boolean).length;
     const failed = results.length - succeeded;
     // Keep failed items selected so they can be retried
     setSelected(new Set(ids.filter((_, i) => !results[i])));
     if (failed === 0) setBulkMode(false);
     reload();
-    if (succeeded) toast.success(`${succeeded} file${succeeded === 1 ? "" : "s"} moved to trash.`);
-    if (failed) toast.error(`${failed} file${failed === 1 ? "" : "s"} could not be moved to trash.`);
+    if (failed === 0) toast.success(`${succeeded} file${succeeded === 1 ? "" : "s"} ${cfg.done}.`);
+    else toast.error(`${succeeded} ${cfg.done}, ${failed} failed.`);
+  };
+
+  const pageIds = items.map(i => i._id);
+  const allOnPageSelected = pageIds.length > 0 && pageIds.every(id => selected.has(id));
+  const toggleSelectPage = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (allOnPageSelected) pageIds.forEach(id => next.delete(id));
+      else pageIds.forEach(id => next.add(id));
+      return next;
+    });
   };
 
   const copyUrl = async (url) => {
@@ -258,7 +328,7 @@ export default function AdminMedia() {
           <label className="wp-btn" style={{ cursor: uploading ? "default" : "pointer" }}>
             <Upload className="w-4 h-4" aria-hidden="true" />
             {uploading ? "Uploading..." : "Add New Media File"}
-            <input type="file" multiple accept="image/*" className="hidden" onChange={e => handleFiles(e.target.files)} disabled={uploading} />
+            <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={e => handleFiles(e.target.files)} disabled={uploading} />
           </label>
         }
       />
@@ -266,11 +336,11 @@ export default function AdminMedia() {
       {/* ── Library / Trash ── */}
       <div className="wp-subsub" role="tablist" aria-label="Media views">
         <button type="button" role="tab" aria-selected={tab === "library"} className={tab === "library" ? "is-current" : undefined} onClick={() => changeTab("library")}>
-          All media <span className="wp-count">({tab === "library" ? (pagination.total || 0) : "-"})</span>
+          All media <span className="wp-count">({counts.library})</span>
         </button>
         <span className="wp-sep" aria-hidden="true">|</span>
         <button type="button" role="tab" aria-selected={tab === "trash"} className={tab === "trash" ? "is-current" : undefined} onClick={() => changeTab("trash")}>
-          Trash {tab === "trash" && <span className="wp-count">({pagination.total || 0})</span>}
+          Trash <span className="wp-count">({counts.trash})</span>
         </button>
       </div>
 
@@ -310,21 +380,44 @@ export default function AdminMedia() {
           {bulkMode ? `Cancel bulk select (${selected.size})` : "Bulk select"}
         </button>
 
-        {bulkMode && selected.size > 0 && (
-          <button type="button" onClick={bulkSoftDelete} className="wp-btn" style={{ color: "#b32d2e", borderColor: "#b32d2e" }}>
-            <Trash2 className="w-4 h-4" aria-hidden="true" /> Move to Trash
+        {bulkMode && items.length > 0 && (
+          <button type="button" onClick={toggleSelectPage} className="wp-btn">
+            {allOnPageSelected ? "Deselect page" : "Select page"}
           </button>
         )}
 
+        {bulkMode && selected.size > 0 && (tab === "trash" ? (
+          <>
+            <button type="button" onClick={() => runBulk("restore")} disabled={bulkBusy} className="wp-btn">
+              <RotateCcw className="w-4 h-4" aria-hidden="true" /> Restore
+            </button>
+            <button type="button" onClick={() => runBulk("permanent")} disabled={bulkBusy} className="wp-btn" style={{ color: "#b32d2e", borderColor: "#b32d2e" }}>
+              <Trash2 className="w-4 h-4" aria-hidden="true" /> Delete permanently
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={() => runBulk("trash")} disabled={bulkBusy} className="wp-btn" style={{ color: "#b32d2e", borderColor: "#b32d2e" }}>
+            <Trash2 className="w-4 h-4" aria-hidden="true" /> Move to Trash
+          </button>
+        ))}
+
         <span className="wp-spacer" />
 
-        <div className="wp-search" role="search">
+        <form className="wp-search" role="search" onSubmit={submitSearch}>
           <label htmlFor="media-search" className="sr-only">Search media</label>
           <Search className="w-4 h-4 wp-hide-sm" aria-hidden="true" style={{ color: "#8c8f94" }} />
           <input id="media-search" type="search" value={search} onChange={e => handleSearch(e.target.value)}
             placeholder="Search media items..." className="wp-input" />
-        </div>
+          <button type="submit" className="wp-btn">Search</button>
+        </form>
       </div>
+
+      {loadError && (
+        <Notice type="error">
+          {loadError}{" "}
+          <button type="button" onClick={reload} style={{ background: "none", border: 0, padding: 0, color: "#2271b1", textDecoration: "underline", cursor: "pointer" }}>Try again</button>
+        </Notice>
+      )}
 
       {/* ── Library Content ── */}
       <div
@@ -463,6 +556,21 @@ export default function AdminMedia() {
                   <p style={{ margin: 0 }}><span className="wp-muted">Uploaded on:</span> {new Date(detailItem.createdAt).toLocaleDateString()}</p>
                   {detailItem.width && <p style={{ margin: 0 }}><span className="wp-muted">Dimensions:</span> {detailItem.width} by {detailItem.height} pixels</p>}
                   {detailItem.fileSize && <p style={{ margin: 0 }}><span className="wp-muted">File size:</span> {(detailItem.fileSize/1024).toFixed(0)} KB</p>}
+                  <p style={{ margin: 0 }}>
+                    <span className="wp-muted">Used in:</span>{" "}
+                    {detailItem.usageCount > 0 ? `${detailItem.usageCount} place${detailItem.usageCount === 1 ? "" : "s"}` : "Not recorded as used"}
+                  </p>
+                  {detailItem.usageRefs?.length > 0 && (
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                      {detailItem.usageRefs.slice(0, 5).map((r, i) => (
+                        <li key={i} style={{ wordBreak: "break-word" }}>{r.label || `${r.entityType} — ${r.fieldName}`}</li>
+                      ))}
+                      {detailItem.usageRefs.length > 5 && <li className="wp-muted">and {detailItem.usageRefs.length - 5} more</li>}
+                    </ul>
+                  )}
+                  {detailItem.isDeleted && detailItem.deletedAt && (
+                    <p style={{ margin: 0 }}><span className="wp-muted">Trashed on:</span> {new Date(detailItem.deletedAt).toLocaleDateString()}</p>
+                  )}
                 </div>
 
                 {/* Editable Fields */}
@@ -505,20 +613,14 @@ export default function AdminMedia() {
                       <button type="button" onClick={() => restore(detailItem._id)} className="wp-btn">
                         <RotateCcw className="w-4 h-4" aria-hidden="true" /> Restore
                       </button>
-                      <button type="button" onClick={() => setDeleteConfirm(detailItem._id)} style={{ background: "none", border: 0, padding: 0, color: "#b32d2e", textDecoration: "underline", cursor: "pointer", minHeight: 30 }}>
+                      <button type="button" onClick={() => permanentDelete(detailItem._id)} style={{ background: "none", border: 0, padding: 0, color: "#b32d2e", textDecoration: "underline", cursor: "pointer", minHeight: 30 }}>
                         Delete permanently
                       </button>
                     </>
                   ) : (
-                    <>
-                      <button type="button" onClick={() => softDelete(detailItem._id)} style={{ background: "none", border: 0, padding: 0, color: "#b32d2e", textDecoration: "underline", cursor: "pointer", minHeight: 30 }}>
-                        Move to Trash
-                      </button>
-                      <span aria-hidden="true" style={{ color: "#a7aaad" }}>|</span>
-                      <button type="button" onClick={() => setDeleteConfirm(detailItem._id)} style={{ background: "none", border: 0, padding: 0, color: "#b32d2e", textDecoration: "underline", cursor: "pointer", minHeight: 30 }}>
-                        Delete permanently
-                      </button>
-                    </>
+                    <button type="button" onClick={() => softDelete(detailItem._id)} style={{ background: "none", border: 0, padding: 0, color: "#b32d2e", textDecoration: "underline", cursor: "pointer", minHeight: 30 }}>
+                      Move to Trash
+                    </button>
                   )}
                 </div>
               </div>
@@ -535,25 +637,6 @@ export default function AdminMedia() {
         </div>
       )}
 
-      {/* ── Permanent Delete Confirmation Modal ── */}
-      {deleteConfirm && (
-        <div className="wp-modal-backdrop" style={{ zIndex: 600 }}>
-          <div className="wp-modal" role="alertdialog" aria-modal="true" aria-labelledby="media-delete-title" aria-describedby="media-delete-desc" style={{ maxWidth: 440 }}>
-            <div className="wp-modal-head">
-              <h2 id="media-delete-title" className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5" aria-hidden="true" style={{ color: "#d63638" }} /> Permanently Delete?
-              </h2>
-            </div>
-            <div className="wp-modal-body">
-              <p id="media-delete-desc" style={{ margin: 0 }}>This file will be erased from Cloudinary forever. This action <strong style={{ color: "#b32d2e" }}>cannot be undone</strong>.</p>
-            </div>
-            <div className="wp-modal-foot">
-              <button type="button" onClick={() => setDeleteConfirm(null)} className="wp-btn">Cancel</button>
-              <button type="button" onClick={() => permanentDelete(deleteConfirm)} className="wp-btn wp-btn-primary" style={{ background: "#d63638", borderColor: "#d63638" }}>Delete Forever</button>
-            </div>
-          </div>
-        </div>
-      )}
     </Page>
     </RequirePermission>
   );

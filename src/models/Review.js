@@ -41,7 +41,8 @@ const ReviewSchema = new mongoose.Schema({
   spamScore: { type: Number, default: 0 },
   fingerprint: { type: String, index: true },
   shadowBanned: { type: Boolean, default: false, index: true },
-  isDeleted: { type: Boolean, default: false, index: true } // Soft delete support
+  isDeleted: { type: Boolean, default: false, index: true }, // Soft delete support
+  deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 // Compound unique index: prevent duplicate reviews for the same product in the same order
