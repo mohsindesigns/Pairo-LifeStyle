@@ -6,6 +6,7 @@ import ShippingMethod from '@/models/ShippingMethod';
 import { getServerSession } from 'next-auth';
 import { authOptions }      from '@/app/api/auth/[...nextauth]/route';
 import { can }              from '@/lib/rbac';
+import { normalizeMethodSettings } from '@/app/admin/settings/shipping/methodSettings';
 
 async function requireSettings() {
   const session = await getServerSession(authOptions);
@@ -41,7 +42,9 @@ export async function POST(req, { params }) {
     const { name, description, provider, settings, conditions, status, sortOrder, activeFrom, activeUntil } = body;
     if (!name?.trim()) return NextResponse.json({ error: 'Method name is required.' }, { status: 400 });
     if (!provider) return NextResponse.json({ error: 'Provider is required.' }, { status: 400 });
-    const method = await ShippingMethod.create({ zoneId, name: name.trim(), description: description ?? '', provider, settings: settings ?? {}, conditions: conditions ?? [], status: status ?? 'Active', sortOrder: sortOrder ?? 0, activeFrom: activeFrom || null, activeUntil: activeUntil || null });
+    const normalized = normalizeMethodSettings(provider, settings);
+    if (normalized.error) return NextResponse.json({ error: normalized.error }, { status: 400 });
+    const method = await ShippingMethod.create({ zoneId, name: name.trim(), description: description ?? '', provider, settings: normalized.settings, conditions: conditions ?? [], status: status ?? 'Active', sortOrder: sortOrder ?? 0, activeFrom: activeFrom || null, activeUntil: activeUntil || null });
     return NextResponse.json({ success: true, method }, { status: 201 });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -60,9 +63,12 @@ export async function PUT(req, { params }) {
     const { id, name, description, provider, settings, conditions, status, sortOrder, activeFrom, activeUntil } = body;
     if (!id) return NextResponse.json({ error: 'Method id is required.' }, { status: 400 });
     if (!name?.trim()) return NextResponse.json({ error: 'Method name is required.' }, { status: 400 });
+    // Only touch settings when the client sent them (undefined is left out of $set).
+    const normalized = settings === undefined ? { settings: undefined } : normalizeMethodSettings(provider, settings);
+    if (normalized.error) return NextResponse.json({ error: normalized.error }, { status: 400 });
     const method = await ShippingMethod.findOneAndUpdate(
       { _id: id, zoneId },
-      { $set: { name: name.trim(), description, provider, settings, conditions, status, sortOrder, activeFrom: activeFrom || null, activeUntil: activeUntil || null } },
+      { $set: { name: name.trim(), description, provider, settings: normalized.settings, conditions, status, sortOrder, activeFrom: activeFrom || null, activeUntil: activeUntil || null } },
       { new: true, runValidators: true }
     );
     if (!method) return NextResponse.json({ error: 'Method not found.' }, { status: 404 });

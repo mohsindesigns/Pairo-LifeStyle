@@ -62,15 +62,17 @@ function SettingsRow({ label, htmlFor, hint: hintText, children }) {
 }
 
 // ─── WordPress Style Toggle (switch) ───────────────────────────────────────────
-function Toggle({ on, onChange, label }) {
+function Toggle({ on, onChange, label, disabled = false }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
+      aria-busy={disabled || undefined}
       onClick={onChange}
-      className="inline-flex items-center min-h-[40px] bg-transparent border-0 p-0 cursor-pointer"
+      disabled={disabled}
+      className={`inline-flex items-center min-h-[40px] bg-transparent border-0 p-0 ${disabled ? "cursor-wait opacity-60" : "cursor-pointer"}`}
     >
       <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${on ? "bg-[#2271b1]" : "bg-[#8c8f94]"}`}>
         <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on ? "translate-x-6" : "translate-x-1"}`} />
@@ -123,6 +125,17 @@ function ClassNameEditor({ name, onRename }) {
   );
 }
 
+// Serialises everything the "Save changes" button persists, except `enabled`
+// (the switch saves that on its own), so it can be compared for dirtiness.
+function snapshotOf(s) {
+  return JSON.stringify({
+    calculationMethod: s.calculationMethod,
+    taxRoundingMode: s.taxRoundingMode,
+    priceDisplaySuffix: s.priceDisplaySuffix,
+    taxClasses: s.taxClasses,
+  });
+}
+
 function slugify(name) {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-+|-+$)/g, "") || "class";
 }
@@ -132,6 +145,10 @@ export default function TaxSettingsPage() {
   const [activeClassKey, setActiveClassKey] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [togglingTaxes, setTogglingTaxes] = useState(false);
+  // Last state confirmed by the server (minus `enabled`, which the switch saves
+  // on its own) — used to tell whether the form has unsaved edits.
+  const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [addingClass, setAddingClass] = useState(false);
   const [newClassName, setNewClassName] = useState("");
   const fileInputRef = useRef(null);
@@ -145,6 +162,7 @@ export default function TaxSettingsPage() {
         const data = await res.json();
         if (data.success && data.settings) {
           setSettings({ ...defaultSettings, ...data.settings });
+          setSavedSnapshot(snapshotOf({ ...defaultSettings, ...data.settings }));
           setActiveClassKey(data.settings.taxClasses?.[0]?.key ?? null);
         } else {
           toast.error(data.error || "Failed to load tax settings.");
@@ -157,6 +175,7 @@ export default function TaxSettingsPage() {
     })();
   }, []);
 
+  const isDirty = savedSnapshot !== null && snapshotOf(settings) !== savedSnapshot;
   const set = (k, v) => setSettings((p) => ({ ...p, [k]: v }));
   const activeClass = settings.taxClasses.find((c) => c.key === activeClassKey) || settings.taxClasses[0] || null;
 
@@ -223,6 +242,7 @@ export default function TaxSettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
       setSettings({ ...defaultSettings, ...data.settings });
+      setSavedSnapshot(snapshotOf({ ...defaultSettings, ...data.settings }));
       if (!data.settings.taxClasses?.some((c) => c.key === activeClassKey)) {
         setActiveClassKey(data.settings.taxClasses?.[0]?.key ?? null);
       }
@@ -287,37 +307,48 @@ export default function TaxSettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import failed.");
       setSettings({ ...defaultSettings, ...data.settings });
+      setSavedSnapshot(snapshotOf({ ...defaultSettings, ...data.settings }));
       toast.success(`Imported ${data.imported} rate row(s).`);
     } catch (err) {
       toast.error(err.message);
     }
   };
 
+  // Saves ONLY the enabled flag (PATCH) — any unsaved class/rate/option edits
+  // stay local and unsaved. Reverts the switch if the request fails.
   const handleToggleTaxes = async () => {
-    const nextVal = !settings.enabled;
+    if (togglingTaxes) return;
+    const prevVal = settings.enabled;
+    const nextVal = !prevVal;
+    setTogglingTaxes(true);
     set("enabled", nextVal);
     try {
       const res = await fetch("/api/admin/tax", {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...settings, enabled: nextVal }),
+        body: JSON.stringify({ enabled: nextVal }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update tax status.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to update tax status.");
       toast.success(nextVal ? "Tax module enabled." : "Tax module disabled.");
     } catch (e) {
+      set("enabled", prevVal);
       toast.error(e.message || "Failed to update tax status.");
+    } finally {
+      setTogglingTaxes(false);
     }
   };
 
   if (loading) {
     return (
+      <RequirePermission permission="settings.view">
       <Page>
         <PageHeader title="Tax" />
         <p className="wp-muted flex items-center gap-2 py-6">
           <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />Loading tax settings…
         </p>
       </Page>
+      </RequirePermission>
     );
   }
 
@@ -333,7 +364,7 @@ export default function TaxSettingsPage() {
         <div className="wp-inside" style={{ paddingTop: 4, paddingBottom: 4 }}>
           <SettingsRow label="Enable taxes" hint="Enable tax rates and calculations on the storefront cart and checkout pages. This switch saves immediately.">
             <div className="flex items-center gap-3">
-              <Toggle on={settings.enabled} onChange={handleToggleTaxes} label="Enable taxes" />
+              <Toggle on={settings.enabled} onChange={handleToggleTaxes} label="Enable taxes" disabled={togglingTaxes} />
               <span className={settings.enabled ? "wp-strong" : "wp-muted"}>{settings.enabled ? "Active" : "Inactive"}</span>
             </div>
           </SettingsRow>
@@ -541,13 +572,15 @@ export default function TaxSettingsPage() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || togglingTaxes}
           className="wp-btn wp-btn-primary"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Save className="w-4 h-4" aria-hidden="true" />}
           {saving ? "Saving changes…" : "Save changes"}
         </button>
-        <span className="wp-muted wp-small">Make sure to save changes for settings to take effect.</span>
+        <span className={isDirty ? "wp-strong wp-small" : "wp-muted wp-small"}>
+          {isDirty ? "You have unsaved changes." : "Make sure to save changes for settings to take effect."}
+        </span>
       </div>
     </Page>
     </RequirePermission>

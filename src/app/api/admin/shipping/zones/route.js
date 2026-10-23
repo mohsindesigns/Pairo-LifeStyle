@@ -42,13 +42,21 @@ export async function GET(req) {
     await ensureCatchAllZone();
 
     const zones = await ShippingZone.find().sort({ sortOrder: 1 }).lean();
+    // One aggregate for every zone's method count + a light summary (name,
+    // status, provider) so the list can show method pills without an N+1.
     const counts = await ShippingMethod.aggregate([
-      { $group: { _id: '$zoneId', count: { $sum: 1 } } }
+      { $sort: { sortOrder: 1 } },
+      { $group: {
+        _id: '$zoneId',
+        count: { $sum: 1 },
+        methods: { $push: { _id: '$_id', name: '$name', status: '$status', provider: '$provider' } },
+      } }
     ]);
-    const countMap = Object.fromEntries(counts.map(c => [c._id.toString(), c.count]));
+    const countMap = Object.fromEntries(counts.map(c => [String(c._id), c]));
     const result = zones.map(z => ({
       ...z,
-      methodCount: countMap[z._id.toString()] ?? 0,
+      methodCount: countMap[z._id.toString()]?.count ?? 0,
+      methodSummary: countMap[z._id.toString()]?.methods ?? [],
       isCatchAll: (z.matchRules?.length ?? 0) === 0,
     }));
     return NextResponse.json({ success: true, zones: result });

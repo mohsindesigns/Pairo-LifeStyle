@@ -10,6 +10,7 @@ import { Page, PageHeader, Notice } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import { COUNTRIES, countryName } from "@/lib/countries";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { normalizeMethodSettings } from "./methodSettings";
 
 // ─── Shared WordPress input styles ─────────────────────────────────────────────
 const inp  = "wp-input wp-full";
@@ -268,23 +269,23 @@ function ProviderSettings({ provider, settings, onChange }) {
 
   if (provider === "FLAT_RATE") return (
     <FRow label={<>Shipping cost ($) <span className="text-[#d63638]">*</span></>} htmlFor="method-cost">
-      <input id="method-cost" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.cost ?? ""} onChange={e => s("cost", Number(e.target.value))} placeholder="e.g. 10" />
+      <input id="method-cost" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.cost ?? ""} onChange={e => s("cost", e.target.value)} placeholder="e.g. 10" required aria-required="true" />
     </FRow>
   );
   if (provider === "FREE_SHIPPING") return (
     <>
-      <FRow label="Minimum order amount ($)" htmlFor="method-min" hint="Leave 0 to always offer free shipping.">
-        <input id="method-min" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.minimumOrderAmount ?? ""} onChange={e => s("minimumOrderAmount", Number(e.target.value))} placeholder="0 = always free" />
+      <FRow label="Minimum order amount ($)" htmlFor="method-min" hint="Leave blank (or 0) to always offer free shipping.">
+        <input id="method-min" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.minimumOrderAmount ?? ""} onChange={e => s("minimumOrderAmount", e.target.value)} placeholder="Blank = always free" />
       </FRow>
       <FRow label="Fallback cost ($)" htmlFor="method-fallback">
-        <input id="method-fallback" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.fallbackCost ?? ""} onChange={e => s("fallbackCost", Number(e.target.value))} placeholder="Charged if minimum not met" />
+        <input id="method-fallback" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.fallbackCost ?? ""} onChange={e => s("fallbackCost", e.target.value)} placeholder="Charged if minimum not met" />
       </FRow>
     </>
   );
   if (provider === "LOCAL_PICKUP") return (
     <>
       <FRow label="Handling fee ($)" htmlFor="method-fee" hint="Usually 0. This is an optional admin/preparation charge.">
-        <input id="method-fee" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.cost ?? ""} onChange={e => s("cost", Number(e.target.value))} placeholder="0" />
+        <input id="method-fee" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.cost ?? ""} onChange={e => s("cost", e.target.value)} placeholder="0" />
       </FRow>
       <FRow label="Pickup location" htmlFor="method-pickup">
         <select id="method-pickup" className={sel} value={settings.pickupLocationId ?? ""} onChange={e => s("pickupLocationId", e.target.value || null)} disabled={loadingLocations}>
@@ -317,12 +318,14 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
 
   const save = async () => {
     if (!m.name?.trim()) return toast.error("Method name is required.");
+    const normalized = normalizeMethodSettings(m.provider, m.settings);
+    if (normalized.error) return toast.error(normalized.error);
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/shipping/zones/${zoneId}/methods`, {
         method: m._id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...m, id: m._id }),
+        body: JSON.stringify({ ...m, settings: normalized.settings, id: m._id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save.");
@@ -412,12 +415,12 @@ function StatusPill({ status }) {
 }
 
 // ─── Zone row(s) in the zones table ────────────────────────────────────────────
-function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabled }) {
+function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabled, onMoveUp, onMoveDown, moveDisabled }) {
   const { showConfirm } = usePopup();
   const [zone, setZone]               = useState(initZone);
   const [methods, setMethods]         = useState([]);
   const [hasLoaded, setHasLoaded]     = useState(false);
-  const [expanded, setExpanded]       = useState(true);
+  const [expanded, setExpanded]       = useState(false);
   const [loadingMethods, setLM]       = useState(false);
   const [showMethodModal, setSMM]     = useState(false);
   const [editingMethod, setEM]        = useState(null);
@@ -440,18 +443,16 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
     finally { setLM(false); }
   }, [zone._id]);
 
-  useEffect(() => {
-    let active = true;
-    Promise.resolve().then(() => {
-      if (active) loadMethods();
-    });
-    return () => { active = false; };
-  }, [loadMethods]);
+  // Methods are fetched the first time the zone is expanded, then cached
+  // (mutations below refresh the cache).
+  const expand = () => {
+    setExpanded(true);
+    if (!hasLoaded && !loadingMethods) loadMethods();
+  };
 
   const toggle = () => {
-    const next = !expanded;
-    setExpanded(next);
-    if (next) loadMethods();
+    if (expanded) setExpanded(false);
+    else expand();
   };
 
   const saveZone = async () => {
@@ -474,7 +475,8 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
     setDM(mid);
     try {
       const res = await fetch(`/api/admin/shipping/zones/${zone._id}/methods?id=${mid}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Delete failed (HTTP ${res.status}).`);
       await loadMethods();
       toast.success("Method deleted.");
     } catch (e) { toast.error(e.message); }
@@ -483,6 +485,8 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
 
   const providerLabel = { FLAT_RATE: "Flat Rate", FREE_SHIPPING: "Free Shipping", LOCAL_PICKUP: "Local Pickup" };
   const displayCount = hasLoaded ? methods.length : (initZone.methodCount ?? 0);
+  // Before the methods are loaded, show the summary the zones list returns.
+  const pillMethods = hasLoaded ? methods : (initZone.methodSummary || []);
   const chips = regionChips(zone.matchRules);
   const zid = zone._id;
 
@@ -495,7 +499,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
           <button
             type="button"
             className="wp-row-title bg-transparent border-0 p-0 cursor-pointer text-left"
-            onClick={() => { setForm(zone); setEditing(p => !p); setExpanded(true); }}
+            onClick={() => { setForm(zone); setEditing(p => !p); expand(); }}
             aria-expanded={editing}
           >
             {zone.name}
@@ -513,7 +517,7 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
             {chips.length ? chips.join(", ") : "Everywhere (catch-all)"} · {displayCount} method{displayCount !== 1 ? "s" : ""} · {zone.status}
           </div>
           <div className="wp-row-actions">
-            <span><button type="button" onClick={() => { setForm(zone); setEditing(p => !p); setExpanded(true); }} className="max-[782px]:min-h-[40px]" title="Edit zone">Edit</button></span>
+            <span><button type="button" onClick={() => { setForm(zone); setEditing(p => !p); expand(); }} className="max-[782px]:min-h-[40px]" title="Edit zone">Edit</button></span>
             <span>
               {deleteDisabled ? (
                 <span
@@ -526,6 +530,16 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
                 <button type="button" onClick={() => onDelete(zone._id)} className="is-danger max-[782px]:min-h-[40px]" title="Delete zone">Delete</button>
               )}
             </span>
+            {onMoveUp && (
+              <span>
+                <button type="button" onClick={onMoveUp} disabled={moveDisabled} className="max-[782px]:min-h-[40px]" aria-label={`Move ${zone.name} up`}>Move up</button>
+              </span>
+            )}
+            {onMoveDown && (
+              <span>
+                <button type="button" onClick={onMoveDown} disabled={moveDisabled} className="max-[782px]:min-h-[40px]" aria-label={`Move ${zone.name} down`}>Move down</button>
+              </span>
+            )}
             <span>
               <button type="button" onClick={toggle} className="inline-flex items-center gap-1 max-[782px]:min-h-[40px]" aria-expanded={expanded}>
                 {expanded ? <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />}
@@ -544,9 +558,9 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, dragHandle, deleteDisabl
           )}
         </td>
         <td className="wp-hide-sm">
-          {hasLoaded && methods.length > 0 ? (
+          {pillMethods.length > 0 ? (
             <div className="flex flex-wrap gap-1">
-              {methods.map(m => (
+              {pillMethods.map(m => (
                 <span key={m._id} className={`wp-pill wp-pill-sm ${m.status === "Active" ? "" : "opacity-60"}`} title={providerLabel[m.provider]}>{m.name}</span>
               ))}
             </div>
@@ -864,6 +878,7 @@ export default function ShippingSettingsPage() {
           ...z,
           isCatchAll: (z.matchRules?.length ?? 0) === 0,
           methodCount: byId[z._id]?.methodCount ?? 0,
+          methodSummary: byId[z._id]?.methodSummary ?? [],
         }));
       });
     } catch (e) {
@@ -882,6 +897,17 @@ export default function ShippingSettingsPage() {
     setZones(next);
     persistOrder(next);
     setDragIndex(null);
+  };
+
+  // Keyboard/touch alternative to drag — same persistence call.
+  const moveZone = (index, delta) => {
+    const target = index + delta;
+    if (reordering || target < 0 || target >= zones.length) return;
+    const next = [...zones];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved);
+    setZones(next);
+    persistOrder(next);
   };
 
   const catchAllCount = zones.filter(z => z.isCatchAll).length;
@@ -928,7 +954,7 @@ export default function ShippingSettingsPage() {
           <p className="wp-muted" style={{ margin: "0 0 10px", maxWidth: 900 }}>
             A shipping zone is a geographic region where a certain set of shipping methods are offered.
             During checkout, the matching engine looks for the most specific geographical match.
-            Drag zones by their handle to reorder them. Every store keeps exactly one catch-all zone
+            Drag zones by their handle (or use Move up / Move down) to reorder them. Every store keeps exactly one catch-all zone
             that matches any address not covered elsewhere.
           </p>
 
@@ -975,6 +1001,9 @@ export default function ShippingSettingsPage() {
                     onDelete={handleDelete}
                     onUpdate={updated => setZones(p => p.map(z => z._id === updated._id ? { ...z, ...updated } : z))}
                     deleteDisabled={zone.isCatchAll && catchAllCount <= 1}
+                    onMoveUp={index > 0 ? () => moveZone(index, -1) : undefined}
+                    onMoveDown={index < zones.length - 1 ? () => moveZone(index, 1) : undefined}
+                    moveDisabled={reordering}
                     dragHandle={
                       <span
                         draggable
