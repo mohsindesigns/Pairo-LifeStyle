@@ -58,7 +58,7 @@ import dynamic from "next/dynamic";
 import { SECTION_SCHEMAS } from "@/lib/section-schemas";
 import { TEMPLATE_REGISTRY } from "@/lib/templates";
 import MediaPickerModal from "./MediaPickerModal";
-import AdminPageLayout from "./AdminPageLayout";
+import { Page, PageHeader } from "./ui";
 import SEOConfigPanel from "./SEOConfigPanel";
 import * as LucideIcons from "lucide-react";
 
@@ -104,22 +104,21 @@ const IconPicker = ({ value, onChange }) => {
    }, [search, allIconNames]);
 
    return (
-      <div className="flex flex-col gap-2 border border-[#c3c4c7] bg-[#f6f7f7] p-2">
-         <div className="flex items-center gap-3 p-2 bg-white border border-[#c3c4c7]">
-            <div className="w-10 h-10 shrink-0 bg-gray-50 border border-gray-100 flex items-center justify-center text-[#2271b1]">
-               <Icon className="w-6 h-6" />
+      <div className="flex flex-col gap-2 border border-[#dcdcde] bg-[#f6f7f7] p-2">
+         <div className="flex items-center gap-2">
+            <div className="w-10 h-10 shrink-0 bg-white border border-[#dcdcde] flex items-center justify-center text-[#2271b1]" title={value || "No icon selected"}>
+               <Icon className="w-5 h-5" aria-hidden="true" />
             </div>
-            <div className="flex-1 min-w-0">
-               <input
-                  type="text"
-                  placeholder="Search icons..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full text-[13px] border-none p-0 focus:ring-0 placeholder:text-[#646970] font-medium"
-               />
-            </div>
+            <input
+               type="search"
+               aria-label="Search icons"
+               placeholder="Search icons..."
+               value={search}
+               onChange={(e) => setSearch(e.target.value)}
+               className="wp-input flex-1 min-w-0"
+            />
          </div>
-         <div className="grid grid-cols-5 xs:grid-cols-7 gap-1 p-1 max-h-[140px] overflow-y-auto bg-white border border-[#c3c4c7]">
+         <div className="grid grid-cols-6 sm:grid-cols-8 gap-1 p-1 max-h-[160px] overflow-y-auto bg-white border border-[#dcdcde]">
             {filteredIcons.map(iconName => {
                const ItemIcon = LucideIcons[iconName];
                if (!ItemIcon) return null;
@@ -128,9 +127,12 @@ const IconPicker = ({ value, onChange }) => {
                      key={iconName}
                      type="button"
                      onClick={() => onChange(iconName)}
-                     className={`p-2 flex items-center justify-center rounded-sm transition-all ${value === iconName ? 'bg-[#2271b1] text-white' : 'bg-white hover:bg-gray-100 text-[#646970]'}`}
+                     aria-label={iconName}
+                     aria-pressed={value === iconName}
+                     title={iconName}
+                     className={`min-h-[40px] flex items-center justify-center ${value === iconName ? 'bg-[#2271b1] text-white' : 'bg-white hover:bg-[#f0f0f1] text-[#3c434a]'}`}
                   >
-                     <ItemIcon className="w-4 h-4" />
+                     <ItemIcon className="w-4 h-4" aria-hidden="true" />
                   </button>
                );
             })}
@@ -162,49 +164,49 @@ const SectionMetaBox = ({
    };
 
    return (
-      <div ref={setNodeRef} style={style} className={`bg-white border border-[#c3c4c7] mb-3 shadow-sm ${!section.enabled ? 'opacity-60' : ''}`}>
-         <div className="px-2 sm:px-3 py-2 border-b border-[#c3c4c7] flex items-center justify-between gap-1 bg-[#f6f7f7] hover:bg-white transition-colors">
-            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-               <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-[#2271b1] shrink-0">
-                  <GripVertical className="w-4 h-4" />
+      <div ref={setNodeRef} style={style} className={`bg-white border border-[#c3c4c7] mb-2 ${!section.enabled ? 'opacity-60' : ''}`}>
+         <div className={`flex items-center justify-between gap-1 px-1 sm:px-2 bg-white ${isExpanded ? 'border-b border-[#dcdcde]' : ''}`}>
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+               <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing min-w-[36px] min-h-[40px] flex items-center justify-center text-[#8c8f94] hover:text-[#2271b1] shrink-0" title="Drag to reorder">
+                  <GripVertical className="w-4 h-4" aria-hidden="true" />
                </div>
-               <div className="flex flex-wrap items-center gap-2 select-none cursor-pointer min-w-0" onClick={() => onToggleExpand(section.id)}>
-                  <h3 className="text-[13px] font-bold text-gray-700 break-words">{schema.name}</h3>
-                  {!section.enabled && <span className="text-[9px] bg-gray-200 px-1.5 py-0.5 rounded uppercase font-black">Hidden</span>}
+               <div className="flex flex-wrap items-center gap-2 select-none cursor-pointer min-w-0 py-2" onClick={() => onToggleExpand(section.id)}>
+                  <h3 className="text-[14px] font-semibold text-[#1d2327] break-words m-0">{schema.name}</h3>
+                  {!section.enabled && <span className="wp-pill wp-pill-sm wp-st-draft">Hidden</span>}
                </div>
             </div>
 
-            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-               <button type="button" onClick={() => onUpdate(section.id, null, !section.enabled)} className={`p-1.5 rounded hover:bg-gray-100 ${section.enabled ? 'text-green-600' : 'text-gray-400'}`}>
-                  {section.enabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            <div className="flex items-center shrink-0">
+               <button type="button" onClick={() => onUpdate(section.id, null, !section.enabled)} aria-label={section.enabled ? `Hide ${schema.name} section` : `Show ${schema.name} section`} title={section.enabled ? "Hide section" : "Show section"} className={`min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] ${section.enabled ? 'text-[#00a32a]' : 'text-[#8c8f94]'}`}>
+                  {section.enabled ? <Eye className="w-4 h-4" aria-hidden="true" /> : <EyeOff className="w-4 h-4" aria-hidden="true" />}
                </button>
-               <button type="button" onClick={() => onDuplicate(section)} className="p-1.5 rounded hover:bg-gray-100 text-[#2271b1]">
-                  <Copy className="w-3.5 h-3.5" />
+               <button type="button" onClick={() => onDuplicate(section)} aria-label={`Duplicate ${schema.name} section`} title="Duplicate section" className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#2271b1]">
+                  <Copy className="w-4 h-4" aria-hidden="true" />
                </button>
-               <button type="button" onClick={() => onDelete(section.id)} className="p-1.5 rounded hover:bg-red-50 text-[#d63638]">
-                  <Trash2 className="w-3.5 h-3.5" />
+               <button type="button" onClick={() => onDelete(section.id)} aria-label={`Delete ${schema.name} section`} title="Delete section" className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#fcf0f1] text-[#d63638]">
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
                </button>
-               <button type="button" onClick={() => onToggleExpand(section.id)} className="p-1.5 rounded hover:bg-gray-100 text-gray-500">
-                  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+               <button type="button" onClick={() => onToggleExpand(section.id)} aria-expanded={!!isExpanded} aria-label={isExpanded ? `Collapse ${schema.name} section` : `Expand ${schema.name} section`} className="min-w-[36px] min-h-[40px] flex items-center justify-center hover:bg-[#f0f0f1] text-[#646970]">
+                  {isExpanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
                </button>
             </div>
          </div>
 
          {isExpanded && (
-            <div className="p-3 sm:p-5 bg-white space-y-4 sm:space-y-6">
+            <div className="p-3 sm:p-4 bg-white">
                {schema.fields.filter(field => {
                    if (!field.dependsOn) return true;
                    const val = config[field.dependsOn] !== undefined ? config[field.dependsOn] : (field.dependsOn === 'showType' ? 'collection' : undefined);
                    return val === field.visibleIf;
                 }).map((field) => (
-                  <div key={field.name} className="space-y-1.5">
-                     <label className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{field.label}</label>
+                  <div key={field.name} className="wp-field">
+                     <label className="wp-label">{field.label}</label>
                      {renderField(field, config[field.name], (val) => onUpdate(section.id, { [field.name]: val }), onOpenMediaPicker)}
                   </div>
                ))}
-               <div className="pt-3 border-t border-gray-100 flex flex-wrap justify-between items-center gap-1 opacity-30 text-[9px] font-mono">
-                  <span className="break-all">TYPE: {section.type}</span>
-                  <span>ID: {section.id.slice(0, 8)}</span>
+               <div className="pt-2 mt-2 border-t border-[#f0f0f1] flex flex-wrap justify-between items-center gap-1 wp-muted wp-small">
+                  <span className="break-all">Type: <code>{section.type}</code></span>
+                  <span>ID: <code>{section.id.slice(0, 8)}</code></span>
                </div>
             </div>
          )}
@@ -400,7 +402,7 @@ export default function PageForm({ pageId }) {
    };
 
    const renderField = (field, value, onChange, onOpenMediaPicker) => {
-      const inputClass = "w-full border border-[#c3c4c7] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white transition-all shadow-inner";
+      const inputClass = "wp-input wp-full";
 
       switch (field.type) {
          case "text":
@@ -422,31 +424,33 @@ export default function PageForm({ pageId }) {
                />
             );
          case "textarea":
-            return <textarea rows={3} value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} resize-none`} />;
+            return <textarea rows={3} value={value || ""} onChange={(e) => onChange(e.target.value)} className="wp-textarea wp-full" />;
          case "image":
             return (
                <div className="flex flex-col gap-2">
-                  <div className="flex flex-col xs:flex-row gap-2">
-                     <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${inputClass} min-w-0`} placeholder="URL or Pick Asset..." />
-                     <button type="button" onClick={() => onOpenMediaPicker(onChange)} className="h-9 px-4 bg-white border border-[#c3c4c7] text-[12px] font-bold hover:bg-[#f6f7f7] shrink-0 w-full xs:w-auto">Select Image</button>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                     <input type="text" value={value || ""} onChange={(e) => onChange(e.target.value)} className="wp-input flex-1 min-w-0" placeholder="Image URL" aria-label="Image URL" />
+                     <button type="button" onClick={() => onOpenMediaPicker(onChange)} className="wp-btn shrink-0">Select Image</button>
                   </div>
                   {value ? (
-                     <div
-                        className="w-32 aspect-square border-2 border-dashed border-gray-200 rounded bg-gray-50 overflow-hidden cursor-pointer hover:border-[#2271b1] transition-all group relative"
+                     <button
+                        type="button"
+                        aria-label="Change image"
+                        title="Change image"
+                        className="w-32 aspect-square border border-[#dcdcde] bg-[#f6f7f7] overflow-hidden cursor-pointer hover:border-[#2271b1] p-0"
                         onClick={() => onOpenMediaPicker(onChange)}
                      >
-                        <img src={value} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                           <span className="bg-black/60 text-white text-[9px] px-2 py-1 rounded font-bold">CHANGE</span>
-                        </div>
-                     </div>
+                        <img src={value} alt="" className="w-full h-full object-cover" />
+                     </button>
                   ) : (
-                     <div
-                        className="w-32 aspect-square border-2 border-dashed border-gray-200 rounded bg-gray-50 flex items-center justify-center cursor-pointer hover:border-[#2271b1] text-gray-400"
+                     <button
+                        type="button"
+                        aria-label="Select image"
+                        className="w-32 aspect-square border border-dashed border-[#c3c4c7] bg-[#f6f7f7] flex items-center justify-center cursor-pointer hover:border-[#2271b1] text-[#646970] p-0"
                         onClick={() => onOpenMediaPicker(onChange)}
                      >
-                        <Plus className="w-5 h-5" />
-                     </div>
+                        <Plus className="w-5 h-5" aria-hidden="true" />
+                     </button>
                   )}
                </div>
             );
@@ -454,7 +458,7 @@ export default function PageForm({ pageId }) {
             return <IconPicker value={value} onChange={onChange} />;
          case "select":
             return (
-               <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+               <select value={value || ""} onChange={(e) => onChange(e.target.value)} className="wp-select wp-full">
                   <option value="">— Select —</option>
                   {(field.options === 'categories' ? dynamicOptions.categories :
                      field.options === 'products' ? dynamicOptions.products :
@@ -471,13 +475,12 @@ export default function PageForm({ pageId }) {
                field.options === 'blogs' ? dynamicOptions.blogs :
                Array.isArray(field.options) ? field.options : [];
             return (
-               <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto p-3 border border-[#c3c4c7] bg-white shadow-inner">
-                  {msOpts.length === 0 && <span className="text-[11px] text-gray-400 italic p-2">No options available</span>}
+               <div className="wp-checklist" style={{ maxHeight: 200, overflowY: "auto" }}>
+                  {msOpts.length === 0 && <span className="wp-muted">No options available</span>}
                   {msOpts.map(opt => (
-                     <label key={opt.value} className="flex items-center gap-2.5 text-[13px] hover:bg-[#f0f6fa] px-2 py-1.5 cursor-pointer transition-colors rounded">
+                     <label key={opt.value} className="wp-check">
                         <input
                            type="checkbox"
-                           className="rounded-sm border-gray-300 text-[#2271b1] focus:ring-[#2271b1]"
                            checked={selected.some(v => String(v) === String(opt.value))}
                            onChange={(e) => onChange(
                               e.target.checked
@@ -494,24 +497,24 @@ export default function PageForm({ pageId }) {
          case "repeater":
             const items = value || [];
             return (
-               <div className="space-y-3 bg-[#f6f7f7] p-2 sm:p-4 border border-[#c3c4c7]">
+               <div className="flex flex-col gap-2 bg-[#f6f7f7] p-2 sm:p-3 border border-[#dcdcde]">
                   {items.map((item, index) => (
-                     <div key={index} className="bg-white border border-[#c3c4c7] p-3 sm:p-4 relative shadow-sm">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f0f0f1] pb-2 mb-4">
-                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Item {index + 1}</span>
-                           <button type="button" onClick={() => { const n = [...items]; n.splice(index, 1); onChange(n); }} className="text-[#d63638] text-[11px] font-bold hover:underline">Remove</button>
+                     <div key={index} className="bg-white border border-[#dcdcde]">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f0f0f1] px-3 py-2 bg-[#f6f7f7]">
+                           <span className="wp-strong">Item {index + 1}</span>
+                           <button type="button" onClick={() => { const n = [...items]; n.splice(index, 1); onChange(n); }} className="text-[#d63638] underline min-h-[32px]" style={{ background: "none", border: 0, cursor: "pointer" }}>Remove</button>
                         </div>
-                        <div className="grid grid-cols-1 gap-5">
+                        <div className="p-3">
                            {field.fields.map(sf => (
-                              <div key={sf.name} className="space-y-1.5">
-                                 <label className="text-[11px] font-bold text-gray-400 uppercase">{sf.label}</label>
+                              <div key={sf.name} className="wp-field">
+                                 <label className="wp-label">{sf.label}</label>
                                  {renderField(sf, item[sf.name], (v) => { const n = [...items]; n[index] = { ...item, [sf.name]: v }; onChange(n); }, onOpenMediaPicker)}
                               </div>
                            ))}
                         </div>
                      </div>
                   ))}
-                  <button type="button" onClick={() => onChange([...items, {}])} className="w-full py-2 bg-white border border-[#c3c4c7] text-[#2271b1] text-[11px] font-bold uppercase hover:bg-[#f6f7f7] transition-all">+ Add Item</button>
+                  <button type="button" onClick={() => onChange([...items, {}])} className="wp-btn self-start"><Plus className="w-4 h-4" aria-hidden="true" /> Add Item</button>
                </div>
             );
          case "quill":
@@ -539,188 +542,163 @@ export default function PageForm({ pageId }) {
       }
    };
 
-   if (loading) return <div className="p-4 sm:p-10 text-[13px] font-medium text-gray-500 bg-[#f0f2f1] min-h-screen">Loading WordPress-style editor...</div>;
+   if (loading) return (
+      <Page>
+         <PageHeader title={pageId === "new" ? "Add New Page" : "Edit Page"} />
+         <p className="wp-muted" role="status">Loading page editor…</p>
+      </Page>
+   );
 
    if (!page) {
       return (
-         <div className="p-4 sm:p-10 text-center bg-[#f0f2f1] min-h-screen flex flex-col items-center justify-center gap-4">
-            <div className="bg-white p-4 sm:p-8 border border-[#c3c4c7] max-w-md w-full text-left shadow-sm rounded-sm">
-               <h2 className="text-[#d63638] font-bold text-[16px] mb-2 flex items-center gap-2">
-                  Failed to load page data
-               </h2>
-               <p className="text-gray-600 text-[13px] mb-6 leading-relaxed">
-                  Your administrator session may have expired, or the page you are trying to edit does not exist. Please try logging back in.
+         <Page>
+            <PageHeader title="Edit Page" />
+            <div className="wp-notice wp-notice-error" role="alert">
+               <p>
+                  <strong>Failed to load page data.</strong> Your administrator session may have expired, or the page you are trying to edit does not exist. Please try logging back in.
                </p>
-               <div className="flex flex-col gap-2.5">
-                  <button
-                     type="button"
-                     onClick={() => window.location.reload()}
-                     className="w-full bg-[#2271b1] text-white px-4 py-2 text-[12px] font-bold hover:bg-[#135e96] transition-all text-center rounded-sm"
-                  >
-                     Retry Connection / Reload
-                  </button>
-                  <Link
-                     href="/admin-login"
-                     className="w-full border border-[#c3c4c7] text-gray-700 px-4 py-2 text-[12px] font-bold bg-[#f6f7f7] hover:bg-[#f0f0f1] transition-all text-center block rounded-sm"
-                  >
-                     Log In to Admin Panel
-                  </Link>
-                  <Link
-                     href="/admin/pages"
-                     className="w-full text-[#2271b1] text-[12px] hover:underline text-center mt-2 block"
-                  >
-                     ← Back to Pages List
-                  </Link>
-               </div>
             </div>
-         </div>
+            <div className="flex flex-wrap items-center gap-2">
+               <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="wp-btn wp-btn-primary"
+               >
+                  Retry Connection / Reload
+               </button>
+               <Link href="/admin-login" className="wp-btn">
+                  Log In to Admin Panel
+               </Link>
+               <Link href="/admin/pages" className="wp-link">
+                  ← Back to Pages List
+               </Link>
+            </div>
+         </Page>
       );
    }
 
+   const linkBtnStyle = { background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit" };
+
    return (
-      <AdminPageLayout
-         title="Edit Page"
-         addNewLink="/admin/pages/new"
-         addNewLabel="Add New"
-         breadcrumbs={[{ label: "Pages", href: "/admin/pages" }, { label: "Edit" }]}
-      >
-         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start pb-40 min-w-0">
+      <Page>
+         <PageHeader
+            title={pageId === "new" ? "Add New Page" : "Edit Page"}
+            actions={<Link href="/admin/pages/new" className="wp-btn">Add New</Link>}
+         />
+         <form onSubmit={handleSave} className="wp-cols" style={{ paddingBottom: 40 }}>
             {/* Main Column */}
-            <div className="lg:col-span-3 space-y-4 min-w-0">
-               <div className="space-y-1">
-                  <div className="flex flex-col items-start sm:flex-row sm:items-center gap-2">
-                     <input
-                        required
-                        placeholder="Enter title here"
-                        className="w-full min-w-0 border border-[#c3c4c7] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] rounded-lg outline-none px-4 py-2.5 text-[20px] bg-white shadow-sm font-semibold transition-all"
-                        value={page.title}
-                        onChange={(e) => {
-                           const val = e.target.value;
-                           if (pageId === "new") {
-                              const slug = val
-                                 .toLowerCase()
-                                 .replace(/[^a-z0-9]+/g, '-')
-                                 .replace(/(^-|-$)/g, '');
-                              setPage(prev => ({ ...prev, title: val, slug }));
-                           } else {
-                              setPage(prev => ({ ...prev, title: val }));
-                           }
-                        }}
-                     />
-                     {page.isSystem && <span className="bg-amber-100 text-amber-700 text-[9px] font-black uppercase px-2 py-1 rounded shrink-0 whitespace-nowrap">System Page</span>}
-                     {pageId === "new" ? (
-                        <div className="flex items-center gap-1.5 shrink-0 max-w-full bg-white border border-[#c3c4c7] px-2 py-1 rounded-[3px]">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-tight">Template:</span>
-                           <select
-                              value={page.template || "default"}
-                              onChange={(e) => {
-                                 const nextTemplate = e.target.value;
-                                 const templateConfig = TEMPLATE_REGISTRY[nextTemplate] || TEMPLATE_REGISTRY.default;
-                                 const defaultSecs = templateConfig.defaultSections ? templateConfig.defaultSections.map((s, i) => ({
-                                    id: generateId(),
-                                    type: s.type,
-                                    enabled: true,
-                                    order: i,
-                                    config: s.config || {}
-                                 })) : [];
-                                 setPage(prev => ({
-                                    ...prev,
-                                    template: nextTemplate,
-                                    sections: defaultSecs
-                                 }));
-                              }}
-                              className="text-[11px] font-bold text-[#2271b1] bg-transparent outline-none cursor-pointer border-none p-0 focus:ring-0 min-w-0"
-                           >
-                              <option value="default">Default Template</option>
-                              <option value="home">Homepage Template</option>
-                              <option value="about">About Page Template</option>
-                              <option value="contact">Contact Page Template</option>
-                           </select>
-                        </div>
-                     ) : (
-                        <span className="bg-blue-50 text-blue-700 text-[9px] font-black uppercase px-2 py-1 rounded select-none border border-blue-200 shrink-0 max-w-full break-words">
-                           Template: {TEMPLATE_REGISTRY[page.template || "default"]?.name || page.template || "Default"}
-                        </span>
-                     )}
-                  </div>
-                  <div className="text-[12px] text-gray-500 px-1 mt-1 flex flex-wrap items-center gap-1.5">
-                     Permalink: <span className="text-gray-400">pairo.store/</span>
+            <div className="wp-col-main">
+               <div style={{ marginBottom: 20 }}>
+                  <label htmlFor="page-title-input" className="sr-only">Page title</label>
+                  <input
+                     id="page-title-input"
+                     required
+                     placeholder="Enter title here"
+                     className="wp-title-input"
+                     value={page.title}
+                     onChange={(e) => {
+                        const val = e.target.value;
+                        if (pageId === "new") {
+                           const slug = val
+                              .toLowerCase()
+                              .replace(/[^a-z0-9]+/g, '-')
+                              .replace(/(^-|-$)/g, '');
+                           setPage(prev => ({ ...prev, title: val, slug }));
+                        } else {
+                           setPage(prev => ({ ...prev, title: val }));
+                        }
+                     }}
+                  />
+                  <div className="wp-small flex flex-wrap items-center gap-1.5 break-words" style={{ marginTop: 8, color: "#3c434a" }}>
+                     <span className="wp-strong">Permalink:</span>
+                     <span className="wp-muted break-all">pairo.store/</span>
                      {page.isSystem ? (
-                        <span className="font-mono text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                           {page.slug}
-                        </span>
+                        <>
+                           <span className="wp-strong break-all">{page.slug}</span>
+                           <span className="wp-muted">(system slug locked)</span>
+                        </>
                      ) : (
-                        <input className="border-b border-dashed border-[#2271b1]/30 bg-transparent outline-none text-[#2271b1] font-mono w-fit min-w-[50px] max-w-full focus:border-[#2271b1]" value={page.slug || ""} onChange={(e) => setPage({ ...page, slug: e.target.value })} />
-                     )}
-                     {page.isSystem && (
-                        <span className="text-[10px] text-gray-400 italic">(system slug locked)</span>
+                        <>
+                           <label htmlFor="page-slug-input" className="sr-only">Permalink slug</label>
+                           <input
+                              id="page-slug-input"
+                              className="wp-input"
+                              style={{ minWidth: 140, minHeight: 28, fontFamily: "monospace" }}
+                              value={page.slug || ""}
+                              onChange={(e) => setPage({ ...page, slug: e.target.value })}
+                           />
+                        </>
                      )}
                   </div>
                </div>
 
-                {/* Content / SEO Tabs */}
-                <div className="flex flex-wrap border-b border-[#ccd0d4] gap-x-4 sm:gap-x-6 gap-y-1 select-none pb-0">
-                   <button
-                      type="button"
-                      onClick={() => setActiveFormTab("content")}
-                      className={`pb-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[1px] cursor-pointer ${
-                         activeFormTab === "content"
-                            ? "border-[#2271b1] text-[#2271b1]"
-                            : "border-transparent text-gray-500 hover:text-black"
-                      }`}
-                   >
-                      Content Editor
-                   </button>
-                   <button
-                      type="button"
-                      onClick={() => setActiveFormTab("seo")}
-                      className={`pb-2.5 text-[14px] font-bold transition-all border-b-2 -mb-[1px] cursor-pointer ${
-                         activeFormTab === "seo"
-                            ? "border-[#2271b1] text-[#2271b1]"
-                            : "border-transparent text-gray-500 hover:text-black"
-                      }`}
-                   >
-                      SEO Settings
-                   </button>
-                </div>
+               {/* Content / SEO Tabs */}
+               <div className="wp-tabs" role="tablist" aria-label="Editor sections">
+                  <button
+                     type="button"
+                     role="tab"
+                     id="page-tab-content"
+                     aria-selected={activeFormTab === "content"}
+                     aria-controls="page-form-panel"
+                     onClick={() => setActiveFormTab("content")}
+                     className="wp-tab"
+                  >
+                     Content Editor
+                  </button>
+                  <button
+                     type="button"
+                     role="tab"
+                     id="page-tab-seo"
+                     aria-selected={activeFormTab === "seo"}
+                     aria-controls="page-form-panel"
+                     onClick={() => setActiveFormTab("seo")}
+                     className="wp-tab"
+                  >
+                     SEO Settings
+                  </button>
+               </div>
 
+               <div id="page-form-panel" role="tabpanel" aria-labelledby={activeFormTab === "seo" ? "page-tab-seo" : "page-tab-content"}>
                {activeFormTab === "content" ? (
                   /* Section Manager Meta Box */
-                  <div className="bg-white border border-[#c3c4c7] shadow-sm">
-                     <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-[13px] font-bold text-gray-700 uppercase tracking-tighter">Page Sections</span>
-                        <div className="relative group">
-                           <button type="button" className="text-[11px] font-bold text-[#2271b1] hover:text-black flex items-center gap-1 whitespace-nowrap">
-                              <Plus className="w-3.5 h-3.5" /> Add Section
-                           </button>
-                           <div className="absolute right-0 top-full mt-1 w-48 max-w-[calc(100vw-1rem)] bg-white border border-[#c3c4c7] shadow-xl z-50 hidden group-hover:block py-1">
-                              {Object.entries(SECTION_SCHEMAS)
-                                 .filter(([type]) => {
-                                    const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
-                                    return !templateConfig || !templateConfig.allowedSections || templateConfig.allowedSections.includes(type);
-                                 })
-                                 .map(([type, s]) => (
-                                    <button
-                                       key={type}
-                                       type="button"
-                                       onClick={() => {
-                                          const id = generateId();
-                                          const newSec = { id, type, enabled: true, order: page.sections.length, config: {} };
-                                          setPage({ ...page, sections: [...page.sections, newSec] });
-                                          setExpandedSectionId(id);
-                                       }}
-                                       className="w-full text-left px-4 py-1.5 text-[12px] hover:bg-[#2271b1] hover:text-white"
-                                    >
-                                       {s.name}
-                                    </button>
-                                 ))}
-                           </div>
+                  <section className="wp-postbox" aria-labelledby="page-sections-title">
+                     <div className="wp-postbox-head">
+                        <h2 id="page-sections-title">Page Sections</h2>
+                        <div className="wp-postbox-aside relative group">
+                              <button type="button" className="wp-btn" aria-haspopup="true">
+                                 <Plus className="w-4 h-4" aria-hidden="true" /> Add Section
+                              </button>
+                              <div className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto bg-white border border-[#c3c4c7] shadow-[0_3px_8px_rgba(0,0,0,0.15)] z-50 hidden group-hover:block group-focus-within:block py-1">
+                                 {Object.entries(SECTION_SCHEMAS)
+                                    .filter(([type]) => {
+                                       const templateConfig = TEMPLATE_REGISTRY[page.template || "default"];
+                                       return !templateConfig || !templateConfig.allowedSections || templateConfig.allowedSections.includes(type);
+                                    })
+                                    .map(([type, s]) => (
+                                       <button
+                                          key={type}
+                                          type="button"
+                                          onClick={() => {
+                                             const id = generateId();
+                                             const newSec = { id, type, enabled: true, order: page.sections.length, config: {} };
+                                             setPage({ ...page, sections: [...page.sections, newSec] });
+                                             setExpandedSectionId(id);
+                                          }}
+                                          className="w-full text-left px-3 min-h-[36px] text-[13px] text-[#1d2327] hover:bg-[#2271b1] hover:text-white focus:bg-[#2271b1] focus:text-white"
+                                       >
+                                          {s.name}
+                                       </button>
+                                    ))}
+                              </div>
                         </div>
                      </div>
-                     <div className="p-2 sm:p-4 bg-[#f0f2f1]/30">
+                     <div className="wp-inside" style={{ background: "#f6f7f7" }}>
+                        {page.sections.length === 0 && (
+                           <p className="wp-muted" style={{ margin: 0 }}>No sections yet. Use “Add Section” to start building this page.</p>
+                        )}
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                            <SortableContext items={page.sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                              <div className="space-y-1">
+                              <div>
                                  {page.sections.map((s) => (
                                     <SectionMetaBox
                                        key={s.id}
@@ -743,7 +721,7 @@ export default function PageForm({ pageId }) {
                            </SortableContext>
                         </DndContext>
                      </div>
-                  </div>
+                  </section>
                ) : (
                   <SEOConfigPanel
                      seo={page.seo || {}}
@@ -755,52 +733,99 @@ export default function PageForm({ pageId }) {
                      parentType="page"
                   />
                )}
+               </div>
             </div>
 
             {/* Sidebar */}
-            <div className="space-y-4 min-w-0">
-               <div className="bg-white border border-[#c3c4c7] shadow-sm rounded-[2px]">
-                  <div className="bg-[#f6f7f7] border-b border-[#c3c4c7] px-3 py-2 text-[13px] font-bold text-gray-700">Publish</div>
-                  <div className="p-3 space-y-4 text-[13px]">
-                     <div className="flex flex-wrap justify-between items-center gap-2">
-                        <button type="button" onClick={handleSave} className="border border-[#c3c4c7] px-3 py-1.5 rounded-[3px] bg-[#f6f7f7] hover:bg-[#f0f0f1] text-[12px] font-medium">Save Draft</button>
-                        <Link href={`/${page.slug}`} target="_blank" className="text-[#2271b1] underline">Preview</Link>
+            <div className="wp-col-side">
+               <section className="wp-postbox" aria-labelledby="page-publish-title">
+                  <div className="wp-postbox-head"><h2 id="page-publish-title">Publish</h2></div>
+                  <div className="flex flex-wrap justify-between items-center gap-2" style={{ padding: "10px 12px 2px" }}>
+                     <button type="button" onClick={handleSave} className="wp-btn">Save Draft</button>
+                     <Link href={`/${page.slug}`} target="_blank" className="wp-btn">Preview</Link>
+                  </div>
+                  <div className="wp-misc">
+                     <div className="wp-misc-row">
+                        <label htmlFor="page-status-select" className="wp-muted">Status:</label>
+                        <strong className="wp-strong">{page.status}</strong>
+                        <select
+                           id="page-status-select"
+                           className="wp-select"
+                           style={{ marginLeft: "auto" }}
+                           value={page.status}
+                           onChange={(e) => setPage({ ...page, status: e.target.value })}
+                        >
+                           <option value="Draft">Draft</option>
+                           <option value="Published">Published</option>
+                        </select>
                      </div>
-                     <div className="space-y-3 py-3 border-y border-gray-100">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                           <p><span className="text-gray-400">Status:</span> <strong>{page.status}</strong></p>
-                           <select
-                              className="text-[11px] border border-gray-200 rounded px-1 py-0.5 outline-none focus:border-[#2271b1] max-w-full"
-                              value={page.status}
-                              onChange={(e) => setPage({ ...page, status: e.target.value })}
-                           >
-                              <option value="Draft">Draft</option>
-                              <option value="Published">Published</option>
-                           </select>
-                        </div>
-                        <p><span className="text-gray-400">Last Modified:</span> <strong>{page.updatedAt ? new Date(page.updatedAt).toLocaleDateString() : "Not saved yet"}</strong></p>
+                     <div className="wp-misc-row">
+                        {pageId === "new" ? (
+                           <>
+                              <label htmlFor="page-template-select" className="wp-muted">Template:</label>
+                              <select
+                                 id="page-template-select"
+                                 className="wp-select"
+                                 style={{ marginLeft: "auto", maxWidth: "100%" }}
+                                 value={page.template || "default"}
+                                 onChange={(e) => {
+                                    const nextTemplate = e.target.value;
+                                    const templateConfig = TEMPLATE_REGISTRY[nextTemplate] || TEMPLATE_REGISTRY.default;
+                                    const defaultSecs = templateConfig.defaultSections ? templateConfig.defaultSections.map((s, i) => ({
+                                       id: generateId(),
+                                       type: s.type,
+                                       enabled: true,
+                                       order: i,
+                                       config: s.config || {}
+                                    })) : [];
+                                    setPage(prev => ({
+                                       ...prev,
+                                       template: nextTemplate,
+                                       sections: defaultSecs
+                                    }));
+                                 }}
+                              >
+                                 <option value="default">Default Template</option>
+                                 <option value="home">Homepage Template</option>
+                                 <option value="about">About Page Template</option>
+                                 <option value="contact">Contact Page Template</option>
+                              </select>
+                           </>
+                        ) : (
+                           <>
+                              <span className="wp-muted">Template:</span>
+                              <strong className="wp-strong break-words">{TEMPLATE_REGISTRY[page.template || "default"]?.name || page.template || "Default"}</strong>
+                           </>
+                        )}
                      </div>
-                     <div className="bg-[#f6f7f7] border-t border-[#c3c4c7] -mx-3 -mb-3 p-3 flex flex-wrap justify-between items-center gap-2">
-                        <div>
-                           {!page.isSystem && pageId !== "new" && (
-                              <button type="button" onClick={handleDelete} className="text-[#d63638] underline hover:text-red-800 transition-colors">
-                                 Delete Page
-                              </button>
-                           )}
+                     {page.isSystem && (
+                        <div className="wp-misc-row">
+                           <span className="wp-muted">Type:</span> <strong className="wp-strong">System page</strong>
                         </div>
-                        <button type="submit" disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold hover:bg-[#135e96]">
-                           {saving ? "Saving..." : "Update"}
-                        </button>
+                     )}
+                     <div className="wp-misc-row">
+                        <span className="wp-muted">Last Modified:</span>
+                        <strong className="wp-strong">{page.updatedAt ? new Date(page.updatedAt).toLocaleDateString() : "Not saved yet"}</strong>
                      </div>
                   </div>
-               </div>
-
+                  <div className="wp-box-foot">
+                     {!page.isSystem && pageId !== "new" && (
+                        <button type="button" onClick={handleDelete} style={{ ...linkBtnStyle, color: "#b32d2e", textDecoration: "underline" }}>
+                           Delete Page
+                        </button>
+                     )}
+                     <span className="wp-spacer" />
+                     <button type="submit" disabled={saving} className="wp-btn wp-btn-primary" style={{ minHeight: 36 }}>
+                        {saving ? "Saving..." : "Update"}
+                     </button>
+                  </div>
+               </section>
             </div>
          </form>
 
          {mediaPicker.open && (
             <MediaPickerModal open={true} onClose={() => setMediaPicker({ open: false, onSelect: null })} onSelect={(sel) => { mediaPicker.onSelect(sel.url); setMediaPicker({ open: false, onSelect: null }); }} title="Asset Library" />
          )}
-      </AdminPageLayout>
+      </Page>
    );
 }
