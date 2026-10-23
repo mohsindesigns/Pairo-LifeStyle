@@ -1,27 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { 
-  Search, 
-  Plus, 
-  Tag, 
-  Calendar, 
-  Clock, 
-  Play, 
-  Pause, 
-  Trash2, 
-  Copy, 
-  Edit, 
-  MoreVertical,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  AlertCircle,
-  Target,
-  DollarSign
-} from "lucide-react";
 import Link from "next/link";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
@@ -141,179 +122,171 @@ export default function PromotionsDashboard() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Active': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      case 'Paused': return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'Expired': return 'bg-rose-100 text-rose-700 border-rose-200';
-      case 'Draft': return 'bg-slate-100 text-slate-700 border-slate-200';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'Active': return 'wp-st-published';
+      case 'Paused': return 'wp-st-confirmed';
+      case 'Expired': return 'wp-st-cancelled';
+      case 'Draft': return 'wp-st-draft';
+      default: return '';
     }
   };
 
+  const scheduleText = (p) =>
+    `${p.startDate ? formatDate(p.startDate) : 'Always'} → ${p.endDate ? formatDate(p.endDate) : 'Indefinite'}`;
+
+  const headerRow = (
+    <tr>
+      <th scope="col" className="wp-check-col">
+        <input
+          type="checkbox"
+          aria-label="Select all promotions"
+          checked={selectedIds.length > 0 && selectedIds.length === filteredPromotions.length}
+          onChange={toggleSelectAll}
+        />
+      </th>
+      <th scope="col">Name</th>
+      <th scope="col">Status</th>
+      <th scope="col" className="wp-hide-sm">Applies to</th>
+      <th scope="col" className="wp-hide-sm">Schedule</th>
+      <th scope="col" className="wp-hide-sm">Usage</th>
+      <th scope="col" className="wp-hide-sm wp-num">Priority</th>
+    </tr>
+  );
+
   return (
     <RequirePermission permission="promotions.view">
-    <AdminPageLayout
-      title="Discounts & Coupons"
-      addNewLink="/admin/promotions/new"
-      addNewLabel="Create Discount"
-      breadcrumbs={[{ label: "Marketing", href: "#" }, { label: "Discounts" }]}
-    >
-      <div className="space-y-4 md:space-y-6">
-        {/* Performance Cards */}
-        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-            <div className="bg-white p-3 sm:p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
-                <div className="flex items-center justify-between">
-                    <span className="text-[12px] xs:text-[13px] text-[#646970] font-medium uppercase tracking-wider">Active Offers</span>
-                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                </div>
-                <div className="text-xl sm:text-2xl font-bold text-[#1d2327] mt-1">
-                    {promotions.filter(p => p.status === "Active").length}
-                </div>
-            </div>
-            <div className="bg-white p-3 sm:p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
-                <div className="flex items-center justify-between">
-                    <span className="text-[12px] xs:text-[13px] text-[#646970] font-medium uppercase tracking-wider">Total Usage</span>
-                    <Tag className="w-4 h-4 text-[#2271b1]" />
-                </div>
-                <div className="text-xl sm:text-2xl font-bold text-[#1d2327] mt-1">
-                    {promotions.reduce((acc, p) => acc + (p.analytics?.timesUsed || 0), 0)}
-                </div>
-            </div>
-            <div className="bg-white p-3 sm:p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
-                <div className="flex items-center justify-between">
-                    <span className="text-[12px] xs:text-[13px] text-[#646970] font-medium uppercase tracking-wider">Discount Distributed</span>
-                    <AlertCircle className="w-4 h-4 text-rose-500" />
-                </div>
-                <div className="text-xl sm:text-2xl font-bold text-[#1d2327] mt-1">
-                    ${promotions.reduce((acc, p) => acc + (p.analytics?.discountDistributed || 0), 0).toFixed(0)}
-                </div>
-            </div>
-            <div className="bg-white p-3 sm:p-4 border border-[#ccd0d4] shadow-sm rounded-sm">
-                <div className="flex items-center justify-between">
-                    <span className="text-[12px] xs:text-[13px] text-[#646970] font-medium uppercase tracking-wider">Revenue Generated</span>
-                    <DollarSign className="w-4 h-4 text-emerald-600" />
-                </div>
-                <div className="text-xl sm:text-2xl font-bold text-[#1d2327] mt-1">
-                    ${promotions.reduce((acc, p) => acc + (p.analytics?.revenueGenerated || 0), 0).toFixed(0)}
-                </div>
-            </div>
+    <Page>
+      <PageHeader
+        title="Discounts & Coupons"
+        actions={<Link href="/admin/promotions/new" className="wp-btn">Add new discount</Link>}
+      />
+
+      {/* Summary */}
+      <div className="wp-stats">
+        <div className="wp-stat">
+          <div className="wp-stat-label">Active offers</div>
+          <div className="wp-stat-value">{promotions.filter(p => p.status === "Active").length}</div>
         </div>
-
-        {/* View Tabs */}
-        <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
-           <li className={`${view === "all" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("all")}>
-              All <span className="text-[#646970] font-normal">({promotions.length})</span>
-           </li>
-           <span className="text-[#c3c4c7]">|</span>
-           <li className={`${view === "running" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("running")}>
-              Running <span className="text-[#646970] font-normal">({promotions.filter(p => p.status === "Active").length})</span>
-           </li>
-           <span className="text-[#c3c4c7]">|</span>
-           <li className={`${view === "paused" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("paused")}>
-              Paused <span className="text-[#646970] font-normal">({promotions.filter(p => p.adminStatus === "Paused").length})</span>
-           </li>
-        </ul>
-
-        {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 shadow-sm">
-           <div className="flex flex-wrap items-center gap-1.5 xs:gap-2">
-              <select className="min-w-0 border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none max-w-full" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
-                 <option>Bulk actions</option>
-                 <option>Duplicate</option>
-                 <option>Move to Trash</option>
-                 <option>Delete Permanently</option>
-              </select>
-              <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
-           </div>
-
-           <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto min-w-0">
-              <input 
-                type="text" 
-                placeholder="Search campaigns..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
-              />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shrink-0 whitespace-nowrap">Search</button>
-           </div>
+        <div className="wp-stat">
+          <div className="wp-stat-label">Total usage</div>
+          <div className="wp-stat-value">{promotions.reduce((acc, p) => acc + (p.analytics?.timesUsed || 0), 0)}</div>
         </div>
-
-        {/* Data Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
-          <table className="w-full text-left border-collapse table-fixed min-w-[560px] md:min-w-[760px] lg:min-w-[1000px] text-[13px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredPromotions.length} onChange={toggleSelectAll} /></th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Discount Name & Coupon Code</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-32">Status</th>
-                <th className="hidden lg:table-cell px-3 py-2 font-bold text-[#1d2327] w-32">Targeting</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-48">Schedule</th>
-                <th className="hidden md:table-cell px-3 py-2 font-bold text-[#1d2327] w-32">Performance</th>
-                <th className="hidden lg:table-cell px-3 py-2 font-bold text-[#1d2327] w-28 text-center">Priority</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-24 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={8} className="p-8 text-center text-gray-400 italic">Loading campaigns...</td></tr>
-              ) : filteredPromotions.length === 0 ? (
-                <tr><td colSpan={8} className="p-8 text-center text-gray-500 italic">No promotions found matching filters.</td></tr>
-              ) : (
-                filteredPromotions.map((p) => (
-                  <tr key={p._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(p._id) ? "bg-[#f0f6fa]" : ""}`}>
-                    <td className="px-3 py-4 text-center align-top"><input type="checkbox" checked={selectedIds.includes(p._id)} onChange={() => toggleSelect(p._id)} /></td>
-                    <td className="px-3 py-4 align-top">
-                       <Link href={`/admin/promotions/${p._id}`} className="text-[#2271b1] font-bold hover:underline text-sm">{p.title}</Link>
-                       <div className="mt-0.5 font-mono text-[11px] text-[#646970]">{p.code || "Automatic (No Code)"}</div>
-                       <div className="flex flex-wrap items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-medium">
-                          <Link href={`/admin/promotions/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
-                          <span className="text-[#c3c4c7]">|</span>
-                          <button onClick={() => handleDuplicate(p)} className="hover:text-[#135e96]">Duplicate</button>
-                          <span className="text-[#c3c4c7]">|</span>
-                          <button onClick={() => handleToggleStatus(p._id, p.adminStatus)} className="hover:text-[#135e96]">
-                            {p.adminStatus === 'Active' ? 'Pause' : 'Activate'}
-                          </button>
-                          <span className="text-[#c3c4c7]">|</span>
-                          <button onClick={() => handleArchive(p._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Archive</button>
-                       </div>
-                    </td>
-                    <td className="px-3 py-4 align-top">
-                       <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${getStatusColor(p.status)}`}>
-                          {p.status}
-                       </span>
-                    </td>
-                    <td className="hidden lg:table-cell px-3 py-4 align-top">
-                       <div className="flex items-center gap-1 text-[11px] font-medium text-gray-600 capitalize">
-                          <Target className="w-3 h-3" />
-                          {p.actions?.[0]?.target || 'Cart'}
-                       </div>
-                    </td>
-                    <td className="px-3 py-4 align-top text-[#646970]">
-                       <div className="flex flex-wrap items-center gap-1.5">
-                          <Calendar className="w-3 h-3" />
-                          <span>{p.startDate ? new Date(p.startDate).toLocaleDateString() : 'Always'}</span>
-                          <span>→</span>
-                          <span>{p.endDate ? new Date(p.endDate).toLocaleDateString() : 'Indefinite'}</span>
-                       </div>
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-4 align-top">
-                       <div className="text-[11px] text-[#646970]">Used: <span className="font-bold text-[#1d2327]">{p.analytics?.timesUsed || 0}</span></div>
-                       <div className="text-[11px] text-[#646970]">Saved: <span className="font-bold text-[#1d2327]">${(p.analytics?.discountDistributed || 0).toFixed(0)}</span></div>
-                       <div className="text-[11px] text-[#646970]">Revenue: <span className="font-bold text-[#1d2327]">${(p.analytics?.revenueGenerated || 0).toFixed(0)}</span></div>
-                    </td>
-                    <td className="hidden lg:table-cell px-3 py-4 align-top text-center text-[#646970] font-bold">{p.priority || 0}</td>
-                    <td className="px-3 py-4 text-right align-top">
-                       <button className="p-1.5 border border-[#ccd0d4] rounded hover:bg-white inline-block">
-                          <MoreVertical className="w-4 h-4 text-[#646970]" />
-                       </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="wp-stat">
+          <div className="wp-stat-label">Discount distributed</div>
+          <div className="wp-stat-value">${promotions.reduce((acc, p) => acc + (p.analytics?.discountDistributed || 0), 0).toFixed(0)}</div>
+        </div>
+        <div className="wp-stat">
+          <div className="wp-stat-label">Revenue generated</div>
+          <div className="wp-stat-value">${promotions.reduce((acc, p) => acc + (p.analytics?.revenueGenerated || 0), 0).toFixed(0)}</div>
         </div>
       </div>
-    </AdminPageLayout>
+
+      {/* Status filter links */}
+      <div className="wp-subsub" role="tablist" aria-label="Filter promotions by status">
+        <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-current" : undefined} onClick={() => setView("all")}>
+          All <span className="wp-count">({promotions.length})</span>
+        </button>
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <button type="button" role="tab" aria-selected={view === "running"} className={view === "running" ? "is-current" : undefined} onClick={() => setView("running")}>
+          Running <span className="wp-count">({promotions.filter(p => p.status === "Active").length})</span>
+        </button>
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <button type="button" role="tab" aria-selected={view === "paused"} className={view === "paused" ? "is-current" : undefined} onClick={() => setView("paused")}>
+          Paused <span className="wp-count">({promotions.filter(p => p.adminStatus === "Paused").length})</span>
+        </button>
+      </div>
+
+      {/* Toolbar */}
+      <div className="wp-toolbar">
+        <label htmlFor="promotions-bulk-action" className="sr-only">Select bulk action</label>
+        <select
+          id="promotions-bulk-action"
+          className="wp-select"
+          value={bulkAction}
+          onChange={(e) => setBulkAction(e.target.value)}
+        >
+          <option>Bulk actions</option>
+          <option>Duplicate</option>
+          <option>Move to Trash</option>
+          <option>Delete Permanently</option>
+        </select>
+        <button type="button" onClick={handleBulkAction} className="wp-btn">Apply</button>
+
+        <span className="wp-spacer" />
+
+        <div className="wp-search" role="search">
+          <label htmlFor="promotions-search" className="sr-only">Search promotions</label>
+          <input
+            id="promotions-search"
+            type="search"
+            placeholder="Search campaigns..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="wp-input"
+          />
+          <button type="button" className="wp-btn">Search promotions</button>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={7} className="wp-muted">Loading campaigns…</td></tr>
+            ) : filteredPromotions.length === 0 ? (
+              <tr><td colSpan={7} className="wp-muted">No promotions found matching filters.</td></tr>
+            ) : (
+              filteredPromotions.map((p) => (
+                <tr key={p._id} className={selectedIds.includes(p._id) ? "is-selected" : undefined}>
+                  <td className="wp-check-col">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${p.title}`}
+                      checked={selectedIds.includes(p._id)}
+                      onChange={() => toggleSelect(p._id)}
+                    />
+                  </td>
+                  <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                    <Link href={`/admin/promotions/${p._id}`} className="wp-row-title">{p.title}</Link>
+                    <div className="wp-muted wp-small" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", marginTop: 2 }}>
+                      {p.code || "Automatic (no code)"}
+                    </div>
+                    <div className="wp-mobile-meta">
+                      {scheduleText(p)} · Used {p.analytics?.timesUsed || 0}
+                    </div>
+                    <div className="wp-row-actions">
+                      <span><Link href={`/admin/promotions/${p._id}`}>Edit</Link></span>
+                      <span><button type="button" onClick={() => handleDuplicate(p)}>Duplicate</button></span>
+                      <span>
+                        <button type="button" onClick={() => handleToggleStatus(p._id, p.adminStatus)}>
+                          {p.adminStatus === 'Active' ? 'Pause' : 'Activate'}
+                        </button>
+                      </span>
+                      <span><button type="button" onClick={() => handleArchive(p._id)} className="is-danger">Archive</button></span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`wp-pill wp-pill-sm ${getStatusColor(p.status)}`}>{p.status}</span>
+                  </td>
+                  <td className="wp-hide-sm" style={{ textTransform: "capitalize" }}>
+                    {p.actions?.[0]?.target || 'Cart'}
+                  </td>
+                  <td className="wp-hide-sm wp-muted">{scheduleText(p)}</td>
+                  <td className="wp-hide-sm">
+                    <div>Used: <span className="wp-strong">{p.analytics?.timesUsed || 0}</span></div>
+                    <div>Saved: <span className="wp-strong">${(p.analytics?.discountDistributed || 0).toFixed(0)}</span></div>
+                    <div>Revenue: <span className="wp-strong">${(p.analytics?.revenueGenerated || 0).toFixed(0)}</span></div>
+                  </td>
+                  <td className="wp-hide-sm wp-num">{p.priority || 0}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot>{headerRow}</tfoot>
+        </table>
+      </div>
+    </Page>
     </RequirePermission>
   );
 }

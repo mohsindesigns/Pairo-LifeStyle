@@ -1,7 +1,7 @@
 import React from 'react';
-import { Trash2, ShoppingCart, Tag, Percent, ArrowRight, Plus } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 
-const MultiSelect = ({ selectedIds = [], options = [], onChange, placeholder = "Select item..." }) => {
+const MultiSelect = ({ selectedIds = [], options = [], onChange, placeholder = "Select item...", label }) => {
   const handleAdd = (id) => {
     if (id && !selectedIds.includes(id)) {
       onChange([...selectedIds, id]);
@@ -13,11 +13,12 @@ const MultiSelect = ({ selectedIds = [], options = [], onChange, placeholder = "
   };
 
   return (
-    <div className="space-y-1.5 mt-1">
+    <div className="flex flex-col gap-2">
       <select
         value=""
         onChange={(e) => handleAdd(e.target.value)}
-        className="w-full text-[12px] border border-gray-300 p-1.5 rounded-sm outline-none focus:border-[#2271b1] bg-white cursor-pointer"
+        aria-label={label || placeholder}
+        className="wp-select wp-full"
       >
         <option value="">{placeholder}</option>
         {options.map(opt => (
@@ -27,18 +28,20 @@ const MultiSelect = ({ selectedIds = [], options = [], onChange, placeholder = "
         ))}
       </select>
       {selectedIds.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 p-1.5 bg-gray-50 border border-gray-200 rounded-sm max-h-[120px] overflow-y-auto w-full">
+        <div className="flex flex-wrap gap-1.5 overflow-y-auto" style={{ maxHeight: 140 }}>
           {selectedIds.map(id => {
             const option = options.find(opt => (opt._id?.toString() || opt.id) === id);
             return (
-              <span key={id} className="inline-flex items-center gap-1 bg-white border border-gray-300 text-[11px] font-medium px-2 py-0.5 rounded-sm shadow-sm">
-                {option ? option.name : id}
+              <span key={id} className="wp-chip" style={{ maxWidth: '100%' }}>
+                <span className="truncate">{option ? option.name : id}</span>
                 <button
                   type="button"
                   onClick={() => handleRemove(id)}
-                  className="text-gray-400 hover:text-rose-600 font-bold ml-1"
+                  aria-label={`Remove ${option ? option.name : id}`}
+                  className="min-w-6 min-h-6 max-[782px]:min-w-10 max-[782px]:min-h-10"
+                  style={{ justifyContent: 'center', alignItems: 'center' }}
                 >
-                  &times;
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </span>
             );
@@ -48,6 +51,26 @@ const MultiSelect = ({ selectedIds = [], options = [], onChange, placeholder = "
     </div>
   );
 };
+
+// Small presentational helpers (layout only).
+const Field = ({ label, children, className = '' }) => (
+  <label className={`block min-w-0 ${className}`}>
+    <span className="wp-label">{label}</span>
+    {children}
+  </label>
+);
+
+const Group = ({ title, aside, children }) => (
+  <div className="min-w-0" style={{ border: '1px solid var(--wp-border-2)', background: 'var(--wp-alt)', padding: 12 }}>
+    <div className="flex flex-wrap items-center gap-2" style={{ marginBottom: 10 }}>
+      <h3 className="wp-strong flex-1" style={{ fontSize: 13, margin: 0 }}>{title}</h3>
+      {aside}
+    </div>
+    <div className="flex flex-col gap-3">{children}</div>
+  </div>
+);
+
+const iconBtnDanger = { borderColor: 'var(--wp-danger)', color: 'var(--wp-danger)', padding: 0, minWidth: 40 };
 
 export default function ActionBlock({ action, index, onUpdate, onRemove, catalogData }) {
   const { products = [], categories = [], collections = [] } = catalogData || {};
@@ -126,172 +149,157 @@ export default function ActionBlock({ action, index, onUpdate, onRemove, catalog
     onUpdate(index, 'bundleConfig', config);
   };
 
+  const targetNoun = action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections';
+
   return (
-    <div className="bg-white border border-gray-200 rounded-sm shadow-sm overflow-hidden mb-3">
+    <div className="min-w-0" style={{ border: '1px solid var(--wp-border)', background: '#fff', marginBottom: 12 }}>
       {/* Action Header */}
-      <div className="bg-[#f9fafb] border-b border-gray-100 px-3 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="p-1 bg-emerald-100 text-emerald-700 rounded-sm">
-            <Percent className="w-3.5 h-3.5" />
-          </div>
-          <span className="text-[12px] font-bold text-gray-700 uppercase tracking-tight">Action #{index + 1}</span>
-        </div>
-        <button onClick={() => onRemove(index)} className="text-gray-400 hover:text-rose-600 p-1">
-          <Trash2 className="w-4 h-4" />
+      <div className="flex items-center gap-2" style={{ minHeight: 40, padding: '0 12px', background: 'var(--wp-alt)', borderBottom: '1px solid var(--wp-border-2)' }}>
+        <span className="wp-strong flex-1">Action #{index + 1}</span>
+        <button type="button" onClick={() => onRemove(index)} className="wp-btn" style={iconBtnDanger} aria-label={`Remove action ${index + 1}`}>
+          <Trash2 className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
 
       {/* Action Settings */}
-      <div className="p-4 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className="text-[11px] font-bold text-gray-500 uppercase">Discount Type</label>
-            <select 
-              value={action.type} 
+      <div className="flex flex-col gap-4" style={{ padding: 12 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Discount type">
+            <select
+              value={action.type}
               onChange={(e) => onUpdate(index, 'type', e.target.value)}
-              className="w-full text-[13px] border border-gray-300 p-2 rounded-sm outline-none focus:border-[#2271b1]"
+              className="wp-select wp-full"
             >
               {types.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
-          </div>
+          </Field>
 
           {action.type !== 'bxgy' && action.type !== 'bundle' && (
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-gray-500 uppercase">Target Scope</label>
-              <select 
-                value={action.target} 
+            <Field label="Applies to">
+              <select
+                value={action.target}
                 onChange={(e) => onUpdate(index, 'target', e.target.value)}
-                className="w-full text-[13px] border border-gray-300 p-2 rounded-sm outline-none focus:border-[#2271b1]"
+                className="wp-select wp-full"
               >
                 {targets.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
-            </div>
+            </Field>
           )}
         </div>
 
         {/* BOGO (Buy X Get Y) UPGRADED BLOCK */}
         {action.type === 'bxgy' && (
-          <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-sm space-y-4">
-            <span className="text-[12px] font-bold text-emerald-800 uppercase tracking-wider block">Buy X Get Y (BOGO) Config</span>
-            
+          <div className="flex flex-col gap-3">
             {/* Buy X Section */}
-            <div className="space-y-3 p-3 bg-white border border-emerald-200 rounded-sm">
-              <span className="text-[11px] font-bold text-emerald-700 block">WHEN CUSTOMER BUYS:</span>
-              <div className="grid grid-cols-3 gap-3 items-end">
-                <div className="space-y-1 col-span-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Quantity</label>
-                  <input 
-                    type="number" 
-                    value={action.bxgyConfig?.buyQty || 1} 
+            <Group title="When the customer buys">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Field label="Quantity">
+                  <input
+                    type="number"
+                    value={action.bxgyConfig?.buyQty || 1}
                     onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, buyQty: parseInt(e.target.value) || 1 })}
-                    className="w-full border border-gray-300 p-1.5 rounded-sm text-center text-[12px]" 
+                    className="wp-input wp-full"
                   />
-                </div>
-                <div className="space-y-1 col-span-2">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">From Target Type</label>
-                  <select 
-                    value={action.bxgyConfig?.buyType || 'product'} 
+                </Field>
+                <Field label="From" className="sm:col-span-2">
+                  <select
+                    value={action.bxgyConfig?.buyType || 'product'}
                     onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, buyType: e.target.value, buyTargetIds: [] })}
-                    className="w-full border border-gray-300 p-1.5 rounded-sm text-[12px]" 
+                    className="wp-select wp-full"
                   >
                     {bxgyTargetTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
-                </div>
+                </Field>
               </div>
               {action.bxgyConfig?.buyType !== 'all' && (
-                <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Qualifying Buy Targets</label>
+                <div className="min-w-0">
+                  <span className="wp-label">Qualifying buy targets</span>
                   <MultiSelect
                     selectedIds={action.bxgyConfig?.buyTargetIds || []}
                     options={action.bxgyConfig?.buyType === 'product' ? products : action.bxgyConfig?.buyType === 'category' ? categories : collections}
                     onChange={(vals) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, buyTargetIds: vals })}
                     placeholder={`Choose Buy ${action.bxgyConfig?.buyType === 'product' ? 'Products' : action.bxgyConfig?.buyType === 'category' ? 'Categories' : 'Collections'}...`}
+                    label="Add a qualifying buy target"
                   />
                 </div>
               )}
-            </div>
+            </Group>
 
             {/* Get Y Section */}
-            <div className="space-y-3 p-3 bg-white border border-emerald-200 rounded-sm">
-              <span className="text-[11px] font-bold text-emerald-700 block">THEY GET:</span>
-              <div className="grid grid-cols-3 gap-3 items-end">
-                <div className="space-y-1 col-span-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Quantity</label>
-                  <input 
-                    type="number" 
-                    value={action.bxgyConfig?.getQty || 1} 
+            <Group title="They get">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Field label="Quantity">
+                  <input
+                    type="number"
+                    value={action.bxgyConfig?.getQty || 1}
                     onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, getQty: parseInt(e.target.value) || 1 })}
-                    className="w-full border border-gray-300 p-1.5 rounded-sm text-center text-[12px]" 
+                    className="wp-input wp-full"
                   />
-                </div>
-                <div className="space-y-1 col-span-2">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">From Target Type</label>
-                  <select 
-                    value={action.bxgyConfig?.getType || 'product'} 
+                </Field>
+                <Field label="From" className="sm:col-span-2">
+                  <select
+                    value={action.bxgyConfig?.getType || 'product'}
                     onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, getType: e.target.value, getTargetIds: [] })}
-                    className="w-full border border-gray-300 p-1.5 rounded-sm text-[12px]" 
+                    className="wp-select wp-full"
                   >
                     {bxgyTargetTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
-                </div>
+                </Field>
               </div>
               {action.bxgyConfig?.getType !== 'all' && (
-                <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Qualifying Get Targets</label>
+                <div className="min-w-0">
+                  <span className="wp-label">Qualifying get targets</span>
                   <MultiSelect
                     selectedIds={action.bxgyConfig?.getTargetIds || []}
                     options={action.bxgyConfig?.getType === 'product' ? products : action.bxgyConfig?.getType === 'category' ? categories : collections}
                     onChange={(vals) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, getTargetIds: vals })}
                     placeholder={`Choose Get ${action.bxgyConfig?.getType === 'product' ? 'Products' : action.bxgyConfig?.getType === 'category' ? 'Categories' : 'Collections'}...`}
+                    label="Add a qualifying get target"
                   />
                 </div>
               )}
-            </div>
 
-            {/* Discount Applied on Y */}
-            <div className="bg-white border border-emerald-200 p-3 rounded-sm grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-gray-500 uppercase">Discount Type</label>
-                <select 
-                  value={action.bxgyConfig?.discountType || 'free'} 
-                  onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, discountType: e.target.value })}
-                  className="w-full border border-gray-300 p-1.5 rounded-sm text-[12px]" 
-                >
-                  <option value="free">Free (100% off)</option>
-                  <option value="percentage">Percentage Discount</option>
-                  <option value="fixed">Fixed Price Discount</option>
-                </select>
+              {/* Discount Applied on Y */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Discount on the Y items">
+                  <select
+                    value={action.bxgyConfig?.discountType || 'free'}
+                    onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, discountType: e.target.value })}
+                    className="wp-select wp-full"
+                  >
+                    <option value="free">Free (100% off)</option>
+                    <option value="percentage">Percentage Discount</option>
+                    <option value="fixed">Fixed Price Discount</option>
+                  </select>
+                </Field>
+                {action.bxgyConfig?.discountType !== 'free' && (
+                  <Field label="Value">
+                    <input
+                      type="number"
+                      value={action.bxgyConfig?.discountValue || 0}
+                      onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, discountValue: parseFloat(e.target.value) || 0 })}
+                      className="wp-input wp-full"
+                    />
+                  </Field>
+                )}
               </div>
-              {action.bxgyConfig?.discountType !== 'free' && (
-                <div className="space-y-1">
-                  <label className="text-[10px] font-semibold text-gray-500 uppercase">Value</label>
-                  <input 
-                    type="number" 
-                    value={action.bxgyConfig?.discountValue || 0} 
-                    onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, discountValue: parseFloat(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 p-1.5 rounded-sm text-[12px]" 
-                  />
-                </div>
-              )}
-            </div>
+            </Group>
 
             {/* Same Product & Cheapest Options */}
-            <div className="flex flex-col gap-2 pl-1">
-              <label className="flex items-center gap-2 text-[12px] font-medium text-emerald-800 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={action.bxgyConfig?.mustBeSameProduct || false} 
+            <div className="flex flex-col gap-1">
+              <label className="wp-check">
+                <input
+                  type="checkbox"
+                  checked={action.bxgyConfig?.mustBeSameProduct || false}
                   onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, mustBeSameProduct: e.target.checked })}
-                  className="rounded text-emerald-600"
                 />
                 <span>Must be same product (Buy X and Get Y of same product ID)</span>
               </label>
-              <label className="flex items-center gap-2 text-[12px] font-medium text-emerald-800 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={action.bxgyConfig?.useCheapest !== false} 
+              <label className="wp-check">
+                <input
+                  type="checkbox"
+                  checked={action.bxgyConfig?.useCheapest !== false}
                   onChange={(e) => onUpdate(index, 'bxgyConfig', { ...action.bxgyConfig, useCheapest: e.target.checked })}
-                  className="rounded text-emerald-600"
                 />
                 <span>Cheapest item gets discounted first</span>
               </label>
@@ -301,197 +309,177 @@ export default function ActionBlock({ action, index, onUpdate, onRemove, catalog
 
         {/* QUANTITY TIER BLOCK */}
         {action.type === 'quantity_tier' && (
-          <div className="bg-blue-50 border border-blue-100 p-4 rounded-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-bold text-blue-800 uppercase tracking-wider">Quantity Breaks Config</span>
-              <button 
-                type="button" 
-                onClick={handleAddTier} 
-                className="text-[11px] font-bold text-[#2271b1] hover:underline"
-              >
-                + ADD TIER
+          <Group
+            title="Quantity breaks"
+            aside={
+              <button type="button" onClick={handleAddTier} className="wp-btn">
+                Add tier
               </button>
-            </div>
-
-            <div className="space-y-2">
-              {(action.quantityTiers || []).map((tier, tIdx) => (
-                <div key={tIdx} className="grid grid-cols-12 gap-2 items-center bg-white border border-blue-200 p-2 rounded-sm shadow-inner">
-                  <div className="col-span-3 space-y-0.5">
-                    <label className="text-[9px] text-gray-400 font-bold uppercase block">Min Qty</label>
-                    <input 
-                      type="number"
-                      value={tier.quantity}
-                      onChange={(e) => handleUpdateTier(tIdx, 'quantity', parseInt(e.target.value) || 1)}
-                      className="w-full border border-gray-300 rounded-sm p-1 text-[12px] text-center"
-                    />
-                  </div>
-                  <div className="col-span-4 space-y-0.5">
-                    <label className="text-[9px] text-gray-400 font-bold uppercase block">Price Type</label>
-                    <select
-                      value={tier.priceType}
-                      onChange={(e) => handleUpdateTier(tIdx, 'priceType', e.target.value)}
-                      className="w-full border border-gray-300 rounded-sm p-1 text-[11px]"
-                    >
-                      <option value="per_unit">Price/Unit</option>
-                      <option value="total">Total Price</option>
-                      <option value="percentage">% Discount</option>
-                      <option value="fixed_discount">$ Discount</option>
-                    </select>
-                  </div>
-                  <div className="col-span-4 space-y-0.5">
-                    <label className="text-[9px] text-gray-400 font-bold uppercase block">Value</label>
-                    <input 
-                      type="number"
-                      value={tier.value}
-                      onChange={(e) => handleUpdateTier(tIdx, 'value', parseFloat(e.target.value) || 0)}
-                      className="w-full border border-gray-300 rounded-sm p-1 text-[12px] text-center"
-                    />
-                  </div>
-                  <div className="col-span-1 text-center pt-3">
-                    <button 
-                      type="button" 
-                      onClick={() => handleRemoveTier(tIdx)}
-                      className="text-gray-400 hover:text-rose-600"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {(!action.quantityTiers || action.quantityTiers.length === 0) && (
-                <div className="text-[11px] text-blue-500 italic text-center py-4 border border-dashed border-blue-200 rounded-sm">
-                  No quantity tiers defined. Click "+ ADD TIER" above.
-                </div>
-              )}
-            </div>
+            }
+          >
+            {(action.quantityTiers || []).map((tier, tIdx) => (
+              <div key={tIdx} className="flex flex-wrap items-end gap-2" style={{ background: '#fff', border: '1px solid var(--wp-border-2)', padding: 8 }}>
+                <Field label="Min qty" className="flex-1" >
+                  <input
+                    type="number"
+                    value={tier.quantity}
+                    onChange={(e) => handleUpdateTier(tIdx, 'quantity', parseInt(e.target.value) || 1)}
+                    className="wp-input wp-full"
+                    style={{ minWidth: 80 }}
+                  />
+                </Field>
+                <Field label="Price type" className="flex-1">
+                  <select
+                    value={tier.priceType}
+                    onChange={(e) => handleUpdateTier(tIdx, 'priceType', e.target.value)}
+                    className="wp-select wp-full"
+                    style={{ minWidth: 120 }}
+                  >
+                    <option value="per_unit">Price/Unit</option>
+                    <option value="total">Total Price</option>
+                    <option value="percentage">% Discount</option>
+                    <option value="fixed_discount">$ Discount</option>
+                  </select>
+                </Field>
+                <Field label="Value" className="flex-1">
+                  <input
+                    type="number"
+                    value={tier.value}
+                    onChange={(e) => handleUpdateTier(tIdx, 'value', parseFloat(e.target.value) || 0)}
+                    className="wp-input wp-full"
+                    style={{ minWidth: 80 }}
+                  />
+                </Field>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveTier(tIdx)}
+                  className="wp-btn"
+                  style={iconBtnDanger}
+                  aria-label={`Remove tier ${tIdx + 1}`}
+                >
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            {(!action.quantityTiers || action.quantityTiers.length === 0) && (
+              <p className="wp-muted" style={{ margin: 0, padding: 12, textAlign: 'center', border: '1px dashed var(--wp-border)', background: '#fff' }}>
+                No quantity tiers defined. Click &quot;Add tier&quot; above.
+              </p>
+            )}
 
             {(action.target === 'product' || action.target === 'category' || action.target === 'collection') && (
-              <div className="space-y-1 bg-white p-3 border border-blue-200 rounded-sm">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Qualifying target {action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections'}</label>
-                <MultiSelect 
-                  selectedIds={action.targetIds || []} 
-                  options={action.target === 'product' ? products : action.target === 'category' ? categories : collections} 
+              <div className="min-w-0">
+                <span className="wp-label">Qualifying target {targetNoun}</span>
+                <MultiSelect
+                  selectedIds={action.targetIds || []}
+                  options={action.target === 'product' ? products : action.target === 'category' ? categories : collections}
                   onChange={(vals) => onUpdate(index, 'targetIds', vals)}
-                  placeholder={`Choose qualifying ${action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections'}...`}
+                  placeholder={`Choose qualifying ${targetNoun}...`}
                 />
               </div>
             )}
-          </div>
+          </Group>
         )}
 
         {/* PRODUCT BUNDLE BLOCK */}
         {action.type === 'bundle' && (
-          <div className="bg-purple-50 border border-purple-100 p-4 rounded-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-bold text-purple-800 uppercase tracking-wider">Bundle Requirements</span>
-              <button 
-                type="button" 
-                onClick={handleAddBundleProduct} 
-                className="text-[11px] font-bold text-purple-700 hover:underline"
-              >
-                + ADD PRODUCT
+          <Group
+            title="Bundle requirements"
+            aside={
+              <button type="button" onClick={handleAddBundleProduct} className="wp-btn">
+                Add product
               </button>
-            </div>
-
-            <div className="space-y-2">
-              {((action.bundleConfig || {}).products || []).map((prod, pIdx) => (
-                <div key={pIdx} className="grid grid-cols-12 gap-2 items-center bg-white border border-purple-200 p-2 rounded-sm shadow-inner">
-                  <div className="col-span-8 space-y-0.5">
-                    <label className="text-[9px] text-gray-400 font-bold uppercase block">Product</label>
-                    <select
-                      value={prod.productId}
-                      onChange={(e) => handleUpdateBundleProduct(pIdx, 'productId', e.target.value)}
-                      className="w-full border border-gray-300 rounded-sm p-1.5 text-[12px] bg-white"
-                    >
-                      <option value="">-- Select Product --</option>
-                      {products.map(p => (
-                        <option key={p._id || p.id} value={p._id?.toString() || p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-span-3 space-y-0.5">
-                    <label className="text-[9px] text-gray-400 font-bold uppercase block">Quantity</label>
-                    <input 
-                      type="number"
-                      value={prod.quantity}
-                      onChange={(e) => handleUpdateBundleProduct(pIdx, 'quantity', parseInt(e.target.value) || 1)}
-                      className="w-full border border-gray-300 rounded-sm p-1 text-[12px] text-center"
-                    />
-                  </div>
-                  <div className="col-span-1 text-center pt-3">
-                    <button 
-                      type="button" 
-                      onClick={() => handleRemoveBundleProduct(pIdx)}
-                      className="text-gray-400 hover:text-rose-600"
-                    >
-                      &times;
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {(!action.bundleConfig?.products || action.bundleConfig.products.length === 0) && (
-                <div className="text-[11px] text-purple-500 italic text-center py-4 border border-dashed border-purple-200 rounded-sm">
-                  No bundle products defined. Click "+ ADD PRODUCT" above.
-                </div>
-              )}
-            </div>
+            }
+          >
+            {((action.bundleConfig || {}).products || []).map((prod, pIdx) => (
+              <div key={pIdx} className="flex flex-wrap items-end gap-2" style={{ background: '#fff', border: '1px solid var(--wp-border-2)', padding: 8 }}>
+                <Field label="Product" className="flex-1" >
+                  <select
+                    value={prod.productId}
+                    onChange={(e) => handleUpdateBundleProduct(pIdx, 'productId', e.target.value)}
+                    className="wp-select wp-full"
+                    style={{ minWidth: 160 }}
+                  >
+                    <option value="">-- Select Product --</option>
+                    {products.map(p => (
+                      <option key={p._id || p.id} value={p._id?.toString() || p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Quantity">
+                  <input
+                    type="number"
+                    value={prod.quantity}
+                    onChange={(e) => handleUpdateBundleProduct(pIdx, 'quantity', parseInt(e.target.value) || 1)}
+                    className="wp-input"
+                    style={{ width: 90 }}
+                  />
+                </Field>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveBundleProduct(pIdx)}
+                  className="wp-btn"
+                  style={iconBtnDanger}
+                  aria-label={`Remove bundle product ${pIdx + 1}`}
+                >
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            {(!action.bundleConfig?.products || action.bundleConfig.products.length === 0) && (
+              <p className="wp-muted" style={{ margin: 0, padding: 12, textAlign: 'center', border: '1px dashed var(--wp-border)', background: '#fff' }}>
+                No bundle products defined. Click &quot;Add product&quot; above.
+              </p>
+            )}
 
             {/* Bundle Discount / Pricing */}
-            <div className="bg-white border border-purple-200 p-3 rounded-sm grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Bundle Pricing Type</label>
-                <select 
-                  value={action.bundleConfig?.priceType || 'fixed_price'} 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Bundle pricing type">
+                <select
+                  value={action.bundleConfig?.priceType || 'fixed_price'}
                   onChange={(e) => onUpdate(index, 'bundleConfig', { ...action.bundleConfig, priceType: e.target.value })}
-                  className="w-full border border-gray-300 p-1.5 rounded-sm text-[12px]" 
+                  className="wp-select wp-full"
                 >
                   <option value="fixed_price">Fixed Bundle Price</option>
                   <option value="discount_percentage">Percentage Discount</option>
                   <option value="discount_fixed">Fixed Amount Discount</option>
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-500 uppercase">Bundle Price/Value</label>
-                <input 
-                  type="number" 
-                  value={action.bundleConfig?.value || 0} 
+              </Field>
+              <Field label="Bundle price / value">
+                <input
+                  type="number"
+                  value={action.bundleConfig?.value || 0}
                   onChange={(e) => onUpdate(index, 'bundleConfig', { ...action.bundleConfig, value: parseFloat(e.target.value) || 0 })}
-                  className="w-full border border-gray-300 p-1.5 rounded-sm text-[12px]" 
+                  className="wp-input wp-full"
                 />
-              </div>
+              </Field>
             </div>
-          </div>
+          </Group>
         )}
 
         {/* standard discount/fixed pricing inputs for general targets */}
         {action.type !== 'bxgy' && action.type !== 'quantity_tier' && action.type !== 'bundle' && action.type !== 'free_shipping' && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold text-gray-500 uppercase">Discount Value</label>
-              <div className="relative">
-                <span className="absolute left-2 top-2 text-gray-400 text-sm">
-                  {action.type === 'fixed_discount' || action.type === 'fixed_product_price' ? '$' : '%'}
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  max={action.type === 'percentage_discount' ? 100 : undefined}
-                  value={action.value || 0}
-                  onChange={(e) => onUpdate(index, 'value', Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full text-[13px] border border-gray-300 p-2 pl-6 rounded-sm outline-none focus:border-[#2271b1]"
-                />
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label={`Discount value (${action.type === 'fixed_discount' || action.type === 'fixed_product_price' ? '$' : '%'})`}>
+              <input
+                type="number"
+                min="0"
+                max={action.type === 'percentage_discount' ? 100 : undefined}
+                value={action.value || 0}
+                onChange={(e) => onUpdate(index, 'value', Math.max(0, parseFloat(e.target.value) || 0))}
+                className="wp-input wp-full"
+              />
+            </Field>
             {(action.target === 'product' || action.target === 'category' || action.target === 'collection') && (
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-500 uppercase">Target {action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections'}</label>
+              <div className="min-w-0">
+                <span className="wp-label">Target {targetNoun}</span>
                 <MultiSelect
                   selectedIds={action.targetIds || []}
                   options={action.target === 'product' ? products : action.target === 'category' ? categories : collections}
                   onChange={(vals) => onUpdate(index, 'targetIds', vals)}
-                  placeholder={`Choose target ${action.target === 'product' ? 'Products' : action.target === 'category' ? 'Categories' : 'Collections'}...`}
+                  placeholder={`Choose target ${targetNoun}...`}
                 />
               </div>
             )}
