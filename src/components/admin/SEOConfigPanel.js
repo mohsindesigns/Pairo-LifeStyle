@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useId } from "react";
+import React, { useState, useId, useRef, useEffect } from "react";
 import {
   CheckCircle,
   RefreshCw,
@@ -22,6 +22,16 @@ export default function SEOConfigPanel({
   const [activePreviewTab, setActivePreviewTab] = useState("google-mobile");
   const [activeSubTab, setActiveSubTab] = useState("general");
   const uid = useId();
+
+  // Latest SEO value, including changes emitted but not yet re-rendered from the parent,
+  // so quick consecutive edits (e.g. noindex then nofollow) build on each other instead
+  // of on a stale `seo` prop.
+  const latestSeoRef = useRef(seo);
+  useEffect(() => { latestSeoRef.current = seo; }, [seo]);
+  const emit = (next) => {
+    latestSeoRef.current = next;
+    onChange(next);
+  };
 
   // Initialize fields safely
   const title = seo.title || "";
@@ -55,8 +65,8 @@ export default function SEOConfigPanel({
     if (field === "keywords") {
       updatedVal = val.split(",").map(k => k.trim()).filter(Boolean);
     }
-    onChange({
-      ...seo,
+    emit({
+      ...latestSeoRef.current,
       [field]: updatedVal
     });
   };
@@ -78,20 +88,21 @@ export default function SEOConfigPanel({
     else if (parentType === "blog") pathPrefix = "/blog/";
     else if (parentType === "category") pathPrefix = "/";
 
+    const current = latestSeoRef.current || {};
     const generated = {
-      ...seo,
+      ...current,
       title: parentTitle.substring(0, 60),
       description: cleanDesc,
       focusKeyword: parentTitle.split(" ")[0]?.toLowerCase() || "",
       canonicalUrl: resolvedSlug ? `${siteUrl}${pathPrefix}${resolvedSlug}` : "",
       ogTitle: parentTitle.substring(0, 60),
       ogDescription: cleanDesc,
-      ogImage: parentImage || seo.ogImage || "",
+      ogImage: parentImage || current.ogImage || "",
       twitterTitle: parentTitle.substring(0, 60),
       twitterDescription: cleanDesc,
-      twitterImage: parentImage || seo.twitterImage || seo.ogImage || "",
+      twitterImage: parentImage || current.twitterImage || current.ogImage || "",
     };
-    onChange(generated);
+    emit(generated);
   };
 
   // Live fallback titles & descriptions for preview calculations

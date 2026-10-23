@@ -11,13 +11,15 @@ import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AdminMedia() {
-  const { showConfirm } = usePopup();
+  const { showConfirm, showAlert } = usePopup();
   const [items, setItems]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [view, setView]             = useState("grid");          // grid | list
   const [tab, setTab]               = useState("library");       // library | trash
-  const [search, setSearch]         = useState("");
-  const [page, setPage]             = useState(1);
+  const [search, setSearch]         = useState("");               // search box text (debounced into query)
+  // One source of truth for what the library shows: type filter, sort, search and page
+  const [query, setQuery]           = useState({ type: "all", sort: "newest", search: "", page: 1 });
+  const page = query.page;
   const [pagination, setPagination] = useState({});
   const [selected, setSelected]     = useState(new Set());
   const [bulkMode, setBulkMode]     = useState(false);
@@ -31,11 +33,12 @@ export default function AdminMedia() {
   const fileInputRef = useRef(null);
   const searchTimeout = useRef(null);
 
-  const fetchMedia = useCallback(async (q = "", pg = 1, t = "library", type = 'all', s = 'newest') => {
+  const fetchMedia = useCallback(async (q, t = "library") => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        search: q, page: pg.toString(), limit: "30", trash: (t === "trash").toString(), type, sort: s, _t: Date.now().toString()
+        search: q.search || "", page: String(q.page || 1), limit: "30", trash: (t === "trash").toString(),
+        type: q.type || "all", sort: q.sort || "newest", _t: Date.now().toString()
       });
       const res = await fetch(`/api/admin/media?${params}`);
       const data = await res.json();
@@ -45,18 +48,29 @@ export default function AdminMedia() {
   }, []);
 
   useEffect(() => {
-    setPage(1);
+    fetchMedia(query, tab);
+  }, [tab, query, fetchMedia]);
+
+  // Re-fetch the current view (same type, sort, search and page)
+  const reload = () => fetchMedia(query, tab);
+
+  const changeTab = (t) => {
+    if (t === tab) return;
+    clearTimeout(searchTimeout.current);
     setSearch("");
-    fetchMedia("", 1, tab);
+    setQuery(q => ({ ...q, search: "", page: 1 }));
     setSelected(new Set());
     setDetailItem(null);
-  }, [tab, fetchMedia]);
+    setTab(t);
+  };
 
   const handleSearch = (val) => {
     setSearch(val);
     clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => { setPage(1); fetchMedia(val, 1, tab); }, 400);
+    searchTimeout.current = setTimeout(() => { setQuery(q => ({ ...q, search: val, page: 1 })); }, 400);
   };
+
+  const goToPage = (p) => setQuery(q => ({ ...q, page: p }));
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -80,7 +94,15 @@ export default function AdminMedia() {
     try {
       const res = await fetch("/api/admin/media/upload", { method: "POST", body: formData });
       const data = await res.json();
-      if (data.success) { await fetchMedia("", 1, "library"); setSearch(""); setPage(1); setTab("library"); }
+      if (data.success) {
+        clearTimeout(searchTimeout.current);
+        setSearch("");
+        setSelected(new Set());
+        setDetailItem(null);
+        // New query object always triggers a fresh fetch of page 1 (keeps type & sort)
+        setQuery(q => ({ ...q, search: "", page: 1 }));
+        setTab("library");
+      }
       if (data.errors?.length) toast.error(data.errors.map(e => `${e.file}: ${e.error}`).join('\n'));
     } finally { setUploading(false); }
   };
@@ -116,7 +138,7 @@ export default function AdminMedia() {
           const data = await res.json();
           throw new Error(data.error || "Failed to move file to trash.");
         }
-        fetchMedia(search, page, tab);
+        reload();
       });
 
     toast.promise(promise, {
@@ -129,9 +151,8 @@ export default function AdminMedia() {
     });
   };
 
+  // Confirmation is the in-page "Permanently Delete?" dialog (deleteConfirm) — no second prompt here.
   const permanentDelete = async (id) => {
-    const ok = await showConfirm("Are you sure you want to delete this file permanently? This will break references on products and pages!");
-    if (!ok) return;
     const previousItems = items;
     setItems(prev => prev.filter(item => item._id !== id));
     setDetailItem(null);
@@ -146,7 +167,7 @@ export default function AdminMedia() {
         if (data.error === "Image is still in use") {
           throw new Error(`Cannot delete — image is used in ${data.usageCount} place(s).`);
         }
-        fetchMedia(search, page, tab);
+        reload();
       });
 
     toast.promise(promise, {
@@ -173,7 +194,7 @@ export default function AdminMedia() {
         const data = await res.json();
         throw new Error(data.error || "Failed to restore file.");
       }
-      fetchMedia(search, page, tab);
+      reload();
     });
 
     toast.promise(promise, {
@@ -187,16 +208,38 @@ export default function AdminMedia() {
   };
 
   const bulkSoftDelete = async () => {
-    await Promise.all([...selected].map(id => fetch(`/api/admin/media/${id}`, { method: "DELETE" })));
-    setSelected(new Set());
-    setBulkMode(false);
-    fetchMedia(search, page, tab);
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const ok = await showConfirm(
+      `Move ${ids.length} file${ids.length === 1 ? "" : "s"} to trash?`,
+      "Move to Trash",
+      { confirmText: "Move to Trash", danger: true }
+    );
+    if (!ok) return;
+    const results = await Promise.all(ids.map(async (id) => {
+      try {
+        const res = await fetch(`/api/admin/media/${id}`, { method: "DELETE" });
+        return res.ok;
+      } catch { return false; }
+    }));
+    const succeeded = results.filter(Boolean).length;
+    const failed = results.length - succeeded;
+    // Keep failed items selected so they can be retried
+    setSelected(new Set(ids.filter((_, i) => !results[i])));
+    if (failed === 0) setBulkMode(false);
+    reload();
+    if (succeeded) toast.success(`${succeeded} file${succeeded === 1 ? "" : "s"} moved to trash.`);
+    if (failed) toast.error(`${failed} file${failed === 1 ? "" : "s"} could not be moved to trash.`);
   };
 
-  const copyUrl = (url) => {
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyUrl = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showAlert("Could not copy the URL. Select the File URL field and copy it manually.", "Copy failed");
+    }
   };
 
   const thumbUrl = (item) => item.url.includes('cloudinary.com') ? item.url.replace('/upload/', '/upload/w_400,h_400,c_fill,f_auto,q_auto/') : item.url;
@@ -222,11 +265,11 @@ export default function AdminMedia() {
 
       {/* ── Library / Trash ── */}
       <div className="wp-subsub" role="tablist" aria-label="Media views">
-        <button type="button" role="tab" aria-selected={tab === "library"} className={tab === "library" ? "is-current" : undefined} onClick={() => setTab("library")}>
+        <button type="button" role="tab" aria-selected={tab === "library"} className={tab === "library" ? "is-current" : undefined} onClick={() => changeTab("library")}>
           All media <span className="wp-count">({tab === "library" ? (pagination.total || 0) : "-"})</span>
         </button>
         <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={tab === "trash"} className={tab === "trash" ? "is-current" : undefined} onClick={() => setTab("trash")}>
+        <button type="button" role="tab" aria-selected={tab === "trash"} className={tab === "trash" ? "is-current" : undefined} onClick={() => changeTab("trash")}>
           Trash {tab === "trash" && <span className="wp-count">({pagination.total || 0})</span>}
         </button>
       </div>
@@ -241,18 +284,19 @@ export default function AdminMedia() {
         <label htmlFor="media-filter-type" className="sr-only">Filter by type</label>
         <select
           id="media-filter-type"
-          onChange={(e) => fetchMedia(search, 1, tab, e.target.value)}
+          value={query.type}
+          onChange={(e) => { const type = e.target.value; setQuery(q => ({ ...q, type, page: 1 })); }}
           className="wp-select"
         >
           <option value="all">All media items</option>
           <option value="image">Images</option>
-          <option value="video">Videos</option>
         </select>
 
         <label htmlFor="media-sort" className="sr-only">Sort media</label>
         <select
           id="media-sort"
-          onChange={(e) => fetchMedia(search, 1, tab, 'all', e.target.value)}
+          value={query.sort}
+          onChange={(e) => { const sort = e.target.value; setQuery(q => ({ ...q, sort, page: 1 })); }}
           className="wp-select"
         >
           <option value="newest">Sort: Newest</option>
@@ -391,9 +435,9 @@ export default function AdminMedia() {
           <span className="wp-spacer" />
           <div className="wp-pages">
             <span>{pagination.total} items</span>
-            <button type="button" className="wp-pager" aria-label="Previous page" disabled={page <= 1} onClick={() => { const p = page-1; setPage(p); fetchMedia(search, p, tab); }}><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
+            <button type="button" className="wp-pager" aria-label="Previous page" disabled={page <= 1} onClick={() => goToPage(page - 1)}><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
             <span>Page {page} of {pagination.pages}</span>
-            <button type="button" className="wp-pager" aria-label="Next page" disabled={page >= pagination.pages} onClick={() => { const p = page+1; setPage(p); fetchMedia(search, p, tab); }}><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
+            <button type="button" className="wp-pager" aria-label="Next page" disabled={page >= pagination.pages} onClick={() => goToPage(page + 1)}><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
           </div>
         </div>
       )}
@@ -443,6 +487,13 @@ export default function AdminMedia() {
                     <div className="wp-frow">
                       <label htmlFor="media-field-url" className="wp-flabel" style={{ width: 110 }}>File URL</label>
                       <input id="media-field-url" readOnly value={detailItem.url} className="wp-input" style={{ flex: "1 1 180px", minWidth: 0 }} onFocus={e => e.target.select()} />
+                    </div>
+                    <div className="wp-frow">
+                      <span className="wp-flabel" style={{ width: 110 }} aria-hidden="true" />
+                      <button type="button" onClick={() => copyUrl(detailItem.url)} className="wp-btn">
+                        {copied ? <><Check className="w-4 h-4" aria-hidden="true" /> Copied</> : "Copy URL"}
+                      </button>
+                      <span className="sr-only" role="status">{copied ? "URL copied to clipboard" : ""}</span>
                     </div>
                   </div>
                 )}

@@ -7,6 +7,9 @@ import { Page, PageHeader } from "@/components/admin/ui";
 import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { toast } from "react-hot-toast";
+
+const PER_PAGE = 20;
 
 export default function AdminBlogs() {
   const router = useRouter();
@@ -19,6 +22,7 @@ export default function AdminBlogs() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
   const [counts, setCounts] = useState({ all: 0, published: 0, trash: 0 });
+  const [page, setPage] = useState(1);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -93,70 +97,105 @@ export default function AdminBlogs() {
     const ok = await showConfirm(`Are you sure you want to permanently delete "${title}"? This cannot be undone.`);
     if (!ok) return;
     try {
-      const res = await fetch(`/api/admin/blogs?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/blogs?id=${id}&permanent=true`, { method: "DELETE" });
       if (res.ok) fetchBlogs();
     } catch (err) {
       console.error(err);
     }
   };
 
+  const duplicateRequest = async (blog) => {
+    const { _id, createdAt, updatedAt, ...rest } = blog;
+    const copy = {
+      ...rest,
+      title: `${blog.title} (Copy)`,
+      slug: `${blog.slug}-copy-${Math.floor(Math.random() * 1000)}`,
+      status: "Draft"
+    };
+    const res = await fetch("/api/admin/blogs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(copy)
+    });
+    return res.ok;
+  };
+
   const handleDuplicate = async (blog) => {
     try {
-      const { _id, createdAt, updatedAt, ...rest } = blog;
-      const copy = {
-        ...rest,
-        title: `${blog.title} (Copy)`,
-        slug: `${blog.slug}-copy-${Math.floor(Math.random() * 1000)}`,
-        status: "Draft"
-      };
-      const res = await fetch("/api/admin/blogs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(copy)
-      });
-      if (res.ok) fetchBlogs();
+      if (await duplicateRequest(blog)) fetchBlogs();
     } catch (err) {
       console.error("Duplicate failed:", err);
     }
   };
 
+  // Bulk actions offered depend on the view: permanent delete only from Trash.
+  const bulkOptions = view === "trash" ? ["Delete Permanently"] : ["Duplicate", "Move to Trash"];
+
   const handleBulkAction = async () => {
-     if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`);
-     if (ok) {
+     if (!bulkOptions.includes(bulkAction) || selectedIds.length === 0) return;
+     const n = selectedIds.length;
+     const isPermanent = bulkAction === "Delete Permanently";
+     const ok = isPermanent
+        ? await showConfirm(`Permanently delete ${n} post${n === 1 ? "" : "s"}? This cannot be undone.`, "Delete Permanently", { confirmText: "Delete Permanently", danger: true })
+        : await showConfirm(`Apply "${bulkAction}" to ${n} item${n === 1 ? "" : "s"}?`);
+     if (!ok) return;
+
+     const ids = [...selectedIds];
+     const results = [];
+     for (const id of ids) {
         try {
-           for (const id of selectedIds) {
-              if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
-                 await fetch(`/api/admin/blogs?id=${id}`, { method: "DELETE" });
-              } else if (bulkAction === "Duplicate") {
-                 const blog = blogs.find(b => b._id === id);
-                 if (blog) await handleDuplicate(blog);
-              }
+           if (bulkAction === "Move to Trash") {
+              const res = await fetch(`/api/admin/blogs?id=${id}`, { method: "DELETE" });
+              results.push(res.ok);
+           } else if (isPermanent) {
+              // permanent=true: the API refuses unless the post is already in Trash
+              const res = await fetch(`/api/admin/blogs?id=${id}&permanent=true`, { method: "DELETE" });
+              results.push(res.ok);
+           } else if (bulkAction === "Duplicate") {
+              const blog = blogs.find(b => b._id === id);
+              results.push(blog ? await duplicateRequest(blog) : false);
            }
-           setSelectedIds([]);
-           fetchBlogs();
-        } catch (err) {
-           console.error("Bulk action failed:", err);
+        } catch {
+           results.push(false);
         }
      }
+     const succeeded = results.filter(Boolean).length;
+     const failed = results.length - succeeded;
+     setSelectedIds(ids.filter((_, i) => !results[i]));
+     fetchBlogs();
+     if (succeeded) toast.success(`${bulkAction}: ${succeeded} post${succeeded === 1 ? "" : "s"} done.`);
+     if (failed) toast.error(`${bulkAction} failed for ${failed} post${failed === 1 ? "" : "s"}.`);
   };
 
   const toggleSelect = (id) => {
      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  const toggleSelectAll = () => {
-     if (selectedIds.length === filteredBlogs.length) setSelectedIds([]);
-     else setSelectedIds(filteredBlogs.map(b => b._id));
-  };
-
   const filteredBlogs = blogs.filter(b => {
-     const matchesSearch = b.title?.toLowerCase().includes(searchTerm.toLowerCase());
+     const matchesSearch = (b.title || "").toLowerCase().includes(searchTerm.trim().toLowerCase());
      const matchesCategory = selectedCategory === "All categories" || b.category === selectedCategory;
      return matchesSearch && matchesCategory;
   });
 
-  const allSelected = selectedIds.length > 0 && selectedIds.length === filteredBlogs.length;
+  const totalPages = Math.max(1, Math.ceil(filteredBlogs.length / PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const pageBlogs = filteredBlogs.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const toggleSelectAll = () => {
+     if (allSelected) setSelectedIds([]);
+     else setSelectedIds(pageBlogs.map(b => b._id));
+  };
+
+  const allSelected = pageBlogs.length > 0 && pageBlogs.every(b => selectedIds.includes(b._id));
+
+  const changeView = (v) => { setView(v); setPage(1); setSelectedIds([]); setBulkAction("Bulk actions"); };
+
+  const handleSearchSubmit = (e) => {
+     e.preventDefault();
+     // Results already filter live as you type; submitting jumps back to the first page of matches.
+     setPage(1);
+     setSelectedIds([]);
+  };
 
   const headerRow = (
     <tr>
@@ -172,12 +211,14 @@ export default function AdminBlogs() {
     </tr>
   );
 
+  const goToPage = (p) => { setPage(Math.min(Math.max(1, p), totalPages)); setSelectedIds([]); };
+
   const pagination = (
     <div className="wp-pages">
-      <span>{filteredBlogs.length} items</span>
-      <button type="button" className="wp-pager" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-      <span>1 of 1</span>
-      <button type="button" className="wp-pager" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+      <span>{filteredBlogs.length} {filteredBlogs.length === 1 ? "item" : "items"}</span>
+      <button type="button" className="wp-pager" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
+      <span>{currentPage} of {totalPages}</span>
+      <button type="button" className="wp-pager" aria-label="Next page" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
     </div>
   );
 
@@ -191,15 +232,15 @@ export default function AdminBlogs() {
 
       {/* Status filter links */}
       <div className="wp-subsub" role="tablist" aria-label="Filter posts by status">
-        <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-current" : undefined} onClick={() => setView("all")}>
+        <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-current" : undefined} onClick={() => changeView("all")}>
           All <span className="wp-count">({counts.all})</span>
         </button>
         <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={view === "published"} className={view === "published" ? "is-current" : undefined} onClick={() => setView("published")}>
+        <button type="button" role="tab" aria-selected={view === "published"} className={view === "published" ? "is-current" : undefined} onClick={() => changeView("published")}>
           Published <span className="wp-count">({counts.published})</span>
         </button>
         <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={view === "trash"} className={view === "trash" ? "is-current" : undefined} onClick={() => setView("trash")}>
+        <button type="button" role="tab" aria-selected={view === "trash"} className={view === "trash" ? "is-current" : undefined} onClick={() => changeView("trash")}>
           Trash <span className="wp-count">({counts.trash})</span>
         </button>
       </div>
@@ -209,9 +250,7 @@ export default function AdminBlogs() {
         <label htmlFor="blogs-bulk-action" className="sr-only">Select bulk action</label>
         <select id="blogs-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
           <option>Bulk actions</option>
-          <option>Duplicate</option>
-          <option>Move to Trash</option>
-          <option>Delete Permanently</option>
+          {bulkOptions.map(opt => <option key={opt}>{opt}</option>)}
         </select>
         <button type="button" onClick={handleBulkAction} className="wp-btn">Apply</button>
 
@@ -220,7 +259,7 @@ export default function AdminBlogs() {
           id="blogs-filter-category"
           className="wp-select"
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
+          onChange={(e) => { setSelectedCategory(e.target.value); setPage(1); setSelectedIds([]); }}
         >
           <option>All categories</option>
           {Array.from(new Set(blogs.map(b => b.category).filter(Boolean))).map(cat => (
@@ -230,18 +269,18 @@ export default function AdminBlogs() {
 
         <span className="wp-spacer" />
 
-        <div className="wp-search" role="search">
+        <form className="wp-search" role="search" onSubmit={handleSearchSubmit}>
           <label htmlFor="blogs-search" className="sr-only">Search posts</label>
           <input
             id="blogs-search"
             type="search"
             placeholder="Search posts"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             className="wp-input"
           />
-          <button type="button" className="wp-btn">Search Posts</button>
-        </div>
+          <button type="submit" className="wp-btn">Search Posts</button>
+        </form>
       </div>
 
       <div className="wp-toolbar">
@@ -255,10 +294,10 @@ export default function AdminBlogs() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="wp-muted">Loading posts…</td></tr>
-            ) : filteredBlogs.length === 0 ? (
+            ) : pageBlogs.length === 0 ? (
               <tr><td colSpan={6} className="wp-muted">No posts found.</td></tr>
             ) : (
-              filteredBlogs.map((b) => (
+              pageBlogs.map((b) => (
                 <tr key={b._id} className={selectedIds.includes(b._id) ? "is-selected" : undefined}>
                   <td className="wp-check-col">
                     <label htmlFor={`blog-select-${b._id}`} className="sr-only">Select {b.title}</label>
@@ -293,7 +332,7 @@ export default function AdminBlogs() {
                       </div>
                     </div>
                   </td>
-                  <td className="wp-hide-sm">Admin</td>
+                  <td className="wp-hide-sm">{b.author?.trim() ? b.author : "—"}</td>
                   <td className="wp-hide-sm">{b.category && b.category !== "Uncategorized" ? b.category : "—"}</td>
                   <td>
                     <span className={`wp-pill ${b.status === "Published" || !b.status ? "wp-st-published" : "wp-st-draft"}`}>

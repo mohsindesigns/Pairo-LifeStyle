@@ -87,7 +87,7 @@ function SortableItem({ url, onRemove, onSetFeatured, isFeatured }) {
   );
 }
 
-export default function GallerySorter({ images, onChange, featuredImage }) {
+export default function GallerySorter({ images, onChange, featuredImage, onSetFeatured }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -119,13 +119,12 @@ export default function GallerySorter({ images, onChange, featuredImage }) {
     onChange(images.filter(img => img !== url));
   };
 
+  // The featured/main image is images[0] (ProductForm's "Product image" and the
+  // storefront both read images[0]), so "Set as featured" moves it to the front.
   const setFeatured = (url) => {
-    // If the caller wants a separate featuredImage field, handle it here or via onChange
-    // For now, we'll assume the first image in the array is often used as featured,
-    // but we can pass back a specific URL if needed.
-    if (featuredImage !== undefined) {
-      // Logic handled by parent
-    }
+    const idx = images.indexOf(url);
+    if (idx > 0) onChange(arrayMove(images, idx, 0));
+    if (onSetFeatured) onSetFeatured(url);
   };
 
   return (
@@ -139,13 +138,13 @@ export default function GallerySorter({ images, onChange, featuredImage }) {
         strategy={rectSortingStrategy}
       >
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-          {images.map((url) => (
+          {images.map((url, i) => (
             <SortableItem
               key={url}
               url={url}
               onRemove={removeImage}
               onSetFeatured={setFeatured}
-              isFeatured={url === featuredImage}
+              isFeatured={featuredImage !== undefined ? url === featuredImage : i === 0}
             />
           ))}
         </div>

@@ -148,13 +148,14 @@ export default function BlogForm({ blogId }) {
       }
    }, []);
 
-   const handleSubmit = async (e) => {
-      e.preventDefault();
+   // overrides: fields forced for this save only (e.g. "Save Draft" forces status Draft)
+   const handleSubmit = async (e, overrides = null) => {
+      e?.preventDefault?.();
       setSaving(true);
       try {
          const method = blogId ? "PUT" : "POST";
          // Strip immutable Mongoose fields that cause _id update errors
-         const { _id, __v, createdAt, updatedAt, ...cleanData } = formData;
+         const { _id, __v, createdAt, updatedAt, ...cleanData } = overrides ? { ...formData, ...overrides } : formData;
          const payload = blogId ? { ...cleanData, id: blogId } : cleanData;
          console.log("[BlogForm] Submitting seo:", payload.seo);
          const res = await fetch("/api/admin/blogs", {
@@ -164,7 +165,10 @@ export default function BlogForm({ blogId }) {
          });
          if (res.ok) {
             const savedBlog = await res.json();
-            toast.success(blogId ? "Blog post updated successfully!" : "Blog post created successfully!");
+            if (overrides) setFormData(prev => ({ ...prev, ...overrides }));
+            toast.success(overrides?.status === "Draft"
+               ? "Draft saved."
+               : (blogId ? "Blog post updated successfully!" : "Blog post created successfully!"));
             if (!blogId && savedBlog._id) {
                router.push(`/admin/blogs/${savedBlog._id}`);
             }
@@ -485,7 +489,8 @@ export default function BlogForm({ blogId }) {
                   <div className="flex flex-wrap justify-between items-center gap-2" style={{ padding: "10px 12px 2px" }}>
                      <button
                          type="button"
-                         onClick={handleSubmit}
+                         onClick={(e) => handleSubmit(e, { status: "Draft" })}
+                         disabled={saving}
                          className="wp-btn"
                      >
                          Save Draft

@@ -126,9 +126,17 @@ export async function DELETE(req) {
    await dbConnect();
    const { searchParams } = new URL(req.url);
    const id = searchParams.get("id");
+   // ?permanent=true asks explicitly for a permanent delete; it is only allowed for posts
+   // already in Trash (never deletes a live post in one step). Without the flag the
+   // existing behaviour stays: live post -> Trash, trashed post -> permanent delete.
+   const permanent = searchParams.get("permanent") === "true";
    try {
       const blog = await Blog.findById(id);
       if (!blog) return NextResponse.json({ error: "Blog not found" }, { status: 404 });
+
+      if (permanent && !blog.isDeleted) {
+         return NextResponse.json({ error: "Move the post to Trash before deleting it permanently." }, { status: 400 });
+      }
 
       if (blog.isDeleted) {
          // Clean up media usage references

@@ -90,6 +90,17 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
     onClose();
   };
 
+  // Double-click: insert the clicked item directly (state from toggleSelect isn't updated yet)
+  const insertItem = (item) => {
+    if (multiple) {
+      const merged = selected.some(s => s._id === item._id) ? selected : [...selected, item];
+      onSelect(merged);
+    } else {
+      onSelect(item);
+    }
+    onClose();
+  };
+
   // Upload handling
   const handleFiles = async (files) => {
     if (!files || files.length === 0) return;
@@ -266,7 +277,7 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
                         <button
                           type="button"
                           onClick={() => toggleSelect(item)}
-                          onDoubleClick={() => { toggleSelect(item); handleInsert(); }}
+                          onDoubleClick={() => insertItem(item)}
                           aria-pressed={isSelected(item)}
                           aria-label={item.filename || item.title || "Media item"}
                           title={item.filename}

@@ -74,6 +74,7 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
   };
 
   return (
+    <>
     <div className="wp-modal-backdrop" onClick={onClose}>
       <div
         className="wp-modal"
@@ -190,14 +191,21 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
           </button>
         </div>
       </div>
-
-      {mediaPicker && (
-        <MediaPickerModal
-          onSelect={url => { setForm(prev => ({ ...prev, image: url })); setMediaPicker(false); }}
-          onClose={() => setMediaPicker(false)}
-        />
-      )}
     </div>
+
+      {/* Rendered outside the form backdrop so clicks in the picker don't close the form */}
+      <MediaPickerModal
+        open={mediaPicker}
+        title="Select Image"
+        onSelect={media => {
+          const picked = Array.isArray(media) ? media[0] : media;
+          const url = typeof picked === "string" ? picked : picked?.url;
+          if (url) setForm(prev => ({ ...prev, image: url }));
+          setMediaPicker(false);
+        }}
+        onClose={() => setMediaPicker(false)}
+      />
+    </>
   );
 }
 
@@ -275,7 +283,10 @@ export default function GalleryItemsPage() {
   return (
     <RequirePermission permission="pages.edit">
     <Page>
-      <PageHeader title="Gallery Items" />
+      <PageHeader
+        title="Gallery Items"
+        actions={<button type="button" onClick={() => { setEditingItem(null); setFormOpen(true); }} className="wp-btn">Add Gallery Item</button>}
+      />
       <div className="wp-notice wp-notice-info">
         <p><strong>Tip:</strong> Gallery items with a linked product will show a &quot;View Product&quot; button on the public gallery page. The link is stored by product ID, so it stays correct even if the product permalink changes.</p>
       </div>
