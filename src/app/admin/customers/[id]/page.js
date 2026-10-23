@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import { ArrowLeft, User as UserIcon, Package, Calendar, Mail, MapPin, ExternalLink } from "lucide-react";
+import { ArrowLeft, Package, Calendar, Mail, MapPin, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, Postbox, Notice, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
 import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function CustomerDetail({ params }) {
@@ -36,175 +36,200 @@ export default function CustomerDetail({ params }) {
     fetchCustomer();
   }, [id, router]);
 
-  if (loading) return <AdminPageLayout title="Loading Customer..."><div className="p-10 text-center italic text-gray-400">Loading details...</div></AdminPageLayout>;
-  if (!customer) return <AdminPageLayout title="Error"><div className="p-10 text-center text-red-500 font-bold uppercase">Customer not found</div></AdminPageLayout>;
+  if (loading) return (
+    <Page>
+      <PageHeader title="Loading Customer..." />
+      <p className="wp-muted" role="status">Loading details...</p>
+    </Page>
+  );
+  if (!customer) return (
+    <Page>
+      <PageHeader title="Error" actions={<Link href="/admin/customers" className="wp-btn">Back to Customers</Link>} />
+      <Notice type="error">Customer not found.</Notice>
+    </Page>
+  );
+
+  const orders = customer.orders || [];
+  const currency = orders[0]?.currency || "USD";
+  const totalSpent = orders.reduce((sum, o) => sum + (o.financials?.total ?? 0), 0);
+  const lastOrder = orders[0];
+  const initials = (() => {
+    const parts = (customer.name || customer.email || "?").trim().split(/\s+/).filter(Boolean);
+    return ((parts[0]?.[0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?";
+  })();
 
   return (
     <RequirePermission permission="customers.view">
-    <AdminPageLayout
-      title={customer.name}
-      breadcrumbs={[{ label: "Customers", href: "/admin/customers" }, { label: customer.name }]}
-    >
-      <div className="space-y-6">
-         <div className="flex items-center gap-4 mb-2">
-            <Link href="/admin/customers" className="text-[#2271b1] hover:text-[#135e96] flex items-center gap-1 text-[13px] font-medium">
-               <ArrowLeft className="w-4 h-4" /> Back to Customers
-            </Link>
-         </div>
+    <Page>
+      <PageHeader
+        title={customer.name}
+        actions={
+          <Link href="/admin/customers" className="wp-btn">
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to Customers
+          </Link>
+        }
+      />
 
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Sidebar: Profile Info */}
-            <div className="space-y-6">
-               <div className="bg-white border border-[#ccd0d4] p-6 shadow-sm">
-                  <div className="flex flex-col items-center text-center pb-6 border-b border-[#f0f0f1]">
-                     <div className="w-20 h-20 bg-gray-50 border border-gray-200 rounded-[2px] flex items-center justify-center text-[#8c8f94] mb-4">
-                        <UserIcon className="w-10 h-10" />
-                     </div>
-                     <h2 className="text-xl font-bold text-[#1d2327] uppercase leading-tight">{customer.name}</h2>
-                     <p className="text-[13px] text-[#646970] mt-1">{customer.email}</p>
-                     <span className="mt-3 px-3 py-1 bg-[#f6f7f7] border border-[#ccd0d4] text-[11px] font-bold uppercase tracking-wider rounded-[2px]">
-                        {customer.role || 'CUSTOMER'}
-                     </span>
-                  </div>
+      {/* Profile header */}
+      <section className="wp-postbox" aria-label="Customer profile">
+        <div className="wp-inside" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16 }}>
+          <div className="wp-avatar wp-avatar-lg" aria-hidden="true">{initials}</div>
+          <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <h2 className="wp-strong" style={{ fontSize: 18, margin: 0, overflowWrap: "anywhere" }}>{customer.name}</h2>
+            <p className="wp-muted" style={{ margin: "2px 0 0", display: "flex", alignItems: "center", gap: 6, overflowWrap: "anywhere" }}>
+              <Mail className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {customer.email}
+            </p>
+            <p className="wp-muted wp-small" style={{ margin: "4px 0 0", display: "flex", alignItems: "center", gap: 6 }}>
+              <Calendar className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Customer since {formatDate(customer.createdAt)}
+            </p>
+          </div>
+          <span className="wp-pill" style={{ textTransform: "capitalize" }}>{customer.role || "customer"}</span>
+        </div>
+      </section>
 
-                  <div className="py-6 space-y-4">
-                     <div className="flex items-start gap-3">
-                        <Mail className="w-4 h-4 text-[#8c8f94] mt-0.5" />
-                        <div>
-                           <p className="text-[11px] font-bold text-[#1d2327] uppercase">Contact</p>
-                           <p className="text-[13px] text-[#2271b1] hover:underline cursor-pointer">{customer.email}</p>
-                        </div>
-                     </div>
-                     <div className="flex items-start gap-3">
-                        <Calendar className="w-4 h-4 text-[#8c8f94] mt-0.5" />
-                        <div>
-                           <p className="text-[11px] font-bold text-[#1d2327] uppercase">Customer Since</p>
-                           <p className="text-[13px] text-[#3c434a]">{new Date(customer.createdAt).toLocaleDateString()}</p>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-
-               {/* Addresses */}
-               <div className="bg-white border border-[#ccd0d4] shadow-sm">
-                  <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-                     <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wide">Saved Addresses</h3>
-                  </div>
-                  <div className="p-4 space-y-4">
-                     {customer.addresses?.length === 0 ? (
-                        <p className="text-[13px] text-gray-400 italic">No addresses saved.</p>
-                     ) : (
-                        customer.addresses?.map((addr, i) => (
-                           <div key={i} className="p-3 bg-[#fbfbfb] border border-[#f0f0f1] rounded-[2px]">
-                              <p className="text-[13px] font-bold text-[#3c434a]">{addr.fullName}</p>
-                              <p className="text-[12px] text-[#646970] leading-relaxed">
-                                 {addr.street}<br />
-                                 {addr.city}, {addr.state} {addr.zipCode}<br />
-                                 {addr.country}
-                              </p>
-                           </div>
-                        ))
-                     )}
-                  </div>
-               </div>
-            </div>
-
-            {/* Main Content: Order History */}
-            <div className="lg:col-span-2 space-y-6">
-               <div className="bg-white border border-[#ccd0d4] shadow-sm">
-                  <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center justify-between">
-                     <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wide">Order History</h3>
-                     <span className="text-[11px] font-bold text-[#646970] uppercase">{customer.orders?.length || 0} Total Orders</span>
-                  </div>
-                  <div className="overflow-x-auto">
-                     <table className="w-full text-left border-collapse text-[13px]">
-                        <thead>
-                           <tr className="border-b border-[#f0f0f1] text-[#646970]">
-                              <th className="px-4 py-3 font-bold uppercase text-[11px]">Order #</th>
-                              <th className="px-4 py-3 font-bold uppercase text-[11px]">Date</th>
-                              <th className="px-4 py-3 font-bold uppercase text-[11px]">Status</th>
-                              <th className="px-4 py-3 font-bold uppercase text-[11px] text-right">Total</th>
-                              <th className="px-4 py-3 w-10"></th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#f0f0f1]">
-                           {customer.orders?.length === 0 ? (
-                              <tr><td colSpan={5} className="p-12 text-center italic text-gray-400">No orders placed by this customer yet.</td></tr>
-                           ) : (
-                              customer.orders?.map((order) => (
-                                 <tr key={order.id} className="hover:bg-[#fbfbfb]">
-                                    <td className="px-4 py-4">
-                                       <Link href={`/admin/orders/${order.id}`} className="font-bold text-[#2271b1] hover:underline">
-                                          #{order.orderNumber}
-                                       </Link>
-                                    </td>
-                                    <td className="px-4 py-4 text-[#3c434a]">
-                                       {new Date(order.createdAt).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-4 py-4">
-                                       <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
-                                          order.status === 'Delivered' ? 'bg-[#c6e1c6] text-[#1e4620]' :
-                                          order.status === 'Cancelled' ? 'bg-[#f8d7da] text-[#842029]' :
-                                          'bg-[#d9ebf5] text-[#1a4a6e]'
-                                       }`}>
-                                          {order.status}
-                                       </span>
-                                    </td>
-                                    <td className="px-4 py-4 text-right font-bold text-[#1d2327]">
-                                       ${(order.financials?.total ?? 0).toLocaleString()}
-                                    </td>
-                                    <td className="px-4 py-4 text-center">
-                                       <Link href={`/admin/orders/${order.id}`} className="text-[#8c8f94] hover:text-[#2271b1]">
-                                          <ExternalLink className="w-4 h-4" />
-                                       </Link>
-                                    </td>
-                                 </tr>
-                              ))
-                           )}
-                        </tbody>
-                     </table>
-                  </div>
-               </div>
-
-               {/* Detailed Item View */}
-               {customer.orders?.length > 0 && (
-                  <div className="bg-white border border-[#ccd0d4] shadow-sm">
-                     <div className="p-4 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-                        <h3 className="text-[13px] font-bold text-[#1d2327] uppercase tracking-wide">Item Acquisition History</h3>
-                     </div>
-                     <div className="p-6 space-y-6">
-                        {customer.orders.map((order) => (
-                           <div key={order.id} className="space-y-4">
-                              <div className="flex items-center gap-2 text-[11px] font-bold text-[#646970] uppercase">
-                                 <Package className="w-3 h-3" /> 
-                                 Order #{order.orderNumber} — {new Date(order.createdAt).toLocaleDateString()}
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                 {order.items?.map((item, idx) => (
-                                    <div key={idx} className="flex gap-4 p-3 border border-[#f0f0f1] rounded-[2px] bg-[#fbfbfb]">
-                                       <div className="w-12 h-12 bg-gray-100 rounded-[2px] overflow-hidden flex-shrink-0">
-                                          <img src={item.image} className="w-full h-full object-cover" alt={item.name} />
-                                       </div>
-                                       <div>
-                                          <p className="text-[13px] font-bold text-[#1d2327] uppercase leading-tight">{item.name}</p>
-                                          <p className="text-[11px] text-[#646970] mt-0.5">
-                                             QTY: {item.quantity} | {item.selectedVariant?.title || 'Standard'}
-                                          </p>
-                                          <p className="text-[12px] font-bold text-[#3c434a] mt-1">${((item.priceAtPurchase || 0) * (item.quantity || 0)).toLocaleString()}</p>
-                                       </div>
-                                    </div>
-                                 ))}
-                              </div>
-                              <div className="h-px bg-[#f0f0f1] last:hidden" />
-                           </div>
-                        ))}
-                     </div>
-                  </div>
-               )}
-            </div>
-         </div>
+      {/* KPI strip */}
+      <div className="wp-stats">
+        <div className="wp-stat">
+          <div className="wp-stat-label">Orders</div>
+          <div className="wp-stat-value">{orders.length}</div>
+        </div>
+        <div className="wp-stat">
+          <div className="wp-stat-label">Total spent</div>
+          <div className="wp-stat-value">{formatMoney(totalSpent, currency)}</div>
+        </div>
+        <div className="wp-stat">
+          <div className="wp-stat-label">Average order</div>
+          <div className="wp-stat-value">{formatMoney(orders.length ? totalSpent / orders.length : 0, currency)}</div>
+        </div>
+        <div className="wp-stat">
+          <div className="wp-stat-label">Last order</div>
+          <div className="wp-stat-value">{lastOrder ? formatDate(lastOrder.createdAt) : "—"}</div>
+        </div>
       </div>
-    </AdminPageLayout>
+
+      <div className="wp-cols">
+        {/* Main column */}
+        <div className="wp-col-main">
+          <Postbox id="order-history" title="Order History" aside={`${customer.orders?.length || 0} total orders`} flush>
+            <div style={{ overflowX: "auto" }}>
+              <table className="wp-list-table">
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th className="wp-hide-sm">Date</th>
+                    <th>Status</th>
+                    <th className="wp-num">Total</th>
+                    <th style={{ width: 40 }}><span className="sr-only">Open</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customer.orders?.length === 0 ? (
+                    <tr><td colSpan={5} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>No orders placed by this customer yet.</td></tr>
+                  ) : (
+                    customer.orders?.map((order) => (
+                      <tr key={order.id}>
+                        <td>
+                          <Link href={`/admin/orders/${order.id}`} className="wp-row-title">
+                            #{order.orderNumber}
+                          </Link>
+                          <div className="wp-mobile-meta">{formatDate(order.createdAt)}</div>
+                        </td>
+                        <td className="wp-hide-sm">{formatDate(order.createdAt)}</td>
+                        <td><StatusPill status={order.status} small /></td>
+                        <td className="wp-num wp-strong">{formatMoney(order.financials?.total ?? 0, order.currency || currency)}</td>
+                        <td>
+                          <Link href={`/admin/orders/${order.id}`} className="wp-link" aria-label={`Open order #${order.orderNumber}`}>
+                            <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Postbox>
+
+          {/* Detailed Item View */}
+          {customer.orders?.length > 0 && (
+            <Postbox id="item-history" title="Items Purchased">
+              {customer.orders.map((order) => (
+                <div key={order.id} style={{ marginBottom: 16 }}>
+                  <div className="wp-strong" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                    <Package className="w-3.5 h-3.5" aria-hidden="true" />
+                    Order #{order.orderNumber} <span className="wp-muted" style={{ fontWeight: 400 }}>— {formatDate(order.createdAt)}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {order.items?.map((item, idx) => (
+                      <div key={idx} style={{ display: "flex", gap: 10, padding: 8, border: "1px solid #f0f0f1", background: "#f6f7f7", minWidth: 0 }}>
+                        <div className="wp-thumb">
+                          <img src={item.image} alt={item.name} />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="wp-strong" style={{ overflowWrap: "anywhere" }}>{item.name}</div>
+                          <div className="wp-muted wp-small">
+                            Qty {item.quantity} · {item.selectedVariant?.title || 'Standard'}
+                          </div>
+                          <div className="wp-small wp-strong">{formatMoney((item.priceAtPurchase || 0) * (item.quantity || 0), order.currency || currency)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </Postbox>
+          )}
+
+          {/* Addresses */}
+          <Postbox id="saved-addresses" title="Saved Addresses">
+            {customer.addresses?.length === 0 ? (
+              <p className="wp-empty">No addresses saved.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {customer.addresses?.map((addr, i) => (
+                  <address key={i} className="wp-addr" style={{ display: "flex", gap: 8 }}>
+                    <MapPin className="w-4 h-4 shrink-0 text-[#8c8f94]" style={{ marginTop: 3 }} aria-hidden="true" />
+                    <span>
+                      <span className="wp-strong">{addr.fullName}</span>
+                      {addr.isDefault && <span className="wp-pill wp-pill-sm" style={{ marginLeft: 6 }}>Default</span>}<br />
+                      {addr.street}<br />
+                      {addr.city}, {addr.state} {addr.zipCode}<br />
+                      {addr.country}
+                    </span>
+                  </address>
+                ))}
+              </div>
+            )}
+          </Postbox>
+        </div>
+
+        {/* Side column */}
+        <div className="wp-col-side">
+          <Postbox id="account-details" title="Account">
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">Email</span>
+              <span className="wp-kv-v" style={{ overflowWrap: "anywhere", textAlign: "right" }}>{customer.email}</span>
+            </div>
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">Role</span>
+              <span className="wp-kv-v" style={{ textTransform: "capitalize" }}>{customer.role || "customer"}</span>
+            </div>
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">Email verified</span>
+              <span className="wp-kv-v">{customer.emailVerified ? "Yes" : "No"}</span>
+            </div>
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">Customer since</span>
+              <span className="wp-kv-v">{formatDate(customer.createdAt)}</span>
+            </div>
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">Saved addresses</span>
+              <span className="wp-kv-v">{customer.addresses?.length || 0}</span>
+            </div>
+          </Postbox>
+        </div>
+      </div>
+    </Page>
     </RequirePermission>
   );
 }

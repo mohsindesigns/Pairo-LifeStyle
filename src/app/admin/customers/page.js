@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, User as UserIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, formatMoney, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
@@ -98,113 +98,142 @@ export default function AdminCustomers() {
     c.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const allSelected = selectedIds.length > 0 && selectedIds.length === filteredCustomers.length;
+  const itemsLabel = `${filteredCustomers.length} item${filteredCustomers.length === 1 ? "" : "s"}`;
+  const initialsOf = (c) => {
+    const source = (c.name || c.email || "?").trim();
+    const parts = source.split(/\s+/).filter(Boolean);
+    return ((parts[0]?.[0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?";
+  };
+  const locationOf = (c) => {
+    const addr = (c.addresses || []).find((a) => a?.isDefault) || (c.addresses || [])[0];
+    if (!addr) return "";
+    return [addr.city, addr.state, addr.country].filter(Boolean).join(", ");
+  };
+
+  const columns = (
+    <tr>
+      <th className="wp-check-col">
+        <input type="checkbox" aria-label="Select all customers" checked={allSelected} onChange={toggleSelectAll} />
+      </th>
+      <th>Customer</th>
+      <th className="wp-hide-sm">Location</th>
+      <th className="wp-num">Orders</th>
+      <th className="wp-num wp-hide-sm">Total spent</th>
+      <th className="wp-hide-sm">Last order</th>
+      <th className="wp-hide-sm">Registered</th>
+    </tr>
+  );
+
   return (
     <RequirePermission permission="customers.view">
-    <AdminPageLayout
-      title="Customers"
-      addNewLink="/admin/customers/new"
-      addNewLabel="Add New"
-      breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Customers" }]}
-    >
-      <div className="space-y-4">
-        {/* Filter Links */}
-        <ul className="flex items-center gap-2 text-[13px] text-[#2271b1]">
-           <li className="text-[#1d2327] font-semibold cursor-pointer">All <span className="text-[#646970] font-normal">({customers.length})</span></li>
-           <span className="text-[#c3c4c7]">|</span>
-           <li className="cursor-pointer hover:text-[#135e96]">Active Customers</li>
-        </ul>
+    <Page>
+      <PageHeader
+        title="Customers"
+        actions={<Link href="/admin/customers/new" className="wp-btn">Add New</Link>}
+        aside={
+          <div className="wp-search" role="search">
+            <label htmlFor="customer-search" className="sr-only">Search customers</label>
+            <input
+              id="customer-search"
+              type="search"
+              className="wp-input"
+              placeholder="Search customers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <button className="wp-btn">Search Customers</button>
+          </div>
+        }
+      />
 
-        {/* Action Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex flex-col md:flex-row items-center justify-between gap-2 md:gap-4 shadow-sm">
-           <div className="flex flex-wrap items-center gap-1.5 xs:gap-2 w-full md:w-auto">
-              <select className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none max-w-full" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
-                 <option>Bulk actions</option>
-                 <option>Duplicate</option>
-                 <option>Move to Trash</option>
-                 <option>Delete Permanently</option>
-              </select>
-              <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
-           </div>
-
-           <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto min-w-0">
-              <input 
-                type="text" 
-                placeholder="Search customers..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-48 bg-white focus:border-[#2271b1] rounded-[3px]"
-              />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shrink-0 whitespace-nowrap">
-                Search <span className="hidden xs:inline">Customers</span>
-              </button>
-           </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-x-auto max-w-full">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[500px] md:min-w-[800px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredCustomers.length} onChange={toggleSelectAll} /></th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Username</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Name</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Email</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] text-right">Orders</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={5} className="p-8 text-center italic text-gray-400">Loading customers...</td></tr>
-              ) : filteredCustomers.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center italic text-gray-400">No customers found.</td></tr>
-              ) : (
-                filteredCustomers.map((c) => (
-                  <tr key={c._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(c._id) ? "bg-[#f0f6fa]" : ""}`}>
-                    <td className="px-3 py-4 text-center align-top"><input type="checkbox" checked={selectedIds.includes(c._id)} onChange={() => toggleSelect(c._id)} /></td>
-                    <td className="px-3 py-4 align-top">
-                      <div className="flex items-center gap-3">
-                         <div className="w-8 h-8 bg-white border border-[#dcdcde] rounded-[2px] flex items-center justify-center text-[#8c8f94] shrink-0">
-                            <UserIcon className="w-4 h-4" />
-                         </div>
-                          <div className="flex flex-col min-w-0">
-                             <Link href={`/admin/customers/${c._id}`} className="font-bold text-[#2271b1] hover:underline cursor-pointer block mb-1 break-words">
-                                {c.email?.split('@')[0]}
-                             </Link>
-                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
-                                <Link href={`/admin/customers/${c._id}`} className="hover:text-[#135e96]">Edit</Link>
-                                <span className="text-[#c3c4c7]">|</span>
-                                <button onClick={() => handleDuplicate(c)} className="hover:text-[#135e96]">Duplicate</button>
-                                <span className="text-[#c3c4c7]">|</span>
-                                <button onClick={() => handleDelete(c._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
-                                <span className="text-[#c3c4c7]">|</span>
-                                <Link href={`/admin/customers/${c._id}`} className="hover:text-[#135e96]">View</Link>
-                             </div>
-                          </div>
-                       </div>
-                    </td>
-                    <td className="px-3 py-4 align-top text-[#3c434a]">{c.name || "—"}</td>
-                    <td className="px-3 py-4 align-top text-[#2271b1] hover:underline cursor-pointer break-all">
-                       <Link href={`/admin/customers/${c._id}`}>{c.email}</Link>
-                    </td>
-                    <td className="px-3 py-4 align-top text-right font-bold text-[#1d2327]">{c.orderCount || 0}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 text-[13px] text-[#646970]">
-           <div>{filteredCustomers.length} items</div>
-           <div className="flex items-center gap-1">
-              <button className="p-1 border border-[#ccd0d4] bg-white rounded disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
-              <span className="px-3">1 of 1</span>
-              <button className="p-1 border border-[#ccd0d4] bg-white rounded disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
-           </div>
-        </div>
+      {/* Filter Links */}
+      <div className="wp-subsub">
+        <span className="is-current">All <span className="wp-count">({customers.length})</span></span>
+        <span className="wp-sep">|</span>
+        <button type="button">Active Customers</button>
       </div>
-    </AdminPageLayout>
+
+      {/* Action Bar */}
+      <div className="wp-toolbar">
+        <label htmlFor="customer-bulk-action" className="sr-only">Select bulk action</label>
+        <select id="customer-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+          <option>Bulk actions</option>
+          <option>Duplicate</option>
+          <option>Move to Trash</option>
+          <option>Delete Permanently</option>
+        </select>
+        <button onClick={handleBulkAction} className="wp-btn">Apply</button>
+        <span className="wp-spacer" />
+        <span className="wp-pages">{itemsLabel}</span>
+      </div>
+
+      {/* Table */}
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{columns}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>Loading customers...</td></tr>
+            ) : filteredCustomers.length === 0 ? (
+              <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>No customers found.</td></tr>
+            ) : (
+              filteredCustomers.map((c) => {
+                const location = locationOf(c);
+                return (
+                  <tr key={c._id} className={selectedIds.includes(c._id) ? "is-selected" : undefined}>
+                    <td className="wp-check-col">
+                      <input type="checkbox" aria-label={`Select ${c.name || c.email}`} checked={selectedIds.includes(c._id)} onChange={() => toggleSelect(c._id)} />
+                    </td>
+                    <td style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start", minWidth: 0 }}>
+                        <div className="wp-avatar" aria-hidden="true">{initialsOf(c)}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <Link href={`/admin/customers/${c._id}`} className="wp-row-title" style={{ overflowWrap: "anywhere" }}>
+                            {c.name || c.email?.split('@')[0]}
+                          </Link>
+                          <div className="wp-muted" style={{ overflowWrap: "anywhere" }}>
+                            <Link href={`/admin/customers/${c._id}`} className="wp-link">{c.email}</Link>
+                          </div>
+                          <div className="wp-mobile-meta">
+                            {formatMoney(c.totalSpent)} spent
+                            {c.lastOrderDate ? ` · Last order ${formatDate(c.lastOrderDate)}` : ""}
+                            {location ? ` · ${location}` : ""}
+                          </div>
+                          <div className="wp-row-actions">
+                            <Link href={`/admin/customers/${c._id}`}>Edit</Link>
+                            <button type="button" onClick={() => handleDuplicate(c)}>Duplicate</button>
+                            <button type="button" className="is-danger" onClick={() => handleDelete(c._id)}>Trash</button>
+                            <Link href={`/admin/customers/${c._id}`}>View</Link>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="wp-hide-sm">{location || <span className="wp-muted">—</span>}</td>
+                    <td className="wp-num wp-strong">{c.orderCount || 0}</td>
+                    <td className="wp-num wp-hide-sm">{formatMoney(c.totalSpent)}</td>
+                    <td className="wp-hide-sm">{c.lastOrderDate ? formatDate(c.lastOrderDate) : <span className="wp-muted">—</span>}</td>
+                    <td className="wp-hide-sm">{c.createdAt ? formatDate(c.createdAt) : <span className="wp-muted">—</span>}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+          <tfoot>{columns}</tfoot>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <span className="wp-pages">
+          {itemsLabel}
+          <button type="button" className="wp-pager" aria-label="Previous page"><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
+          <span>1 of 1</span>
+          <button type="button" className="wp-pager" aria-label="Next page"><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
+        </span>
+      </div>
+    </Page>
     </RequirePermission>
   );
 }

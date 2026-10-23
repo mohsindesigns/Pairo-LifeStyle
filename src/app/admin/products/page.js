@@ -1,27 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { 
-  Search, 
-  Plus, 
-  Image as ImageIcon,
-  ExternalLink,
-  AlertCircle,
-  Circle,
-  TrendingUp,
-  Infinity,
-  Copy,
-  Trash2,
-  Edit,
-  Eye,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  X
-} from "lucide-react";
+import { Image as ImageIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, formatDate } from "@/components/admin/ui";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
@@ -201,308 +184,347 @@ export default function AdminProducts() {
     return matchesSearch && matchesCategory && matchesStock && matchesType;
   });
 
+  const stockClass = (p) =>
+    !p.manageStock
+      ? "wp-stock-in"
+      : p.stock <= 0
+        ? "wp-stock-out"
+        : p.stock <= (p.lowStockThreshold || 5)
+          ? "wp-stock-low"
+          : "wp-stock-in";
+
+  const stockLabel = (p) =>
+    !p.manageStock
+      ? "In stock"
+      : p.stock <= 0
+        ? "Out of stock"
+        : p.stock <= (p.lowStockThreshold || 5)
+          ? `Low stock (${p.stock})`
+          : `In stock (${p.stock})`;
+
+  const allSelected = filteredProducts.length > 0 && selectedIds.length === filteredProducts.length;
+
+  const pagination = (
+    <div className="wp-pages">
+      <span>{filteredProducts.length} items</span>
+      <button type="button" className="wp-pager" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+      <span>1 of 1</span>
+      <button type="button" className="wp-pager" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+    </div>
+  );
+
+  const headerRow = (
+    <tr>
+      <th scope="col" className="wp-check-col">
+        <input
+          type="checkbox"
+          aria-label="Select all products"
+          checked={allSelected}
+          onChange={toggleSelectAll}
+        />
+      </th>
+      <th scope="col" style={{ width: 60 }}>
+        <ImageIcon className="w-4 h-4" aria-hidden="true" style={{ color: "#8c8f94" }} />
+        <span className="sr-only">Image</span>
+      </th>
+      <th scope="col">Name</th>
+      <th scope="col" className="wp-hide-sm">SKU</th>
+      <th scope="col" className="wp-hide-sm">Stock</th>
+      <th scope="col" className="wp-hide-sm">Price</th>
+      <th scope="col" className="wp-hide-sm">Categories</th>
+      <th scope="col">Status</th>
+      <th scope="col" className="wp-hide-sm">Date</th>
+    </tr>
+  );
+
   return (
     <RequirePermission permission="products.view">
-    <AdminPageLayout
-      title="Products"
-      addNewLink="/admin/products/new"
-      addNewLabel="Add New"
-      breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Products" }]}
-    >
-      <div className="space-y-4">
-        {/* View Tabs */}
-        <ul className="flex flex-wrap items-center gap-1.5 text-[13px] text-[#2271b1] select-none font-sans">
-          <li className={`${view === "all" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("all")}>
-            All <span className="text-[#646970] font-normal">({counts.all})</span>
-          </li>
-          <span className="text-[#c3c4c7] font-normal">|</span>
-          <li className={`${view === "published" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("published")}>
-            Published <span className="text-[#646970] font-normal">({counts.published})</span>
-          </li>
-          <span className="text-[#c3c4c7] font-normal">|</span>
-          <li className={`${view === "trash" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("trash")}>
-            Trash <span className="text-[#646970] font-normal">({view === "trash" ? products.length : "-"})</span>
-          </li>
-        </ul>
+    <Page>
+      <PageHeader
+        title="Products"
+        actions={<Link href="/admin/products/new" className="wp-btn">Add new product</Link>}
+      />
 
-        {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 shadow-sm font-sans">
-          <div className="flex flex-wrap items-center gap-1.5 xs:gap-2">
-            <select 
-              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
-              value={bulkAction} 
-              onChange={(e) => setBulkAction(e.target.value)}
-            >
-              <option>Bulk actions</option>
-              {view === "trash" ? (
-                <option>Delete Permanently</option>
-              ) : (
-                <>
-                  <option>Move to Trash</option>
-                  <option>Duplicate</option>
-                </>
-              )}
-            </select>
-            <button 
-              type="button"
-              onClick={handleBulkAction} 
-              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
-            >
-              Apply
-            </button>
-            
-            <select 
-              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
-              value={selectedCategory} 
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
-              <option>All categories</option>
-              {categories.map(cat => <option key={cat._id} value={cat.name}>{cat.name}</option>)}
-            </select>
+      {/* Status filter links */}
+      <div className="wp-subsub" role="tablist" aria-label="Filter products by status">
+        <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-current" : undefined} onClick={() => setView("all")}>
+          All <span className="wp-count">({counts.all})</span>
+        </button>
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <button type="button" role="tab" aria-selected={view === "published"} className={view === "published" ? "is-current" : undefined} onClick={() => setView("published")}>
+          Published <span className="wp-count">({counts.published})</span>
+        </button>
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <button type="button" role="tab" aria-selected={view === "trash"} className={view === "trash" ? "is-current" : undefined} onClick={() => setView("trash")}>
+          Trash <span className="wp-count">({view === "trash" ? products.length : "-"})</span>
+        </button>
+      </div>
 
-            <select 
-              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
-              value={selectedStock} 
-              onChange={(e) => setSelectedStock(e.target.value)}
-            >
-              <option>All stock</option>
-              <option>In stock</option>
-              <option>Low stock</option>
-              <option>Out of stock</option>
-            </select>
+      {/* Toolbar */}
+      <div className="wp-toolbar">
+        <label htmlFor="products-bulk-action" className="sr-only">Select bulk action</label>
+        <select
+          id="products-bulk-action"
+          className="wp-select"
+          value={bulkAction}
+          onChange={(e) => setBulkAction(e.target.value)}
+        >
+          <option>Bulk actions</option>
+          {view === "trash" ? (
+            <option>Delete Permanently</option>
+          ) : (
+            <>
+              <option>Move to Trash</option>
+              <option>Duplicate</option>
+            </>
+          )}
+        </select>
+        <button type="button" onClick={handleBulkAction} className="wp-btn">
+          Apply
+        </button>
 
-            <select 
-              className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 xs:py-1.5 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] max-w-full" 
-              value={selectedType} 
-              onChange={(e) => setSelectedType(e.target.value)}
-            >
-              <option value="All types">All types</option>
-              <option value="simple">Simple product</option>
-              <option value="variable">Variable product</option>
-              <option value="gifting">Gifting product</option>
-            </select>
+        <label htmlFor="products-filter-category" className="sr-only">Filter by category</label>
+        <select
+          id="products-filter-category"
+          className="wp-select"
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+        >
+          <option>All categories</option>
+          {categories.map(cat => <option key={cat._id} value={cat.name}>{cat.name}</option>)}
+        </select>
 
-            <button 
-              type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer hover:text-[#000] active:bg-[#eee]"
-            >
-              Filter
-            </button>
-          </div>
+        <label htmlFor="products-filter-stock" className="sr-only">Filter by stock status</label>
+        <select
+          id="products-filter-stock"
+          className="wp-select"
+          value={selectedStock}
+          onChange={(e) => setSelectedStock(e.target.value)}
+        >
+          <option>All stock</option>
+          <option>In stock</option>
+          <option>Low stock</option>
+          <option>Out of stock</option>
+        </select>
 
-          <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto">
-            <input 
-              type="text" 
-              placeholder="Search products..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 xs:py-1.5 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-48 bg-white focus:border-[#2271b1] rounded-[3px]"
-            />
-            <button 
-              type="button"
-              className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 xs:py-1.5 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] cursor-pointer shrink-0 whitespace-nowrap"
-            >
-              Search
-            </button>
-          </div>
+        <label htmlFor="products-filter-type" className="sr-only">Filter by product type</label>
+        <select
+          id="products-filter-type"
+          className="wp-select"
+          value={selectedType}
+          onChange={(e) => setSelectedType(e.target.value)}
+        >
+          <option value="All types">All types</option>
+          <option value="simple">Simple product</option>
+          <option value="variable">Variable product</option>
+          <option value="gifting">Gifting product</option>
+        </select>
+
+        <button type="button" className="wp-btn">
+          Filter
+        </button>
+
+        <span className="wp-spacer" />
+
+        <div className="wp-search" role="search">
+          <label htmlFor="products-search" className="sr-only">Search products</label>
+          <input
+            id="products-search"
+            type="search"
+            placeholder="Search products..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="wp-input"
+          />
+          <button type="button" className="wp-btn">
+            Search products
+          </button>
         </div>
+      </div>
 
-        {/* Data Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
-          <table className="w-full text-left border-collapse table-fixed min-w-[640px] md:min-w-[800px] lg:min-w-[950px] text-[13px] font-sans">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#2c3539]">
-                <th className="px-3 py-2.5 w-9 text-center align-middle"><input type="checkbox" checked={filteredProducts.length > 0 && selectedIds.length === filteredProducts.length} onChange={toggleSelectAll} className="rounded-[2px] border-gray-300" /></th>
-                <th className="px-3 py-2.5 w-16 text-center align-middle"><ImageIcon className="w-4 h-4 text-[#8c8f94] mx-auto" /></th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-auto">Name</th>
-                <th className="hidden md:table-cell px-3 py-2.5 font-bold text-[#1d2327] w-36">Categories</th>
-                <th className="hidden md:table-cell px-3 py-2.5 font-bold text-[#1d2327] w-28">SKU</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-32 text-center">Stock</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-24">Price</th>
-                <th className="px-3 py-2.5 font-bold text-[#1d2327] w-24">Status</th>
-                <th className="hidden lg:table-cell px-3 py-2.5 font-bold text-[#1d2327] w-32">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1] text-[#2c3539]">
-              {loading ? (
-                <tr><td colSpan={9} className="p-8 text-center text-gray-400 italic">Loading catalog...</td></tr>
-              ) : filteredProducts.length === 0 ? (
-                <tr><td colSpan={9} className="p-8 text-center text-gray-500 italic">No products found.</td></tr>
-              ) : (
-                filteredProducts.map((p) => (
-                  <tr key={p._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(p._id) ? "bg-[#f0f6fa]" : ""}`}>
-                    <td className="px-3 py-3 text-center align-top pt-3.5"><input type="checkbox" checked={selectedIds.includes(p._id)} onChange={() => toggleSelect(p._id)} className="rounded-[2px] border-gray-300" /></td>
-                    <td className="px-3 py-3 text-center align-top pt-3.5">
-                      <div className="w-10 h-10 bg-white border border-[#dcdcde] rounded-[2px] mx-auto overflow-hidden">
-                        {p.images?.length > 0 ? <img src={p.images[0]} className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5 text-[#dcdcde] mt-2.5 mx-auto" />}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 align-top pt-3.5">
-                      <Link href={`/admin/products/${p._id}`} className="text-[#2271b1] font-bold hover:text-[#135e96] text-[14px] block mb-0.5 leading-tight">{p.name}</Link>
-                      <div className="flex flex-wrap items-center gap-x-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium mt-1">
-                        {view === "trash" ? (
-                          <>
-                            <button onClick={() => handleRestoreProduct(p._id)} className="hover:text-[#135e96] cursor-pointer">Restore</button>
-                            <span className="text-[#c3c4c7] font-normal">|</span>
-                            <button onClick={() => handlePermanentDeleteProduct(p._id, p.name)} className="hover:text-[#bc0b0d] cursor-pointer">Delete Permanently</button>
-                          </>
-                        ) : (
-                          <>
-                            <Link href={`/admin/products/${p._id}`} className="hover:text-[#135e96]">Edit</Link>
-                            <span className="text-[#c3c4c7] font-normal">|</span>
-                            <button onClick={() => openQuickEdit(p)} className="hover:text-[#135e96] cursor-pointer">Quick Edit</button>
-                            <span className="text-[#c3c4c7] font-normal">|</span>
-                            <button onClick={() => handleDuplicate(p)} className="hover:text-[#135e96] cursor-pointer">Duplicate</button>
-                            <span className="text-[#c3c4c7] font-normal">|</span>
-                            <button onClick={() => handleTrash(p._id)} className="hover:text-[#bc0b0d] cursor-pointer">Trash</button>
-                            <span className="text-[#c3c4c7] font-normal">|</span>
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pagination}
+      </div>
+
+      {/* Data Table */}
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={9} className="wp-muted">Loading products…</td></tr>
+            ) : filteredProducts.length === 0 ? (
+              <tr><td colSpan={9} className="wp-muted">No products found.</td></tr>
+            ) : (
+              filteredProducts.map((p) => (
+                <tr key={p._id} className={selectedIds.includes(p._id) ? "is-selected" : undefined}>
+                  <td className="wp-check-col">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${p.name}`}
+                      checked={selectedIds.includes(p._id)}
+                      onChange={() => toggleSelect(p._id)}
+                    />
+                  </td>
+                  <td>
+                    <div className="wp-thumb">
+                      {p.images?.length > 0 ? <img src={p.images[0]} alt="" /> : <ImageIcon className="w-5 h-5" aria-hidden="true" style={{ color: "#a7aaad" }} />}
+                    </div>
+                  </td>
+                  <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                    <Link href={`/admin/products/${p._id}`} className="wp-row-title">{p.name}</Link>
+                    <div className="wp-mobile-meta">
+                      {p.sku ? `SKU: ${p.sku} · ` : ""}
+                      <span className={stockClass(p)}>{stockLabel(p)}</span>
+                      {" · "}
+                      <span className="wp-strong">${p.price?.toFixed(2)}</span>
+                    </div>
+                    <div className="wp-row-actions">
+                      <span className="is-muted">ID: {String(p._id).slice(-6)}</span>
+                      {view === "trash" ? (
+                        <>
+                          <span><button type="button" onClick={() => handleRestoreProduct(p._id)}>Restore</button></span>
+                          <span><button type="button" onClick={() => handlePermanentDeleteProduct(p._id, p.name)} className="is-danger">Delete Permanently</button></span>
+                        </>
+                      ) : (
+                        <>
+                          <span><Link href={`/admin/products/${p._id}`}>Edit</Link></span>
+                          <span><button type="button" onClick={() => openQuickEdit(p)}>Quick Edit</button></span>
+                          <span><button type="button" onClick={() => handleDuplicate(p)}>Duplicate</button></span>
+                          <span><button type="button" onClick={() => handleTrash(p._id)} className="is-danger">Trash</button></span>
+                          <span>
                             <Link href={getProductUrl({
                               ...p,
                               categories: p.categories?.map(id => categories.find(c => c._id === id)).filter(Boolean),
                               primaryCategory: p.primaryCategory ? categories.find(c => c._id === p.primaryCategory) : null
-                            })} target="_blank" className="hover:text-[#135e96]">View</Link>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-3 align-top pt-3.5">
-                      <div className="flex flex-wrap gap-1 leading-normal">
-                        {p.categories?.length > 0 ? (
-                          p.categories.map((catId, idx) => {
-                            const cat = categories.find(c => c._id === catId);
-                            return (
-                              <React.Fragment key={catId}>
-                                <span className="text-[#2271b1] hover:underline cursor-pointer">{cat?.name || "—"}</span>
-                                {idx < p.categories.length - 1 && <span className="text-gray-400">, </span>}
-                              </React.Fragment>
-                            );
-                          })
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-3 align-top pt-3.5 text-[#646970] font-mono leading-normal break-all">{p.sku || "—"}</td>
-                    <td className="px-3 py-3 align-top pt-3 text-center">
-                      <span className={`inline-block font-semibold text-[11.5px] ${
-                        !p.manageStock 
-                          ? "text-[#7ad03a]" 
-                          : p.stock <= 0 
-                            ? "text-[#a00] font-bold" 
-                            : p.stock <= (p.lowStockThreshold || 5)
-                              ? "text-[#ffb900] font-bold"
-                              : "text-[#7ad03a]"
-                      }`}>
-                        {!p.manageStock 
-                          ? "In stock" 
-                          : p.stock <= 0 
-                            ? "Out of stock" 
-                            : p.stock <= (p.lowStockThreshold || 5)
-                              ? `Low stock (${p.stock})`
-                              : `In stock (${p.stock})`}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 align-top pt-3.5 font-bold text-neutral-800">${p.price?.toFixed(2)}</td>
-                    <td className="px-3 py-3 align-top pt-3">
-                      <button 
-                        type="button"
-                        onClick={async () => {
-                          const newStatus = p.status === 'Published' ? 'Draft' : 'Published';
-                          const res = await fetch("/api/admin/products", {
-                            method: "PUT",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ id: p._id, status: newStatus })
-                          });
-                          if (res.ok) fetchProducts();
-                        }}
-                        className={`px-2 py-0.5 rounded-[3px] border text-[10px] font-bold uppercase transition-colors cursor-pointer ${p.status === 'Published' ? 'bg-[#e5f5fa] text-[#0073aa] border-[#0073aa]/20 hover:bg-[#d1ecf1]' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
-                      >
-                        {p.status}
-                      </button>
-                    </td>
-                    <td className="hidden lg:table-cell px-3 py-3 align-top pt-3.5 text-[#646970] leading-normal">
-                      {new Date(p.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                            })} target="_blank">View</Link>
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm wp-muted" style={{ wordBreak: "break-all" }}>{p.sku || "—"}</td>
+                  <td className="wp-hide-sm">
+                    <span className={stockClass(p)}>{stockLabel(p)}</span>
+                  </td>
+                  <td className="wp-hide-sm">
+                    <span className="wp-price"><ins>${p.price?.toFixed(2)}</ins></span>
+                  </td>
+                  <td className="wp-hide-sm">
+                    {p.categories?.length > 0 ? (
+                      p.categories.map((catId, idx) => {
+                        const cat = categories.find(c => c._id === catId);
+                        return (
+                          <React.Fragment key={catId}>
+                            <span className="wp-link">{cat?.name || "—"}</span>
+                            {idx < p.categories.length - 1 && ", "}
+                          </React.Fragment>
+                        );
+                      })
+                    ) : (
+                      <span className="wp-muted">—</span>
+                    )}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const newStatus = p.status === 'Published' ? 'Draft' : 'Published';
+                        const res = await fetch("/api/admin/products", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: p._id, status: newStatus })
+                        });
+                        if (res.ok) fetchProducts();
+                      }}
+                      title={p.status === 'Published' ? "Click to switch to Draft" : "Click to publish"}
+                      aria-label={`Status: ${p.status}. Toggle status`}
+                      className={`wp-pill ${p.status === 'Published' ? 'wp-st-published' : 'wp-st-draft'}`}
+                      style={{ border: 0, cursor: "pointer" }}
+                    >
+                      {p.status}
+                    </button>
+                  </td>
+                  <td className="wp-hide-sm wp-muted">
+                    {formatDate(p.createdAt)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot>{headerRow}</tfoot>
+        </table>
+      </div>
 
-        {/* Quick Edit Overlay */}
-        {quickEditId && (
-          <div className="fixed inset-0 bg-black/10 backdrop-blur-[1px] z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div className="bg-white border border-[#ccd0d4] shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] overflow-y-auto rounded-[3px] animate-in fade-in zoom-in duration-150">
-              <div className="bg-[#f6f7f7] border-b border-[#ccd0d4] px-4 py-3 flex items-center justify-between gap-2">
-                <h3 className="text-[14px] font-bold text-[#1d2327] min-w-0 break-words">Quick Edit — {quickEditData.name}</h3>
-                <button onClick={() => setQuickEditId(null)} className="text-gray-400 hover:text-black shrink-0"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 font-sans">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-[12px] font-bold mb-1 text-gray-700">Title</label>
-                    <input className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1]" value={quickEditData.name} onChange={e => setQuickEditData({...quickEditData, name: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-bold mb-1 text-gray-700">Slug</label>
-                    <input className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] font-mono text-gray-500 outline-none focus:border-[#2271b1]" value={quickEditData.slug} onChange={e => setQuickEditData({...quickEditData, slug: e.target.value})} />
-                  </div>
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pagination}
+      </div>
+
+      {/* Quick Edit Modal */}
+      {quickEditId && (
+        <div className="wp-modal-backdrop">
+          <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="quick-edit-title">
+            <div className="wp-modal-head">
+              <h2 id="quick-edit-title" style={{ minWidth: 0, wordBreak: "break-word" }}>Quick Edit — {quickEditData.name}</h2>
+              <button type="button" onClick={() => setQuickEditId(null)} className="wp-notice-dismiss" aria-label="Close quick edit"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="wp-modal-body grid grid-cols-1 md:grid-cols-2 gap-x-5">
+              <div>
+                <div className="wp-field">
+                  <label htmlFor="qe-name" className="wp-label">Title</label>
+                  <input id="qe-name" className="wp-input wp-full" value={quickEditData.name} onChange={e => setQuickEditData({...quickEditData, name: e.target.value})} />
                 </div>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[12px] font-bold mb-1 text-gray-700">Price ($)</label>
-                      <input type="number" className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1]" value={quickEditData.price} onChange={e => setQuickEditData({...quickEditData, price: parseFloat(e.target.value)})} />
-                    </div>
-                    <div>
-                      <label className="block text-[12px] font-bold mb-1 text-gray-700">SKU</label>
-                      <input className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] uppercase outline-none focus:border-[#2271b1]" value={quickEditData.sku} onChange={e => setQuickEditData({...quickEditData, sku: e.target.value})} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-bold mb-1 text-gray-700">Status</label>
-                    <select className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] cursor-pointer" value={quickEditData.status} onChange={e => setQuickEditData({...quickEditData, status: e.target.value})}>
-                      <option value="Draft">Draft</option>
-                      <option value="Published">Published</option>
-                    </select>
-                  </div>
+                <div className="wp-field">
+                  <label htmlFor="qe-slug" className="wp-label">Slug</label>
+                  <input id="qe-slug" className="wp-input wp-full" style={{ fontFamily: "monospace" }} value={quickEditData.slug} onChange={e => setQuickEditData({...quickEditData, slug: e.target.value})} />
                 </div>
               </div>
-              <div className="bg-[#f6f7f7] border-t border-[#ccd0d4] px-4 py-3 flex flex-col-reverse xs:flex-row xs:items-center xs:justify-between gap-2">
-                <button onClick={() => setQuickEditId(null)} className="text-[13px] text-[#2271b1] hover:text-[#135e96] underline font-medium">Cancel</button>
-                <button 
-                  onClick={async () => {
-                    const res = await fetch("/api/admin/products", {
-                      method: "PUT",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ ...quickEditData, id: quickEditId })
-                    });
-                    if (res.ok) {
-                      setQuickEditId(null);
-                      fetchProducts();
-                    }
-                  }}
-                  className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] font-bold text-[13px] hover:bg-[#135e96] cursor-pointer w-full xs:w-auto"
-                >
-                  Update
-                </button>
+              <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                  <div className="wp-field">
+                    <label htmlFor="qe-price" className="wp-label">Price ($)</label>
+                    <input id="qe-price" type="number" className="wp-input wp-full" value={quickEditData.price} onChange={e => setQuickEditData({...quickEditData, price: parseFloat(e.target.value)})} />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="qe-sku" className="wp-label">SKU</label>
+                    <input id="qe-sku" className="wp-input wp-full uppercase" value={quickEditData.sku} onChange={e => setQuickEditData({...quickEditData, sku: e.target.value})} />
+                  </div>
+                </div>
+                <div className="wp-field">
+                  <label htmlFor="qe-status" className="wp-label">Status</label>
+                  <select id="qe-status" className="wp-select wp-full" value={quickEditData.status} onChange={e => setQuickEditData({...quickEditData, status: e.target.value})}>
+                    <option value="Draft">Draft</option>
+                    <option value="Published">Published</option>
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Pagination */}
-        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 text-[13px] text-[#646970] font-sans">
-          <div>{filteredProducts.length} items</div>
-          <div className="flex items-center gap-1">
-            <button className="p-1 border border-[#ccd0d4] bg-[#f6f7f7] hover:bg-[#f0f0f1] rounded disabled:opacity-50 cursor-pointer"><ChevronLeft className="w-4 h-4 text-gray-600" /></button>
-            <span className="px-2">1 of 1</span>
-            <button className="p-1 border border-[#ccd0d4] bg-[#f6f7f7] hover:bg-[#f0f0f1] rounded disabled:opacity-50 cursor-pointer"><ChevronRight className="w-4 h-4 text-gray-600" /></button>
+            <div className="wp-modal-foot">
+              <button type="button" onClick={() => setQuickEditId(null)} className="wp-btn">Cancel</button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await fetch("/api/admin/products", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ...quickEditData, id: quickEditId })
+                  });
+                  if (res.ok) {
+                    setQuickEditId(null);
+                    fetchProducts();
+                  }
+                }}
+                className="wp-btn wp-btn-primary"
+              >
+                Update
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </AdminPageLayout>
+      )}
+    </Page>
     </RequirePermission>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Search, Plus, Trash2, Edit, ExternalLink, ImageIcon, Check, FileText } from "lucide-react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { ImageIcon } from "lucide-react";
+import { Page, PageHeader, Postbox } from "@/components/admin/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getCategoryUrl } from "@/lib/routes";
@@ -103,109 +103,163 @@ export default function CategoryManager({ type = "product", title = "Categories"
      c.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const breadcrumbs = type === "product" 
-    ? [{ label: "WooCommerce", href: "/admin/orders" }, { label: "Categories" }]
-    : [{ label: "Blog", href: "/admin/blogs" }, { label: "Categories" }];
-
   const newLink = type === 'product' ? '/admin/products/categories/new' : '/admin/blogs/categories/new';
   const getEditLink = (id) => type === 'product' ? `/admin/products/categories/${id}` : `/admin/blogs/categories/${id}`;
 
-  return (
-    <AdminPageLayout 
-      title={title} 
-      breadcrumbs={breadcrumbs}
-      addNewLink={newLink}
-      addNewLabel="Add New"
-    >
-      <div className="space-y-4">
-        {/* View Tabs */}
-        <ul className="flex items-center gap-2 text-[13px] text-[#2271b1]">
-           <li className="text-[#1d2327] font-semibold cursor-pointer">
-              All <span className="text-[#646970] font-normal">({categories.length})</span>
-           </li>
-        </ul>
+  const allSelected = selectedIds.length > 0 && selectedIds.length === filteredCategories.length;
+  const itemLabel = type === "product" ? "products" : "posts";
 
-        {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-4 shadow-sm">
-           <div className="flex flex-wrap items-center gap-1.5 xs:gap-2">
-              <select className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none min-w-0 max-w-full" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
-                 <option>Bulk actions</option>
-                 <option>Duplicate</option>
-                 <option>Move to Trash</option>
-                 <option>Delete Permanently</option>
-              </select>
-              <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
-           </div>
-           <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto min-w-0">
-              <input 
-                type="text" 
-                placeholder="Search categories..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
-              />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shrink-0 whitespace-nowrap">
-                Search <span className="hidden xs:inline">Categories</span>
-              </button>
-           </div>
+  return (
+    <Page>
+      <PageHeader
+        title={title}
+        actions={<Link href={newLink} className="wp-btn">Add New</Link>}
+        aside={
+          <div className="wp-search" role="search">
+            <label htmlFor="category-search" className="sr-only">Search categories</label>
+            <input
+              id="category-search"
+              type="search"
+              className="wp-input"
+              placeholder="Search categories..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <button className="wp-btn">Search Categories</button>
+          </div>
+        }
+      />
+
+      <div className="wp-cols">
+        {/* Left column: add new */}
+        <div className="wp-col-side" style={{ flex: "1 1 300px", maxWidth: "100%" }}>
+          <Postbox id="add-category" title="Add new category">
+            <p className="wp-desc" style={{ marginTop: 0 }}>
+              Categories group your {itemLabel} so shoppers can browse them together. Each category gets its own page.
+            </p>
+            <p className="wp-desc">
+              The editor lets you set the name, slug, short and full description, image, banner, {type === "product" ? "default size chart, " : ""}FAQs and SEO details.
+            </p>
+            <div style={{ marginTop: 14 }}>
+              <Link href={newLink} className="wp-btn wp-btn-primary">Add new category</Link>
+            </div>
+          </Postbox>
         </div>
 
-        {/* Table */}
-        <div className="bg-white border border-[#ccd0d4] max-w-full overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse table-fixed text-[13px] min-w-[520px] md:min-w-[800px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-3 py-2 w-8 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredCategories.length} onChange={toggleSelectAll} /></th>
-                <th className="px-3 py-2 w-16 text-center"><ImageIcon className="w-4 h-4 mx-auto text-[#8c8f94]" /></th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Name</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-48 hidden md:table-cell">Slug</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-24">Status</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-20 text-right">Items</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={6} className="p-8 text-center italic text-gray-400">Loading...</td></tr>
-              ) : filteredCategories.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center italic text-gray-400">No categories found.</td></tr>
-              ) : (
-                filteredCategories.map((cat) => (
-                  <tr key={cat._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(cat._id) ? "bg-[#f0f6fa]" : ""}`}>
-                    <td className="px-3 py-4 text-center align-top"><input type="checkbox" checked={selectedIds.includes(cat._id)} onChange={() => toggleSelect(cat._id)} /></td>
-                    <td className="px-3 py-4 text-center align-top">
-                       <div className="w-10 h-10 bg-white border border-[#dcdcde] rounded-[2px] mx-auto overflow-hidden">
-                          {cat.image ? <img src={cat.image} className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5 text-[#dcdcde] mt-2.5 mx-auto" />}
-                       </div>
-                    </td>
-                    <td className="px-3 py-4 align-top">
-                      <div className="flex flex-col min-w-0">
-                         <Link href={getEditLink(cat._id)} className="text-[#2271b1] font-bold hover:underline block mb-1 break-words">{cat.name}</Link>
-                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
-                            <Link href={getEditLink(cat._id)} className="hover:text-[#135e96]">Edit</Link>
-                            <span className="text-[#c3c4c7]">|</span>
-                            <button onClick={() => handleDuplicate(cat)} className="hover:text-[#135e96]">Duplicate</button>
-                            <span className="text-[#c3c4c7]">|</span>
-                            <button onClick={() => handleDelete(cat._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
-                            <span className="text-[#c3c4c7]">|</span>
-                            <Link href={getCategoryUrl(cat)} target="_blank" className="hover:text-[#135e96]">View</Link>
-                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 align-top font-mono text-gray-500 break-all hidden md:table-cell">{cat.slug}</td>
-                    <td className="px-3 py-4 align-top">
-                       <span className={`px-2 py-0.5 rounded-[2px] text-[10px] font-bold uppercase ${cat.status === 'Published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                          {cat.status || "Published"}
-                       </span>
-                    </td>
-                    <td className="px-3 py-4 align-top font-bold text-[#2271b1] text-right">{cat.productCount || 0}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Right column: list table */}
+        <div className="wp-col-main">
+          <div className="wp-subsub">
+            <span className="is-current">
+              All <span className="wp-count">({categories.length})</span>
+            </span>
+          </div>
+
+          <div className="wp-toolbar">
+            <label htmlFor="category-bulk-action" className="sr-only">Select bulk action</label>
+            <select id="category-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+              <option>Bulk actions</option>
+              <option>Duplicate</option>
+              <option>Move to Trash</option>
+              <option>Delete Permanently</option>
+            </select>
+            <button onClick={handleBulkAction} className="wp-btn">Apply</button>
+            <span className="wp-spacer" />
+            <span className="wp-pages">
+              {filteredCategories.length} item{filteredCategories.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="wp-table-box">
+            <table className="wp-list-table">
+              <thead>
+                <tr>
+                  <th className="wp-check-col">
+                    <input type="checkbox" aria-label="Select all categories" checked={allSelected} onChange={toggleSelectAll} />
+                  </th>
+                  <th style={{ width: 56 }}>
+                    <ImageIcon className="w-4 h-4 text-[#8c8f94]" aria-hidden="true" />
+                    <span className="sr-only">Image</span>
+                  </th>
+                  <th>Name</th>
+                  <th className="wp-hide-sm">Description</th>
+                  <th className="wp-hide-sm">Slug</th>
+                  <th className="wp-hide-sm">Status</th>
+                  <th className="wp-num">Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>Loading...</td></tr>
+                ) : filteredCategories.length === 0 ? (
+                  <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>No categories found.</td></tr>
+                ) : (
+                  filteredCategories.map((cat) => {
+                    const status = cat.status || "Published";
+                    return (
+                      <tr key={cat._id} className={selectedIds.includes(cat._id) ? "is-selected" : undefined}>
+                        <td className="wp-check-col">
+                          <input type="checkbox" aria-label={`Select ${cat.name}`} checked={selectedIds.includes(cat._id)} onChange={() => toggleSelect(cat._id)} />
+                        </td>
+                        <td>
+                          <div className="wp-thumb">
+                            {cat.image ? <img src={cat.image} alt="" /> : <ImageIcon className="w-5 h-5 text-[#a7aaad]" aria-hidden="true" />}
+                          </div>
+                        </td>
+                        <td style={{ minWidth: 0 }}>
+                          <Link href={getEditLink(cat._id)} className="wp-row-title break-words">{cat.name}</Link>
+                          <div className="wp-mobile-meta">
+                            /{cat.slug} · {status}
+                          </div>
+                          <div className="wp-row-actions">
+                            <Link href={getEditLink(cat._id)}>Edit</Link>
+                            <button type="button" onClick={() => handleDuplicate(cat)}>Duplicate</button>
+                            <button type="button" className="is-danger" onClick={() => handleDelete(cat._id)}>Trash</button>
+                            <Link href={getCategoryUrl(cat)} target="_blank">View</Link>
+                          </div>
+                        </td>
+                        <td className="wp-hide-sm">
+                          {cat.description ? (
+                            <span className="line-clamp-2">{cat.description}</span>
+                          ) : (
+                            <span className="wp-muted" aria-label="No description">—</span>
+                          )}
+                        </td>
+                        <td className="wp-hide-sm" style={{ wordBreak: "break-all" }}>{cat.slug}</td>
+                        <td className="wp-hide-sm">
+                          <span className={`wp-pill wp-pill-sm ${status === "Published" ? "wp-st-published" : "wp-st-draft"}`}>{status}</span>
+                        </td>
+                        <td className="wp-num">
+                          <Link href={getEditLink(cat._id)} className="wp-link">{cat.productCount || 0}</Link>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th className="wp-check-col">
+                    <input type="checkbox" aria-label="Select all categories" checked={allSelected} onChange={toggleSelectAll} />
+                  </th>
+                  <th><span className="sr-only">Image</span></th>
+                  <th>Name</th>
+                  <th className="wp-hide-sm">Description</th>
+                  <th className="wp-hide-sm">Slug</th>
+                  <th className="wp-hide-sm">Status</th>
+                  <th className="wp-num">Count</th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div className="wp-toolbar">
+            <span className="wp-spacer" />
+            <span className="wp-pages">
+              {filteredCategories.length} item{filteredCategories.length === 1 ? "" : "s"}
+            </span>
+          </div>
         </div>
       </div>
-    </AdminPageLayout>
+    </Page>
   );
 }
-
