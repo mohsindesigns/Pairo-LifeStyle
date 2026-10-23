@@ -55,7 +55,7 @@ const NavLink = ({ href, icon: Icon, children, exact = false, isSubmenu = false 
       href={href}
       className={`flex items-center gap-2 px-3 py-2.5 md:py-2 text-[14px] md:text-[13px] transition-all group ${isActive
           ? "bg-[#2271b1] text-white font-medium"
-          : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"
+          : "text-[#f0f0f1] hover:bg-[#2c3338] hover:text-[#72aee6]"
         }`}
     >
       {Icon && <Icon className={`w-[18px] h-[18px] ${isActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />}
@@ -71,7 +71,7 @@ const AccordionMenu = ({ title, icon: Icon, children, isOpen, onToggle }) => {
         onClick={onToggle}
         className={`w-full flex items-center justify-between px-3 py-2.5 md:py-2 text-[14px] md:text-[13px] transition-all group ${isOpen
             ? "bg-[#2271b1] text-white font-medium"
-            : "hover:bg-[#2c3338] hover:text-[#72aee6] text-[#a7aaad]"
+            : "hover:bg-[#2c3338] hover:text-[#72aee6] text-[#f0f0f1]"
           }`}
       >
         <div className="flex items-center gap-2">
@@ -179,7 +179,7 @@ export default function AdminSidebar({ open = false, onClose }) {
 
           {/* Dashboard Accordion */}
           <div className="mb-0">
-            <Link href="/admin" className={`flex items-center justify-between px-3 py-2 text-[13px] transition-all group ${isDashboardActive ? "bg-[#2271b1] text-white font-medium" : "text-[#a7aaad] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
+            <Link href="/admin" className={`flex items-center justify-between px-3 py-2 text-[13px] transition-all group ${isDashboardActive ? "bg-[#2271b1] text-white font-medium" : "text-[#f0f0f1] hover:bg-[#2c3338] hover:text-[#72aee6]"}`}>
               <div className="flex items-center gap-2">
                 <LayoutDashboard className={`w-[18px] h-[18px] ${isDashboardActive ? "text-white" : "text-[#a7aaad] group-hover:text-[#72aee6]"}`} />
                 <span>Dashboard</span>

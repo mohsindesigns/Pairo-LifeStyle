@@ -1,4 +1,5 @@
 import AdminLayoutClient from "./AdminLayoutClient";
+import "./admin-ui.css";
 
 export const metadata = {
   title: "Admin Panel",
