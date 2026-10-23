@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { usePopup } from "@/context/PopupContext";
 
-export default function RevisionHistory({ promotionId, onRollback }) {
+export default function RevisionHistory({ promotionId, onRollback, onCountChange }) {
   const { showConfirm } = usePopup();
   const [revisions, setRevisions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,13 +12,19 @@ export default function RevisionHistory({ promotionId, onRollback }) {
     try {
       const res = await fetch(`/api/admin/promotions/${promotionId}/revisions`);
       const data = await res.json();
-      if (res.ok) setRevisions(data);
+      if (res.ok && Array.isArray(data)) {
+        setRevisions(data);
+        onCountChange?.(data.length);
+      } else {
+        onCountChange?.(undefined);
+      }
     } catch (err) {
       console.error("Failed to fetch revisions:", err);
+      onCountChange?.(undefined);
     } finally {
       setLoading(false);
     }
-  }, [promotionId]);
+  }, [promotionId, onCountChange]);
 
   useEffect(() => {
     if (promotionId) {

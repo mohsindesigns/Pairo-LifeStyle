@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Trash2, GripVertical, ChevronDown } from 'lucide-react';
+import { childRulePath, joinPath } from '../promotionEditorUtils';
 
 
 // Each condition field maps to ONE sensible comparison automatically, so admins never
@@ -80,7 +81,7 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
 
 export default function ConditionRow({ rule, path, index, onUpdate, onRemove, catalogData }) {
   const { products = [], categories = [], collections = [] } = catalogData || {};
-  const base = `${path}.rules.${index}`;
+  const base = childRulePath(path, index);
   const config = FIELD_CONFIG[rule.field] || FIELD_CONFIG.subtotal;
   const isKnownField = Object.prototype.hasOwnProperty.call(FIELD_CONFIG, rule.field);
 
@@ -89,12 +90,12 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
   const handleFieldChange = (newField) => {
     const next = FIELD_CONFIG[newField] || FIELD_CONFIG.subtotal;
     const emptyValue = (next.kind === 'money' || next.kind === 'number') ? '' : [];
-    onUpdate(`${base}.field`, newField);
-    onUpdate(`${base}.op`, next.op);
-    onUpdate(`${base}.value`, emptyValue);
+    onUpdate(joinPath(base, 'field'), newField);
+    onUpdate(joinPath(base, 'op'), next.op);
+    onUpdate(joinPath(base, 'value'), emptyValue);
   };
 
-  const setValue = (v) => onUpdate(`${base}.value`, v);
+  const setValue = (v) => onUpdate(joinPath(base, 'value'), v);
   const arrValue = Array.isArray(rule.value) ? rule.value : [];
   const toOptions = (list) => list.map((x) => ({ id: x._id?.toString() || x.id, label: x.name }));
 

@@ -14,6 +14,7 @@ import Validator from "@/lib/promotionEngine/Validator";
 import RevisionHistory from "@/components/admin/promotions/History/RevisionHistory";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { toLocalDateInput, fromLocalDateInput, parsePriority } from "@/components/admin/promotions/promotionEditorUtils";
 
 export default function PromotionEditor({ isNew = false } = {}) {
   const params = useParams();
@@ -27,6 +28,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
   const [loading, setLoading] = useState(id !== "new");
   const [saving, setSaving] = useState(false);
   const [validation, setValidation] = useState({ isValid: true, errors: [], warnings: [] });
+  const [revisionCount, setRevisionCount] = useState(null);
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -82,6 +84,11 @@ export default function PromotionEditor({ isNew = false } = {}) {
         toast.error("Please fix the errors before saving.");
         return;
     }
+    const priority = parsePriority(formData.priority);
+    if (!priority.ok) {
+        toast.error(priority.error);
+        return;
+    }
     setSaving(true);
     try {
       const method = id === "new" ? "POST" : "PUT";
@@ -90,7 +97,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, priority: priority.value })
       });
 
       if (res.ok) {
@@ -115,6 +122,8 @@ export default function PromotionEditor({ isNew = false } = {}) {
       setSaving(false);
     }
   };
+
+  const priorityCheck = parsePriority(formData.priority);
 
   if (loading) return <div className="wp-page"><p className="wp-muted">Loading promotion…</p></div>;
 
@@ -166,10 +175,18 @@ export default function PromotionEditor({ isNew = false } = {}) {
               <input
                 id="promo-priority"
                 type="number"
-                value={formData.priority}
-                onChange={(e) => updateField('priority', parseInt(e.target.value))}
+                min="0"
+                max="1000"
+                step="1"
+                value={formData.priority ?? ""}
+                onChange={(e) => updateField('priority', e.target.value)}
+                aria-invalid={!priorityCheck.ok}
+                aria-describedby={!priorityCheck.ok ? "promo-priority-error" : undefined}
                 className="wp-input"
               />
+              {!priorityCheck.ok && (
+                <span id="promo-priority-error" className="wp-hint" style={{ color: "var(--wp-danger)" }}>{priorityCheck.error}</span>
+              )}
             </div>
             <div className="wp-frow">
               <span className="wp-flabel">Combining</span>
@@ -265,6 +282,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
             <RevisionHistory
               promotionId={id}
               onRollback={handleRollback}
+              onCountChange={setRevisionCount}
             />
           )}
         </div>
@@ -329,7 +347,17 @@ export default function PromotionEditor({ isNew = false } = {}) {
               )}
               <div className="wp-misc-row">
                 <span>History:</span>
-                <span className="wp-strong">No revisions</span>
+                <span className="wp-strong">
+                  {id === "new"
+                    ? "No revisions"
+                    : revisionCount === null
+                      ? "Loading…"
+                      : revisionCount === undefined
+                        ? "Unavailable"
+                      : revisionCount === 0
+                        ? "No revisions"
+                        : `${revisionCount} revision${revisionCount === 1 ? "" : "s"}`}
+                </span>
               </div>
             </div>
 
@@ -339,8 +367,8 @@ export default function PromotionEditor({ isNew = false } = {}) {
                 <input
                   id="promo-start"
                   type="date"
-                  value={formData.startDate ? new Date(formData.startDate).toISOString().slice(0, 10) : ""}
-                  onChange={(e) => updateField('startDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  value={toLocalDateInput(formData.startDate)}
+                  onChange={(e) => updateField('startDate', fromLocalDateInput(e.target.value))}
                   className="wp-input wp-full"
                 />
                 <p className="wp-desc">Leave blank to start immediately.</p>
@@ -350,8 +378,8 @@ export default function PromotionEditor({ isNew = false } = {}) {
                 <input
                   id="promo-end"
                   type="date"
-                  value={formData.endDate ? new Date(formData.endDate).toISOString().slice(0, 10) : ""}
-                  onChange={(e) => updateField('endDate', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                  value={toLocalDateInput(formData.endDate)}
+                  onChange={(e) => updateField('endDate', fromLocalDateInput(e.target.value, { endOfDay: true }))}
                   className="wp-input wp-full"
                 />
                 <p className="wp-desc">Leave blank to run indefinitely.</p>

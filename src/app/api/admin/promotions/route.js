@@ -35,8 +35,10 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
+    // includeArchived=1 also returns archived (trashed) promotions, for the list's Trash view.
+    const includeArchived = searchParams.get('includeArchived') === '1';
 
-    const query = {
+    const query = includeArchived ? {} : {
         adminStatus: { $ne: 'Archived' }
     };
     

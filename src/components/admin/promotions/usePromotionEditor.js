@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { setConditionValue, addConditionRule, removeConditionRule } from './promotionEditorUtils';
 
 /**
  * Custom hook to manage the recursive state of a Promotion.
@@ -23,84 +24,19 @@ export default function usePromotionEditor(initialData) {
   };
 
   // --- RECURSIVE CONDITION UPDATES ---
+  // Fully immutable (see promotionEditorUtils) so StrictMode's double-invoked
+  // updaters can't apply an add/remove twice.
 
   const updateCondition = useCallback((path, value) => {
-    setFormData(prev => {
-      const newData = { ...prev };
-      const parts = path.split('.');
-      let current = newData.conditions;
-      
-      for (let i = 0; i < parts.length - 1; i++) {
-        const part = parts[i];
-        if (part === 'rules') {
-            const nextPart = parts[i+1];
-            current = current.rules[parseInt(nextPart)];
-            i++; // skip the index part
-        } else {
-            current = current[part];
-        }
-      }
-      
-      const lastPart = parts[parts.length - 1];
-      current[lastPart] = value;
-      
-      return { ...newData };
-    });
+    setFormData(prev => ({ ...prev, conditions: setConditionValue(prev.conditions, path, value) }));
   }, []);
 
   const addRule = useCallback((path, type = 'rule') => {
-    setFormData(prev => {
-      const newData = { ...prev };
-      let current = newData.conditions;
-      
-      if (path !== "") {
-        const parts = path.split('.');
-        for (let i = 0; i < parts.length; i++) {
-          const part = parts[i];
-          if (part === 'rules') {
-              const nextPart = parts[i+1];
-              current = current.rules[parseInt(nextPart)];
-              i++;
-          } else {
-              current = current[part];
-          }
-        }
-      }
-
-      if (!current.rules) current.rules = [];
-      
-      if (type === 'group') {
-        current.rules.push({ operator: 'AND', rules: [] });
-      } else {
-        current.rules.push({ field: 'subtotal', op: '>=', value: 0 });
-      }
-
-      return { ...newData };
-    });
+    setFormData(prev => ({ ...prev, conditions: addConditionRule(prev.conditions, path, type) }));
   }, []);
 
   const removeRule = useCallback((path, index) => {
-    setFormData(prev => {
-        const newData = { ...prev };
-        let current = newData.conditions;
-        
-        if (path !== "") {
-          const parts = path.split('.');
-          for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            if (part === 'rules') {
-                const nextPart = parts[i+1];
-                current = current.rules[parseInt(nextPart)];
-                i++;
-            } else {
-                current = current[part];
-            }
-          }
-        }
-
-        current.rules.splice(index, 1);
-        return { ...newData };
-    });
+    setFormData(prev => ({ ...prev, conditions: removeConditionRule(prev.conditions, path, index) }));
   }, []);
 
   // --- ACTION UPDATES ---

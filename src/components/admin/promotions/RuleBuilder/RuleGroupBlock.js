@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import ConditionRow from './ConditionRow';
+import { childRulePath, joinPath, parentOfGroupPath } from '../promotionEditorUtils';
 
 const OPERATOR_HINT = {
   AND: 'all of the following',
@@ -47,7 +48,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
         <select
           id={operatorId}
           value={group.operator || 'AND'}
-          onChange={(e) => onUpdate(`${path}${path ? '.' : ''}operator`, e.target.value)}
+          onChange={(e) => onUpdate(joinPath(path, 'operator'), e.target.value)}
           className="wp-select"
         >
           <option value="AND">AND</option>
@@ -68,7 +69,10 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
           {depth > 0 && (
             <button
               type="button"
-              onClick={() => onRemove(path.split('.').slice(0, -1).join('.'), index)}
+              onClick={() => {
+                const parent = parentOfGroupPath(path);
+                if (parent) onRemove(parent.parentPath, index);
+              }}
               className="wp-btn"
               style={{ borderColor: 'var(--wp-danger)', color: 'var(--wp-danger)', padding: 0, minWidth: 40 }}
               aria-label="Remove group"
@@ -83,7 +87,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
       {!isCollapsed && (
         <div className="flex flex-col gap-2">
           {group.rules?.map((rule, idx) => {
-            const currentPath = `${path}${path ? '.' : ''}rules.${idx}`;
+            const currentPath = childRulePath(path, idx);
             if (rule.rules) {
               // It's a nested group
               return (

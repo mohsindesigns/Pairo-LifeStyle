@@ -2,6 +2,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
+import PromotionRevision from "@/models/PromotionRevision";
+import PromotionCustomerUsage from "@/models/PromotionCustomerUsage";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
 import Validator from "@/lib/promotionEngine/Validator";
@@ -141,12 +143,50 @@ export async function DELETE(req, { params }) {
 
   const { id } = await params;
   await dbConnect();
+  const adminName = session.user.name || session.user.email;
   try {
-    // Instead of hard delete, we archive
+    const { searchParams } = new URL(req.url);
+    const permanent = searchParams.get('permanent') === '1';
+
+    if (permanent) {
+      // Permanent delete is only allowed from the Trash (an already-archived promotion),
+      // so a live promotion can never be hard-deleted in one step.
+      const existing = await Promotion.findById(id);
+      if (!existing) {
+        return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+      }
+      if (existing.adminStatus !== 'Archived') {
+        return NextResponse.json({ error: "Move the promotion to Trash before deleting it permanently." }, { status: 409 });
+      }
+
+      await deactivatePromotionStripeCode(existing);
+      await Promotion.deleteOne({ _id: id });
+
+      // Revision snapshots and per-customer usage counters only make sense for an existing
+      // promotion, so they go with it. The audit log is kept as the permanent record, with a
+      // DELETE entry describing what was removed. Orders keep their own appliedPromotions copy.
+      await PromotionRevision.deleteMany({ promotionId: id });
+      await PromotionCustomerUsage.deleteMany({ promotionId: id });
+      await HistoryService.logAction('DELETE', id, {
+        adminName,
+        metadata: { title: existing.title, code: existing.code || null }
+      });
+
+      await cache.clearActivePromotionCache();
+      return NextResponse.json({ success: true, message: "Promotion deleted permanently" });
+    }
+
+    // Default: soft delete (move to Trash) by archiving
+    const oldPromo = await Promotion.findById(id);
+    if (!oldPromo) {
+      return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+    }
     const promotion = await Promotion.findByIdAndUpdate(id, { adminStatus: 'Archived' }, { new: true });
 
-    if (!promotion) {
-      return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+    if (oldPromo.adminStatus !== 'Archived') {
+      await HistoryService.logAction('ARCHIVE', id, { adminName }, [
+        { field: 'adminStatus', oldValue: oldPromo.adminStatus, newValue: 'Archived' }
+      ]);
     }
 
     await deactivatePromotionStripeCode(promotion);
