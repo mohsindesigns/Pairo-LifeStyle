@@ -78,7 +78,7 @@ async function runSync() {
   await dbConnect();
 
   const since = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
-  const candidates = await SizeConfirmation.find({ sentAt: { $gte: since } });
+  const candidates = await SizeConfirmation.find({ sentAt: { $gte: since }, isDeleted: { $ne: true } });
   if (candidates.length === 0) return { newReplies: 0, checked: 0 };
 
   const byMessageId = new Map(candidates.map((c) => [c.messageId, c]));

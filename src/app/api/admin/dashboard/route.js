@@ -210,7 +210,7 @@ async function activitySection(user) {
   }
   if (can(user, "orders.view")) {
     jobs.push(
-      SizeConfirmation.find({ unreadReplies: { $gt: 0 } }).sort({ lastReplyAt: -1 }).limit(LIMIT)
+      SizeConfirmation.find({ unreadReplies: { $gt: 0 }, isDeleted: { $ne: true } }).sort({ lastReplyAt: -1 }).limit(LIMIT)
         .select("orderId orderNumber customerName customerEmail lastReplyAt updatedAt").lean()
         .then((rows) => rows.map((r) => ({
           kind: "size-reply",
