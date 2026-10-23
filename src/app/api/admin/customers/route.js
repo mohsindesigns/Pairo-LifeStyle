@@ -7,12 +7,14 @@ import { can } from "@/lib/rbac";
 import { sanitizeText } from "@/lib/sanitize";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 import {
   parseCustomerListParams,
   buildCustomerFilter,
   escapeRegex,
   validateNewCustomer,
   totalPages,
+  parseCustomerDeleteMode,
 } from "./helpers";
 
 // Adds orderCount / totalSpent / lastOrderDate from the Orders collection.
@@ -48,7 +50,23 @@ export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!can(session.user, "customers.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // "Add new order" customer picker: staff with orders.create but not customers.view get
+  // only what's needed to build an order (name, email, phone, saved addresses).
+  if (!can(session.user, "customers.view")) {
+    if (new URL(req.url).searchParams.get("forOrder") !== "true" || !can(session.user, "orders.create")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    await dbConnect();
+    try {
+      const customers = await Customer.find({ role: { $ne: "admin" }, isDeleted: { $ne: true } })
+        .select("name email phone addresses")
+        .sort({ createdAt: -1 })
+        .lean();
+      return NextResponse.json(customers);
+    } catch (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
 
   const { paginated, page, search, filter, limit } = parseCustomerListParams(new URL(req.url).searchParams);
 
@@ -56,7 +74,7 @@ export async function GET(req) {
   try {
     // Legacy shape (no ?page): full array, used by Topbar search and New Order screen.
     if (!paginated) {
-      const customers = await Customer.find({ role: { $ne: "admin" } })
+      const customers = await Customer.find({ role: { $ne: "admin" }, isDeleted: { $ne: true } })
           .select('-password')
           .sort({ createdAt: -1 })
           .lean();
@@ -69,12 +87,17 @@ export async function GET(req) {
 
     // Paginated list for the Customers screen.
     const activeIds = await getActiveCustomerIds();
-    const listFilter = buildCustomerFilter({ search, activeIds: filter === "active" ? activeIds : null });
+    const listFilter = buildCustomerFilter({
+      search,
+      activeIds: filter === "active" ? activeIds : null,
+      trash: filter === "trash",
+    });
 
-    const [total, allCount, activeCount] = await Promise.all([
+    const [total, allCount, activeCount, trashCount] = await Promise.all([
       Customer.countDocuments(listFilter),
       Customer.countDocuments(buildCustomerFilter()),
       Customer.countDocuments(buildCustomerFilter({ activeIds })),
+      Customer.countDocuments(buildCustomerFilter({ trash: true })),
     ]);
 
     const pages = totalPages(total, limit);
@@ -92,7 +115,7 @@ export async function GET(req) {
       page: currentPage,
       pages,
       limit,
-      counts: { all: allCount, active: activeCount },
+      counts: { all: allCount, active: activeCount, trash: trashCount },
     });
   } catch (error) {
     console.error("[Customer API Error]:", error);
@@ -143,5 +166,76 @@ export async function POST(req) {
     }
     console.error("[Customer API Create Error]:", error);
     return NextResponse.json({ error: "Failed to create customer." }, { status: 500 });
+  }
+}
+
+// Move a customer to the Trash (?mode=trash, default) or delete a trashed customer
+// permanently (?mode=permanent). Their orders are never touched: each order keeps
+// its own customer snapshot (email/name/shipping address).
+export async function DELETE(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!can(session.user, "customers.delete")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  const mode = parseCustomerDeleteMode(searchParams.get("mode"));
+  if (!id || !mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Customer ID is required" }, { status: 400 });
+  }
+
+  await dbConnect();
+  try {
+    const customer = await Customer.findOne({ _id: id, role: { $ne: "admin" } }).select("_id isDeleted").lean();
+    if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+
+    if (mode === "trash") {
+      if (!customer.isDeleted) {
+        await Customer.updateOne({ _id: id }, { $set: { isDeleted: true, deletedAt: new Date() } });
+      }
+      return NextResponse.json({ success: true, message: "Customer moved to trash" });
+    }
+
+    // Permanent delete is only allowed from the Trash (atomic: re-checks isDeleted).
+    const deleted = await Customer.findOneAndDelete({ _id: id, isDeleted: true });
+    if (!deleted) {
+      return NextResponse.json({ error: "Move the customer to trash before deleting them permanently." }, { status: 409 });
+    }
+    return NextResponse.json({ success: true, message: "Customer deleted permanently" });
+  } catch (error) {
+    console.error("[Customer API Delete Error]:", error);
+    return NextResponse.json({ error: "Failed to delete customer." }, { status: 500 });
+  }
+}
+
+// Restore a customer from the Trash: PUT { id, isDeleted: false }.
+export async function PUT(req) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!can(session.user, "customers.delete")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await req.json().catch(() => ({}));
+  const { id, isDeleted } = body || {};
+  if (!id || !mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Customer ID is required" }, { status: 400 });
+  }
+  if (isDeleted !== false) {
+    return NextResponse.json({ error: "Only restoring (isDeleted: false) is supported" }, { status: 400 });
+  }
+
+  await dbConnect();
+  try {
+    const customer = await Customer.findOneAndUpdate(
+      { _id: id, role: { $ne: "admin" } },
+      { $set: { isDeleted: false, deletedAt: null } },
+      { new: true }
+    ).select("-password").lean();
+    if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+    return NextResponse.json({ success: true, customer });
+  } catch (error) {
+    console.error("[Customer API Restore Error]:", error);
+    return NextResponse.json({ error: "Failed to restore customer." }, { status: 500 });
   }
 }

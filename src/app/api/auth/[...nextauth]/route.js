@@ -9,6 +9,11 @@ import bcrypt from "bcryptjs";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { rateLimit } from "@/lib/rateLimit";
 
+// Staff session lifetime: "Remember me" on the admin login keeps staff signed in for 30 days,
+// otherwise 12 hours. (Customer/affiliate sessions keep NextAuth's default lifetime.)
+const STAFF_REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
+const STAFF_SESSION_MS = 12 * 60 * 60 * 1000;
+
 export const authOptions = {
   providers: [
     CredentialsProvider({
@@ -17,7 +22,8 @@ export const authOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
         loginType: { label: "Type", type: "text" }, // 'staff', 'customer', or 'affiliate'
-        turnstileToken: { label: "Turnstile Token", type: "text" }
+        turnstileToken: { label: "Turnstile Token", type: "text" },
+        rememberMe: { label: "Remember Me", type: "text" } // staff login only: "true" | "false"
       },
       async authorize(credentials, req) {
         await dbConnect();
@@ -66,7 +72,8 @@ export const authOptions = {
                         email: staff.email, 
                         role: staff.roleId, 
                         isStaff: true,
-                        isAffiliate: false
+                        isAffiliate: false,
+                        rememberMe: credentials?.rememberMe === "true"
                     };
                 }
                 throw new Error("Invalid email or password");
@@ -98,6 +105,10 @@ export const authOptions = {
         // 5. Try Customer
         if (!credentials.loginType || credentials.loginType === 'customer') {
             const customer = await Customer.findOne({ email: cleanEmail }).lean();
+            // A customer an admin moved to the Trash can't sign in.
+            if (customer?.isDeleted) {
+                throw new Error("Invalid email or password");
+            }
             if (customer) {
                 const isMatch = await bcrypt.compare(password, customer.password);
                 if (isMatch) {
@@ -129,7 +140,15 @@ export const authOptions = {
         token.isAffiliate = user.isAffiliate || false;
         if (user.isStaff) {
             token.role = user.role;
+            token.staffExpiresAt = Date.now() + (user.rememberMe ? STAFF_REMEMBER_MS : STAFF_SESSION_MS);
         }
+      }
+
+      // Staff sessions end at their own expiry (see STAFF_*_MS). Clearing the token signs the
+      // user out, same as the suspended-account check below. Tokens issued before this field
+      // existed have no expiry and are left alone.
+      if (token?.isStaff && token.staffExpiresAt && Date.now() > token.staffExpiresAt) {
+          return {};
       }
 
       // Security: Re-verify staff status AND role/permissions from DB on every request, so

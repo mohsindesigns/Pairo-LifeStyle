@@ -3,9 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
 import { Page, PageHeader, formatMoney, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+
+async function readError(res, fallback) {
+  try {
+    const data = await res.json();
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function AdminCustomers() {
   const { showConfirm } = usePopup();
@@ -15,7 +25,7 @@ export default function AdminCustomers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
-  const [meta, setMeta] = useState({ total: 0, pages: 1, counts: { all: 0, active: 0 } });
+  const [meta, setMeta] = useState({ total: 0, pages: 1, counts: { all: 0, active: 0, trash: 0 } });
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
 
@@ -31,7 +41,7 @@ export default function AdminCustomers() {
         setMeta({
           total: data.total || 0,
           pages: data.pages || 1,
-          counts: data.counts || { all: 0, active: 0 },
+          counts: { all: 0, active: 0, trash: 0, ...(data.counts || {}) },
         });
         if (data.page && data.page !== page) setPage(data.page);
       }
@@ -66,8 +76,11 @@ export default function AdminCustomers() {
     setSearchTerm(searchInput.trim());
   };
 
+  const isTrash = filter === "trash";
+
   const changeFilter = (next) => {
     setSelectedIds([]);
+    setBulkAction("Bulk actions");
     setPage(1);
     setFilter(next);
   };
@@ -77,33 +90,107 @@ export default function AdminCustomers() {
     setPage(Math.min(Math.max(1, next), meta.pages));
   };
 
-  const handleDelete = async (id) => {
-    const ok = await showConfirm("Are you sure you want to move this customer to trash?");
-    if (!ok) return;
+  // --- single-customer requests (throw on failure) ---
+  const trashCustomer = async (id) => {
+    const res = await fetch(`/api/admin/customers?id=${id}&mode=trash`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to move customer to trash."));
+  };
+
+  const deleteCustomerPermanently = async (id) => {
+    const res = await fetch(`/api/admin/customers?id=${id}&mode=permanent`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to delete customer."));
+  };
+
+  const restoreCustomer = async (id) => {
+    const res = await fetch("/api/admin/customers", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, isDeleted: false }),
+    });
+    if (!res.ok) throw new Error(await readError(res, "Failed to restore customer."));
+  };
+
+  const nameOf = (c) => c?.name || c?.email || "this customer";
+
+  const reloadAfterRemoval = (removed) => {
+    // If every row on this page went away, step back a page.
+    if (removed >= customers.length && page > 1) setPage(page - 1);
+    else fetchCustomers();
+  };
+
+  const runRowAction = async (action, messages) => {
     try {
-      const res = await fetch(`/api/admin/customers?id=${id}`, { method: "DELETE" });
-      if (res.ok) fetchCustomers();
+      await action();
+      toast.success(messages.success);
+      reloadAfterRemoval(1);
     } catch (err) {
-      console.error(err);
+      toast.error(err.message || messages.error);
     }
   };
 
+  const handleDelete = async (c) => {
+    const ok = await showConfirm(
+      `${nameOf(c)} will be moved to the Trash and won't be able to sign in. Their orders are kept.`,
+      "Move to Trash?",
+      { confirmText: "Move to Trash", danger: true }
+    );
+    if (!ok) return;
+    runRowAction(() => trashCustomer(c._id), { success: `${nameOf(c)} moved to the Trash.`, error: "Failed to move customer to trash." });
+  };
+
+  const handleRestore = (c) => runRowAction(() => restoreCustomer(c._id), {
+    success: `${nameOf(c)} restored.`,
+    error: "Failed to restore customer.",
+  });
+
+  const handleDeletePermanently = async (c) => {
+    const ok = await showConfirm(
+      `${nameOf(c)} will be deleted permanently. This cannot be undone. Their orders are kept.`,
+      "Delete permanently?",
+      { confirmText: "Delete Permanently", danger: true }
+    );
+    if (!ok) return;
+    runRowAction(() => deleteCustomerPermanently(c._id), { success: "Customer deleted permanently.", error: "Failed to delete customer." });
+  };
+
+  const BULK_ACTIONS = {
+    "Move to Trash": { verb: "moved to the Trash", run: trashCustomer },
+    Restore: { verb: "restored", run: restoreCustomer },
+    "Delete Permanently": { verb: "deleted permanently", run: deleteCustomerPermanently },
+  };
+
   const handleBulkAction = async () => {
-     if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     const ok = await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} customers?`);
-     if (ok) {
-        try {
-           for (const id of selectedIds) {
-              if (bulkAction === "Move to Trash" || bulkAction === "Delete Permanently") {
-                  await fetch(`/api/admin/customers?id=${id}`, { method: "DELETE" });
-              }
-           }
-           setSelectedIds([]);
-           fetchCustomers();
-        } catch (err) {
-           console.error("Bulk action failed:", err);
-        }
-     }
+    const def = BULK_ACTIONS[bulkAction];
+    if (!def || selectedIds.length === 0) return;
+    const n = selectedIds.length;
+    const label = `${n} customer${n === 1 ? "" : "s"}`;
+    const ok = bulkAction === "Delete Permanently"
+      ? await showConfirm(`${label} will be deleted permanently. This cannot be undone. Their orders are kept.`, "Delete permanently?", { confirmText: "Delete Permanently", danger: true })
+      : bulkAction === "Move to Trash"
+        ? await showConfirm(`${label} will be moved to the Trash and won't be able to sign in. Their orders are kept.`, "Move to Trash?", { confirmText: "Move to Trash", danger: true })
+        : await showConfirm(`Restore ${label}?`);
+    if (!ok) return;
+
+    let succeeded = 0;
+    const failures = [];
+    for (const id of selectedIds) {
+      const c = customers.find((x) => x._id === id);
+      try {
+        await def.run(id);
+        succeeded++;
+      } catch (err) {
+        failures.push(`${nameOf(c)}: ${err.message}`);
+      }
+    }
+
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    reloadAfterRemoval(succeeded);
+
+    if (succeeded > 0) toast.success(`${succeeded} customer${succeeded === 1 ? "" : "s"} ${def.verb}.`);
+    if (failures.length > 0) {
+      toast.error(`${failures.length} failed — ${failures.slice(0, 5).join("; ")}${failures.length > 5 ? "; …" : ""}`, { duration: 8000 });
+    }
   };
 
   const toggleSelect = (id) => {
@@ -182,6 +269,12 @@ export default function AdminCustomers() {
             Active Customers <span className="wp-count">({meta.counts.active})</span>
           </button>
         )}
+        <span className="wp-sep">|</span>
+        {isTrash ? (
+          <span className="is-current" aria-current="page">Trash <span className="wp-count">({meta.counts.trash})</span></span>
+        ) : (
+          <button type="button" onClick={() => changeFilter("trash")}>Trash <span className="wp-count">({meta.counts.trash})</span></button>
+        )}
       </div>
 
       {/* Action Bar */}
@@ -189,10 +282,16 @@ export default function AdminCustomers() {
         <label htmlFor="customer-bulk-action" className="sr-only">Select bulk action</label>
         <select id="customer-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
           <option>Bulk actions</option>
-          <option>Move to Trash</option>
-          <option>Delete Permanently</option>
+          {isTrash ? (
+            <>
+              <option>Restore</option>
+              <option>Delete Permanently</option>
+            </>
+          ) : (
+            <option>Move to Trash</option>
+          )}
         </select>
-        <button onClick={handleBulkAction} className="wp-btn">Apply</button>
+        <button type="button" onClick={handleBulkAction} className="wp-btn">Apply</button>
         <span className="wp-spacer" />
         <span className="wp-pages">{itemsLabel}</span>
       </div>
@@ -205,7 +304,7 @@ export default function AdminCustomers() {
             {loading ? (
               <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>Loading customers...</td></tr>
             ) : filteredCustomers.length === 0 ? (
-              <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>No customers found.</td></tr>
+              <tr><td colSpan={7} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>{isTrash ? "No customers found in Trash." : "No customers found."}</td></tr>
             ) : (
               filteredCustomers.map((c) => {
                 const location = locationOf(c);
@@ -230,9 +329,18 @@ export default function AdminCustomers() {
                             {location ? ` · ${location}` : ""}
                           </div>
                           <div className="wp-row-actions">
-                            <Link href={`/admin/customers/${c._id}`}>Edit</Link>
-                            <button type="button" className="is-danger" onClick={() => handleDelete(c._id)}>Trash</button>
-                            <Link href={`/admin/customers/${c._id}`}>View</Link>
+                            {isTrash ? (
+                              <>
+                                <button type="button" onClick={() => handleRestore(c)}>Restore</button>
+                                <button type="button" className="is-danger" onClick={() => handleDeletePermanently(c)}>Delete Permanently</button>
+                              </>
+                            ) : (
+                              <>
+                                <Link href={`/admin/customers/${c._id}`}>Edit</Link>
+                                <button type="button" className="is-danger" onClick={() => handleDelete(c)}>Trash</button>
+                                <Link href={`/admin/customers/${c._id}`}>View</Link>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

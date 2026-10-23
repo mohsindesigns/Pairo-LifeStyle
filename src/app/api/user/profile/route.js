@@ -30,7 +30,8 @@ export async function GET() {
             orderHistory: []
           };
           const orders = await Order.find({
-            "customer.email": staff.email
+            "customer.email": staff.email,
+            isDeleted: { $ne: true }
           }).sort({ createdAt: -1 }).lean();
           if (orders.length > 0) {
             const productIds = orders.flatMap(o => (o.items || []).map(item => item.productId)).filter(Boolean);
@@ -61,7 +62,8 @@ export async function GET() {
 
     // Fetch Orders from Order collection (Live data)
     const orders = await Order.find({
-      "customer.userId": session.user.id
+      "customer.userId": session.user.id,
+      isDeleted: { $ne: true }
     }).sort({ createdAt: -1 }).lean();
 
     // Fetch product images for any orders with missing image URLs
@@ -193,7 +195,7 @@ export async function POST(req) {
       case "deleteAccount":
         return NextResponse.json({ message: "Account deletion is disabled for this store." }, { status: 403 });
       case "cancelOrder": {
-        const order = await Order.findOne({ _id: data.orderId, "customer.userId": session.user.id });
+        const order = await Order.findOne({ _id: data.orderId, "customer.userId": session.user.id, isDeleted: { $ne: true } });
         if (!order) return NextResponse.json({ message: "Order not found" }, { status: 404 });
         
         // Cancellation Logic: Only if not already shipped/packed

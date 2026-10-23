@@ -337,7 +337,8 @@ export default function CategoryManager({ type = "product", title = "Categories"
                               <Link href={getEditLink(cat._id)}>Edit</Link>
                               <button type="button" onClick={() => handleDuplicate(cat)}>Duplicate</button>
                               <button type="button" className="is-danger" onClick={() => handleDelete(cat._id)}>Trash</button>
-                              <Link href={getCategoryUrl(cat)} target="_blank">View</Link>
+                              {/* Blog categories have no public per-category page (/blog lists all posts). */}
+                              {type === "product" && <Link href={getCategoryUrl(cat)} target="_blank">View</Link>}
                             </div>
                           )}
                         </td>

@@ -17,7 +17,8 @@ export async function GET(req, { params }) {
     const { id } = await params;
     const order = await Order.findOne({ 
       _id: id, 
-      "customer.userId": session.user.id 
+      "customer.userId": session.user.id,
+      isDeleted: { $ne: true }
     }).populate('items.productId', 'images image').lean();
 
     if (!order) {

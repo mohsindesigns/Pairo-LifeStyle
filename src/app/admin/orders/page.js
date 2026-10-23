@@ -105,18 +105,10 @@ export default function AdminOrdersPage() {
     if (!res.ok) throw new Error(await readError(res, "Failed to restore order."));
   };
 
+  // Server-side copy: keeps the original prices, no stock deduction, no emails or
+  // commissions; the copy is a Pending draft noted "Duplicated from #<n>".
   const duplicateOrder = async (order) => {
-    const { _id, createdAt, updatedAt, orderNumber, isDeleted, deletedAt, ...rest } = order;
-    const copy = {
-      ...rest,
-      orderNumber: `COPY-${orderNumber || Math.floor(Math.random() * 1000)}`,
-      status: "Pending"
-    };
-    const res = await fetch("/api/admin/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(copy)
-    });
+    const res = await fetch(`/api/admin/orders/${order._id}/duplicate`, { method: "POST" });
     if (!res.ok) throw new Error(await readError(res, "Failed to duplicate order."));
   };
 
@@ -159,7 +151,7 @@ export default function AdminOrdersPage() {
 
   const handleDuplicate = (order) => runRowAction(() => duplicateOrder(order), {
     loading: "Duplicating order...",
-    success: "Order duplicated.",
+    success: `Order #${order.orderNumber} duplicated as a Pending draft.`,
     error: "Failed to duplicate order.",
   });
 

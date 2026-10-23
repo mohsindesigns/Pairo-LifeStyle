@@ -192,7 +192,7 @@ export async function POST(req) {
       let customerInfo = { userId: null, email: customer?.email || "", isGuest: true };
       if (customer?.customerId) {
         const existingCustomer = await Customer.findById(customer.customerId).session(mongoSession);
-        if (!existingCustomer) throw new Error("Selected customer not found");
+        if (!existingCustomer || existingCustomer.isDeleted) throw new Error("Selected customer not found");
         customerInfo = { userId: existingCustomer._id, email: existingCustomer.email, isGuest: false };
       }
 

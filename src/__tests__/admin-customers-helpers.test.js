@@ -5,6 +5,7 @@ import {
   escapeRegex,
   validateNewCustomer,
   totalPages,
+  parseCustomerDeleteMode,
   CUSTOMERS_PAGE_SIZE,
 } from "@/app/api/admin/customers/helpers";
 
@@ -35,8 +36,22 @@ describe("admin customers list params", () => {
 });
 
 describe("buildCustomerFilter", () => {
-  it("always excludes admins", () => {
-    expect(buildCustomerFilter()).toEqual({ role: { $ne: "admin" } });
+  it("always excludes admins and trashed customers", () => {
+    expect(buildCustomerFilter()).toEqual({ role: { $ne: "admin" }, isDeleted: { $ne: true } });
+  });
+
+  it("lists only trashed customers for the Trash view", () => {
+    expect(buildCustomerFilter({ trash: true })).toEqual({ role: { $ne: "admin" }, isDeleted: true });
+  });
+
+  it("accepts the trash filter param", () => {
+    expect(parseCustomerListParams(new URLSearchParams("page=1&filter=trash")).filter).toBe("trash");
+  });
+
+  it("delete mode defaults to trash; permanent only when asked", () => {
+    expect(parseCustomerDeleteMode(null)).toBe("trash");
+    expect(parseCustomerDeleteMode("evil")).toBe("trash");
+    expect(parseCustomerDeleteMode("permanent")).toBe("permanent");
   });
 
   it("escapes regex input for search", () => {

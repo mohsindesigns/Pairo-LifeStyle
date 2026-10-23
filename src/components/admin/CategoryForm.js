@@ -518,10 +518,11 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                   <input type="checkbox" checked={formData.isFeatured} onChange={(e) => setFormData({...formData, isFeatured: e.target.checked})} />
                   Featured Category
                 </label>
-                {formData.slug && (
+                {/* Only product categories have a public page; blog categories have none. */}
+                {formData.slug && type === 'product' && (
                   <div className="wp-misc-row">
                     <a
-                      href={type === 'product' ? getCategoryUrl(formData.slug) : `/blog/${formData.slug}`}
+                      href={getCategoryUrl(formData.slug)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="wp-link"
