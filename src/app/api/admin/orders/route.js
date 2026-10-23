@@ -263,7 +263,7 @@ export async function DELETE(req) {
     const id = searchParams.get("id");
     const permanent = searchParams.get("permanent") === "true";
 
-    if (!id) {
+    if (!id || !mongoose.isValidObjectId(id)) {
       return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
     }
 
@@ -279,6 +279,12 @@ export async function DELETE(req) {
         await Order.updateOne({ _id: order._id }, { $set: { isDeleted: true, deletedAt: new Date() } });
       }
       return NextResponse.json({ success: true, message: "Order moved to trash" });
+    }
+
+    // Permanent delete is only allowed from the Trash, so a single click can never
+    // wipe out a live order.
+    if (!order.isDeleted) {
+      return NextResponse.json({ error: "Move the order to the Trash before deleting it permanently." }, { status: 409 });
     }
 
     // Permanent delete: cancel associated commissions first

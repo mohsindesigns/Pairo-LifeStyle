@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
-import { Page, PageHeader, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Page, PageHeader, Notice, Skeleton, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
@@ -35,6 +36,7 @@ export default function AdminOrdersPage() {
   const [referralFilter, setReferralFilter] = useState("all");
   const [pagination, setPagination] = useState({ total: 0, pages: 1, currentPage: 1 });
   const [counts, setCounts] = useState(null);
+  const [loadError, setLoadError] = useState("");
 
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
@@ -52,15 +54,16 @@ export default function AdminOrdersPage() {
       if (referralFilter !== "all") params.set("referral", referralFilter);
 
       const res = await fetch(`/api/admin/orders?${params.toString()}`);
-      const data = await res.json();
-      if (data.success) {
-        setOrders(data.orders);
-        setSelectedIds([]); // selection only ever refers to the rows currently shown
-        setPagination(data.pagination);
-        setCounts(data.counts || null);
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to load orders.");
+      setOrders(data.orders);
+      setSelectedIds([]); // selection only ever refers to the rows currently shown
+      setPagination(data.pagination);
+      setCounts(data.counts || null);
+      setLoadError("");
     } catch (error) {
       console.error(error);
+      setLoadError(error.message || "Failed to load orders.");
     } finally {
       setLoading(false);
     }
@@ -165,7 +168,14 @@ export default function AdminOrdersPage() {
 
   const handleBulkAction = async () => {
     const def = BULK_LABELS[bulkAction];
-    if (!def || selectedIds.length === 0) return;
+    if (!def) {
+      toast.error("Choose a bulk action first.");
+      return;
+    }
+    if (selectedIds.length === 0) {
+      toast.error("Select at least one order.");
+      return;
+    }
 
     const n = selectedIds.length;
     const ok = bulkAction === "Delete Permanently"
@@ -192,7 +202,12 @@ export default function AdminOrdersPage() {
 
     setSelectedIds([]);
     setBulkAction("Bulk actions");
-    fetchOrders(pagination.currentPage);
+    // Removing every row on the last page steps back one page.
+    const removesRows = bulkAction !== "Duplicate";
+    const page = removesRows && succeeded >= orders.length && pagination.currentPage > 1
+      ? pagination.currentPage - 1
+      : pagination.currentPage;
+    fetchOrders(page);
 
     if (succeeded > 0) toast.success(`${succeeded} order${succeeded === 1 ? "" : "s"} ${def.verb}.`);
     if (failures.length > 0) {
@@ -224,25 +239,25 @@ export default function AdminOrdersPage() {
 
   const pager = (
     <div className="wp-pages">
-      <span>{pagination.total} items</span>
+      <span>{pagination.total} {pagination.total === 1 ? "item" : "items"}</span>
       <button
         type="button"
         className="wp-pager"
         aria-label="Previous page"
-        disabled={pagination.currentPage === 1}
+        disabled={loading || pagination.currentPage <= 1}
         onClick={() => fetchOrders(pagination.currentPage - 1)}
       >
-        ‹
+        <ChevronLeft className="w-4 h-4" aria-hidden="true" />
       </button>
       <span>{pagination.currentPage} of {pagination.pages}</span>
       <button
         type="button"
         className="wp-pager"
         aria-label="Next page"
-        disabled={pagination.currentPage === pagination.pages}
+        disabled={loading || pagination.currentPage >= pagination.pages}
         onClick={() => fetchOrders(pagination.currentPage + 1)}
       >
-        ›
+        <ChevronRight className="w-4 h-4" aria-hidden="true" />
       </button>
     </div>
   );
@@ -257,7 +272,7 @@ export default function AdminOrdersPage() {
       <th scope="col" className="wp-hide-sm">Status</th>
       <th scope="col" className="wp-hide-sm">Ship to</th>
       <th scope="col" className="wp-hide-sm">Payment</th>
-      <th scope="col" className="wp-num">Total</th>
+      <th scope="col" className="wp-num" style={{ textAlign: "right" }}>Total</th>
     </tr>
   );
 
@@ -296,14 +311,16 @@ export default function AdminOrdersPage() {
         >
           <option>Bulk actions</option>
           {isTrash ? (
-            <option>Restore</option>
+            <>
+              <option>Restore</option>
+              <option>Delete Permanently</option>
+            </>
           ) : (
             <>
               <option>Duplicate</option>
               <option>Move to Trash</option>
             </>
           )}
-          <option>Delete Permanently</option>
         </select>
         <button type="button" onClick={handleBulkAction} className="wp-btn">
           Apply
@@ -336,14 +353,46 @@ export default function AdminOrdersPage() {
         </form>
       </div>
 
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pager}
+      </div>
+
+      {loadError && (
+        <Notice type="error" onDismiss={() => setLoadError("")}>
+          {loadError}{" "}
+          <button type="button" className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={() => fetchOrders(pagination.currentPage)}>
+            Try again
+          </button>
+        </Notice>
+      )}
+
       <div className="wp-table-box">
         <table className="wp-list-table">
           <thead>{headRow}</thead>
           <tbody>
-            {loading ? (
-              <tr><td colSpan={7} className="wp-muted">Loading orders...</td></tr>
+            {loading && displayedOrders.length === 0 ? (
+              [0, 1, 2, 3, 4].map((i) => (
+                <tr key={`sk-${i}`} aria-hidden="true">
+                  <td className="wp-check-col"><Skeleton height={16} width={16} /></td>
+                  <td><Skeleton height={16} width="70%" /><Skeleton height={12} width="40%" style={{ marginTop: 8 }} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width={80} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={22} width={84} /></td>
+                  <td className="wp-hide-sm"><Skeleton height={14} width="80%" /></td>
+                  <td className="wp-hide-sm"><Skeleton height={22} width={70} /></td>
+                  <td className="wp-num"><Skeleton height={14} width={64} style={{ marginLeft: "auto" }} /></td>
+                </tr>
+              ))
             ) : displayedOrders.length === 0 ? (
-              <tr><td colSpan={7} className="wp-muted">No orders found.</td></tr>
+              <tr>
+                <td colSpan={7} className="wp-muted">
+                  {search
+                    ? <>No orders match &ldquo;{search}&rdquo;.</>
+                    : isTrash
+                      ? "No orders in the Trash."
+                      : "No orders found."}
+                </td>
+              </tr>
             ) : (
               displayedOrders.map((order) => {
                 const customerName = order.shippingAddress?.fullName || order.customer?.email || "Guest";
@@ -382,14 +431,14 @@ export default function AdminOrdersPage() {
                       <div className="wp-row-actions">
                         {isTrash ? (
                           <>
-                            <button type="button" onClick={() => handleRestore(order)}>Restore</button>
-                            <button type="button" className="is-danger" onClick={() => handleDeletePermanently(order)}>Delete Permanently</button>
+                            <span><button type="button" onClick={() => handleRestore(order)}>Restore</button></span>
+                            <span><button type="button" className="is-danger" onClick={() => handleDeletePermanently(order)}>Delete Permanently</button></span>
                           </>
                         ) : (
                           <>
-                            <Link href={`/admin/orders/${order._id}`}>View</Link>
-                            <button type="button" onClick={() => handleDuplicate(order)}>Duplicate</button>
-                            <button type="button" className="is-danger" onClick={() => handleTrash(order)}>Trash</button>
+                            <span><Link href={`/admin/orders/${order._id}`}>Edit</Link></span>
+                            <span><button type="button" onClick={() => handleDuplicate(order)}>Duplicate</button></span>
+                            <span><button type="button" className="is-danger" onClick={() => handleTrash(order)}>Trash</button></span>
                           </>
                         )}
                       </div>
@@ -410,7 +459,7 @@ export default function AdminOrdersPage() {
                       )}
                       {order.payment?.method && <div className="wp-muted wp-small" style={{ marginTop: 4 }}>{order.payment.method}</div>}
                     </td>
-                    <td className="wp-num">
+                    <td className="wp-num" style={{ whiteSpace: "nowrap" }}>
                       <span className="wp-strong">{formatMoney(order.financials?.total, order.financials?.currency || "USD")}</span>
                       <div className="wp-muted wp-small">{itemCount} item{itemCount === 1 ? "" : "s"}</div>
                     </td>

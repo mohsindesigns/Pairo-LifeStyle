@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, MapPin, ExternalLink, Copy, Send, FileText } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
 import InvoiceTemplate from "@/components/admin/InvoiceTemplate";
@@ -17,6 +17,7 @@ import SizeConfirmationPanel from "@/components/admin/SizeConfirmationPanel";
 
 export default function OrderDetailPage() {
   const { id } = useParams();
+  const router = useRouter();
   const { data: session } = useSession();
   const { showConfirm } = usePopup();
   const [order, setOrder] = useState(null);
@@ -36,6 +37,7 @@ export default function OrderDetailPage() {
   const [savingAmount, setSavingAmount] = useState(false);
   const [convertingToCard, setConvertingToCard] = useState(false);
   const [exportingVendorPdf, setExportingVendorPdf] = useState(false);
+  const [trashBusy, setTrashBusy] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -86,13 +88,17 @@ export default function OrderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ timelineMessage: newNote }),
       });
-      const data = await res.json();
-      if (data.success) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
         setOrder(data.order);
         setNewNote("");
+        toast.success("Note added.");
+      } else {
+        toast.error(data.error || "Couldn't add the note.");
       }
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't add the note.");
     } finally {
       setUpdating(false);
     }
@@ -418,6 +424,81 @@ export default function OrderDetailPage() {
     );
   };
 
+  const readError = async (res, fallback) => {
+    const data = await res.json().catch(() => ({}));
+    return data.error || fallback;
+  };
+
+  // Server-side copy (POST /api/admin/orders/[id]/duplicate): a Pending draft at the
+  // original prices — no stock change, no emails, no commissions. Opens the copy.
+  const duplicateThisOrder = async () => {
+    setTrashBusy(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${order._id}/duplicate`, { method: "POST" });
+      if (!res.ok) throw new Error(await readError(res, "Failed to duplicate order."));
+      const data = await res.json();
+      toast.success(`Order #${order.orderNumber} duplicated as #${data.order.orderNumber} (Pending draft).`);
+      router.push(`/admin/orders/${data.order._id}`);
+    } catch (err) {
+      toast.error(err.message || "Failed to duplicate order.");
+    } finally {
+      setTrashBusy(false);
+    }
+  };
+
+  const moveToTrash = async () => {
+    setTrashBusy(true);
+    try {
+      const res = await fetch(`/api/admin/orders?id=${order._id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readError(res, "Failed to move order to trash."));
+      toast.success(`Order #${order.orderNumber} moved to the Trash.`);
+      router.push("/admin/orders");
+    } catch (err) {
+      toast.error(err.message || "Failed to move order to trash.");
+      setTrashBusy(false);
+    }
+  };
+
+  const restoreFromTrash = async () => {
+    setTrashBusy(true);
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: order._id, isDeleted: false }),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Failed to restore order."));
+      setOrder((prev) => ({ ...prev, isDeleted: false, deletedAt: null }));
+      toast.success(`Order #${order.orderNumber} restored.`);
+    } catch (err) {
+      toast.error(err.message || "Failed to restore order.");
+    } finally {
+      setTrashBusy(false);
+    }
+  };
+
+  const deletePermanently = async () => {
+    const ok = await showConfirm(
+      `Order #${order.orderNumber} will be deleted permanently. This cannot be undone.`,
+      "Delete permanently?",
+      { confirmText: "Delete Permanently", danger: true }
+    );
+    if (!ok) return;
+    setTrashBusy(true);
+    try {
+      const res = await fetch(`/api/admin/orders?id=${order._id}&permanent=true`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await readError(res, "Failed to delete order."));
+      toast.success("Order deleted permanently.");
+      router.push("/admin/orders");
+    } catch (err) {
+      toast.error(err.message || "Failed to delete order.");
+      setTrashBusy(false);
+    }
+  };
+
+  const canTrash = ["orders.update", "orders.edit", "orders.delete"].some((k) => can(session?.user, k));
+  const linkBtn = { background: "none", border: 0, padding: 0, cursor: "pointer", fontSize: 13, minHeight: 36, display: "inline-flex", alignItems: "center" };
+
   const backLink = (
     <Link href="/admin/orders" className="wp-btn">
       <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Back to orders
@@ -459,6 +540,20 @@ export default function OrderDetailPage() {
     <RequirePermission permission="orders.view">
     <Page>
       <PageHeader title="Edit order" actions={backLink} />
+
+      {order.isDeleted && (
+        <div className="wp-notice wp-notice-warning print:hidden" role="status">
+          <p style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 12px" }}>
+            <span>This order is in the Trash. Restore it to change its status.</span>
+            <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="wp-btn" disabled={trashBusy} onClick={restoreFromTrash}>Restore</button>
+              <button type="button" className="wp-btn" style={{ borderColor: "#b32d2e", color: "#b32d2e" }} disabled={trashBusy} onClick={deletePermanently}>
+                Delete Permanently
+              </button>
+            </span>
+          </p>
+        </div>
+      )}
 
       <InvoiceTemplate order={order} />
 
@@ -651,9 +746,9 @@ export default function OrderDetailPage() {
               <thead>
                 <tr>
                   <th scope="col">Item</th>
-                  <th scope="col" className="wp-num wp-hide-sm">Cost</th>
-                  <th scope="col" className="wp-num wp-hide-sm">Qty</th>
-                  <th scope="col" className="wp-num">Total</th>
+                  <th scope="col" className="wp-num wp-hide-sm" style={{ textAlign: "right" }}>Cost</th>
+                  <th scope="col" className="wp-num wp-hide-sm" style={{ textAlign: "right" }}>Qty</th>
+                  <th scope="col" className="wp-num" style={{ textAlign: "right" }}>Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -778,11 +873,11 @@ export default function OrderDetailPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="wp-num wp-hide-sm">
+                    <td className="wp-num wp-hide-sm" style={{ whiteSpace: "nowrap" }}>
                       {formatMoney(item.priceAtPurchase, currencyCode)}
                     </td>
-                    <td className="wp-num wp-hide-sm">× {item.quantity || 1}</td>
-                    <td className="wp-num wp-strong">
+                    <td className="wp-num wp-hide-sm" style={{ whiteSpace: "nowrap" }}>× {item.quantity || 1}</td>
+                    <td className="wp-num wp-strong" style={{ whiteSpace: "nowrap" }}>
                       {formatMoney((item.priceAtPurchase || 0) * (item.quantity || 1), currencyCode)}
                     </td>
                   </tr>
@@ -885,13 +980,13 @@ export default function OrderDetailPage() {
           {/* Order actions */}
           <Postbox
             title="Order actions"
-            footer={
+            footer={order.isDeleted ? null : (
               <>
                 {renderCancelRefundButton()}
                 <span className="wp-spacer" />
                 {renderProgressButton()}
               </>
-            }
+            )}
           >
             <div className="wp-kv">
               <span className="wp-kv-k wp-muted">Current status</span>
@@ -905,6 +1000,23 @@ export default function OrderDetailPage() {
                 {order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
               </span>
             </div>
+            {!order.isDeleted && (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0 6px", paddingTop: 2, color: "#a7aaad" }}>
+                {can(session?.user, "orders.create") && (
+                  <>
+                    <button type="button" className="wp-link" style={linkBtn} disabled={trashBusy} onClick={duplicateThisOrder}>
+                      Duplicate
+                    </button>
+                    {canTrash && <span aria-hidden="true">|</span>}
+                  </>
+                )}
+                {canTrash && (
+                  <button type="button" className="wp-link" style={{ ...linkBtn, color: "#b32d2e" }} disabled={trashBusy} onClick={moveToTrash}>
+                    Move to Trash
+                  </button>
+                )}
+              </div>
+            )}
           </Postbox>
 
           {/* Payment & Invoice Actions (Custom Orders only) */}

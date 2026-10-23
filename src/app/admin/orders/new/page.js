@@ -3,9 +3,10 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Plus, X, Search, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, X, Search, Loader2, ChevronLeft } from "lucide-react";
 import { toast } from "react-hot-toast";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, Notice, formatMoney } from "@/components/admin/ui";
 import { can } from "@/lib/rbac";
 import { usePopup } from "@/context/PopupContext";
 import { addressFromCustomer, isSameAddress } from "@/lib/order-address-prefill";
@@ -285,27 +286,34 @@ export default function AdminNewOrderPage() {
   const subtotal = lineItems.reduce((sum, i) => sum + (Number(i.price) || 0) * (Number(i.quantity) || 0), 0);
   const total = subtotal + (Number(shippingCost) || 0);
 
+  // Validation errors show next to the Create Order button and as a toast (the
+  // button can be far from the top of the form on a phone).
+  const fail = (message) => {
+    setError(message);
+    toast.error(message);
+  };
+
   const handleSubmit = async () => {
     setError("");
 
     if (lineItems.length === 0) {
-      setError("Add at least one product to the order.");
+      fail("Add at least one product to the order.");
       return;
     }
     if (!shippingAddress.fullName || !shippingAddress.street || !shippingAddress.city || !shippingAddress.country) {
-      setError("Shipping name, street, city, and country are required.");
+      fail("Shipping name, street, city, and country are required.");
       return;
     }
     if (customerMode === "existing" && !selectedCustomerId) {
-      setError("Select a customer.");
+      fail("Select a customer.");
       return;
     }
     if (customerMode === "guest" && !guestEmail) {
-      setError("Enter a guest email address.");
+      fail("Enter a guest email address.");
       return;
     }
     if (lineItems.some(i => Number(i.price) < 0)) {
-      setError("Price cannot be negative.");
+      fail("Price cannot be negative.");
       return;
     }
 
@@ -340,25 +348,32 @@ export default function AdminNewOrderPage() {
       router.push(`/admin/orders/${data.order._id}`);
     } catch (err) {
       setError(err.message || "Failed to create order");
+      toast.error(err.message || "Failed to create order");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const backLink = (
+    <Link href="/admin/orders" className="wp-btn">
+      <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Back to orders
+    </Link>
+  );
+
   if (status === "loading") return null;
 
   if (!can(session?.user, "orders.create")) {
     return (
-      <AdminPageLayout title="Create Order" breadcrumbs={[{ label: "Orders", href: "/admin/orders" }, { label: "Create Order" }]}>
-        <div className="wp-notice wp-notice-error" role="alert">
-          <p>You don&apos;t have permission to create orders.</p>
-        </div>
-      </AdminPageLayout>
+      <Page>
+        <PageHeader title="Add new order" actions={backLink} />
+        <Notice type="error">You don&apos;t have permission to create orders.</Notice>
+      </Page>
     );
   }
 
   return (
-    <AdminPageLayout title="Add new order" breadcrumbs={[{ label: "Orders", href: "/admin/orders" }, { label: "Create Order" }]}>
+    <Page>
+      <PageHeader title="Add new order" actions={backLink} />
       <div className="wp-cols">
 
         {/* ===================== MAIN COLUMN ===================== */}
@@ -477,10 +492,10 @@ export default function AdminNewOrderPage() {
                 <thead>
                   <tr>
                     <th scope="col">Item</th>
-                    <th scope="col" className="wp-num">Cost</th>
-                    <th scope="col" className="wp-num">Qty</th>
-                    <th scope="col" className="wp-num wp-hide-sm">Total</th>
-                    <th scope="col"><span className="sr-only">Remove</span></th>
+                    <th scope="col" className="wp-num" style={{ textAlign: "right" }}>Cost</th>
+                    <th scope="col" className="wp-num" style={{ textAlign: "center" }}>Qty</th>
+                    <th scope="col" className="wp-num wp-hide-sm" style={{ textAlign: "right" }}>Total</th>
+                    <th scope="col" style={{ width: 44 }}><span className="sr-only">Remove</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -490,16 +505,16 @@ export default function AdminNewOrderPage() {
                   {lineItems.map(item => (
                     <Fragment key={item.key}>
                     <tr>
-                      <td style={{ minWidth: 180 }}>
+                      <td style={{ minWidth: 120 }}>
                         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                          <span className="wp-thumb">
+                          <span className="wp-thumb wp-hide-sm">
                             <img src={item.image || "/placeholder.jpg"} alt="" />
                           </span>
                           <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word" }}>
                             <div className="wp-strong">{item.name}</div>
                             {item.variantTitle && <div className="wp-muted wp-small">{item.variantTitle}</div>}
 
-                            <fieldset style={{ border: 0, padding: 0, margin: "6px 0 0", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0 12px" }}>
+                            <fieldset style={{ border: 0, padding: 0, margin: "6px 0 0", wordBreak: "normal", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0 12px" }}>
                               <legend className="sr-only">Order type for {item.name}</legend>
                               <span className="wp-muted wp-small" aria-hidden="true">Order type:</span>
                               <label className="wp-check">
@@ -534,10 +549,10 @@ export default function AdminNewOrderPage() {
                           value={item.price}
                           onChange={(e) => updateItem(item.key, { price: e.target.value })}
                           className="wp-input"
-                          style={{ width: 90, textAlign: "right" }}
+                          style={{ width: 76, textAlign: "right" }}
                         />
                       </td>
-                      <td className="wp-num">
+                      <td style={{ textAlign: "center" }}>
                         <input
                           type="number"
                           min={1}
@@ -545,11 +560,11 @@ export default function AdminNewOrderPage() {
                           value={item.quantity}
                           onChange={(e) => updateItem(item.key, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
                           className="wp-input"
-                          style={{ width: 64, textAlign: "center" }}
+                          style={{ width: 52, textAlign: "center" }}
                         />
                       </td>
                       <td className="wp-num wp-hide-sm wp-strong" style={{ whiteSpace: "nowrap" }}>
-                        ${((Number(item.price) || 0) * (Number(item.quantity) || 0)).toLocaleString()}
+                        {formatMoney((Number(item.price) || 0) * (Number(item.quantity) || 0))}
                       </td>
                       <td style={{ width: 44 }}>
                         <button
@@ -585,7 +600,7 @@ export default function AdminNewOrderPage() {
               <div style={{ width: "100%", maxWidth: 300 }}>
                 <div className="wp-kv">
                   <span className="wp-kv-k wp-muted">Items subtotal</span>
-                  <span className="wp-kv-v">${subtotal.toLocaleString()}</span>
+                  <span className="wp-kv-v">{formatMoney(subtotal)}</span>
                 </div>
                 <div className="wp-kv">
                   <label htmlFor="new-order-shipping-cost" className="wp-kv-k wp-muted">Shipping</label>
@@ -602,7 +617,7 @@ export default function AdminNewOrderPage() {
                 </div>
                 <div className="wp-kv" style={{ borderTop: "1px solid #dcdcde", marginTop: 4, paddingTop: 10 }}>
                   <span className="wp-kv-k wp-strong">Order total</span>
-                  <span className="wp-kv-v" style={{ fontSize: 15 }}>${total.toLocaleString()}</span>
+                  <span className="wp-kv-v" style={{ fontSize: 15 }}>{formatMoney(total)}</span>
                 </div>
               </div>
             </div>
@@ -630,7 +645,7 @@ export default function AdminNewOrderPage() {
               </div>
               <div className="wp-kv">
                 <span className="wp-kv-k wp-muted">Total</span>
-                <span className="wp-kv-v">${total.toLocaleString()}</span>
+                <span className="wp-kv-v">{formatMoney(total)}</span>
               </div>
 
               <div className="wp-field" style={{ marginTop: 12, marginBottom: 0 }}>
@@ -658,6 +673,6 @@ export default function AdminNewOrderPage() {
           </section>
         </div>
       </div>
-    </AdminPageLayout>
+    </Page>
   );
 }

@@ -52,8 +52,19 @@ const AbandonedCartSchema = new mongoose.Schema({
     sentAt: { type: Date, default: null },
     voucherCode: { type: String, default: null },
   },
+
+  // Admin Trash (soft delete). Trashed carts are hidden from the admin list (except the
+  // Trash view) and must not receive recovery emails.
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
 }, { timestamps: true });
 
 AbandonedCartSchema.index({ status: 1, updatedAt: -1 });
+
+// A dev server that hot-reloads this file keeps the model compiled from the old schema,
+// which would silently drop the newer Trash fields; recompile it when they are missing.
+if (mongoose.models.AbandonedCart && !mongoose.models.AbandonedCart.schema.path('isDeleted')) {
+  mongoose.deleteModel('AbandonedCart');
+}
 
 export default mongoose.models.AbandonedCart || mongoose.model('AbandonedCart', AbandonedCartSchema);
