@@ -102,7 +102,7 @@ export async function GET(req) {
     r => ({ id: String(r._id), title: r.customerName, href: `/admin/reviews?search=${encodeURIComponent(r.customerName || "")}` }));
 
   add("scripts", can(user, "scripts.view"),
-    find(Script, ["name"], {}, "name"),
+    find(Script, ["name"], { isDeleted: { $ne: true } }, "name"),
     s => ({ id: String(s._id), title: s.name, href: `/admin/settings/scripts/${s._id}` }));
 
   await Promise.all(tasks);
