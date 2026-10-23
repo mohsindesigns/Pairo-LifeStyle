@@ -136,12 +136,12 @@ export async function getAbandonedCartDiagnostics({ windowMinutes = 60, maxAgeHo
   const now = Date.now();
   const cutoff = new Date(now - windowMinutes * 60 * 1000);
   const oldest = new Date(now - maxAgeHours * 60 * 60 * 1000);
-  const active = { status: 'active' };
+  const active = { status: 'active', isDeleted: { $ne: true } };
   const queued = { ...active, 'recoveryEmail.sent': { $ne: true }, 'contact.email': { $regex: EMAIL_PATTERN } };
 
   const [total, recovered, noEmail, invalidEmail, alreadyEmailed, waiting, tooOld, eligible] = await Promise.all([
-    AbandonedCart.countDocuments({}),
-    AbandonedCart.countDocuments({ status: 'recovered' }),
+    AbandonedCart.countDocuments({ isDeleted: { $ne: true } }),
+    AbandonedCart.countDocuments({ status: 'recovered', isDeleted: { $ne: true } }),
     AbandonedCart.countDocuments({ ...active, $or: [{ 'contact.email': { $exists: false } }, { 'contact.email': '' }] }),
     AbandonedCart.countDocuments({ ...active, 'contact.email': { $nin: ['', null], $not: { $regex: EMAIL_PATTERN } } }),
     AbandonedCart.countDocuments({ ...active, 'recoveryEmail.sent': true }),
@@ -176,6 +176,7 @@ export async function sendAbandonedCartRecoveryEmails({ windowMinutes = 60, maxA
   // aren't ancient (avoid resurrecting month-old test/junk rows if the cron was down a while).
   const candidates = await AbandonedCart.find({
     status: 'active',
+    isDeleted: { $ne: true },
     'contact.email': { $regex: EMAIL_PATTERN },
     'recoveryEmail.sent': { $ne: true },
     updatedAt: { $lte: cutoff, $gte: oldestEligible },
