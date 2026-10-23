@@ -60,6 +60,8 @@ import { TEMPLATE_REGISTRY } from "@/lib/templates";
 import MediaPickerModal from "./MediaPickerModal";
 import { Page, PageHeader } from "./ui";
 import SEOConfigPanel from "./SEOConfigPanel";
+import { useRBAC } from "@/hooks/useRBAC";
+import { planTemplateChange } from "./builder/templateChange";
 import * as LucideIcons from "lucide-react";
 
 const QuillEditor = dynamic(() => import("@/components/admin/QuillEditor"), { ssr: false });
@@ -217,6 +219,7 @@ const SectionMetaBox = ({
 export default function PageForm({ pageId }) {
    const router = useRouter();
    const { showConfirm } = usePopup();
+   const { can } = useRBAC();
    const [loading, setLoading] = useState(true);
    const [saving, setSaving] = useState(false);
    const [activeFormTab, setActiveFormTab] = useState("content");
@@ -337,14 +340,16 @@ export default function PageForm({ pageId }) {
       fetchData();
    }, [pageId]);
 
-   const handleSave = async (e) => {
+   // `overrides` lets "Save Draft" force status: "Draft" regardless of the status select.
+   const handleSave = async (e, overrides = {}) => {
       if (e) e.preventDefault();
       setSaving(true);
       try {
          const currentPage = pageRef.current || page;
          if (!currentPage) return;
          // Strip immutable Mongoose fields that cause _id update errors
-         const { _id, __v, createdAt, updatedAt, ...cleanPage } = currentPage;
+         const { _id, __v, createdAt, updatedAt, ...rest } = currentPage;
+         const cleanPage = { ...rest, ...overrides };
          console.log("[PageForm] Saving page seo:", cleanPage.seo);
 
          const isNew = pageId === "new" || !_id;
@@ -359,7 +364,7 @@ export default function PageForm({ pageId }) {
          if (res.ok) {
             const savedData = await res.json();
             setPage(savedData);
-            toast.success(isNew ? "Page created successfully" : "Page updated successfully");
+            toast.success(overrides.status === "Draft" ? "Draft saved" : isNew ? "Page created successfully" : "Page updated successfully");
             if (isNew && savedData._id) {
                router.push(`/admin/pages/${savedData._id}`);
             }
@@ -381,24 +386,61 @@ export default function PageForm({ pageId }) {
          toast.error("System pages cannot be deleted");
          return;
       }
-      if (!(await showConfirm("Are you sure you want to delete this page? This action cannot be undone.", "Delete page", { confirmText: "Delete", danger: true }))) {
+      if (!(await showConfirm("Move this page to the Trash? It will no longer be shown on the site. You can restore it from Pages → Trash.", "Move to Trash", { confirmText: "Move to Trash", danger: true }))) {
          return;
       }
       try {
-         const res = await fetch(`/api/admin/pages/${pageId}`, {
+         const res = await fetch(`/api/admin/pages/${page._id || pageId}`, {
             method: "DELETE"
          });
          if (res.ok) {
-            toast.success("Page deleted successfully");
+            toast.success("Page moved to Trash");
             router.push("/admin/pages");
          } else {
             const errData = await res.json().catch(() => ({}));
-            toast.error(`Delete failed: ${errData.error || res.statusText || "Unknown error"}`);
+            toast.error(`Move to Trash failed: ${errData.error || res.statusText || "Unknown error"}`);
          }
       } catch (err) {
-         toast.error(`Failed to delete page: ${err.message}`);
+         toast.error(`Failed to move page to Trash: ${err.message}`);
          console.error(err);
       }
+   };
+
+   const handleTemplateChange = async (nextTemplate) => {
+      const currentSections = (pageRef.current || page)?.sections || [];
+      const { templateConfig, defaults: defaultSecs, kept, removed, removedNames } =
+         planTemplateChange(TEMPLATE_REGISTRY, SECTION_SCHEMAS, nextTemplate, currentSections, generateId);
+
+      // Nothing to lose: just seed the new template's defaults.
+      if (currentSections.length === 0) {
+         setPage(prev => ({ ...prev, template: nextTemplate, sections: defaultSecs }));
+         return;
+      }
+
+      const replace = await showConfirm(
+         `This page already has ${currentSections.length} section${currentSections.length === 1 ? "" : "s"}. Replace them with the "${templateConfig.name}" default sections, or keep your current sections?` +
+            (removedNames.length
+               ? ` If you keep them, these sections aren't allowed in the new template and will be removed: ${removedNames.join(", ")}.`
+               : " All current sections are allowed in the new template."),
+         "Change template",
+         { confirmText: "Replace with template defaults", cancelText: "Keep current sections" }
+      );
+
+      if (replace) {
+         setPage(prev => ({ ...prev, template: nextTemplate, sections: defaultSecs }));
+         return;
+      }
+
+      if (removed.length > 0) {
+         const ok = await showConfirm(
+            `Keeping your sections will remove ${removed.length} section${removed.length === 1 ? "" : "s"} not allowed in "${templateConfig.name}": ${removedNames.join(", ")}. Continue?`,
+            "Remove sections",
+            { confirmText: "Remove and change template", danger: true }
+         );
+         if (!ok) return; // Template change cancelled; nothing modified.
+      }
+
+      setPage(prev => ({ ...prev, template: nextTemplate, sections: kept }));
    };
 
    const renderField = (field, value, onChange, onOpenMediaPicker) => {
@@ -706,7 +748,11 @@ export default function PageForm({ pageId }) {
                                        isExpanded={expandedSectionId === s.id}
                                        onToggleExpand={(id) => setExpandedSectionId(expandedSectionId === id ? null : id)}
                                        onUpdate={updateSection}
-                                       onDelete={(id) => setPage({ ...page, sections: page.sections.filter(x => x.id !== id) })}
+                                       onDelete={async (id) => {
+                                          if (await showConfirm("Are you sure you want to remove this section? This cannot be undone.", "Remove section", { confirmText: "Remove", danger: true })) {
+                                             setPage(prev => ({ ...prev, sections: prev.sections.filter(x => x.id !== id) }));
+                                          }
+                                       }}
                                        onDuplicate={(sec) => {
                                           const id = generateId();
                                           const newSec = { ...JSON.parse(JSON.stringify(sec)), id, order: page.sections.length };
@@ -741,8 +787,8 @@ export default function PageForm({ pageId }) {
                <section className="wp-postbox" aria-labelledby="page-publish-title">
                   <div className="wp-postbox-head"><h2 id="page-publish-title">Publish</h2></div>
                   <div className="flex flex-wrap justify-between items-center gap-2" style={{ padding: "10px 12px 2px" }}>
-                     <button type="button" onClick={handleSave} className="wp-btn">Save Draft</button>
-                     <Link href={`/${page.slug}`} target="_blank" className="wp-btn">Preview</Link>
+                     <button type="button" onClick={() => handleSave(null, { status: "Draft" })} disabled={saving} className="wp-btn">Save Draft</button>
+                     <Link href={page.slug === 'home' ? '/' : `/${page.slug}`} target="_blank" className="wp-btn">Preview</Link>
                   </div>
                   <div className="wp-misc">
                      <div className="wp-misc-row">
@@ -768,27 +814,11 @@ export default function PageForm({ pageId }) {
                                  className="wp-select"
                                  style={{ marginLeft: "auto", maxWidth: "100%" }}
                                  value={page.template || "default"}
-                                 onChange={(e) => {
-                                    const nextTemplate = e.target.value;
-                                    const templateConfig = TEMPLATE_REGISTRY[nextTemplate] || TEMPLATE_REGISTRY.default;
-                                    const defaultSecs = templateConfig.defaultSections ? templateConfig.defaultSections.map((s, i) => ({
-                                       id: generateId(),
-                                       type: s.type,
-                                       enabled: true,
-                                       order: i,
-                                       config: s.config || {}
-                                    })) : [];
-                                    setPage(prev => ({
-                                       ...prev,
-                                       template: nextTemplate,
-                                       sections: defaultSecs
-                                    }));
-                                 }}
+                                 onChange={(e) => handleTemplateChange(e.target.value)}
                               >
-                                 <option value="default">Default Template</option>
-                                 <option value="home">Homepage Template</option>
-                                 <option value="about">About Page Template</option>
-                                 <option value="contact">Contact Page Template</option>
+                                 {Object.entries(TEMPLATE_REGISTRY).map(([key, t]) => (
+                                    <option key={key} value={key}>{t.name || key}</option>
+                                 ))}
                               </select>
                            </>
                         ) : (
@@ -809,9 +839,9 @@ export default function PageForm({ pageId }) {
                      </div>
                   </div>
                   <div className="wp-box-foot">
-                     {!page.isSystem && pageId !== "new" && (
+                     {!page.isSystem && pageId !== "new" && can("pages.delete") && (
                         <button type="button" onClick={handleDelete} style={{ ...linkBtnStyle, color: "#b32d2e", textDecoration: "underline" }}>
-                           Delete Page
+                           Move to Trash
                         </button>
                      )}
                      <span className="wp-spacer" />

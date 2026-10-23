@@ -255,9 +255,13 @@ export default function PageBuilder({ initialPage }) {
     fetchData();
   }, []);
 
-  const savePage = useCallback(async (data = page) => {
+  // Manual saves toast "Page saved"; autosaves only update the quiet "Synced" indicator. Errors are always toasted.
+  const savePage = useCallback(async (data = page, { manual = false } = {}) => {
     const currentDataStr = JSON.stringify(data);
-    if (currentDataStr === lastSavedRef.current) return; // SKIP: Already saved this state
+    if (currentDataStr === lastSavedRef.current) { // SKIP: Already saved this state
+      if (manual) toast.success("No changes to save", { id: 'save-toast' });
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -268,13 +272,18 @@ export default function PageBuilder({ initialPage }) {
       });
       if (res.ok) {
         const savedData = await res.json();
-        setPage(savedData);
-        lastSavedRef.current = JSON.stringify(savedData);
-        setLastSaved(new Date());
-        toast.success("Changes Saved Automatically", { id: 'save-toast' });
+        const savedAt = new Date();
+        const nextPage = { ...savedData, updatedAt: savedData?.updatedAt || savedAt.toISOString() };
+        setPage(nextPage);
+        lastSavedRef.current = JSON.stringify(nextPage);
+        setLastSaved(savedAt);
+        if (manual) toast.success("Page saved", { id: 'save-toast' });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(`${manual ? "Save" : "Auto-save"} failed: ${errData.error || res.statusText || "Unknown error"}`, { id: 'save-toast' });
       }
     } catch (err) { 
-        toast.error("Auto-save sync failed. Check your connection."); 
+        toast.error(`${manual ? "Save" : "Auto-save"} failed. Check your connection.`, { id: 'save-toast' }); 
     } finally { 
         setIsSaving(false); 
     }
@@ -283,7 +292,7 @@ export default function PageBuilder({ initialPage }) {
   // Optimized Debounced Auto-save
   useEffect(() => {
     const timer = setTimeout(() => {
-      savePage();
+      savePage(undefined, { manual: false });
     }, 4000); // 4s debounce for production stability
     return () => clearTimeout(timer);
   }, [page, savePage]);
@@ -449,10 +458,10 @@ export default function PageBuilder({ initialPage }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <a href={`/${page.slug}`} target="_blank" className="wp-btn">
+          <a href={page.slug === 'home' ? '/' : `/${page.slug}`} target="_blank" className="wp-btn">
             <ExternalLink className="w-4 h-4" aria-hidden="true" /> Live Page
           </a>
-          <button type="button" onClick={() => savePage()} disabled={isSaving} className="wp-btn wp-btn-primary">
+          <button type="button" onClick={() => savePage(undefined, { manual: true })} disabled={isSaving} className="wp-btn wp-btn-primary">
             <Save className="w-4 h-4" aria-hidden="true" /> {isSaving ? "Saving..." : "Save"}
           </button>
         </div>
@@ -531,7 +540,7 @@ export default function PageBuilder({ initialPage }) {
                         </div>
                         <div className="wp-field" style={{ marginBottom: 0 }}>
                            <span className="wp-label" id="builder-og-label">Open Graph image</span>
-                           <button type="button" aria-labelledby="builder-og-label" onClick={() => setMediaPicker({ open: true, onSelect: (url) => setPage({ ...page, seo: { ...page.seo, ogImage: url } }) })} className="w-full aspect-video bg-[#f6f7f7] border border-dashed border-[#c3c4c7] flex flex-col items-center justify-center cursor-pointer hover:border-[#2271b1] overflow-hidden relative p-0">
+                           <button type="button" aria-labelledby="builder-og-label" onClick={() => setMediaPicker({ open: true, onSelect: (url) => setPage(prev => ({ ...prev, seo: { ...(prev.seo || {}), ogImage: url } })) })} className="w-full aspect-video bg-[#f6f7f7] border border-dashed border-[#c3c4c7] flex flex-col items-center justify-center cursor-pointer hover:border-[#2271b1] overflow-hidden relative p-0">
                               {page.seo?.ogImage ? <img src={page.seo.ogImage} alt="" className="w-full h-full object-cover" /> : <span className="wp-link">Select preview image</span>}
                            </button>
                         </div>
@@ -580,12 +589,8 @@ export default function PageBuilder({ initialPage }) {
                       <strong className="wp-strong" style={{ color: "#00a32a" }}>Enabled</strong>
                    </div>
                    <div className="wp-misc-row">
-                      <span className="wp-muted">Revisions:</span>
-                      <strong className="wp-strong">14 Active</strong>
-                   </div>
-                   <div className="wp-misc-row">
                       <span className="wp-muted">Last modified:</span>
-                      <strong className="wp-strong">{new Date(page.updatedAt).toLocaleDateString()}</strong>
+                      <strong className="wp-strong">{page.updatedAt ? new Date(page.updatedAt).toLocaleString() : "—"}</strong>
                    </div>
                 </div>
              </section>
@@ -625,7 +630,18 @@ export default function PageBuilder({ initialPage }) {
       )}
 
       {mediaPicker.open && (
-        <MediaPickerModal onClose={() => setMediaPicker({ open: false, onSelect: null })} onSelect={(url) => { mediaPicker.onSelect(url); setMediaPicker({ open: false, onSelect: null }); }} title="Enterprise Asset Library" />
+        <MediaPickerModal
+          open={mediaPicker.open}
+          onClose={() => setMediaPicker({ open: false, onSelect: null })}
+          onSelect={(item) => {
+            // The picker returns a media object (or an array when multiple); fields store its URL.
+            const media = Array.isArray(item) ? item[0] : item;
+            const url = typeof media === "string" ? media : media?.url;
+            if (url && mediaPicker.onSelect) mediaPicker.onSelect(url);
+            setMediaPicker({ open: false, onSelect: null });
+          }}
+          title="Enterprise Asset Library"
+        />
       )}
     </div>
   );
