@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { ArrowLeft, ArrowRight, Share2, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { motion, useScroll, useSpring, AnimatePresence } from "framer-motion";
 import { getProductUrl } from "@/lib/routes";
+import { extractTocSections } from "@/lib/blogToc";
 
 function makeInternalLinksDofollow(html) {
   if (!html) return "";
@@ -179,30 +180,9 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
     };
 
     // Dynamically extract H1, H2, H3 headings from all post content for the sidebar TOC
-    const [tocSections, setTocSections] = useState([]);
-
-    useEffect(() => {
-       const allContent = post.content || "";
-
-       if (!allContent) {
-          setTocSections([]);
-          return;
-       }
-
-       try {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(allContent, "text/html");
-          const headings = Array.from(doc.querySelectorAll("h1, h2, h3"));
-          const extracted = headings.map((el, i) => {
-             const text = el.textContent.trim();
-             const id = `toc-${text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${i}`;
-             return { id, title: text };
-          });
-          setTocSections(extracted);
-       } catch (e) {
-          setTocSections([]);
-       }
-    }, [post]);
+    // Computed during render (not in an effect), so the server HTML already contains the real table of
+    // contents instead of "No sections found" until the browser finishes loading.
+    const tocSections = useMemo(() => extractTocSections(post.content || ""), [post.content]);
 
     // Add IDs to elements in the rendered blog content after mount with safety delay
     useEffect(() => {

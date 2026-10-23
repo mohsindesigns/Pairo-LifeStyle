@@ -75,8 +75,10 @@ export default function CustomJacketProcess({
   headingLevel = "h2",
   customSteps = NO_STEPS
 }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Start from the steps configured in the dashboard so the first paint is already the real content.
+  const hasCustom = Array.isArray(customSteps) && customSteps.length > 0;
+  const [items, setItems] = useState(hasCustom ? customSteps : []);
+  const [loading, setLoading] = useState(!hasCustom);
   const Heading = headingLevel;
 
   useEffect(() => {

@@ -78,6 +78,9 @@ const CONTACT_SOCIAL_ICONS = {
   whatsapp: WhatsappIcon,
 };
 
+const escapeHtmlAttr = (v) =>
+  String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
 export default function ContactSection({
   officeLabel = "HEADQUARTERS",
   officeTitle = "VISIT THE ATELIER",
@@ -247,7 +250,15 @@ export default function ContactSection({
                     className="space-y-1.5"
                   >
                     <p className="text-[9px] font-semibold text-black uppercase tracking-[0.2em]">{channel.label}</p>
-                    {href ? (
+                    {href && href.startsWith("mailto:") ? (
+                      // Cloudflare's email obfuscation rewrites addresses in the HTML and decodes them with a script,
+                      // so visitors first saw "[email protected]". The email_off markers are Cloudflare's opt-out.
+                      <span
+                        dangerouslySetInnerHTML={{
+                          __html: `<!--email_off--><a href="mailto:${escapeHtmlAttr(val)}" class="text-sm font-medium text-black font-sans tracking-tight break-all hover:underline underline-offset-2 transition-all">${escapeHtmlAttr(val)}</a><!--/email_off-->`,
+                        }}
+                      />
+                    ) : href ? (
                       <a
                         href={href}
                         className="text-sm font-medium text-black font-sans tracking-tight break-all hover:underline underline-offset-2 transition-all"

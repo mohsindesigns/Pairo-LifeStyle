@@ -149,16 +149,21 @@ function GalleryDetailModal({ item, onClose }) {
   );
 }
 
+// Stable reference: a fresh [] default on every render would re-run the loading effect forever.
+const NO_ITEMS = [];
+
 export default function GalleryGrid({
   sectionTitle = "OUR WORK",
   sectionLabel = "FEATURED PIECES",
   sectionDescription = "A carefully curated selection of our finest pieces — each one a testament to premium leather craftsmanship.",
   emptyText = "Gallery coming soon. Check back for our latest work.",
   headingLevel = "h2",
-  customItems = []
+  customItems = NO_ITEMS
 }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Start from the items configured in the dashboard so the first paint is already the real content.
+  const hasCustom = Array.isArray(customItems) && customItems.length > 0;
+  const [items, setItems] = useState(hasCustom ? customItems : []);
+  const [loading, setLoading] = useState(!hasCustom);
   const [activeItem, setActiveItem] = useState(null);
   const Heading = headingLevel;
 

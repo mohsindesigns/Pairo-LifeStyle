@@ -123,7 +123,7 @@ export default async function RootLayout({ children }) {
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),
       Blog.find({ status: 'Published', isDeleted: { $ne: true } })
-        .select('title slug')
+        .select('title slug image category createdAt')
         .sort({ createdAt: -1 })
         .limit(50)
         .maxTimeMS(QUERY_TIMEOUT_MS)
@@ -178,7 +178,10 @@ export default async function RootLayout({ children }) {
     // Inject resolved DB data for Navbar/Footer dynamic rendering
     sanitizedConfig._dbCategories = JSON.parse(JSON.stringify(dbCategories));
     sanitizedConfig._dbPages = JSON.parse(JSON.stringify(dbPages));
-    sanitizedConfig._dbBlogs = JSON.parse(JSON.stringify(dbBlogs));
+    // Menu/footer only need title + slug; the home "journal" section needs the card fields. Both come from
+    // the same query, so the very first paint already shows the real latest posts (no demo content, no flash).
+    sanitizedConfig._dbBlogs = JSON.parse(JSON.stringify(dbBlogs.map((b) => ({ _id: b._id, title: b.title, slug: b.slug }))));
+    sanitizedConfig._homeBlogs = JSON.parse(JSON.stringify(dbBlogs.slice(0, 12)));
     sanitizedConfig._dbProducts = JSON.parse(JSON.stringify(dbProducts));
 
   } catch (error) {

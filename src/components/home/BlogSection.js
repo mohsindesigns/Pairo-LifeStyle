@@ -50,8 +50,10 @@ export default function BlogSection({
   const carouselRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  const [dbBlogs, setDbBlogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Real posts rendered by the server on this very request: no placeholder content, so no "old then new" flash.
+  const serverBlogs = Array.isArray(siteData?._homeBlogs) ? siteData._homeBlogs : [];
+  const [dbBlogs, setDbBlogs] = useState(serverBlogs.slice(0, limit || 6));
+  const [loading, setLoading] = useState(serverBlogs.length === 0);
 
   const blogsConfig = {
     title: title || siteData?.blogs?.title || "OUR JOURNAL",
@@ -73,7 +75,8 @@ export default function BlogSection({
       .then(data => {
         if (Array.isArray(data)) setDbBlogs(data);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, [blogsConfig.limit]);
 
   const scroll = (direction) => {
@@ -107,8 +110,12 @@ export default function BlogSection({
     slug: b.slug,
     image: b.image,
     category: b.category,
-    date: new Date(b.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  })) : (siteData?.blogs?.posts || []);
+    // UTC so the server and the browser format the same date identically (no hydration mismatch)
+    date: new Date(b.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+  })) : [];
+
+  // No real posts yet: show nothing rather than built-in demo posts.
+  if (!loading && posts.length === 0) return null;
 
   return (
     <section className="container mx-auto px-2 sm:px-4 md:px-8 py-2 md:py-4 overflow-hidden">
