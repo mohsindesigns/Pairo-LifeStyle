@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader } from "@/components/admin/ui";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import { toast } from "react-hot-toast";
-import { Plus, Pencil, Trash2, GripVertical, Eye, EyeOff, X, Save, Loader2, Search } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
-const inputClass = "border border-[#8c8f94] bg-white text-[13px] px-3 py-2 rounded-[3px] outline-none focus:border-[#2271b1] w-full";
+const inputClass = "wp-input wp-full";
 
 function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
   const [form, setForm] = useState({
@@ -74,65 +74,68 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
+    <div className="wp-modal-backdrop" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        className="wp-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gallery-item-form-title"
+        style={{ maxWidth: 560 }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-3 sm:p-5 border-b border-gray-100">
-          <h2 className="font-bold text-[14px] sm:text-[15px] text-[#1d2327]">{isNew ? "Add Gallery Item" : "Edit Gallery Item"}</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center">
-            <X className="w-4 h-4" />
+        <div className="wp-modal-head">
+          <h2 id="gallery-item-form-title">{isNew ? "Add Gallery Item" : "Edit Gallery Item"}</h2>
+          <button type="button" onClick={onClose} aria-label="Close dialog" className="flex items-center justify-center" style={{ width: 40, height: 40, background: "none", border: 0, color: "#646970", cursor: "pointer" }}>
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="p-3 sm:p-5 space-y-3 sm:space-y-4">
+        <div className="wp-modal-body">
           {/* Image */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-2">Image *</label>
+          <div className="wp-field">
+            <span className="wp-label">Image <span aria-hidden="true" style={{ color: "#d63638" }}>*</span></span>
             {form.image && (
-              <img src={form.image} alt="Preview" className="w-full aspect-[3/2] object-cover rounded-lg mb-2 border border-[#ccd0d4]" />
+              <img src={form.image} alt="Preview" className="w-full aspect-[3/2] object-cover" style={{ marginBottom: 8, border: "1px solid #dcdcde" }} />
             )}
             <button
               type="button"
               onClick={() => setMediaPicker(true)}
-              className="w-full border-2 border-dashed border-[#ccd0d4] py-2 text-[13px] text-[#2271b1] hover:border-[#2271b1] rounded-lg font-medium"
+              className="wp-btn"
             >
               {form.image ? "Change Image" : "Select Image from Media Library"}
             </button>
           </div>
 
           {/* Title */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Title *</label>
-            <input type="text" name="title" value={form.title} onChange={handleChange} placeholder="e.g. A-1 Shearling Flight Jacket" className={inputClass} />
+          <div className="wp-field">
+            <label htmlFor="gi-title" className="wp-label">Title <span aria-hidden="true" style={{ color: "#d63638" }}>*</span></label>
+            <input id="gi-title" type="text" name="title" value={form.title} onChange={handleChange} placeholder="e.g. A-1 Shearling Flight Jacket" className={inputClass} />
           </div>
 
           {/* Description */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Short Description</label>
-            <textarea name="description" value={form.description} onChange={handleChange} rows={2} placeholder="Optional caption..." className={`${inputClass} resize-none`} />
+          <div className="wp-field">
+            <label htmlFor="gi-description" className="wp-label">Short Description</label>
+            <textarea id="gi-description" name="description" value={form.description} onChange={handleChange} rows={2} placeholder="Optional caption..." className="wp-textarea wp-full" />
           </div>
 
           {/* Linked Product */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Linked Product</label>
+          <div className="wp-field">
+            <label htmlFor="gi-product-search" className="wp-label">Linked Product</label>
             <div className="relative">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#646970]" />
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={productSearch}
-                  onChange={e => {
-                    setProductSearch(e.target.value);
-                    if (!e.target.value) setForm(prev => ({ ...prev, linkedProduct: "" }));
-                  }}
-                  className={`${inputClass} pl-8`}
-                />
-              </div>
+              <input
+                id="gi-product-search"
+                type="search"
+                placeholder="Search products..."
+                value={productSearch}
+                onChange={e => {
+                  setProductSearch(e.target.value);
+                  if (!e.target.value) setForm(prev => ({ ...prev, linkedProduct: "" }));
+                }}
+                className={inputClass}
+                autoComplete="off"
+              />
               {showDropdown && filteredProducts.length > 0 && (
-                <div className="absolute top-full mt-1 w-full bg-white border border-[#ccd0d4] rounded shadow-lg z-10 max-h-48 overflow-y-auto">
+                <div className="absolute w-full overflow-y-auto" style={{ top: "100%", marginTop: 2, background: "#fff", border: "1px solid #c3c4c7", boxShadow: "0 3px 6px rgba(0,0,0,0.1)", zIndex: 10, maxHeight: 192 }}>
                   {filteredProducts.map(p => (
                     <button
                       key={p._id}
@@ -142,12 +145,13 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
                         setProductSearch(p.name);
                         setShowDropdown(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-[13px] hover:bg-[#f0f6fb] flex items-center gap-3"
+                      className="w-full text-left flex items-center gap-3 hover:bg-[#f0f6fc]"
+                      style={{ padding: "6px 10px", minHeight: 40, background: "none", border: 0, borderBottom: "1px solid #f0f0f1", cursor: "pointer" }}
                     >
-                      {p.image && <img src={p.image} alt={p.name} className="w-8 h-8 object-cover rounded" />}
-                      <div>
-                        <p className="font-medium text-[#1d2327]">{p.name}</p>
-                        <p className="text-[11px] text-[#646970]">/{p.slug}</p>
+                      {p.image && <img src={p.image} alt={p.name} className="w-8 h-8 object-cover" />}
+                      <div className="min-w-0">
+                        <p className="wp-strong" style={{ margin: 0 }}>{p.name}</p>
+                        <p className="wp-muted wp-small" style={{ margin: 0 }}>/{p.slug}</p>
                       </div>
                     </button>
                   ))}
@@ -155,22 +159,22 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
               )}
             </div>
             {form.linkedProduct && (
-              <div className="mt-1.5 flex items-center justify-between bg-[#f0f6fb] border border-[#b3d4f0] rounded px-2 py-1">
-                <span className="text-[12px] text-[#2271b1] font-medium">Product linked ✓</span>
-                <button type="button" onClick={() => { setForm(prev => ({ ...prev, linkedProduct: "" })); setProductSearch(""); }} className="text-[11px] text-red-400 hover:text-red-600">Clear</button>
-              </div>
+              <p className="wp-desc flex flex-wrap items-center gap-2">
+                <span style={{ color: "#00a32a" }}>Product linked ✓</span>
+                <button type="button" onClick={() => { setForm(prev => ({ ...prev, linkedProduct: "" })); setProductSearch(""); }} style={{ background: "none", border: 0, padding: 0, color: "#b32d2e", textDecoration: "underline", cursor: "pointer" }}>Clear</button>
+              </p>
             )}
           </div>
 
           {/* Order + Enabled */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Display Order</label>
-              <input type="number" name="order" value={form.order} onChange={handleChange} min={0} className={inputClass} />
+            <div className="wp-field">
+              <label htmlFor="gi-order" className="wp-label">Display Order</label>
+              <input id="gi-order" type="number" name="order" value={form.order} onChange={handleChange} min={0} className={inputClass} />
             </div>
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Visible</label>
-              <select name="enabled" value={form.enabled ? "true" : "false"} onChange={e => setForm(prev => ({ ...prev, enabled: e.target.value === "true" }))} className={inputClass}>
+            <div className="wp-field">
+              <label htmlFor="gi-enabled" className="wp-label">Visible</label>
+              <select id="gi-enabled" name="enabled" value={form.enabled ? "true" : "false"} onChange={e => setForm(prev => ({ ...prev, enabled: e.target.value === "true" }))} className="wp-select wp-full">
                 <option value="true">Yes</option>
                 <option value="false">No</option>
               </select>
@@ -178,10 +182,10 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
           </div>
         </div>
 
-        <div className="p-3 sm:p-5 border-t border-gray-100 flex flex-wrap justify-end gap-2 sm:gap-3">
-          <button onClick={onClose} className="border border-[#8c8f94] text-[#3c434a] px-3 sm:px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="bg-[#2271b1] text-white px-3 sm:px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] flex items-center gap-2 disabled:opacity-60">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        <div className="wp-modal-foot">
+          <button type="button" onClick={onClose} className="wp-btn">Cancel</button>
+          <button type="button" onClick={handleSave} disabled={saving} className="wp-btn wp-btn-primary">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : null}
             {saving ? "Saving..." : "Save Item"}
           </button>
         </div>
@@ -270,69 +274,75 @@ export default function GalleryItemsPage() {
 
   return (
     <RequirePermission permission="pages.edit">
-    <AdminPageLayout title="Gallery Items" addNewLabel="Add Gallery Item" onAddNew={() => { setEditingItem(null); setFormOpen(true); }}>
-      <div className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[13px] text-blue-700">
-          <strong>Tip:</strong> Gallery items with a linked product will show a "View Product" button on the public gallery page. The link is stored by product ID, so it stays correct even if the product permalink changes.
-        </div>
+    <Page>
+      <PageHeader title="Gallery Items" />
+      <div className="wp-notice wp-notice-info">
+        <p><strong>Tip:</strong> Gallery items with a linked product will show a &quot;View Product&quot; button on the public gallery page. The link is stored by product ID, so it stays correct even if the product permalink changes.</p>
+      </div>
 
-        {/* Items Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[700px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Image</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Title</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Linked Product</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Order</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Visible</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={6} className="p-8 text-center italic text-gray-400">Loading...</td></tr>
-              ) : items.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center italic text-gray-400">No gallery items yet. Click "Add Gallery Item" to get started.</td></tr>
-              ) : (
-                items.map(item => (
-                  <tr key={item._id} className={`hover:bg-[#f6f7f7] group transition-colors ${!item.enabled ? "opacity-50" : ""}`}>
-                    <td className="px-4 py-3">
-                      {item.image ? (
-                        <img src={item.image} alt={item.title} className="w-14 h-14 object-cover rounded-lg border border-[#ccd0d4]" />
-                      ) : (
-                        <div className="w-14 h-14 bg-gray-100 rounded-lg border border-[#ccd0d4]" />
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-[#1d2327]">{item.title}</p>
-                      {item.description && <p className="text-[#646970] text-[12px] line-clamp-1">{item.description}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-[#646970]">
-                      {item.linkedProduct?.name ? (
-                        <span className="text-[#2271b1] font-medium">{item.linkedProduct.name}</span>
-                      ) : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-[#646970]">{item.order}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => handleToggleEnabled(item)} className={`w-7 h-4 rounded-full transition-colors ${item.enabled ? "bg-[#2271b1]" : "bg-gray-300"}`} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditingItem(item); setFormOpen(true); }} className="text-[#2271b1] text-[12px] font-medium hover:text-[#135e96] flex items-center gap-1">
-                          <Pencil className="w-3.5 h-3.5" /> Edit
-                        </button>
-                        <button onClick={() => handleDelete(item._id)} className="text-[#d63638] text-[12px] font-medium hover:text-[#bc0b0d] flex items-center gap-1">
-                          <Trash2 className="w-3.5 h-3.5" /> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* Items Table */}
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>
+            <tr>
+              <th scope="col" style={{ width: 76 }}>Image</th>
+              <th scope="col">Title</th>
+              <th scope="col" className="wp-hide-sm">Linked Product</th>
+              <th scope="col" className="wp-hide-sm" style={{ width: 70 }}>Order</th>
+              <th scope="col" style={{ width: 80 }}>Visible</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="wp-muted">Loading…</td></tr>
+            ) : items.length === 0 ? (
+              <tr><td colSpan={5} className="wp-muted">No gallery items yet. Click &quot;Add Gallery Item&quot; to get started.</td></tr>
+            ) : (
+              items.map(item => (
+                <tr key={item._id}>
+                  <td>
+                    <div className="wp-thumb" style={{ width: 56, height: 56, opacity: item.enabled ? 1 : 0.5 }}>
+                      {item.image ? <img src={item.image} alt={item.title} /> : null}
+                    </div>
+                  </td>
+                  <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                    <button type="button" onClick={() => { setEditingItem(item); setFormOpen(true); }} className="wp-row-title" style={{ background: "none", border: 0, padding: 0, textAlign: "left" }}>{item.title}</button>
+                    {!item.enabled && <span className="wp-strong"> — Hidden</span>}
+                    {item.description && <p className="wp-muted line-clamp-1" style={{ margin: "2px 0 0" }}>{item.description}</p>}
+                    <div className="wp-mobile-meta">
+                      {item.linkedProduct?.name ? item.linkedProduct.name : "No linked product"} · Order {item.order}
+                    </div>
+                    <div className="wp-row-actions">
+                      <span><button type="button" onClick={() => { setEditingItem(item); setFormOpen(true); }}>Edit</button></span>
+                      <span><button type="button" onClick={() => handleDelete(item._id)} className="is-danger">Delete</button></span>
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm">
+                    {item.linkedProduct?.name ? (
+                      <span>{item.linkedProduct.name}</span>
+                    ) : <span className="wp-muted">—</span>}
+                  </td>
+                  <td className="wp-hide-sm wp-num">{item.order}</td>
+                  <td>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={!!item.enabled}
+                      aria-label={`Visible: ${item.title}`}
+                      onClick={() => handleToggleEnabled(item)}
+                      className="inline-flex items-center"
+                      style={{ background: "none", border: 0, padding: "8px 0", cursor: "pointer" }}
+                    >
+                      <span aria-hidden="true" style={{ position: "relative", width: 36, height: 20, borderRadius: 10, background: item.enabled ? "#2271b1" : "#c3c4c7", transition: "background .15s" }}>
+                        <span style={{ position: "absolute", top: 2, left: item.enabled ? 18 : 2, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+                      </span>
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Add / Edit Form Modal */}
@@ -345,7 +355,7 @@ export default function GalleryItemsPage() {
           isNew={!editingItem}
         />
       )}
-    </AdminPageLayout>
+    </Page>
     </RequirePermission>
   );
 }

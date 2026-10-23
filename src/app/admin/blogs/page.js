@@ -1,20 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { 
-  Plus, 
-  Image as ImageIcon,
-  ChevronDown,
-  Edit,
-  Trash2,
-  ExternalLink,
-  Check,
-  FileText,
-  ChevronLeft,
-  ChevronRight
-} from "lucide-react";
+import { Image as ImageIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader } from "@/components/admin/ui";
 import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
@@ -167,149 +156,167 @@ export default function AdminBlogs() {
      return matchesSearch && matchesCategory;
   });
 
+  const allSelected = selectedIds.length > 0 && selectedIds.length === filteredBlogs.length;
+
+  const headerRow = (
+    <tr>
+      <th scope="col" className="wp-check-col">
+        <label htmlFor="blogs-select-all" className="sr-only">Select all</label>
+        <input id="blogs-select-all" type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
+      </th>
+      <th scope="col">Title</th>
+      <th scope="col" className="wp-hide-sm">Author</th>
+      <th scope="col" className="wp-hide-sm">Categories</th>
+      <th scope="col">Status</th>
+      <th scope="col" className="wp-hide-sm">Date</th>
+    </tr>
+  );
+
+  const pagination = (
+    <div className="wp-pages">
+      <span>{filteredBlogs.length} items</span>
+      <button type="button" className="wp-pager" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
+      <span>1 of 1</span>
+      <button type="button" className="wp-pager" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+    </div>
+  );
+
   return (
     <RequirePermission permission="blogs.view">
-    <AdminPageLayout
-      title="Blog Posts"
-      addNewLink="/admin/blogs/new"
-      addNewLabel="Add New"
-    >
-      <div className="space-y-4">
-        {/* View Tabs */}
-        <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
-           <li className={`${view === "all" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("all")}>
-              All <span className="text-[#646970] font-normal">({counts.all})</span>
-           </li>
-           <span className="text-[#c3c4c7]">|</span>
-           <li className={`${view === "published" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("published")}>
-              Published <span className="text-[#646970] font-normal">({counts.published})</span>
-           </li>
-           <span className="text-[#c3c4c7]">|</span>
-           <li className={`${view === "trash" ? "text-[#1d2327] font-semibold" : "cursor-pointer hover:text-[#135e96]"}`} onClick={() => setView("trash")}>
-              Trash <span className="text-[#646970] font-normal">({counts.trash})</span>
-           </li>
-        </ul>
+    <Page>
+      <PageHeader
+        title="Posts"
+        actions={<Link href="/admin/blogs/new" className="wp-btn">Add new post</Link>}
+      />
 
-        {/* Filter Bar */}
-        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 shadow-sm">
-            <div className="flex flex-wrap items-center gap-1.5 xs:gap-2 min-w-0">
-               <select className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none min-w-0 max-w-full" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
-                  <option>Bulk actions</option>
-                  <option>Duplicate</option>
-                  <option>Move to Trash</option>
-                  <option>Delete Permanently</option>
-               </select>
-               <button onClick={handleBulkAction} className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Apply</button>
-               
-               <select 
-                 className="border border-[#8c8f94] bg-white text-[12px] xs:text-[13px] px-2 py-1 rounded-[3px] outline-none cursor-pointer focus:border-[#2271b1] min-w-0 max-w-full"
-                 value={selectedCategory}
-                 onChange={(e) => setSelectedCategory(e.target.value)}
-               >
-                 <option>All categories</option>
-                 {Array.from(new Set(blogs.map(b => b.category).filter(Boolean))).map(cat => (
-                   <option key={cat} value={cat}>{cat}</option>
-                 ))}
-               </select>
-            </div>
+      {/* Status filter links */}
+      <div className="wp-subsub" role="tablist" aria-label="Filter posts by status">
+        <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-current" : undefined} onClick={() => setView("all")}>
+          All <span className="wp-count">({counts.all})</span>
+        </button>
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <button type="button" role="tab" aria-selected={view === "published"} className={view === "published" ? "is-current" : undefined} onClick={() => setView("published")}>
+          Published <span className="wp-count">({counts.published})</span>
+        </button>
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <button type="button" role="tab" aria-selected={view === "trash"} className={view === "trash" ? "is-current" : undefined} onClick={() => setView("trash")}>
+          Trash <span className="wp-count">({counts.trash})</span>
+        </button>
+      </div>
 
-           <div className="flex items-center gap-1.5 xs:gap-2 w-full md:w-auto min-w-0">
-              <input
-                type="text"
-                placeholder="Search blog..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] flex-1 min-w-0 md:w-64 bg-white focus:border-[#2271b1] rounded-[3px]"
-              />
-              <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] shrink-0 whitespace-nowrap">
-                Search <span className="hidden xs:inline">Posts</span>
-              </button>
-           </div>
-        </div>
+      {/* Bulk actions, filters, search */}
+      <div className="wp-toolbar">
+        <label htmlFor="blogs-bulk-action" className="sr-only">Select bulk action</label>
+        <select id="blogs-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+          <option>Bulk actions</option>
+          <option>Duplicate</option>
+          <option>Move to Trash</option>
+          <option>Delete Permanently</option>
+        </select>
+        <button type="button" onClick={handleBulkAction} className="wp-btn">Apply</button>
 
-        {/* Data Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
-          <table className="w-full text-left border-collapse table-fixed min-w-[520px] md:min-w-[900px] text-[13px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-3 py-2 w-10 text-center"><input type="checkbox" checked={selectedIds.length > 0 && selectedIds.length === filteredBlogs.length} onChange={toggleSelectAll} /></th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Title</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-32 hidden md:table-cell">Author</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-40">Categories</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-24">Status</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327] w-32 hidden md:table-cell">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-400 italic">Loading articles...</td></tr>
-              ) : filteredBlogs.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-gray-500 italic">No posts found.</td></tr>
-              ) : (
-                filteredBlogs.map((b) => (
-                  <tr key={b._id} className={`hover:bg-[#f6f7f7] group transition-colors ${selectedIds.includes(b._id) ? "bg-[#f0f6fa]" : ""}`}>
-                    <td className="px-3 py-4 text-center align-top"><input type="checkbox" checked={selectedIds.includes(b._id)} onChange={() => toggleSelect(b._id)} /></td>
-                    <td className="px-3 py-4 align-top">
-                      <div className="flex items-start gap-3">
-                         <div className="w-10 h-10 bg-white border border-[#dcdcde] rounded-[2px] overflow-hidden flex-shrink-0 flex items-center justify-center">
-                            {b.image ? <img src={b.image} className="w-full h-full object-cover" /> : <ImageIcon className="w-5 h-5 text-[#dcdcde]" />}
-                         </div>
-                         <div className="flex flex-col min-w-0">
-                            <Link href={`/admin/blogs/${b._id}`} className="text-[#2271b1] font-bold hover:underline block mb-1 text-[14px] break-words">
-                               {b.title}
-                            </Link>
-                            {b.status === "Draft" && <span className="font-bold text-[#1d2327] text-[12px] -mt-1 mb-1">— Draft</span>}
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] font-medium">
-                               {view === "trash" ? (
-                                  <>
-                                     <button onClick={() => handleRestoreBlog(b._id)} className="hover:text-[#135e96]">Restore</button>
-                                     <span className="text-[#c3c4c7]">|</span>
-                                     <button onClick={() => handlePermanentDeleteBlog(b._id, b.title)} className="hover:text-[#d63638]">Delete Permanently</button>
-                                  </>
-                               ) : (
-                                  <>
-                                     <Link href={`/admin/blogs/${b._id}`} className="hover:text-[#135e96]">Edit</Link>
-                                     <span className="text-[#c3c4c7]">|</span>
-                                     <button onClick={() => handleDuplicate(b)} className="hover:text-[#135e96]">Duplicate</button>
-                                     <span className="text-[#c3c4c7]">|</span>
-                                     <button onClick={() => handleTrash(b._id)} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
-                                     <span className="text-[#c3c4c7]">|</span>
-                                     <Link href={`/blog/${b.slug}`} target="_blank" className="hover:text-[#135e96]">View</Link>
-                                  </>
-                               )}
-                            </div>
-                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 align-top text-[#2271b1] hover:underline cursor-pointer hidden md:table-cell">Admin</td>
-                    <td className="px-3 py-4 align-top text-[#2271b1] font-medium hover:underline cursor-pointer">{b.category && b.category !== "Uncategorized" ? b.category : "—"}</td>
-                    <td className="px-3 py-4 align-top">
-                       <span className={`px-2 py-0.5 rounded-[2px] text-[10px] font-bold uppercase ${b.status === 'Published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                          {b.status || "Published"}
-                       </span>
-                    </td>
-                    <td className="px-3 py-4 align-top text-[#646970] hidden md:table-cell">
-                       {b.status === 'Published' ? 'Published' : 'Last Modified'}<br />
-                       {new Date(b.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <label htmlFor="blogs-filter-category" className="sr-only">Filter by category</label>
+        <select
+          id="blogs-filter-category"
+          className="wp-select"
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+        >
+          <option>All categories</option>
+          {Array.from(new Set(blogs.map(b => b.category).filter(Boolean))).map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
 
-        {/* Pagination */}
-        <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 text-[13px] text-[#646970]">
-           <div>{filteredBlogs.length} items</div>
-           <div className="flex items-center gap-1">
-              <button className="p-1.5 md:p-1 border border-[#ccd0d4] bg-white rounded disabled:opacity-50"><ChevronLeft className="w-4 h-4" /></button>
-              <span className="px-3">1 of 1</span>
-              <button className="p-1.5 md:p-1 border border-[#ccd0d4] bg-white rounded disabled:opacity-50"><ChevronRight className="w-4 h-4" /></button>
-           </div>
+        <span className="wp-spacer" />
+
+        <div className="wp-search" role="search">
+          <label htmlFor="blogs-search" className="sr-only">Search posts</label>
+          <input
+            id="blogs-search"
+            type="search"
+            placeholder="Search posts"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="wp-input"
+          />
+          <button type="button" className="wp-btn">Search Posts</button>
         </div>
       </div>
-    </AdminPageLayout>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pagination}
+      </div>
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="wp-muted">Loading posts…</td></tr>
+            ) : filteredBlogs.length === 0 ? (
+              <tr><td colSpan={6} className="wp-muted">No posts found.</td></tr>
+            ) : (
+              filteredBlogs.map((b) => (
+                <tr key={b._id} className={selectedIds.includes(b._id) ? "is-selected" : undefined}>
+                  <td className="wp-check-col">
+                    <label htmlFor={`blog-select-${b._id}`} className="sr-only">Select {b.title}</label>
+                    <input id={`blog-select-${b._id}`} type="checkbox" checked={selectedIds.includes(b._id)} onChange={() => toggleSelect(b._id)} />
+                  </td>
+                  <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <div className="wp-thumb" style={{ flexShrink: 0 }}>
+                        {b.image ? <img src={b.image} alt="" /> : <ImageIcon className="w-5 h-5" aria-hidden="true" style={{ color: "#a7aaad" }} />}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <Link href={`/admin/blogs/${b._id}`} className="wp-row-title">{b.title}</Link>
+                        {b.status === "Draft" && <span className="wp-strong"> — Draft</span>}
+                        <div className="wp-mobile-meta">
+                          {b.category && b.category !== "Uncategorized" ? b.category : "Uncategorized"} · {new Date(b.createdAt).toLocaleDateString()}
+                        </div>
+                        <div className="wp-row-actions">
+                          {view === "trash" ? (
+                            <>
+                              <span><button type="button" onClick={() => handleRestoreBlog(b._id)}>Restore</button></span>
+                              <span><button type="button" onClick={() => handlePermanentDeleteBlog(b._id, b.title)} className="is-danger">Delete Permanently</button></span>
+                            </>
+                          ) : (
+                            <>
+                              <span><Link href={`/admin/blogs/${b._id}`}>Edit</Link></span>
+                              <span><button type="button" onClick={() => handleDuplicate(b)}>Duplicate</button></span>
+                              <span><button type="button" onClick={() => handleTrash(b._id)} className="is-danger">Trash</button></span>
+                              <span><Link href={`/blog/${b.slug}`} target="_blank">View</Link></span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm">Admin</td>
+                  <td className="wp-hide-sm">{b.category && b.category !== "Uncategorized" ? b.category : "—"}</td>
+                  <td>
+                    <span className={`wp-pill ${b.status === "Published" || !b.status ? "wp-st-published" : "wp-st-draft"}`}>
+                      {b.status || "Published"}
+                    </span>
+                  </td>
+                  <td className="wp-hide-sm">
+                    {b.status === "Published" ? "Published" : "Last Modified"}<br />
+                    <span className="wp-muted">{new Date(b.createdAt).toLocaleDateString()}</span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot>{headerRow}</tfoot>
+        </table>
+      </div>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pagination}
+      </div>
+    </Page>
     </RequirePermission>
   );
 }
