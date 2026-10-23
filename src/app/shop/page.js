@@ -1,5 +1,4 @@
 import { permanentRedirect } from "next/navigation";
-import { Suspense } from "react";
 import dbConnect from "@/lib/db";
 import Page from "@/models/Page";
 import ShopContentClient from "./ShopContentClient";
@@ -70,17 +69,9 @@ export default async function ShopPage({ searchParams }) {
           dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
-      <Suspense fallback={
-        <div className="container mx-auto px-4 py-40 text-center">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-            <p className="font-bold text-xl uppercase text-black/40 mt-4">Loading Catalog...</p>
-          </div>
-        </div>
-      }>
-        <ShopContentClient initialCategory={null} initialType={typeSlug} initialProducts={products} />
-      </Suspense>
+      {/* No Suspense here: this route is force-dynamic and its products are loaded before rendering, so a
+          "Loading Catalog..." fallback only ever flashed on screen before the real list streamed in. */}
+      <ShopContentClient initialCategory={null} initialType={typeSlug} initialProducts={products} />
     </>
   );
 }

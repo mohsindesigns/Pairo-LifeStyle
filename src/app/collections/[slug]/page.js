@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
 import { RESERVED_SLUGS } from "@/lib/redirect-resolver";
-import { Suspense } from "react";
 import dbConnect from "@/lib/db";
 import Category from "@/models/Category";
 import ShopContentClient from "@/app/shop/ShopContentClient";
@@ -94,22 +93,14 @@ export default async function DynamicCategoryCatcherPage({ params, searchParams 
           dangerouslySetInnerHTML={{ __html: escapeJsonLd(structuredData) }}
         />
       )}
-      <Suspense fallback={
-        <div className="container mx-auto px-4 py-40 text-center">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-            <p className="font-bold text-xl uppercase text-black/40 mt-4">Loading Catalog...</p>
-          </div>
-        </div>
-      }>
-        <ShopContentClient 
-          initialCategory={category.slug} 
-          initialType={typeSlug} 
-          initialProducts={products} 
-          categoryData={JSON.parse(JSON.stringify(category))} 
-        />
-      </Suspense>
+      {/* No Suspense here: this route is force-dynamic and its products are loaded before rendering, so a
+          "Loading Catalog..." fallback only ever flashed on screen before the real list streamed in. */}
+      <ShopContentClient 
+        initialCategory={category.slug} 
+        initialType={typeSlug} 
+        initialProducts={products} 
+        categoryData={JSON.parse(JSON.stringify(category))} 
+      />
     </>
   );
 }
