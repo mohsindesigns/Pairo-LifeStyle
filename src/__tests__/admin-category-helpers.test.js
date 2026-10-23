@@ -33,7 +33,7 @@ describe("buildCategoryDuplicate", () => {
       expect(copy).not.toHaveProperty(k);
     }
     expect(copy).toMatchObject({
-      name: "Leather Jackets (copy)",
+      name: "Leather Jackets (Copy)",
       slug: "leather-jackets-copy",
       status: "Draft",
       type: "product",

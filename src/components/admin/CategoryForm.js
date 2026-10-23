@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Page, PageHeader, Postbox } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
 import MediaPicker from "@/components/admin/MediaPicker";
 import { useRouter } from "next/navigation";
 import dynamic from 'next/dynamic';
@@ -19,6 +19,9 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
   const [trashing, setTrashing] = useState(false);
   const [loading, setLoading] = useState(categoryId ? true : false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [notFound, setNotFound] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [availableItems, setAvailableItems] = useState([]);
   const [itemSearchTerm, setItemSearchTerm] = useState("");
 
@@ -119,7 +122,10 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
   useEffect(() => {
     const init = async () => {
         let cat = null;
-        if (categoryId) cat = await fetchCategory();
+        if (categoryId) {
+          cat = await fetchCategory();
+          if (!cat) setNotFound(true);
+        }
         await fetchAvailableItems(cat);
         if (type === "product") {
           await fetchSizeCharts();
@@ -140,12 +146,24 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     init();
   }, [categoryId, type]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // "Save Draft" passes forceStatus="Draft"; the main button keeps the chosen status.
+  const handleSubmit = async (e, forceStatus) => {
+    e?.preventDefault?.();
+    if (!formData.name?.trim()) {
+      setSaveError("Enter a category name before saving.");
+      return;
+    }
+    if (categoryId && !formData._id) {
+      setSaveError("This category could not be loaded, so it cannot be saved.");
+      return;
+    }
     setSaving(true);
+    setSaveError("");
     try {
       const method = formData._id ? "PUT" : "POST";
-      const body = { ...formData, id: formData._id };
+      const nextStatus = forceStatus || formData.status;
+      if (forceStatus) setFormData(prev => ({ ...prev, status: forceStatus }));
+      const body = { ...formData, status: nextStatus, id: formData._id };
       
       const res = await fetch("/api/admin/categories", {
         method,
@@ -155,17 +173,20 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       
       if (res.ok) {
         const savedCat = await res.json();
-        toast.success(categoryId ? "Category updated successfully!" : "Category created successfully!");
+        toast.success(forceStatus === "Draft" ? "Draft saved." : (categoryId ? "Category updated." : "Category created."));
         if (!categoryId && savedCat._id) {
           router.push(type === 'product' ? `/admin/products/categories/${savedCat._id}` : `/admin/blogs/categories/${savedCat._id}`);
         }
       } else {
-        const data = await res.json();
-        toast.error("Error saving category: " + (data.error || "Unknown error"));
+        const data = await res.json().catch(() => ({}));
+        const msg = data.error || `Save failed (${res.status})`;
+        setSaveError(msg);
+        toast.error("Error saving category: " + msg);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save category. Check console.");
+      setSaveError("Could not reach the server. Your changes were not saved.");
+      toast.error("Failed to save category.");
     } finally {
       setSaving(false);
     }
@@ -198,6 +219,29 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     }
   };
 
+  const handleRestore = async () => {
+    if (!formData._id) return;
+    setRestoring(true);
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: formData._id, isDeleted: false }),
+      });
+      if (res.ok) {
+        setFormData(prev => ({ ...prev, isDeleted: false, deletedAt: null }));
+        toast.success("Category restored.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error("Could not restore: " + (data.error || res.status));
+      }
+    } catch {
+      toast.error("Could not restore the category.");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const filteredItems = availableItems.filter(i => 
     i.title?.toLowerCase().includes(itemSearchTerm.toLowerCase()) || 
     i.name?.toLowerCase().includes(itemSearchTerm.toLowerCase())
@@ -223,6 +267,23 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
         actions={<Link href={addNewHref} className="wp-btn">Add New</Link>}
         aside={<Link href={backHref} className="wp-link">&larr; Back to categories</Link>}
       />
+
+      {notFound && (
+        <Notice type="error">
+          This category could not be found. It may have been deleted permanently. <Link href={backHref} className="wp-link">Back to categories</Link>
+        </Notice>
+      )}
+      {formData.isDeleted && (
+        <Notice type="warning">
+          This category is in the Trash and is hidden from the store.{" "}
+          <button type="button" className="wp-link" onClick={handleRestore} disabled={restoring} style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>
+            {restoring ? "Restoring…" : "Restore it"}
+          </button>
+        </Notice>
+      )}
+      {saveError && (
+        <Notice type="error" onDismiss={() => setSaveError("")}>{saveError}</Notice>
+      )}
 
       <form onSubmit={handleSubmit}>
         <div className="wp-cols">
@@ -514,6 +575,16 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                     <option>Draft</option>
                   </select>
                 </div>
+                <div className="wp-misc-row">
+                  <button
+                    type="button"
+                    className="wp-btn"
+                    disabled={saving || (categoryId && !formData._id)}
+                    onClick={(e) => handleSubmit(e, "Draft")}
+                  >
+                    Save Draft
+                  </button>
+                </div>
                 <label className="wp-check">
                   <input type="checkbox" checked={formData.isFeatured} onChange={(e) => setFormData({...formData, isFeatured: e.target.checked})} />
                   Featured Category
@@ -542,7 +613,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                 >
                   Cancel
                 </button>
-                {formData._id && (
+                {formData._id && !formData.isDeleted && (
                   <button
                     type="button"
                     onClick={handleTrash}
@@ -554,7 +625,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                   </button>
                 )}
                 <span className="wp-spacer" />
-                <button type="submit" disabled={saving} className="wp-btn wp-btn-primary">
+                <button type="submit" disabled={saving || (categoryId && !formData._id)} className="wp-btn wp-btn-primary">
                   {saving ? "Saving..." : (categoryId ? "Update" : "Publish")}
                 </button>
               </div>

@@ -23,7 +23,19 @@ const SizeChartSchema = new mongoose.Schema(
     },
     
     status: { type: String, enum: ["Draft", "Published"], default: "Published" },
-    isDeleted: { type: Boolean, default: false }
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
+    // References cleared when the chart was moved to the trash, so a restore can
+    // put them back: [{ kind: "category" | "product", id, source }]
+    trashedRefs: {
+      type: [{
+        _id: false,
+        kind: { type: String, enum: ["category", "product"] },
+        id: { type: mongoose.Schema.Types.ObjectId },
+        source: { type: String, default: null }
+      }],
+      default: []
+    }
   },
   { timestamps: true }
 );

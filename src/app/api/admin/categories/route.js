@@ -27,7 +27,8 @@ export async function GET(req) {
       return NextResponse.json(category);
     }
 
-    const query = { isDeleted: trash };
+    // Legacy categories may have no isDeleted field at all; treat them as live.
+    const query = { isDeleted: trash ? true : { $ne: true } };
     if (type === "product") {
        query.$or = [{ type: "product" }, { type: { $exists: false } }];
     } else {
@@ -71,11 +72,8 @@ export async function POST(req) {
   await dbConnect();
   try {
     const data = await req.json();
-    console.log("=== CATEGORY POST REQUEST ===");
-    console.log("Received data:", data);
     
     const type = data.type || "product";
-    console.log("Determined type to save:", type);
     
     // Route Collision Detection
     const { validateSlug } = await import("@/lib/routes-server");
@@ -104,10 +102,10 @@ export async function POST(req) {
     
     let category;
     if (existing) {
-       console.log("Found existing category. isDeleted:", existing.isDeleted);
        if (existing.isDeleted) {
           // Restore the deleted category
           existing.isDeleted = false;
+          existing.deletedAt = null;
           existing.name = data.name; 
           existing.type = type;
           existing.image = data.image || existing.image;
@@ -119,13 +117,11 @@ export async function POST(req) {
           existing.isFeatured = data.isFeatured || existing.isFeatured;
           if (data.seo) existing.seo = { ...existing.seo, ...data.seo };
           category = await existing.save();
-          console.log("Restored category:", category._id, "with type:", category.type);
        } else {
           return NextResponse.json({ error: "A category with this slug already exists." }, { status: 400 });
        }
     } else {
        category = await Category.create({ ...stripServerManagedFields(data), type });
-       console.log("Created NEW category:", category._id, "with type:", category.type);
     }
 
     // Handle Linked Items
@@ -177,6 +173,12 @@ export async function PUT(req) {
   try {
     const { id, ...data } = await req.json();
     const mongoose = require('mongoose');
+    // Never let a client payload rewrite server-managed bookkeeping.
+    delete data._id; delete data.__v; delete data.createdAt; delete data.updatedAt; delete data.productCount;
+    // Restore from trash ({ id, isDeleted: false }) clears the trash timestamp;
+    // trashing goes through DELETE so it is stamped there.
+    if (data.isDeleted === false) data.deletedAt = null;
+    else { delete data.isDeleted; delete data.deletedAt; }
     const oldCategory = await Category.findById(id);
     if (!oldCategory) return NextResponse.json({ error: "Category not found" }, { status: 404 });
 
@@ -378,6 +380,7 @@ export async function DELETE(req) {
       return NextResponse.json({ message: "Category permanently deleted" });
     } else {
       category.isDeleted = true;
+      category.deletedAt = new Date();
       await category.save();
       return NextResponse.json({ message: "Category moved to trash", category });
     }

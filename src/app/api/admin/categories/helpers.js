@@ -24,7 +24,7 @@ export function buildCategoryDuplicate(cat = {}, linkedItems = []) {
   for (const key of DUPLICATE_FIELDS) {
     if (cat[key] !== undefined && cat[key] !== null) copy[key] = cat[key];
   }
-  copy.name = `${cat.name || "Category"} (copy)`;
+  copy.name = `${cat.name || "Category"} (Copy)`;
   copy.slug = `${cat.slug || "category"}-copy`;
   copy.status = "Draft";
   if (cat.seo && typeof cat.seo === "object") {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import RequirePermission from "@/components/admin/RequirePermission";
+import Link from "next/link";
 import { Page, PageHeader } from "@/components/admin/ui";
 
 export default function CategoryFiltersPage() {
@@ -136,9 +137,9 @@ export default function CategoryFiltersPage() {
                       </div>
                     </td>
                     <td style={{ minWidth: 0, wordBreak: "break-word" }}>
-                      <span className="wp-row-title">{cat.name}</span>
+                      <Link href={`/admin/products/categories/${cat._id}`} className="wp-row-title">{cat.name}</Link>
                       <div className="wp-mobile-meta">
-                        {cat.slug} · {cat.status || "Published"} · {cat.productCount || 0} products
+                        {cat.slug} · {cat.status || "Published"} · {cat.productCount || 0} product{cat.productCount === 1 ? "" : "s"}
                       </div>
                     </td>
                     <td className="wp-hide-sm wp-muted" style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{cat.slug}</td>

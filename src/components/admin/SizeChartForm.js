@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
-import { Postbox } from "@/components/admin/ui";
+import { Postbox, Notice, Skeleton } from "@/components/admin/ui";
 
 // Compact button used inside the spreadsheet header/rows
 const miniBtn = { minHeight: 26, padding: "0 6px", lineHeight: 1 };
@@ -39,6 +39,10 @@ export default function SizeChartForm({ initialId = null }) {
   const [saving, setSaving] = useState(false);
   const [searchTarget, setSearchTarget] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [isTrashed, setIsTrashed] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   // Fetch initial data (if editing) & categories/products
   useEffect(() => {
@@ -67,6 +71,7 @@ export default function SizeChartForm({ initialId = null }) {
             setPublicHeading(chart.publicHeading || "");
             setDescription(chart.description || "");
             setStatus(chart.status || "Published");
+            setIsTrashed(!!chart.isDeleted);
             setAssignmentType(chart.assignmentType || "none");
             setAssignmentTargetId(chart.assignmentTargetId || "");
             if (chart.columns && chart.columns.length > 0) {
@@ -81,7 +86,7 @@ export default function SizeChartForm({ initialId = null }) {
           }
         }
       } catch (err) {
-        toast.error("Failed to load initial data");
+        setLoadError("Failed to load the editor data. Reload the page to try again.");
       } finally {
         setLoading(false);
       }
@@ -244,21 +249,30 @@ export default function SizeChartForm({ initialId = null }) {
     e.target.value = ""; // Reset input file
   };
 
-  // Save/Publish
-  const handleSave = async () => {
-    if (!label.trim()) return toast.error("Size Chart Label is required");
-    if (!publicHeading.trim()) return toast.error("Public Heading is required");
-    if (columns.some(col => !col.trim())) return toast.error("Column headers cannot be empty");
+  // Validation problems are shown in a Notice above the form (and a toast) so
+  // they are never lost.
+  const fail = (msg) => {
+    setSaveError(msg);
+    toast.error(msg);
+  };
+
+  // Save/Publish. "Save Draft" passes forceStatus = "Draft".
+  const handleSave = async (forceStatus) => {
+    if (!label.trim()) return fail("Size chart label is required.");
+    if (!publicHeading.trim()) return fail("Public heading is required.");
+    if (columns.some(col => !col.trim())) return fail("Column headers cannot be empty.");
     
     // Filter out rows that are entirely empty
-    const cleanedRows = rows.filter(row => row.some(cell => cell.trim() !== ""));
-    if (cleanedRows.length === 0) return toast.error("Spreadsheet must contain at least one row of measurements");
+    const cleanedRows = rows.filter(row => row.some(cell => (cell || "").trim() !== ""));
+    if (cleanedRows.length === 0) return fail("Add at least one row of measurements.");
 
     if (assignmentType !== "none" && !assignmentTargetId) {
-      return toast.error(`Please select a target ${assignmentType} for assignment`);
+      return fail(`Choose the ${assignmentType} this size chart applies to, or set it to Unassigned.`);
     }
 
+    const nextStatus = typeof forceStatus === "string" ? forceStatus : status;
     setSaving(true);
+    setSaveError("");
     try {
       const payload = {
         label: label.trim(),
@@ -266,7 +280,7 @@ export default function SizeChartForm({ initialId = null }) {
         description: description.trim(),
         columns,
         rows: cleanedRows,
-        status,
+        status: nextStatus,
         assignmentType,
         assignmentTargetId: assignmentTargetId || null
       };
@@ -280,15 +294,38 @@ export default function SizeChartForm({ initialId = null }) {
         body: JSON.stringify(payload)
       });
 
-      const resData = await res.json();
-      if (!res.ok) throw new Error(resData.error || "Save failed");
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(resData.error || `Save failed (${res.status})`);
 
-      toast.success(isNew ? "Size chart created!" : "Size chart updated!");
-      router.push("/admin/products/size-charts");
+      setStatus(nextStatus);
+      toast.success(nextStatus === "Draft" && forceStatus ? "Draft saved." : (isNew ? "Size chart created." : "Size chart updated."));
+      // Same flow as categories: a new chart opens in its editor, an edit stays put.
+      if (isNew && resData._id) router.push(`/admin/products/size-charts/${resData._id}`);
     } catch (err) {
-      toast.error(err.message);
+      fail(err.message || "Save failed.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setRestoring(true);
+    try {
+      const res = await fetch(`/api/admin/size-charts/${initialId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isDeleted: false }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Restore failed");
+      setIsTrashed(false);
+      setAssignmentType(data.assignmentType || "none");
+      setAssignmentTargetId(data.assignmentTargetId || "");
+      toast.success("Size chart restored.");
+    } catch (err) {
+      toast.error(err.message || "Restore failed");
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -313,7 +350,16 @@ export default function SizeChartForm({ initialId = null }) {
 
   if (loading) {
     return (
-      <p className="wp-muted">Loading editor data…</p>
+      <div className="wp-cols" role="status" aria-label="Loading editor">
+        <div className="wp-col-main">
+          <Skeleton height={40} />
+          <Skeleton height={140} style={{ marginTop: 16 }} />
+          <Skeleton height={220} style={{ marginTop: 16 }} />
+        </div>
+        <div className="wp-col-side">
+          <Skeleton height={150} />
+        </div>
+      </div>
     );
   }
 
@@ -321,6 +367,17 @@ export default function SizeChartForm({ initialId = null }) {
   const selectedProductName = products.find(p => p._id === assignmentTargetId)?.name;
 
   return (
+    <>
+    {loadError && <Notice type="error" onDismiss={() => setLoadError("")}>{loadError}</Notice>}
+    {isTrashed && (
+      <Notice type="warning">
+        This size chart is in the Trash, so no product shows it. Restore it to edit or use it again.{" "}
+        <button type="button" className="wp-link" onClick={handleRestore} disabled={restoring} style={{ background: "none", border: 0, padding: 0, cursor: "pointer" }}>
+          {restoring ? "Restoring…" : "Restore it"}
+        </button>
+      </Notice>
+    )}
+    {saveError && <Notice type="error" onDismiss={() => setSaveError("")}>{saveError}</Notice>}
     <div className="wp-cols">
       {/* Main column */}
       <div className="wp-col-main">
@@ -609,11 +666,11 @@ export default function SizeChartForm({ initialId = null }) {
               <span className="wp-spacer" />
               <button
                 type="button"
-                disabled={saving}
-                onClick={handleSave}
+                disabled={saving || isTrashed}
+                onClick={() => handleSave()}
                 className="wp-btn wp-btn-primary"
               >
-                {saving ? "Saving..." : "Save Chart"}
+                {saving ? "Saving..." : (isNew ? (status === "Draft" ? "Save" : "Publish") : "Update")}
               </button>
             </>
           }
@@ -630,9 +687,14 @@ export default function SizeChartForm({ initialId = null }) {
               <option>Draft</option>
             </select>
           </div>
-          <button type="button" onClick={() => setShowPreview(true)} className="wp-btn">
-            Preview chart
-          </button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <button type="button" onClick={() => handleSave("Draft")} disabled={saving || isTrashed} className="wp-btn">
+              Save Draft
+            </button>
+            <button type="button" onClick={() => setShowPreview(true)} className="wp-btn">
+              Preview chart
+            </button>
+          </div>
         </Postbox>
 
         <Postbox title="Import / Export" id="sc-csv">
@@ -707,5 +769,6 @@ export default function SizeChartForm({ initialId = null }) {
         </div>
       )}
     </div>
+    </>
   );
 }
