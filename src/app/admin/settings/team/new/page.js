@@ -111,7 +111,7 @@ export default function InviteStaff() {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               {showPassword ? "Hide" : "Show"}
             </button>
-            <span className="wp-hint">The user will be prompted to change this on their first login.</span>
+            <span className="wp-hint">Share this password with the user securely. They can sign in with it right away; you can set a new one later from the Users list.</span>
           </div>
           <div className="wp-frow">
             <label htmlFor="new-user-role" className="wp-flabel">Role</label>

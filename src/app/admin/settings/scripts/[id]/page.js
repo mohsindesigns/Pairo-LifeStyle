@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Page, PageHeader, Notice } from "@/components/admin/ui";
@@ -11,25 +11,38 @@ export default function EditScriptPage() {
   const { id } = useParams();
   const [script, setScript] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  const fetchScript = useCallback(async () => {
+    setLoading(true);
+    setNotFound(false);
+    setLoadError("");
+    try {
+      const res = await fetch(`/api/admin/scripts/${id}`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setScript(data);
+      } else if (res.status === 404) {
+        setNotFound(true);
+      } else {
+        setLoadError(data.error || `Failed to load script (HTTP ${res.status}).`);
+        toast.error(data.error || "Failed to load script");
+      }
+    } catch (err) {
+      setLoadError("Network error — the script could not be loaded. Check your connection and try again.");
+      toast.error("Network error");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
   useEffect(() => {
-    const fetchScript = async () => {
-      try {
-        const res = await fetch(`/api/admin/scripts/${id}`);
-        const data = await res.json();
-        if (res.ok) {
-          setScript(data);
-        } else {
-          toast.error(data.error || "Failed to load script");
-        }
-      } catch (err) {
-        toast.error("Network error");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchScript();
-  }, [id]);
+    if (!id) return;
+    Promise.resolve().then(() => {
+      fetchScript();
+    });
+  }, [id, fetchScript]);
 
   if (loading) return (
     <Page>
@@ -38,7 +51,18 @@ export default function EditScriptPage() {
     </Page>
   );
 
-  if (!script) return (
+  if (loadError) return (
+    <Page>
+      <PageHeader title="Edit script" />
+      <Notice type="error">{loadError}</Notice>
+      <p style={{ margin: "0 0 14px" }}>
+        <button type="button" className="wp-btn" onClick={fetchScript}>Retry</button>
+      </p>
+      <Link href="/admin/settings/scripts" className="wp-link">← Back to Scripts</Link>
+    </Page>
+  );
+
+  if (notFound || !script) return (
     <Page>
       <PageHeader title="Script not found" />
       <Notice type="error">The requested script configuration could not be found.</Notice>

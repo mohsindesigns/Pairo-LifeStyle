@@ -6,11 +6,25 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { Page, PageHeader, Postbox } from "@/components/admin/ui";
 import { toast } from "react-hot-toast";
+import RequirePermission from "@/components/admin/RequirePermission";
+import { useRBAC } from "@/hooks/useRBAC";
 
 export default function EditStaff() {
+  return (
+    <RequirePermission permission="staff.view">
+      <EditStaffForm />
+    </RequirePermission>
+  );
+}
+
+function EditStaffForm() {
   const router = useRouter();
   const params = useParams();
   const id = params.id;
+  const { can, session } = useRBAC();
+  const canEdit = can("staff.edit");
+  const currentIsSuperAdmin = (session?.user?.role?.slug || session?.user?.roleId?.slug) === "super-admin";
+  const [targetIsSuperAdmin, setTargetIsSuperAdmin] = useState(false);
 
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +50,7 @@ export default function EditStaff() {
         const staffData = staffRes.ok ? await staffRes.json().catch(() => ({})) : {};
 
         setRoles(Array.isArray(rolesData) ? rolesData : []);
+        setTargetIsSuperAdmin(staffData.roleId?.slug === "super-admin");
         setFormData({
           name: staffData.name || "",
           email: staffData.email || "",
@@ -153,6 +168,7 @@ export default function EditStaff() {
             </div>
           </Postbox>
 
+          {(!targetIsSuperAdmin || currentIsSuperAdmin) && (
           <Postbox title="Account management">
             <div className="wp-frow">
               <label htmlFor="edit-user-password" className="wp-flabel">New password</label>
@@ -176,8 +192,12 @@ export default function EditStaff() {
               <span className="wp-hint">Only fill this in if you want to change the password.</span>
             </div>
           </Postbox>
+          )}
 
-          <button type="submit" disabled={saving} className="wp-btn wp-btn-primary">
+          {!canEdit && (
+            <p className="wp-desc">You don&apos;t have permission to edit users.</p>
+          )}
+          <button type="submit" disabled={saving || !canEdit} className="wp-btn wp-btn-primary">
             {saving ? "Updating…" : "Update user"}
           </button>
         </form>

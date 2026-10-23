@@ -120,6 +120,7 @@ export default function StaffManagement() {
 
   const staffList = Array.isArray(staff) ? staff : [];
   const currentUserId = session?.user?.id || session?.user?._id;
+  const currentIsSuperAdmin = (session?.user?.role?.slug || session?.user?.roleId?.slug) === 'super-admin';
 
   const filteredStaff = staffList.filter(s => {
     if (!s) return false;
@@ -234,12 +235,14 @@ export default function StaffManagement() {
                                 {s?.status === 'Active' ? 'Suspend' : 'Activate'}
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
-                            >
-                              Reset password
-                            </button>
+                            {(!isSuperAdmin || currentIsSuperAdmin) && (
+                              <button
+                                type="button"
+                                onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
+                              >
+                                Reset password
+                              </button>
+                            )}
                             {!isSuperAdmin && !isSelf && (
                               <button
                                 type="button"

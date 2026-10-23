@@ -57,6 +57,12 @@ export async function PUT(req, { params }) {
             return NextResponse.json({ error: "You don't have permission to change staff roles" }, { status: 403 });
         }
 
+        // Security: only a Super Admin may set/reset a Super Admin's password — otherwise
+        // anyone with staff.edit could take over a super-admin account.
+        if (password && staff.roleId?.slug === 'super-admin' && session.user.role?.slug !== 'super-admin') {
+            return NextResponse.json({ error: "Only a Super Admin can reset a Super Admin's password" }, { status: 403 });
+        }
+
         const before = JSON.parse(JSON.stringify(staff));
 
         if (name) staff.name = name;

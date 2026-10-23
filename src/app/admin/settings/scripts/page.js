@@ -14,12 +14,15 @@ export default function ScriptManagementPage() {
   const [scripts, setScripts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkAction, setBulkAction] = useState("");
+  const [bulkRunning, setBulkRunning] = useState(false);
 
   const fetchScripts = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/scripts");
       const data = await res.json();
-      if (res.ok) setScripts(data);
+      if (res.ok) setScripts(Array.isArray(data) ? data : []);
     } catch (err) {
       toast.error("Failed to load scripts");
     } finally {
@@ -41,7 +44,7 @@ export default function ScriptManagementPage() {
         body: JSON.stringify({ isActive: !script.isActive })
       });
       if (res.ok) {
-        toast.success(`${script.name} ${!script.isActive ? 'activated' : 'deactivated'}`);
+        toast.success(`${script.name || "Script"} ${!script.isActive ? 'activated' : 'deactivated'}`);
         fetchScripts();
       }
     } catch (err) {
@@ -63,16 +66,82 @@ export default function ScriptManagementPage() {
     }
   };
 
-  const filteredScripts = scripts.filter(s => 
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.type.toLowerCase().includes(search.toLowerCase())
+  const label = (v) => String(v || "").replace(/_/g, " ");
+  const term = search.toLowerCase();
+  const filteredScripts = (Array.isArray(scripts) ? scripts : []).filter(s =>
+    s && (
+      String(s.name || "").toLowerCase().includes(term) ||
+      String(s.type || "").toLowerCase().includes(term)
+    )
   );
+
+  const visibleIds = filteredScripts.map(s => s._id);
+  const selectedVisible = selectedIds.filter(id => visibleIds.includes(id));
+  const allSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length;
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? [] : visibleIds);
+  };
+
+  const applyBulkAction = async () => {
+    const ids = selectedVisible;
+    if (!bulkAction) return toast.error("Choose a bulk action first.");
+    if (ids.length === 0) return toast.error("Select at least one script.");
+
+    if (bulkAction === "delete") {
+      const ok = await showConfirm(
+        `Permanently delete ${ids.length} script${ids.length === 1 ? "" : "s"}? This will stop tracking immediately and cannot be undone.`,
+        "Delete scripts",
+        { confirmText: "Delete", danger: true }
+      );
+      if (!ok) return;
+    }
+
+    setBulkRunning(true);
+    let success = 0;
+    const failures = [];
+    for (const id of ids) {
+      const script = scripts.find(s => s?._id === id);
+      const name = script?.name || "Untitled script";
+      try {
+        const res = bulkAction === "delete"
+          ? await fetch(`/api/admin/scripts/${id}`, { method: 'DELETE' })
+          : await fetch(`/api/admin/scripts/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ isActive: bulkAction === "activate" })
+            });
+        if (res.ok) {
+          success++;
+        } else {
+          const data = await res.json().catch(() => ({}));
+          failures.push(`${name}: ${data.error || `HTTP ${res.status}`}`);
+        }
+      } catch {
+        failures.push(`${name}: network error`);
+      }
+    }
+    setBulkRunning(false);
+    setSelectedIds([]);
+    setBulkAction("");
+    await fetchScripts();
+
+    const verb = bulkAction === "delete" ? "deleted" : bulkAction === "activate" ? "activated" : "paused";
+    if (success > 0) toast.success(`${success} script${success === 1 ? "" : "s"} ${verb}.`);
+    if (failures.length > 0) {
+      toast.error(`${failures.length} failed: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? "…" : ""}`);
+    }
+  };
 
   const activeCount = scripts.filter(s => s.isActive).length;
 
   const headerRow = (
     <tr>
-      <td className="wp-check-col"><input type="checkbox" aria-label="Select all scripts" /></td>
+      <td className="wp-check-col"><input type="checkbox" aria-label="Select all scripts" checked={allSelected} onChange={toggleSelectAll} disabled={visibleIds.length === 0} /></td>
       <th scope="col">Name</th>
       <th scope="col" className="wp-hide-sm">Type</th>
       <th scope="col" className="wp-hide-sm">Placement</th>
@@ -102,13 +171,15 @@ export default function ScriptManagementPage() {
 
       <div className="wp-toolbar">
         <label htmlFor="scripts-bulk-action" className="sr-only">Select bulk action</label>
-        <select id="scripts-bulk-action" className="wp-select">
-          <option>Bulk actions</option>
-          <option>Activate</option>
-          <option>Deactivate</option>
-          <option>Delete</option>
+        <select id="scripts-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+          <option value="">Bulk actions</option>
+          <option value="activate">Activate</option>
+          <option value="pause">Pause</option>
+          <option value="delete">Delete</option>
         </select>
-        <button type="button" className="wp-btn">Apply</button>
+        <button type="button" className="wp-btn" onClick={applyBulkAction} disabled={bulkRunning}>
+          {bulkRunning ? "Applying…" : "Apply"}
+        </button>
         <span className="wp-spacer" />
         <div className="wp-search" role="search">
           <label htmlFor="scripts-search" className="sr-only">Filter scripts</label>
@@ -134,11 +205,11 @@ export default function ScriptManagementPage() {
             ) : (
               filteredScripts.map((s) => (
                 <tr key={s._id}>
-                  <td className="wp-check-col"><input type="checkbox" aria-label={`Select ${s.name}`} /></td>
+                  <td className="wp-check-col"><input type="checkbox" aria-label={`Select ${s.name || "script"}`} checked={selectedIds.includes(s._id)} onChange={() => toggleSelect(s._id)} /></td>
                   <td style={{ wordBreak: "break-word" }}>
-                    <Link href={`/admin/settings/scripts/${s._id}`} className="wp-row-title">{s.name}</Link>
+                    <Link href={`/admin/settings/scripts/${s._id}`} className="wp-row-title">{s.name || "(no name)"}</Link>
                     <div className="wp-mobile-meta">
-                      <span className="capitalize">{s.type.replace('_', ' ')}</span> · <span className="capitalize">{s.location.replace('_', ' ')}</span>
+                      <span className="capitalize">{label(s.type) || "—"}</span> · <span className="capitalize">{label(s.location) || "—"}</span>
                     </div>
                     <div className="wp-row-actions">
                       <Link href={`/admin/settings/scripts/${s._id}`}>Edit</Link>
@@ -146,8 +217,8 @@ export default function ScriptManagementPage() {
                       <button type="button" className="is-danger" onClick={() => deleteScript(s._id)}>Delete</button>
                     </div>
                   </td>
-                  <td className="wp-hide-sm capitalize">{s.type.replace('_', ' ')}</td>
-                  <td className="wp-hide-sm capitalize">{s.location.replace('_', ' ')}</td>
+                  <td className="wp-hide-sm capitalize">{label(s.type) || "—"}</td>
+                  <td className="wp-hide-sm capitalize">{label(s.location) || "—"}</td>
                   <td>
                     <button
                       type="button"

@@ -34,6 +34,19 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
     return data;
   });
 
+  // Raw text of the priority field, so it can be cleared while typing. formData.priority
+  // only ever holds the last valid integer.
+  const [priorityInput, setPriorityInput] = useState(() =>
+    Number.isInteger(formData.priority) ? String(formData.priority) : "0"
+  );
+
+  const handlePriorityChange = (value) => {
+    setPriorityInput(value);
+    if (/^-?\d+$/.test(value.trim())) {
+      setFormData(prev => ({ ...prev, priority: parseInt(value, 10) }));
+    }
+  };
+
   const templates = {
     ga4: {
       title: "Google Analytics 4 (GA4)",
@@ -95,6 +108,20 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    const rawPriority = priorityInput.trim();
+    let priority;
+    if (rawPriority === "") {
+      // Field left empty: keep the previous valid value (or 0).
+      priority = Number.isInteger(formData.priority) ? formData.priority : 0;
+    } else if (/^-?\d+$/.test(rawPriority)) {
+      priority = parseInt(rawPriority, 10);
+    } else {
+      toast.error("Execution priority must be a whole number.");
+      return;
+    }
+    setPriorityInput(String(priority));
+
     setLoading(true);
     
     try {
@@ -104,7 +131,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, priority })
       });
       
       if (res.ok) {
@@ -362,8 +389,9 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
             <input
               id="script-priority"
               type="number"
-              value={formData.priority}
-              onChange={(e) => setFormData({...formData, priority: parseInt(e.target.value)})}
+              step={1}
+              value={priorityInput}
+              onChange={(e) => handlePriorityChange(e.target.value)}
               className="wp-input wp-full"
             />
             <p className="wp-desc">Lower numbers load first (e.g., 0 loads before 10).</p>

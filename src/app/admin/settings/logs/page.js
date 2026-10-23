@@ -1,30 +1,100 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "react-hot-toast";
 import { Page, PageHeader } from "@/components/admin/ui";
 import RequirePermission from "@/components/admin/RequirePermission";
 
+// RFC 4180 CSV cell: wrap in quotes when it contains a quote, comma or newline,
+// doubling embedded quotes. Also neutralise spreadsheet formula injection.
+function csvCell(value) {
+  let str = value == null ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+  return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
 export default function AuditLogs() {
+  return (
+    <RequirePermission permission="settings.view">
+      <AuditLogsView />
+    </RequirePermission>
+  );
+}
+
+function AuditLogsView() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const requestSeq = useRef(0);
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (term) => {
+    const seq = ++requestSeq.current;
+    setLoading(true);
     try {
-      const res = await fetch("/api/admin/audit-logs");
-      const data = await res.json();
-      if (res.ok) setLogs(data);
+      const qs = term ? `?q=${encodeURIComponent(term)}` : "";
+      const res = await fetch(`/api/admin/audit-logs${qs}`);
+      const data = await res.json().catch(() => null);
+      if (seq !== requestSeq.current) return; // a newer search superseded this one
+      if (res.ok && Array.isArray(data)) setLogs(data);
+      else toast.error(data?.error || "Failed to load audit logs");
     } catch (err) {
       console.error(err);
+      if (seq === requestSeq.current) toast.error("Failed to load audit logs");
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     Promise.resolve().then(() => {
-      fetchLogs();
+      fetchLogs(searchTerm);
     });
-  }, []);
+  }, [searchTerm]);
+
+  // Live search (debounced); the Search button / Enter applies immediately.
+  useEffect(() => {
+    const term = searchInput.trim();
+    if (term === searchTerm) return;
+    const t = setTimeout(() => setSearchTerm(term), 400);
+    return () => clearTimeout(t);
+  }, [searchInput, searchTerm]);
+
+  const runSearch = (e) => {
+    e.preventDefault();
+    const term = searchInput.trim();
+    if (term === searchTerm) fetchLogs(term);
+    else setSearchTerm(term);
+  };
+
+  const exportCsv = () => {
+    if (logs.length === 0) {
+      toast.error("No logs to export.");
+      return;
+    }
+    const header = ["Time", "User", "Email", "Action", "Target", "Target ID", "Message", "IP", "User agent"];
+    const rows = logs.map((log) => [
+      log.timestamp ? new Date(log.timestamp).toISOString() : "",
+      log.staffId?.name,
+      log.staffId?.email,
+      log.action,
+      log.resource,
+      log.resourceId,
+      log.details?.message,
+      log.ip,
+      log.userAgent,
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
 
   const actionClass = (action) => {
     const a = action || '';
@@ -45,22 +115,24 @@ export default function AuditLogs() {
   );
 
   return (
-    <RequirePermission permission="settings.view">
     <Page>
       <PageHeader title="Audit log" />
 
       <div className="wp-toolbar">
-        <button type="button" className="wp-btn">Export logs (CSV)</button>
+        <button type="button" className="wp-btn" onClick={exportCsv} disabled={loading || logs.length === 0}>Export logs (CSV)</button>
         <span className="wp-spacer" />
-        <div className="wp-search" role="search">
+        <form className="wp-search" role="search" onSubmit={runSearch}>
           <label htmlFor="logs-search" className="sr-only">Search logs</label>
           <input
             id="logs-search"
             type="search"
             className="wp-input"
-            placeholder="Search by action, user or resource"
+            placeholder="Search by user, action, target or message"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
-        </div>
+          <button type="submit" className="wp-btn">Search Logs</button>
+        </form>
       </div>
 
       <div className="wp-table-box">
@@ -70,7 +142,7 @@ export default function AuditLogs() {
             {loading ? (
               <tr><td colSpan={5} className="wp-muted">Loading audit history…</td></tr>
             ) : logs.length === 0 ? (
-              <tr><td colSpan={5} className="wp-muted">No logs found in the specified period.</td></tr>
+              <tr><td colSpan={5} className="wp-muted">{searchTerm ? "No logs match your search." : "No logs found in the specified period."}</td></tr>
             ) : (
               logs.map((log) => (
                 <tr key={log._id}>
@@ -113,6 +185,5 @@ export default function AuditLogs() {
         </table>
       </div>
     </Page>
-    </RequirePermission>
   );
 }

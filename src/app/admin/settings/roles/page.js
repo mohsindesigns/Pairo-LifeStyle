@@ -69,6 +69,9 @@ export default function RoleManagement() {
       if (res.ok) {
         setRoles(roles.map(r => r._id === selectedRole._id ? selectedRole : r));
         toast.success("Permissions saved successfully!");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to save permissions");
       }
     } catch (err) {
       console.error(err);
@@ -97,6 +100,9 @@ export default function RoleManagement() {
         setRoles(remaining);
         if (selectedRole?._id === role._id) setSelectedRole(remaining[0] || null);
         toast.success("Role deleted successfully.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to delete role");
       }
     } catch (err) {
       console.error(err);
@@ -105,8 +111,11 @@ export default function RoleManagement() {
   };
 
   const toggleModule = (module) => {
-    setExpandedModules(prev => ({ ...prev, [module]: !prev[module] }));
+    // Modules default to expanded (undefined === expanded), so the first click collapses.
+    setExpandedModules(prev => ({ ...prev, [module]: prev[module] === false }));
   };
+
+  const isModuleExpanded = (module) => expandedModules[module] !== false;
 
   const prettify = (key) => String(key).replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase());
 
@@ -244,15 +253,15 @@ export default function RoleManagement() {
                       <button
                         type="button"
                         onClick={() => toggleModule(module)}
-                        aria-expanded={Boolean(expandedModules[module] || true)}
+                        aria-expanded={isModuleExpanded(module)}
                         aria-label={`Toggle ${prettify(module)} permissions`}
                         className="wp-muted"
                         style={{ background: "none", border: 0, padding: 2, cursor: "pointer", display: "inline-flex" }}
                       >
-                        {expandedModules[module] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        {isModuleExpanded(module) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
                     </div>
-                    {(expandedModules[module] || true) && (
+                    {isModuleExpanded(module) && (
                       <div className="flex flex-wrap gap-x-5 gap-y-0" style={{ flex: "1 1 260px", minWidth: 0 }}>
                         {actions.map((action) => {
                           const isChecked = Boolean(selectedRole?.permissions?.[module]?.includes(action));
