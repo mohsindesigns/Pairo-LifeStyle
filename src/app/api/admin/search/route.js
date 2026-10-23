@@ -55,12 +55,12 @@ export async function GET(req) {
     p => ({ id: String(p._id), title: p.name, href: `/admin/products/${p._id}` }));
 
   add("pages", can(user, "pages.view"),
-    find(Page, ["title"], {}, "title"),
+    find(Page, ["title"], { isDeleted: { $ne: true } }, "title"),
     pg => ({ id: String(pg._id), title: pg.title, href: `/admin/pages/${pg._id}` }));
 
   if (wantHome) {
     add("homePage", can(user, "pages.view"),
-      Page.find({ $or: [{ slug: "home" }, { slug: "" }, { title: { $regex: "^home$", $options: "i" } }] })
+      Page.find({ isDeleted: { $ne: true }, $or: [{ slug: "home" }, { slug: "" }, { title: { $regex: "^home$", $options: "i" } }] })
         .select("title").limit(1).lean(),
       pg => ({ id: String(pg._id), title: pg.title, href: `/admin/pages/${pg._id}?tab=seo` }));
   }

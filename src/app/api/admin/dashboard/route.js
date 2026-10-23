@@ -238,7 +238,7 @@ async function glanceSection(user) {
   if (can(user, "orders.view")) entries.push(Order.countDocuments({ isDeleted: { $ne: true } }).then((n) => ["orders", n]));
   if (can(user, "customers.view")) entries.push(Customer.countDocuments({ role: { $ne: "admin" }, isDeleted: { $ne: true } }).then((n) => ["customers", n]));
   if (can(user, "blogs.view")) entries.push(Blog.countDocuments({ isDeleted: { $ne: true } }).then((n) => ["posts", n]));
-  if (can(user, "pages.view")) entries.push(Page.estimatedDocumentCount().then((n) => ["pages", n]));
+  if (can(user, "pages.view")) entries.push(Page.countDocuments({ isDeleted: { $ne: true } }).then((n) => ["pages", n]));
   return Object.fromEntries(await Promise.all(entries));
 }
 
