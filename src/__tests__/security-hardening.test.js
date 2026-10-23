@@ -141,7 +141,8 @@ describe("security hardening", () => {
         financials: { subtotal: 90, shippingCost: 10, tax: 0, discountTotal: 0, total: 100, currency: "USD", promoCode: "SAVE", appliedPromotions: [{ code: "SAVE", rulesSnapshot: { internal: true } }] },
         timeline: [
           { status: "Pending", message: "Order placed successfully.", source: "System", timestamp: new Date() },
-          { status: "Pending", message: "Invoice sent to buyer@example.invalid by Jane (staff)", source: "Admin", timestamp: new Date() },
+          { status: "Confirmed", message: "Invoice sent to buyer@example.invalid by Jane (staff)", source: "Admin", timestamp: new Date() }, // an older staff note: private
+          { status: "Pending", message: "Your order is being prepared.", source: "Admin", timestamp: new Date() }, // staff entry for the CURRENT status: shown
         ],
       }));
     });
@@ -162,7 +163,7 @@ describe("security hardening", () => {
       expect(order.payment).toMatchObject({ method: "Card", status: "Paid", receiptUrl: "https://receipt.example.invalid/r" });
       const text = JSON.stringify(order);
       expect(text).not.toMatch(/pi_secret_123|ch_secret_456|stripe|rulesSnapshot|appliedPromotions|buyer@example/);
-      expect(order.timeline.map((t) => t.source)).toEqual(["System"]);
+      expect(order.timeline.map((t) => t.message)).toEqual(["Order placed successfully.", "Your order is being prepared."]);
       expect(order.financials).toMatchObject({ subtotal: 90, shippingCost: 10, total: 100, promoCode: "SAVE" });
     });
 

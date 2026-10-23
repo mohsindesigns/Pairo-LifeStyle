@@ -28,8 +28,9 @@ export async function GET(req, { params }) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    // Only what the success and tracking pages show. Payment-provider ids, staff-only timeline entries and the
-    // promotion rule snapshots stay on the server.
+    // Only what the success and tracking pages show. Payment-provider ids, older staff-written notes and the
+    // promotion rule snapshots stay on the server. Staff entries for the order's CURRENT status (the "Shipped" /
+    // "Delivered" milestones the customer is meant to see) are kept: the same rule the tracking page applies.
     const financials = order.financials || {};
     const payment = order.payment || {};
     const safeOrder = {
@@ -48,7 +49,7 @@ export async function GET(req, { params }) {
       },
       shippingAddress: order.shippingAddress,
       payment: { method: payment.method, status: payment.status, paidAt: payment.paidAt, receiptUrl: payment.receiptUrl },
-      timeline: (order.timeline || []).filter((entry) => entry.source !== "Admin"),
+      timeline: (order.timeline || []).filter((entry) => entry.source !== "Admin" || entry.status === order.status),
       createdAt: order.createdAt
     };
 
