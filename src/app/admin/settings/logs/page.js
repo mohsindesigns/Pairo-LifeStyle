@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { History, Search, Filter, Monitor, Globe, Clock, ArrowRight } from "lucide-react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader } from "@/components/admin/ui";
 import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function AuditLogs() {
@@ -27,97 +26,93 @@ export default function AuditLogs() {
     });
   }, []);
 
+  const actionClass = (action) => {
+    const a = action || '';
+    if (a.includes('CREATE')) return 'wp-st-published';
+    if (a.includes('DELETE')) return 'wp-st-cancelled';
+    if (a.includes('UPDATE')) return 'wp-st-shipped';
+    return 'wp-st-draft';
+  };
+
+  const headerRow = (
+    <tr>
+      <th scope="col">Time</th>
+      <th scope="col">User</th>
+      <th scope="col">Action</th>
+      <th scope="col" className="wp-hide-sm">Target</th>
+      <th scope="col" className="wp-hide-sm">Details</th>
+    </tr>
+  );
+
   return (
     <RequirePermission permission="settings.view">
-    <AdminPageLayout
-      title="Security & Audit Logs"
-      breadcrumbs={[{ label: "Settings", href: "/admin/settings" }, { label: "Audit Logs" }]}
-    >
-      <div className="space-y-4">
-        {/* Header Actions */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-4 shadow-sm">
-           <div className="relative w-full min-w-0 md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8c8f94]" />
-              <input 
-                type="text" 
-                placeholder="Search by action, staff, or resource..."
-                className="w-full pl-10 pr-4 py-1.5 bg-white border border-[#8c8f94] text-[13px] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-all"
-              />
-           </div>
-           <button className="flex items-center justify-center gap-2 w-full sm:w-auto shrink-0 bg-white border border-[#ccd0d4] px-4 py-1.5 font-bold text-[13px] hover:bg-[#f6f7f7] text-[#1d2327]">
-              <Filter className="w-4 h-4" /> Export Logs (CSV)
-           </button>
-        </div>
+    <Page>
+      <PageHeader title="Audit log" />
 
-        {/* Logs Timeline */}
-        <div className="bg-white border border-[#ccd0d4] shadow-sm">
-           <div className="overflow-x-auto max-w-full">
-              <table className="w-full min-w-[640px] text-left border-collapse text-[13px]">
-                 <thead>
-                    <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                       <th className="px-4 py-3 font-bold uppercase text-[11px] w-48">Timestamp</th>
-                       <th className="px-4 py-3 font-bold uppercase text-[11px] w-48">Staff Member</th>
-                       <th className="px-4 py-3 font-bold uppercase text-[11px]">Action / Details</th>
-                       <th className="hidden md:table-cell px-4 py-3 font-bold uppercase text-[11px] w-40">Identity</th>
-                    </tr>
-                 </thead>
-                 <tbody className="divide-y divide-[#f0f0f1]">
-                    {loading ? (
-                       <tr><td colSpan={4} className="p-10 text-center italic text-gray-400">Loading audit history...</td></tr>
-                    ) : logs.length === 0 ? (
-                       <tr><td colSpan={4} className="p-10 text-center italic text-gray-400">No logs found in the specified period.</td></tr>
-                    ) : (
-                       logs.map((log) => (
-                          <tr key={log._id} className="hover:bg-[#fbfbfb] transition-colors">
-                             <td className="px-4 py-4">
-                                <div className="flex items-center gap-2 text-[#646970]">
-                                   <Clock className="w-3.5 h-3.5 shrink-0" />
-                                   {new Date(log.timestamp).toLocaleString()}
-                                </div>
-                             </td>
-                             <td className="px-4 py-4">
-                                <div className="font-bold text-[#1d2327]">{log.staffId?.name}</div>
-                                <div className="text-[11px] text-[#646970]">{log.staffId?.email}</div>
-                             </td>
-                             <td className="px-4 py-4">
-                                <div className="flex flex-wrap items-center gap-2">
-                                   <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
-                                      (log.action || '').includes('CREATE') ? 'bg-green-100 text-green-700' :
-                                      (log.action || '').includes('DELETE') ? 'bg-red-100 text-red-700' :
-                                      (log.action || '').includes('UPDATE') ? 'bg-blue-100 text-blue-700' :
-                                      'bg-gray-100 text-gray-700'
-                                   }`}>
-                                      {log.action}
-                                   </span>
-                                   <span className="text-[#8c8f94]"><ArrowRight className="w-3 h-3" /></span>
-                                   <span className="font-medium text-[#1d2327] uppercase text-[11px]">{log.resource}</span>
-                                </div>
-                                <p className="text-[12px] text-[#3c434a] mt-1.5 font-medium">{log.details?.message}</p>
-                                {log.details?.before && (
-                                   <div className="mt-2 p-2 bg-gray-50 border border-dashed border-gray-200 text-[10px] text-[#646970] rounded">
-                                      Changes recorded for {log.resource} ID: {log.details.after?.id || 'N/A'}
-                                   </div>
-                                )}
-                             </td>
-                             <td className="hidden md:table-cell px-4 py-4">
-                                <div className="flex flex-col gap-1.5">
-                                   <div className="flex items-center gap-2 text-[11px] text-[#646970]">
-                                      <Globe className="w-3 h-3" /> {log.ip}
-                                   </div>
-                                   <div className="flex items-center gap-2 text-[11px] text-[#646970] truncate max-w-[150px]" title={log.userAgent}>
-                                      <Monitor className="w-3 h-3" /> {log.userAgent}
-                                   </div>
-                                </div>
-                             </td>
-                          </tr>
-                       ))
-                    )}
-                 </tbody>
-              </table>
-           </div>
+      <div className="wp-toolbar">
+        <button type="button" className="wp-btn">Export logs (CSV)</button>
+        <span className="wp-spacer" />
+        <div className="wp-search" role="search">
+          <label htmlFor="logs-search" className="sr-only">Search logs</label>
+          <input
+            id="logs-search"
+            type="search"
+            className="wp-input"
+            placeholder="Search by action, user or resource"
+          />
         </div>
       </div>
-    </AdminPageLayout>
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="wp-muted">Loading audit history…</td></tr>
+            ) : logs.length === 0 ? (
+              <tr><td colSpan={5} className="wp-muted">No logs found in the specified period.</td></tr>
+            ) : (
+              logs.map((log) => (
+                <tr key={log._id}>
+                  <td className="wp-muted" style={{ whiteSpace: "nowrap" }} suppressHydrationWarning>
+                    {new Date(log.timestamp).toLocaleString()}
+                  </td>
+                  <td style={{ wordBreak: "break-word" }}>
+                    <div className="wp-strong">{log.staffId?.name}</div>
+                    <div className="wp-muted wp-small" style={{ wordBreak: "break-all" }}>{log.staffId?.email}</div>
+                  </td>
+                  <td>
+                    <span className={`wp-pill wp-pill-sm ${actionClass(log.action)}`}>{log.action}</span>
+                    <div className="wp-mobile-meta">{log.resource}{log.details?.message ? ` — ${log.details.message}` : ""}</div>
+                  </td>
+                  <td className="wp-hide-sm">{log.resource}</td>
+                  <td className="wp-hide-sm" style={{ wordBreak: "break-word" }}>
+                    {log.details?.message && <div>{log.details.message}</div>}
+                    {log.details?.before && (
+                      <div className="wp-muted wp-small">
+                        Changes recorded for {log.resource} ID: {log.details.after?.id || 'N/A'}
+                      </div>
+                    )}
+                    {(log.ip || log.userAgent) && (
+                      <div className="wp-muted wp-small" style={{ marginTop: 4 }}>
+                        {log.ip}
+                        {log.ip && log.userAgent ? " · " : ""}
+                        {log.userAgent && (
+                          <span title={log.userAgent} style={{ display: "inline-block", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" }}>
+                            {log.userAgent}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot>{headerRow}</tfoot>
+        </table>
+      </div>
+    </Page>
     </RequirePermission>
   );
 }

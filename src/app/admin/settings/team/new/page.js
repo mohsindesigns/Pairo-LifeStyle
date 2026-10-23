@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Shield, Mail, Key, ArrowLeft, Save, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, Postbox } from "@/components/admin/ui";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
 
@@ -62,94 +62,79 @@ export default function InviteStaff() {
 
   return (
     <RequirePermission permission="staff.create">
-    <AdminPageLayout
-      title="Invite Staff Member"
-      breadcrumbs={[{ label: "Team", href: "/admin/settings/team" }, { label: "New Member" }]}
-    >
-      <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
-         <Link href="/admin/settings/team" className="text-[#2271b1] hover:text-[#135e96] flex items-center gap-1 text-[13px] font-medium">
-            <ArrowLeft className="w-4 h-4" /> Back to Team
-         </Link>
+    <Page>
+      <PageHeader title="Add new user" />
+      <p className="wp-muted" style={{ margin: "0 0 14px" }}>
+        Create a brand new staff user and add them to this site. <Link href="/admin/settings/team" className="wp-link">Back to Users</Link>
+      </p>
 
-         <div className="bg-white border border-[#ccd0d4] shadow-sm">
-            <div className="p-4 md:p-6 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-               <h3 className="text-[14px] font-bold text-[#1d2327] uppercase flex items-center gap-2">
-                  <UserPlus className="w-4 h-4" /> Account Details
-               </h3>
-            </div>
-            <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-5">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                     <label className="text-[13px] font-bold text-[#1d2327]">Full Name</label>
-                     <input 
-                        type="text" 
-                        required
-                        className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                     />
-                  </div>
-                  <div className="space-y-1.5">
-                     <label className="text-[13px] font-bold text-[#1d2327]">Email Address</label>
-                     <input 
-                        type="email" 
-                        required
-                        className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                     />
-                  </div>
-               </div>
+      <form onSubmit={handleSubmit} style={{ maxWidth: 760 }}>
+        <Postbox title="Account details">
+          <div className="wp-frow">
+            <label htmlFor="new-user-name" className="wp-flabel">Full name <span className="wp-muted">(required)</span></label>
+            <input
+              id="new-user-name"
+              type="text"
+              required
+              className="wp-input"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+            />
+          </div>
+          <div className="wp-frow">
+            <label htmlFor="new-user-email" className="wp-flabel">Email <span className="wp-muted">(required)</span></label>
+            <input
+              id="new-user-email"
+              type="email"
+              required
+              className="wp-input"
+              value={formData.email}
+              onChange={(e) => setFormData({...formData, email: e.target.value})}
+            />
+          </div>
+          <div className="wp-frow">
+            <label htmlFor="new-user-password" className="wp-flabel">Password <span className="wp-muted">(required)</span></label>
+            <input
+              id="new-user-password"
+              type={showPassword ? "text" : "password"}
+              required
+              className="wp-input"
+              value={formData.password}
+              onChange={(e) => setFormData({...formData, password: e.target.value})}
+            />
+            <button
+              type="button"
+              className="wp-btn"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? "Hide" : "Show"}
+            </button>
+            <span className="wp-hint">The user will be prompted to change this on their first login.</span>
+          </div>
+          <div className="wp-frow">
+            <label htmlFor="new-user-role" className="wp-flabel">Role</label>
+            <select
+              id="new-user-role"
+              required
+              className="wp-select"
+              value={formData.roleId}
+              onChange={(e) => setFormData({...formData, roleId: e.target.value})}
+            >
+              <option value="">Select a role…</option>
+              {roles.map((role) => (
+                <option key={role._id} value={role._id}>{role.name}</option>
+              ))}
+            </select>
+          </div>
+        </Postbox>
 
-               <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Initial Password</label>
-                  <div className="relative">
-                     <input 
-                        type={showPassword ? "text" : "password"} 
-                        required
-                        className="w-full border border-[#8c8f94] pl-3 pr-10 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                        value={formData.password}
-                        onChange={(e) => setFormData({...formData, password: e.target.value})}
-                     />
-                     <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
-                     >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                     </button>
-                  </div>
-                  <p className="text-[11px] text-[#646970]">The user will be prompted to change this on their first login.</p>
-               </div>
-
-               <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Administrative Role</label>
-                  <select 
-                     required
-                     className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                     value={formData.roleId}
-                     onChange={(e) => setFormData({...formData, roleId: e.target.value})}
-                  >
-                     <option value="">Select a role...</option>
-                     {roles.map((role) => (
-                        <option key={role._id} value={role._id}>{role.name}</option>
-                     ))}
-                  </select>
-               </div>
-
-               <div className="pt-4 border-t border-[#f0f0f1] flex justify-end">
-                  <button 
-                     type="submit" 
-                     disabled={loading}
-                     className="w-full xs:w-auto justify-center bg-[#2271b1] text-white px-6 py-2 rounded font-bold text-[13px] hover:bg-[#135e96] flex items-center gap-2 transition-all"
-                  >
-                     <Save className="w-4 h-4" /> {loading ? "Inviting..." : "Create Staff Member"}
-                  </button>
-               </div>
-            </form>
-         </div>
-      </div>
-    </AdminPageLayout>
+        <button type="submit" disabled={loading} className="wp-btn wp-btn-primary">
+          {loading ? "Adding…" : "Add new user"}
+        </button>
+      </form>
+    </Page>
     </RequirePermission>
   );
 }

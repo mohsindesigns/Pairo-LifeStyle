@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import Link from "next/link";
+import { Page, PageHeader, Notice } from "@/components/admin/ui";
 import ScriptEditor from "@/components/admin/ScriptEditor";
 import { toast } from "react-hot-toast";
 
@@ -31,28 +32,31 @@ export default function EditScriptPage() {
   }, [id]);
 
   if (loading) return (
-     <AdminPageLayout title="Edit Script" breadcrumbs={[]}>
-        <div className="p-6 md:p-20 text-center italic text-gray-400">Loading script configuration...</div>
-     </AdminPageLayout>
+    <Page>
+      <PageHeader title="Edit script" />
+      <p className="wp-muted" role="status">Loading script configuration…</p>
+    </Page>
   );
 
   if (!script) return (
-     <AdminPageLayout title="Script Not Found" breadcrumbs={[]}>
-        <div className="p-6 md:p-20 text-center text-red-500">The requested script configuration could not be found.</div>
-     </AdminPageLayout>
+    <Page>
+      <PageHeader title="Script not found" />
+      <Notice type="error">The requested script configuration could not be found.</Notice>
+      <Link href="/admin/settings/scripts" className="wp-link">← Back to Scripts</Link>
+    </Page>
   );
 
   return (
-    <AdminPageLayout 
-      title={`Edit: ${script.name}`} 
-      subtitle={`Version ${script.version || 1} • Last updated ${new Date(script.updatedAt).toLocaleString()}`}
-      breadcrumbs={[
-        { label: "Settings", href: "/admin/settings" },
-        { label: "Scripts", href: "/admin/settings/scripts" },
-        { label: "Edit Script" }
-      ]}
-    >
+    <Page>
+      <PageHeader
+        title="Edit script"
+        actions={<Link href="/admin/settings/scripts/new" className="wp-btn">Add new script</Link>}
+      />
+      <p style={{ margin: "0 0 14px" }}>
+        <Link href="/admin/settings/scripts" className="wp-link">← Back to Scripts</Link>
+        <span className="wp-muted" suppressHydrationWarning> · Version {script.version || 1} · Last updated {new Date(script.updatedAt).toLocaleString()}</span>
+      </p>
       <ScriptEditor initialData={script} isEdit={true} />
-    </AdminPageLayout>
+    </Page>
   );
 }

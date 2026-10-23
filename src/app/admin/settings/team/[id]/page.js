@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { UserCog, Shield, Mail, Key, ArrowLeft, Save, Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Page, PageHeader, Postbox } from "@/components/admin/ui";
 import { toast } from "react-hot-toast";
 
 export default function EditStaff() {
@@ -78,122 +78,110 @@ export default function EditStaff() {
   };
 
   return (
-    <AdminPageLayout
-      title="Edit Staff Member"
-      breadcrumbs={[{ label: "Team", href: "/admin/settings/team" }, { label: "Edit Member" }]}
-    >
-      <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
-        <Link
-          href="/admin/settings/team"
-          className="text-[#2271b1] hover:text-[#135e96] flex items-center gap-1 text-[13px] font-medium"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Team
-        </Link>
+    <Page>
+      <PageHeader
+        title="Edit user"
+        actions={<Link href="/admin/settings/team/new" className="wp-btn">Add new user</Link>}
+      />
+      <p style={{ margin: "0 0 14px" }}>
+        <Link href="/admin/settings/team" className="wp-link">← Back to Users</Link>
+      </p>
 
-        <div className="bg-white border border-[#ccd0d4] shadow-sm">
-          {/* Header */}
-          <div className="p-4 md:p-6 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-            <h3 className="text-[14px] font-bold text-[#1d2327] uppercase flex items-center gap-2">
-              <UserCog className="w-4 h-4" /> Edit Account Details
-            </h3>
+      {loading ? (
+        <Postbox title="Account details">
+          <div className="flex items-center gap-2 wp-muted" role="status">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading user…
           </div>
-
-          {loading ? (
-            <div className="p-6 md:p-12 flex justify-center items-center">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+        </Postbox>
+      ) : (
+        <form onSubmit={handleSubmit} style={{ maxWidth: 760 }}>
+          <Postbox title="Name">
+            <div className="wp-frow">
+              <label htmlFor="edit-user-name" className="wp-flabel">Full name <span className="wp-muted">(required)</span></label>
+              <input
+                id="edit-user-name"
+                type="text"
+                required
+                className="wp-input"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
-                </div>
-              </div>
+            <div className="wp-frow">
+              <label htmlFor="edit-user-role" className="wp-flabel">Role</label>
+              <select
+                id="edit-user-role"
+                required
+                className="wp-select"
+                value={formData.roleId}
+                onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
+              >
+                <option value="">Select a role…</option>
+                {roles.map((role) => (
+                  <option key={role._id} value={role._id}>
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="wp-frow">
+              <label htmlFor="edit-user-status" className="wp-flabel">Account status</label>
+              <select
+                id="edit-user-status"
+                className="wp-select"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              >
+                <option value="Active">Active</option>
+                <option value="Suspended">Suspended</option>
+                <option value="Locked">Locked</option>
+              </select>
+            </div>
+          </Postbox>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Administrative Role</label>
-                  <select
-                    required
-                    className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                    value={formData.roleId}
-                    onChange={(e) => setFormData({ ...formData, roleId: e.target.value })}
-                  >
-                    <option value="">Select a role...</option>
-                    {roles.map((role) => (
-                      <option key={role._id} value={role._id}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Account Status</label>
-                  <select
-                    className="w-full border border-[#8c8f94] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Suspended">Suspended</option>
-                    <option value="Locked">Locked</option>
-                  </select>
-                </div>
-              </div>
+          <Postbox title="Contact info">
+            <div className="wp-frow">
+              <label htmlFor="edit-user-email" className="wp-flabel">Email <span className="wp-muted">(required)</span></label>
+              <input
+                id="edit-user-email"
+                type="email"
+                required
+                className="wp-input"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+          </Postbox>
 
-              <div className="space-y-1.5">
-                <label className="text-[13px] font-bold text-[#1d2327]">New Password</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Leave blank to keep current password"
-                    className="w-full border border-[#8c8f94] pl-3 pr-10 py-2 text-[13px] outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-[#646970]">
-                  Only fill this in if you want to change the password.
-                </p>
-              </div>
+          <Postbox title="Account management">
+            <div className="wp-frow">
+              <label htmlFor="edit-user-password" className="wp-flabel">New password</label>
+              <input
+                id="edit-user-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Leave blank to keep current password"
+                className="wp-input"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              />
+              <button
+                type="button"
+                className="wp-btn"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPassword ? "Hide" : "Show"}
+              </button>
+              <span className="wp-hint">Only fill this in if you want to change the password.</span>
+            </div>
+          </Postbox>
 
-              <div className="pt-4 border-t border-[#f0f0f1] flex justify-end">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full xs:w-auto justify-center bg-[#2271b1] text-white px-6 py-2 rounded font-bold text-[13px] hover:bg-[#135e96] flex items-center gap-2 transition-all"
-                >
-                  <Save className="w-4 h-4" /> {saving ? "Saving..." : "Save Changes"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    </AdminPageLayout>
+          <button type="submit" disabled={saving} className="wp-btn wp-btn-primary">
+            {saving ? "Updating…" : "Update user"}
+          </button>
+        </form>
+      )}
+    </Page>
   );
 }

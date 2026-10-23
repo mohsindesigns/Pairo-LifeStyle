@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, Search, Shield, Mail, Key, UserCheck, UserX, MoreVertical, Lock, Eye, EyeOff, Trash2, X } from "lucide-react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import Link from "next/link";
+import { Eye, EyeOff, X } from "lucide-react";
+import { Page, PageHeader } from "@/components/admin/ui";
 import { useRBAC } from "@/hooks/useRBAC";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
@@ -14,6 +15,7 @@ export default function StaffManagement() {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [roleView, setRoleView] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState({ open: false, id: null, name: "", loading: false });
   const [passwordTarget, setPasswordTarget] = useState({ open: false, id: null, name: "", password: "", showPass: false, loading: false });
 
@@ -137,273 +139,259 @@ export default function StaffManagement() {
     }
   };
 
+  const roleOptions = Array.from(
+    new Map(
+      staffList
+        .filter(s => s?.roleId && typeof s.roleId === "object" && s.roleId.name)
+        .map(s => [s.roleId.slug || s.roleId.name, s.roleId.name])
+    ).entries()
+  );
+  const visibleStaff = roleView === "all"
+    ? filteredStaff
+    : filteredStaff.filter(s => (s?.roleId?.slug || s?.roleId?.name) === roleView);
+
+  const headerRow = (
+    <tr>
+      <th scope="col">Username</th>
+      <th scope="col" className="wp-hide-sm">Email</th>
+      <th scope="col">Role</th>
+      <th scope="col">Status</th>
+      <th scope="col" className="wp-hide-sm">Last login</th>
+    </tr>
+  );
+
   return (
     <RequirePermission permission="staff.view">
-    <AdminPageLayout
-      title="Team Management"
-      addNewLink="/admin/settings/team/new"
-      addNewLabel="Invite Staff Member"
-      breadcrumbs={[{ label: "Settings", href: "/admin/settings" }, { label: "Team" }]}
-    >
-      <div className="space-y-4">
-        {/* Statistics Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
-            <div className="p-3 bg-[#f0f6fb] text-[#2271b1] rounded-full"><Shield className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Total Admins</p><p className="text-xl font-bold">{staffList.length}</p></div>
-          </div>
-          <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
-            <div className="p-3 bg-[#f6f7f7] text-[#1d2327] rounded-full"><UserCheck className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Active Sessions</p><p className="text-xl font-bold">{staffList.filter(s => s?.status === 'Active').length}</p></div>
-          </div>
-          <div className="bg-white border border-[#ccd0d4] p-4 flex items-center gap-4 shadow-sm">
-            <div className="p-3 bg-red-50 text-red-600 rounded-full"><UserX className="w-5 h-5" /></div>
-            <div><p className="text-[11px] font-bold text-[#646970] uppercase">Suspended</p><p className="text-xl font-bold text-red-600">{staffList.filter(s => s?.status && s.status !== 'Active').length}</p></div>
-          </div>
-        </div>
+    <Page>
+      <PageHeader
+        title="Users"
+        actions={<Link href="/admin/settings/team/new" className="wp-btn">Add new user</Link>}
+      />
 
-        {/* Toolbar */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-4 shadow-sm">
-           <div className="relative w-full min-w-0 md:w-96">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8c8f94]" />
-              <input 
-                type="text" 
-                placeholder="Search staff by name or email..."
-                className="w-full pl-10 pr-4 py-1.5 bg-white border border-[#8c8f94] text-[13px] focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] outline-none transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-           </div>
-           <div className="flex flex-wrap items-center gap-2">
-              <select className="min-w-0 border border-[#8c8f94] text-[13px] px-3 py-1.5 outline-none focus:border-[#2271b1]">
-                 <option>All Roles</option>
-                 <option>Super Admin</option>
-                 <option>Admin</option>
-                 <option>Editor</option>
-              </select>
-              <button className="bg-white border border-[#2271b1] text-[#2271b1] px-4 py-1.5 font-bold text-[13px] hover:bg-[#f0f6fb]">Filter</button>
-           </div>
-        </div>
-
-        {/* Staff Table */}
-        <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-hidden">
-          <div className="overflow-x-auto max-w-full">
-          <table className="w-full min-w-[560px] text-left border-collapse text-[13px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#1d2327]">
-                <th className="px-4 py-3 font-bold uppercase text-[11px]">Staff Member</th>
-                <th className="px-4 py-3 font-bold uppercase text-[11px]">Role</th>
-                <th className="px-4 py-3 font-bold uppercase text-[11px]">Status</th>
-                <th className="hidden md:table-cell px-4 py-3 font-bold uppercase text-[11px]">Last Login</th>
-                <th className="px-4 py-3 w-10"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={5} className="p-10 text-center italic text-gray-400">Loading team members...</td></tr>
-              ) : filteredStaff.length === 0 ? (
-                <tr><td colSpan={5} className="p-10 text-center italic text-gray-400">No staff members found.</td></tr>
-              ) : (
-                filteredStaff.map((s, index) => {
-                  const isSuperAdmin = s?.roleId?.slug === 'super-admin';
-                  const isSelf = currentUserId && s?._id === currentUserId;
-                  const roleName = s?.roleId?.name || (typeof s?.roleId === 'string' ? 'Assigned' : 'No Role');
-
-                  return (
-                    <tr key={s?._id || index} className="hover:bg-[#fbfbfb] group transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 bg-[#f0f6fb] border border-[#2271b1]/10 rounded-full flex items-center justify-center text-[#2271b1] font-bold">
-                              {(s?.name || "U").charAt(0).toUpperCase()}
-                           </div>
-                           <div className="flex flex-col min-w-0">
-                              <span className="font-bold text-[#1d2327]">{s?.name || "Unnamed"}</span>
-                              <div className="flex items-center gap-2 text-[11px] text-[#646970]">
-                                 <Mail className="w-3 h-3" /> {s?.email || "No email"}
-                              </div>
-                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-bold uppercase tracking-wider ${
-                          isSuperAdmin ? 'bg-[#2271b1] text-white' : 'bg-[#d9ebf5] text-[#1a4a6e]'
-                        }`}>
-                          {roleName}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                         {isSuperAdmin || isSelf ? (
-                            <div className="flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 text-gray-400 cursor-default">
-                               <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                               {s?.status || "Active"}
-                            </div>
-                         ) : (
-                            <button 
-                              onClick={() => toggleStatus(s._id, s.status)}
-                              className={`flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded transition-colors ${
-                                s?.status === 'Active' ? 'text-green-600 hover:bg-green-50' : 'text-red-600 hover:bg-red-50'
-                              }`}
-                            >
-                               <div className={`w-1.5 h-1.5 rounded-full ${s?.status === 'Active' ? 'bg-green-600' : 'bg-red-600'}`} />
-                               {s?.status || "Active"}
-                            </button>
-                         )}
-                      </td>
-                      <td className="hidden md:table-cell px-4 py-4 text-[#646970]" suppressHydrationWarning>
-                         {formatDate(s?.security?.lastLogin)}
-                      </td>
-                       <td className="px-4 py-4 text-center">
-                          <div className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 flex items-center gap-2 justify-end transition-opacity">
-                              {!isSuperAdmin && !isSelf && (
-                                 <button 
-                                   title="Delete Staff Member" 
-                                   onClick={() => setDeleteTarget({ open: true, id: s._id, name: s.name, loading: false })}
-                                   className="p-1.5 text-[#646970] hover:text-red-600 hover:bg-red-50 rounded"
-                                 >
-                                   <UserX className="w-4 h-4" />
-                                 </button>
-                              )}
-                              {isSuperAdmin && (
-                                 <div title="System Protected" className="p-1.5 text-gray-300">
-                                    <Lock className="w-4 h-4" />
-                                 </div>
-                              )}
-                              <button 
-                                title="Reset Password" 
-                                onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
-                                className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
-                              >
-                                <Key className="w-4 h-4" />
-                              </button>
-                              <button 
-                                title="Edit Member" 
-                                onClick={() => router.push(`/admin/settings/team/${s._id}`)}
-                                className="p-1.5 text-[#646970] hover:text-[#2271b1] hover:bg-[#f0f6fb] rounded"
-                              >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                           </div>
-                        </td>
-                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-          </div>
-        </div>
-
-        {/* Delete Confirmation Modal */}
-        {deleteTarget.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
-              onClick={() => !deleteTarget.loading && setDeleteTarget({ open: false, id: null, name: "", loading: false })} 
-            />
-            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 max-h-[calc(100dvh-1rem)] overflow-y-auto z-10 animate-in zoom-in-95">
-              <div className="h-1 bg-red-500 w-full" />
-              <div className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 shrink-0 rounded-full bg-red-50 flex items-center justify-center text-red-600">
-                    <Trash2 className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-bold text-neutral-900">Delete Staff Member</h3>
-                    <p className="text-xs text-neutral-500">Revoke administrative access</p>
-                  </div>
-                </div>
-                <p className="text-sm text-neutral-600 mb-6">
-                  Are you sure you want to delete <span className="font-semibold text-neutral-900">{deleteTarget.name}</span>? This action cannot be undone and will revoke their access immediately.
-                </p>
-                <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5">
-                  <button
-                    type="button"
-                    disabled={deleteTarget.loading}
-                    onClick={() => setDeleteTarget({ open: false, id: null, name: "", loading: false })}
-                    className="w-full xs:w-auto px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={deleteTarget.loading}
-                    onClick={confirmDeleteStaff}
-                    className="w-full xs:w-auto justify-center px-4 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700 active:scale-[0.98] transition-all flex items-center gap-2"
-                  >
-                    {deleteTarget.loading ? "Deleting..." : "Delete Member"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Reset Password Modal */}
-        {passwordTarget.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
-              onClick={() => !passwordTarget.loading && setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })} 
-            />
-            <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 max-h-[calc(100dvh-1rem)] overflow-y-auto z-10 animate-in zoom-in-95">
-              <div className="h-1 bg-[#2271b1] w-full" />
-              <form onSubmit={submitResetPassword} className="p-4 sm:p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 shrink-0 rounded-full bg-[#f0f6fb] flex items-center justify-center text-[#2271b1]">
-                    <Key className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-bold text-neutral-900">Update Password</h3>
-                    <p className="text-xs text-neutral-500">For {passwordTarget.name}</p>
-                  </div>
-                </div>
-                <div className="space-y-3 mb-6">
-                  <label className="block text-xs font-semibold text-neutral-700">
-                    New Password <span className="text-neutral-400 font-normal">(min. 6 characters)</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={passwordTarget.showPass ? "text" : "password"}
-                      autoFocus
-                      required
-                      minLength={6}
-                      placeholder="Enter new password..."
-                      value={passwordTarget.password}
-                      onChange={(e) => setPasswordTarget(prev => ({ ...prev, password: e.target.value }))}
-                      className="w-full pl-3 pr-10 py-2 border border-neutral-300 rounded-lg text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setPasswordTarget(prev => ({ ...prev, showPass: !prev.showPass }))}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
-                    >
-                      {passwordTarget.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5">
-                  <button
-                    type="button"
-                    disabled={passwordTarget.loading}
-                    onClick={() => setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })}
-                    className="w-full xs:w-auto px-4 py-2 rounded-lg border border-neutral-300 text-neutral-700 text-xs font-semibold hover:bg-neutral-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={passwordTarget.loading}
-                    className="w-full xs:w-auto justify-center px-4 py-2 rounded-lg bg-[#2271b1] text-white text-xs font-semibold hover:bg-[#135e96] active:scale-[0.98] transition-all flex items-center gap-2"
-                  >
-                    {passwordTarget.loading ? "Saving..." : "Update Password"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+      <div className="wp-subsub" role="tablist" aria-label="Filter users by role">
+        <button type="button" role="tab" aria-selected={roleView === "all"} className={roleView === "all" ? "is-current" : undefined} onClick={() => setRoleView("all")}>
+          All <span className="wp-count">({staffList.length})</span>
+        </button>
+        {roleOptions.map(([key, label]) => (
+          <span key={key} style={{ display: "contents" }}>
+            <span className="wp-sep" aria-hidden="true">|</span>
+            <button type="button" role="tab" aria-selected={roleView === key} className={roleView === key ? "is-current" : undefined} onClick={() => setRoleView(key)}>
+              {label} <span className="wp-count">({staffList.filter(s => (s?.roleId?.slug || s?.roleId?.name) === key).length})</span>
+            </button>
+          </span>
+        ))}
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <span className="wp-muted">Active <span className="wp-count">({staffList.filter(s => s?.status === 'Active').length})</span></span>
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <span className="wp-muted">Suspended <span className="wp-count">({staffList.filter(s => s?.status && s.status !== 'Active').length})</span></span>
       </div>
-    </AdminPageLayout>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <div className="wp-search" role="search">
+          <label htmlFor="team-search" className="sr-only">Search users</label>
+          <input
+            id="team-search"
+            type="search"
+            className="wp-input"
+            placeholder="Search by name or email"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="wp-muted">Loading users…</td></tr>
+            ) : visibleStaff.length === 0 ? (
+              <tr><td colSpan={5} className="wp-muted">No users found.</td></tr>
+            ) : (
+              visibleStaff.map((s, index) => {
+                const isSuperAdmin = s?.roleId?.slug === 'super-admin';
+                const isSelf = currentUserId && s?._id === currentUserId;
+                const roleName = s?.roleId?.name || (typeof s?.roleId === 'string' ? 'Assigned' : 'No Role');
+                const isActive = (s?.status || "Active") === 'Active';
+
+                return (
+                  <tr key={s?._id || index}>
+                    <td>
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="wp-avatar" aria-hidden="true">{(s?.name || "U").charAt(0).toUpperCase()}</div>
+                        <div className="min-w-0">
+                          <Link href={`/admin/settings/team/${s._id}`} className="wp-row-title" style={{ wordBreak: "break-word" }}>
+                            {s?.name || "Unnamed"}
+                          </Link>
+                          {isSelf && <span className="wp-muted"> — You</span>}
+                          <div className="wp-mobile-meta" style={{ wordBreak: "break-all" }}>{s?.email || "No email"}</div>
+                          <div className="wp-row-actions">
+                            <button type="button" onClick={() => router.push(`/admin/settings/team/${s._id}`)}>Edit</button>
+                            {!isSuperAdmin && !isSelf && (
+                              <button type="button" onClick={() => toggleStatus(s._id, s.status)}>
+                                {s?.status === 'Active' ? 'Suspend' : 'Activate'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
+                            >
+                              Reset password
+                            </button>
+                            {!isSuperAdmin && !isSelf && (
+                              <button
+                                type="button"
+                                className="is-danger"
+                                onClick={() => setDeleteTarget({ open: true, id: s._id, name: s.name, loading: false })}
+                              >
+                                Delete
+                              </button>
+                            )}
+                            {isSuperAdmin && <span className="is-muted">System protected</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="wp-hide-sm" style={{ wordBreak: "break-all" }}>
+                      {s?.email ? <a href={`mailto:${s.email}`} className="wp-link">{s.email}</a> : <span className="wp-muted">No email</span>}
+                    </td>
+                    <td>{roleName}</td>
+                    <td>
+                      <span className={`wp-pill wp-pill-sm ${isActive ? 'wp-st-published' : 'wp-st-cancelled'}`}>
+                        {s?.status || "Active"}
+                      </span>
+                    </td>
+                    <td className="wp-hide-sm wp-muted" suppressHydrationWarning>
+                      {formatDate(s?.security?.lastLogin)}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+          <tfoot>{headerRow}</tfoot>
+        </table>
+      </div>
+
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <span className="wp-muted">{visibleStaff.length} item{visibleStaff.length === 1 ? "" : "s"}</span>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget.open && (
+        <div
+          className="wp-modal-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget && !deleteTarget.loading) setDeleteTarget({ open: false, id: null, name: "", loading: false }); }}
+        >
+          <div className="wp-modal" style={{ maxWidth: 460 }} role="dialog" aria-modal="true" aria-labelledby="delete-staff-title">
+            <div className="wp-modal-head">
+              <h2 id="delete-staff-title">Delete user</h2>
+              <button
+                type="button"
+                className="wp-notice-dismiss"
+                aria-label="Close"
+                disabled={deleteTarget.loading}
+                onClick={() => setDeleteTarget({ open: false, id: null, name: "", loading: false })}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="wp-modal-body">
+              <p style={{ margin: 0 }}>
+                Are you sure you want to delete <span className="wp-strong">{deleteTarget.name}</span>? This action cannot be undone and will revoke their access immediately.
+              </p>
+            </div>
+            <div className="wp-modal-foot">
+              <button
+                type="button"
+                className="wp-btn"
+                disabled={deleteTarget.loading}
+                onClick={() => setDeleteTarget({ open: false, id: null, name: "", loading: false })}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="wp-btn wp-btn-primary"
+                style={{ background: "#b32d2e", borderColor: "#b32d2e", color: "#fff" }}
+                disabled={deleteTarget.loading}
+                onClick={confirmDeleteStaff}
+              >
+                {deleteTarget.loading ? "Deleting…" : "Delete user"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {passwordTarget.open && (
+        <div
+          className="wp-modal-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget && !passwordTarget.loading) setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false }); }}
+        >
+          <div className="wp-modal" style={{ maxWidth: 460 }} role="dialog" aria-modal="true" aria-labelledby="reset-pass-title">
+            <form onSubmit={submitResetPassword}>
+              <div className="wp-modal-head">
+                <h2 id="reset-pass-title" style={{ minWidth: 0, wordBreak: "break-word" }}>Set new password — {passwordTarget.name}</h2>
+                <button
+                  type="button"
+                  className="wp-notice-dismiss"
+                  aria-label="Close"
+                  disabled={passwordTarget.loading}
+                  onClick={() => setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="wp-modal-body">
+                <label htmlFor="reset-pass-input" className="wp-label">New password</label>
+                <div className="flex gap-2">
+                  <input
+                    id="reset-pass-input"
+                    type={passwordTarget.showPass ? "text" : "password"}
+                    autoFocus
+                    required
+                    minLength={6}
+                    placeholder="Enter new password"
+                    value={passwordTarget.password}
+                    onChange={(e) => setPasswordTarget(prev => ({ ...prev, password: e.target.value }))}
+                    className="wp-input"
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  <button
+                    type="button"
+                    className="wp-btn"
+                    aria-label={passwordTarget.showPass ? "Hide password" : "Show password"}
+                    onClick={() => setPasswordTarget(prev => ({ ...prev, showPass: !prev.showPass }))}
+                  >
+                    {passwordTarget.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {passwordTarget.showPass ? "Hide" : "Show"}
+                  </button>
+                </div>
+                <p className="wp-desc">Minimum 6 characters.</p>
+              </div>
+              <div className="wp-modal-foot">
+                <button
+                  type="button"
+                  className="wp-btn"
+                  disabled={passwordTarget.loading}
+                  onClick={() => setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="wp-btn wp-btn-primary" disabled={passwordTarget.loading}>
+                  {passwordTarget.loading ? "Saving…" : "Update password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </Page>
     </RequirePermission>
   );
 }
