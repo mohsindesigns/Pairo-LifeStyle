@@ -63,10 +63,13 @@ export default function QuillEditor({ value = "", onChange, height = "280px" }) 
           line-height: 1.7;
           padding: 14px 16px;
         }
-        .ql-editor p { margin-bottom: 10px; color: #000; }
-        .ql-editor h1 { font-size: 20px; font-weight: 900; color: #000; margin-bottom: 8px; }
-        .ql-editor h2 { font-size: 16px; font-weight: 900; color: #000; margin-bottom: 6px; }
-        .ql-editor h3 { font-size: 14px; font-weight: 700; color: #000; margin-bottom: 6px; }
+        /* Scoped + !important so the admin's compact h1/h2/h3/p sizes (globals.css) don't flatten the content */
+        .admin-dashboard-container .ql-editor p { font-size: 15px !important; line-height: 1.6 !important; margin-bottom: 10px; color: #000; }
+        .admin-dashboard-container .ql-editor h1 { font-size: 28px !important; line-height: 1.25 !important; font-weight: 800 !important; color: #000; margin: 18px 0 10px; }
+        .admin-dashboard-container .ql-editor h2 { font-size: 22px !important; line-height: 1.3 !important; font-weight: 750 !important; color: #000; margin: 16px 0 8px; }
+        .admin-dashboard-container .ql-editor h3 { font-size: 18px !important; line-height: 1.35 !important; font-weight: 700 !important; color: #000; margin: 14px 0 6px; }
+        .admin-dashboard-container .ql-editor > :first-child { margin-top: 0; }
+        .admin-dashboard-container .ql-editor li { font-size: 15px !important; }
         .ql-editor ul, .ql-editor ol { padding-left: 20px; color: #000; margin-bottom: 10px; }
         .ql-editor li { margin-bottom: 4px; color: #000; }
         .ql-editor blockquote { border-left: 3px solid #000; padding-left: 12px; color: #000; font-style: italic; }

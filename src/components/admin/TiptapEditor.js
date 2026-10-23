@@ -648,6 +648,9 @@ export default function TiptapEditor({ content, onChange }) {
 
   const editor = useEditor({
     immediatelyRender: false,
+    // Tiptap 3 no longer re-renders on every transaction by default; without this the toolbar
+    // (block format select, bold/italic/list states) never reflects where the cursor is.
+    shouldRerenderOnTransaction: true,
     extensions: [
       StarterKit.configure({
         heading: {
@@ -1002,6 +1005,8 @@ export default function TiptapEditor({ content, onChange }) {
         .tiptap-wrapper .ProseMirror h5, .tiptap-wrapper .ProseMirror h5 * { font-size: 1.02rem !important; font-weight: 650 !important; line-height: 1.4 !important; margin-top: 1rem; color: #555; }
         .tiptap-wrapper .ProseMirror h6, .tiptap-wrapper .ProseMirror h6 * { font-size: 0.9rem !important; font-weight: 650 !important; line-height: 1.4 !important; margin-top: 0.75rem; color: #666; }
         .tiptap-wrapper .ProseMirror p { margin-bottom: 0.75rem; }
+        /* Beat the admin's compact 13px p/li size so body text reads as body text next to headings */
+        .tiptap-wrapper .ProseMirror p, .tiptap-wrapper .ProseMirror li { font-size: 15px; line-height: 1.6; }
         .tiptap-wrapper .ProseMirror ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.75rem; }
         .tiptap-wrapper .ProseMirror ol { list-style-type: decimal; padding-left: 1.5rem; margin-top: 0.25rem; margin-bottom: 0.75rem; }
         .tiptap-wrapper .ProseMirror li { margin-bottom: 0.15rem; }
