@@ -46,7 +46,9 @@ const CustomJacketInquirySchema = new mongoose.Schema({
   userAgent: { type: String },
 
   // Soft delete
-  isDeleted: { type: Boolean, default: false, index: true }
+  // A converted inquiry may be trashed: its order keeps its own copy (customJacketSnapshot).
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 // Text search index

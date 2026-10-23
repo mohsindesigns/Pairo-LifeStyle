@@ -46,7 +46,9 @@ const SubmissionSchema = new mongoose.Schema({
   // Conversation threading (Future-ready)
   conversationId: { type: String, index: true },
   
-  isDeleted: { type: Boolean, default: false, index: true }
+  // Soft delete (Trash). 'Trash' stays in the status enum only for older records.
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 // Text indexing for enterprise search

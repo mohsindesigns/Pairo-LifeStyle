@@ -40,7 +40,8 @@ const CorporateGiftingInquirySchema = new mongoose.Schema({
 
   ipAddress: { type: String },
   userAgent: { type: String },
-  isDeleted: { type: Boolean, default: false, index: true }
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 export default mongoose.models.CorporateGiftingInquiry ||
