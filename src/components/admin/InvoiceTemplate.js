@@ -2,9 +2,11 @@
 
 import React from 'react';
 import { siteConfig } from '@/config/siteConfig';
+import { formatMoney } from '@/components/admin/ui';
 
 const InvoiceTemplate = ({ order }) => {
   if (!order) return null;
+  const currency = order.financials?.currency || "USD";
 
   return (
     <div id="invoice-print" className="bg-white p-12 max-w-4xl mx-auto font-sans text-black hidden print:block">
@@ -59,9 +61,9 @@ const InvoiceTemplate = ({ order }) => {
                   <span key={k} className="text-[10px] font-bold text-black/40 uppercase mr-3">{k}: {v}</span>
                 ))}
               </td>
-              <td className="py-6 text-center text-sm font-medium">${item.priceAtPurchase.toLocaleString()}</td>
+              <td className="py-6 text-center text-sm font-medium">{formatMoney(item.priceAtPurchase, currency)}</td>
               <td className="py-6 text-center text-sm font-medium">{item.quantity}</td>
-              <td className="py-6 text-right text-sm font-bold">${(item.priceAtPurchase * item.quantity).toLocaleString()}</td>
+              <td className="py-6 text-right text-sm font-bold">{formatMoney(item.priceAtPurchase * item.quantity, currency)}</td>
             </tr>
           ))}
         </tbody>
@@ -72,29 +74,29 @@ const InvoiceTemplate = ({ order }) => {
         <div className="w-64 space-y-3">
           <div className="flex justify-between text-sm text-black/40">
             <span>Subtotal</span>
-            <span className="font-bold text-black">${order.financials.subtotal.toLocaleString()}</span>
+            <span className="font-bold text-black">{formatMoney(order.financials.subtotal, currency)}</span>
           </div>
           {order.financials?.discountTotal && Number(order.financials.discountTotal) > 0 ? (
             <div className="flex justify-between text-sm text-green-600 font-bold">
               <span>Discount ({order.financials.promoCode})</span>
-              <span>-${(Number(order.financials.discountTotal)).toLocaleString()}</span>
+              <span>-{formatMoney(Number(order.financials.discountTotal), currency)}</span>
             </div>
           ) : null}
           {order.financials?.affiliateDiscountAmount && Number(order.financials.affiliateDiscountAmount) > 0 ? (
             <div className="flex justify-between text-sm text-emerald-600 font-bold">
               <span>Referral Discount ({order.affiliateReferralCode})</span>
-              <span>-${(Number(order.financials.affiliateDiscountAmount)).toLocaleString()}</span>
+              <span>-{formatMoney(Number(order.financials.affiliateDiscountAmount), currency)}</span>
             </div>
           ) : null}
           <div className="flex justify-between text-sm text-black/40">
             <span>Shipping</span>
             <span className="font-bold text-black">
-              {order.financials.shippingCost > 0 ? `$${order.financials.shippingCost.toLocaleString()}` : "Complimentary"}
+              {order.financials.shippingCost > 0 ? formatMoney(order.financials.shippingCost, currency) : "Complimentary"}
             </span>
           </div>
           <div className="pt-4 border-t-2 border-black flex justify-between items-end">
             <span className="text-[10px] font-bold uppercase tracking-widest">Balance Total</span>
-            <span className="text-3xl font-black tracking-tighter">${order.financials.total.toLocaleString()}</span>
+            <span className="text-3xl font-black tracking-tighter">{formatMoney(order.financials.total, currency)}</span>
           </div>
         </div>
       </div>

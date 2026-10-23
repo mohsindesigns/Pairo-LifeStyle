@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
-import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
+import { Page, PageHeader, Notice, Skeleton, formatDate, formatMoney } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { paginate } from "@/lib/admin-products-utils";
@@ -270,11 +270,11 @@ export default function PromotionsDashboard() {
         </div>
         <div className="wp-stat">
           <div className="wp-stat-label">Discount distributed</div>
-          <div className="wp-stat-value">${promotions.reduce((acc, p) => acc + (p.analytics?.discountDistributed || 0), 0).toFixed(0)}</div>
+          <div className="wp-stat-value">{formatMoney(promotions.reduce((acc, p) => acc + (p.analytics?.discountDistributed || 0), 0), "USD", { decimals: 0 })}</div>
         </div>
         <div className="wp-stat">
           <div className="wp-stat-label">Revenue generated</div>
-          <div className="wp-stat-value">${promotions.reduce((acc, p) => acc + (p.analytics?.revenueGenerated || 0), 0).toFixed(0)}</div>
+          <div className="wp-stat-value">{formatMoney(promotions.reduce((acc, p) => acc + (p.analytics?.revenueGenerated || 0), 0), "USD", { decimals: 0 })}</div>
         </div>
       </div>
 
@@ -411,8 +411,8 @@ export default function PromotionsDashboard() {
                   <td className="wp-hide-sm wp-muted">{scheduleText(p)}</td>
                   <td className="wp-hide-sm">
                     <div>Used: <span className="wp-strong">{p.analytics?.timesUsed || 0}</span></div>
-                    <div>Saved: <span className="wp-strong">${(p.analytics?.discountDistributed || 0).toFixed(0)}</span></div>
-                    <div>Revenue: <span className="wp-strong">${(p.analytics?.revenueGenerated || 0).toFixed(0)}</span></div>
+                    <div>Saved: <span className="wp-strong">{formatMoney(p.analytics?.discountDistributed || 0, "USD", { decimals: 0 })}</span></div>
+                    <div>Revenue: <span className="wp-strong">{formatMoney(p.analytics?.revenueGenerated || 0, "USD", { decimals: 0 })}</span></div>
                   </td>
                   <td className="wp-hide-sm wp-num">{p.priority || 0}</td>
                 </tr>

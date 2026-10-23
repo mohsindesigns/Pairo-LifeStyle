@@ -9,7 +9,7 @@ import RequirePermission from "@/components/admin/RequirePermission";
 import ProductSelector from "@/components/admin/discounts/ProductSelector";
 import CategorySelector from "@/components/admin/discounts/CategorySelector";
 import CouponViewModal from "@/components/admin/discounts/CouponViewModal";
-import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
 import { paginate } from "@/lib/admin-products-utils";
 import { deriveCustomerEmailsString, buildDuplicatePayload, isValidUsageLimitInput } from "@/components/admin/discounts/couponUtils";
 
@@ -1167,7 +1167,7 @@ function CouponsContent() {
                 const cStatus = getCouponStatus(d);
                 const prodCount = Array.isArray(d.specificProducts) ? d.specificProducts.length : 0;
                 const catCount = Array.isArray(d.specificCategories) ? d.specificCategories.length : 0;
-                const amountLabel = d.type === 'percentage' ? `${d.value}%` : `$${Number(d.value || 0).toFixed(2)}`;
+                const amountLabel = d.type === 'percentage' ? `${d.value}%` : formatMoney(Number(d.value || 0));
 
                 if (isQuickEditing) {
                   return (
@@ -1383,7 +1383,7 @@ function CouponsContent() {
                     </td>
 
                     <td className="wp-hide-sm">
-                      ${Number(d.minPurchase || 0).toFixed(2)}
+                      {formatMoney(Number(d.minPurchase || 0))}
                     </td>
                     <td className="wp-hide-sm">
                       {d.usageCount || 0} / {d.usageLimit || "∞"}

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import {
   X, QrCode, Copy, Check, Edit2, Package,
 } from "lucide-react";
+import { formatMoney } from "@/components/admin/ui";
 
 export default function CouponViewModal({
   discount,
@@ -104,7 +105,7 @@ export default function CouponViewModal({
               </span>
             </div>
             <p className="wp-desc" style={{ marginTop: 2 }}>
-              {discount.type === "percentage" ? `${discount.value}% discount on eligible items` : `$${Number(discount.value || 0).toFixed(2)} fixed cart discount`}
+              {discount.type === "percentage" ? `${discount.value}% discount on eligible items` : `${formatMoney(Number(discount.value || 0))} fixed cart discount`}
             </p>
           </div>
 
@@ -151,7 +152,7 @@ export default function CouponViewModal({
               <div className="wp-kv">
                 <span className="wp-kv-k">Discount</span>
                 <span className="wp-kv-v">
-                  {discount.type === "percentage" ? `${discount.value}%` : `$${Number(discount.value).toFixed(2)}`}
+                  {discount.type === "percentage" ? `${discount.value}%` : formatMoney(Number(discount.value))}
                 </span>
               </div>
               <div className="wp-kv">
@@ -169,7 +170,7 @@ export default function CouponViewModal({
               <div className="wp-kv">
                 <span className="wp-kv-k">Minimum spend</span>
                 <span className="wp-kv-v">
-                  {discount.minPurchase ? `$${Number(discount.minPurchase).toFixed(2)}` : "None"}
+                  {discount.minPurchase ? formatMoney(Number(discount.minPurchase)) : "None"}
                 </span>
               </div>
               <div className="wp-kv">
@@ -205,7 +206,7 @@ export default function CouponViewModal({
                 {products.map((p, idx) => {
                   const name = typeof p === "object" ? p.name : `Product ID: ${p}`;
                   const img = typeof p === "object" ? (p.image || p.images?.[0]) : null;
-                  const price = typeof p === "object" && p.price ? `$${Number(p.price).toFixed(2)}` : "";
+                  const price = typeof p === "object" && p.price ? formatMoney(Number(p.price)) : "";
                   const sku = typeof p === "object" ? p.sku : "";
 
                   return (
@@ -281,7 +282,7 @@ export default function CouponViewModal({
               {Number(discount.maxDiscountAmount) > 0 && (
                 <div className="wp-kv">
                   <span className="wp-kv-k">Max discount cap</span>
-                  <span className="wp-kv-v">${Number(discount.maxDiscountAmount).toFixed(2)}</span>
+                  <span className="wp-kv-v">{formatMoney(Number(discount.maxDiscountAmount))}</span>
                 </div>
               )}
             </div>

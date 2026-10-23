@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useId } from "react";
 import { X, Check, Package } from "lucide-react";
+import { formatMoney } from "@/components/admin/ui";
 
 export default function ProductSelector({
   selectedIds = [],
@@ -115,7 +116,7 @@ export default function ProductSelector({
               const prod = productMap.get(id);
               const name = prod?.name || `Product ID: ${id.slice(-6)}`;
               const img = prod?.image || (prod?.images && prod.images[0]) || null;
-              const price = prod?.price !== undefined ? `$${Number(prod.price).toFixed(2)}` : "";
+              const price = prod?.price !== undefined ? formatMoney(Number(prod.price)) : "";
 
               return (
                 <span key={id} className="wp-chip" style={{ maxWidth: "100%" }}>
@@ -299,7 +300,7 @@ export default function ProductSelector({
                         </span>
                         <span className="block wp-muted wp-small">
                           {p.sku && <>SKU: {p.sku} · </>}
-                          ${Number(p.price || 0).toFixed(2)}
+                          {formatMoney(Number(p.price || 0))}
                         </span>
                       </span>
                     </label>

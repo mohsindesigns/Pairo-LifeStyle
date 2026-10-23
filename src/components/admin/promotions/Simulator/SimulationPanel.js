@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Play, CheckCircle2, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { formatMoney } from '@/components/admin/ui';
 
 export default function SimulationPanel({ promotionData }) {
   const [cart, setCart] = useState({
@@ -188,14 +189,14 @@ export default function SimulationPanel({ promotionData }) {
           <div className="min-w-0" style={{ borderTop: '1px solid var(--wp-border-2)', paddingTop: 12 }}>
             <div className="wp-kv" style={{ paddingTop: 0 }}>
               <span className="wp-kv-k wp-strong">Test cart</span>
-              <span>Subtotal: <span className="wp-kv-v">${cart.subtotal.toFixed(2)}</span></span>
+              <span>Subtotal: <span className="wp-kv-v">{formatMoney(cart.subtotal)}</span></span>
             </div>
             <div className="flex flex-col gap-1.5">
               {cart.items.map((item, idx) => (
                 <div key={idx} className="min-w-0" style={{ border: '1px solid var(--wp-border-2)', background: 'var(--wp-alt)', padding: '6px 8px' }}>
                   <div className="flex items-center gap-2">
                     <span className="wp-strong flex-1 min-w-0" style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>{item.id} (x{item.quantity})</span>
-                    <span>${(item.price * item.quantity).toFixed(2)}</span>
+                    <span>{formatMoney(item.price * item.quantity)}</span>
                     <button
                       type="button"
                       onClick={() => removeItem(idx)}
@@ -236,11 +237,11 @@ export default function SimulationPanel({ promotionData }) {
                 </div>
                 <div className="min-w-0" style={{ padding: '10px 12px', borderRight: '1px solid var(--wp-border-2)' }}>
                   <div className="wp-muted wp-small">Discount</div>
-                  <div className="wp-strong">${results.discountTotal?.toFixed(2) || '0.00'}</div>
+                  <div className="wp-strong">{formatMoney(results.discountTotal || 0)}</div>
                 </div>
                 <div className="min-w-0" style={{ padding: '10px 12px' }}>
                   <div className="wp-muted wp-small">Final total</div>
-                  <div className="wp-strong">${(cart.subtotal - (results.discountTotal || 0)).toFixed(2)}</div>
+                  <div className="wp-strong">{formatMoney(cart.subtotal - (results.discountTotal || 0))}</div>
                 </div>
               </div>
 
