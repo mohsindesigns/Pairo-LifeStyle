@@ -66,10 +66,12 @@ export default function OrderDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      const data = await res.json();
-      if (data.success) setOrder(data.order);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) setOrder(data.order);
+      else toast.error(data.error || "Couldn't update the order status.");
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't update the order status.");
     } finally {
       setUpdating(false);
     }

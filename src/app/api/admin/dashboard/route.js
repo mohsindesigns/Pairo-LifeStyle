@@ -72,8 +72,8 @@ async function salesSection(w) {
       { $sort: { units: -1, revenue: -1 } },
       { $limit: 5 },
     ]),
-    Customer.countDocuments({ createdAt: { $gte: w.from, $lt: w.to }, role: { $ne: "admin" } }),
-    Customer.countDocuments({ createdAt: { $gte: w.prevFrom, $lt: w.prevTo }, role: { $ne: "admin" } }),
+    Customer.countDocuments({ createdAt: { $gte: w.from, $lt: w.to }, role: { $ne: "admin" }, isDeleted: { $ne: true } }),
+    Customer.countDocuments({ createdAt: { $gte: w.prevFrom, $lt: w.prevTo }, role: { $ne: "admin" }, isDeleted: { $ne: true } }),
   ]);
 
   return {
@@ -236,7 +236,7 @@ async function glanceSection(user) {
     );
   }
   if (can(user, "orders.view")) entries.push(Order.countDocuments({ isDeleted: { $ne: true } }).then((n) => ["orders", n]));
-  if (can(user, "customers.view")) entries.push(Customer.countDocuments({ role: { $ne: "admin" } }).then((n) => ["customers", n]));
+  if (can(user, "customers.view")) entries.push(Customer.countDocuments({ role: { $ne: "admin" }, isDeleted: { $ne: true } }).then((n) => ["customers", n]));
   if (can(user, "blogs.view")) entries.push(Blog.countDocuments({ isDeleted: { $ne: true } }).then((n) => ["posts", n]));
   if (can(user, "pages.view")) entries.push(Page.estimatedDocumentCount().then((n) => ["pages", n]));
   return Object.fromEntries(await Promise.all(entries));

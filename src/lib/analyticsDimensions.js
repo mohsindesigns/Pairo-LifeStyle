@@ -30,6 +30,20 @@ export const PRICE_BANDS = [
   { key: "1000-plus", label: "$1,000+", min: 1000, max: Infinity },
 ];
 
+/** Band label in the store currency, e.g. "Under €100" or "£100 - £250". */
+export function priceBandLabel(band, currency = "USD") {
+  const fmt = (n) => {
+    try {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+    } catch {
+      return `$${n.toLocaleString("en-US")}`;
+    }
+  };
+  if (band.min <= 0) return `Under ${fmt(band.max)}`;
+  if (band.max === Infinity) return `${fmt(band.min)}+`;
+  return `${fmt(band.min)} - ${fmt(band.max)}`;
+}
+
 export function priceBandFor(price) {
   const p = Number(price);
   if (!Number.isFinite(p) || p < 0) return "";

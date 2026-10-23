@@ -74,7 +74,7 @@ export async function GET(req) {
     c => ({ id: String(c._id), title: c.name, href: `/admin/products/categories/${c._id}` }));
 
   add("customers", can(user, "customers.view"),
-    find(Customer, ["name", "email"], { role: { $ne: "admin" } }, "name email"),
+    find(Customer, ["name", "email"], { role: { $ne: "admin" }, isDeleted: { $ne: true } }, "name email"),
     c => ({ id: String(c._id), title: c.name || c.email, href: `/admin/customers/${c._id}` }));
 
   add("orders", can(user, "orders.view"),

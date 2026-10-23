@@ -4,7 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import { can } from "@/lib/rbac";
 import {
-  BOUNCE_EXPR, FUNNEL_EVENTS, PAGE_TYPES, PRICE_BANDS, isBounced,
+  BOUNCE_EXPR, FUNNEL_EVENTS, PAGE_TYPES, PRICE_BANDS, priceBandLabel, isBounced,
 } from "@/lib/analyticsDimensions";
 import AnalyticsSession from "@/models/AnalyticsSession";
 import AnalyticsPageView from "@/models/AnalyticsPageView";
@@ -900,7 +900,7 @@ async function retention(f) {
   const mid = Math.floor(gaps.length / 2);
   const median = gaps.length === 0 ? 0 : gaps.length % 2 ? gaps[mid] : (gaps[mid - 1] + gaps[mid]) / 2;
 
-  const created = await Customer.find({ createdAt: { $gte: f.since, $lte: f.until } }).select("_id").lean();
+  const created = await Customer.find({ createdAt: { $gte: f.since, $lte: f.until }, isDeleted: { $ne: true } }).select("_id").lean();
   const buyerIds = new Set(rows.map((r) => String(r._id)));
   const accountsPurchased = created.filter((c) => buyerIds.has(String(c._id))).length;
 
@@ -1111,14 +1111,21 @@ export async function GET(req) {
 
     if (tab === "options") {
       const [data, currency] = await Promise.all([options(), resolveStoreCurrency()]);
-      return NextResponse.json({ success: true, data: { ...data, currency } });
+      const priceBands = PRICE_BANDS.map((b) => ({ key: b.key, label: priceBandLabel(b, currency) }));
+      return NextResponse.json({ success: true, data: { ...data, priceBands, currency } });
     }
 
     const handler = TABS[tab];
     if (!handler) return NextResponse.json({ error: "Unknown tab" }, { status: 400 });
 
     const filters = parseFilters(sp);
-    const [data, currency] = await Promise.all([handler(filters), resolveStoreCurrency()]);
+    const [raw, currency] = await Promise.all([handler(filters), resolveStoreCurrency()]);
+    const data = Array.isArray(raw?.bands)
+      ? { ...raw, bands: raw.bands.map((r) => {
+          const band = PRICE_BANDS.find((b) => b.key === r.key);
+          return band ? { ...r, label: priceBandLabel(band, currency) } : r;
+        }) }
+      : raw;
     return NextResponse.json({
       success: true,
       tab,

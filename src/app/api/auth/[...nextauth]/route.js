@@ -189,6 +189,17 @@ export const authOptions = {
           }
       }
 
+      // A customer an admin moved to the Trash (or deleted) is signed out on their next request.
+      if (token?.id && !token.isStaff && !token.isAffiliate) {
+          try {
+              await dbConnect();
+              const customer = await Customer.findById(token.id).select('isDeleted').lean();
+              if (!customer || customer.isDeleted) return {};
+          } catch (e) {
+              console.error("JWT Customer Check Error:", e.message);
+          }
+      }
+
       return token;
     },
     async session({ session, token }) {

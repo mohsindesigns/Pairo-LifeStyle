@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   await dbConnect();
-  const page = await Page.findOne({ slug: "blog" }).lean();
+  const page = await Page.findOne({ slug: "blog", isDeleted: { $ne: true } }).lean();
   const { metadata } = await resolveSEOMetadata({
     entity: page || {},
     type: "page",
@@ -84,7 +84,7 @@ export default async function BlogArchive() {
       status: "Published",
       isDeleted: { $ne: true }
     }).sort({ publishedAt: -1, createdAt: -1 }).lean(),
-    Page.findOne({ slug: "blog", status: "Published" }).lean()
+    Page.findOne({ slug: "blog", status: "Published", isDeleted: { $ne: true } }).lean()
   ]);
 
   const posts = dbBlogs.map(b => ({

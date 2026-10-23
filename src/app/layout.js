@@ -117,7 +117,7 @@ export default async function RootLayout({ children }) {
         .sort({ name: 1 })
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),
-      Page.find({ status: 'Published' })
+      Page.find({ status: 'Published', isDeleted: { $ne: true } })
         .select('title slug template')
         .sort({ title: 1 })
         .maxTimeMS(QUERY_TIMEOUT_MS)

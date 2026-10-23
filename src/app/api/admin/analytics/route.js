@@ -135,7 +135,7 @@ export async function GET(req) {
       Product.countDocuments({ status: "Published", isDeleted: { $ne: true } }),
 
       // 3. Total Customers (non-admin)
-      Customer.countDocuments({ role: { $ne: "admin" } }),
+      Customer.countDocuments({ role: { $ne: "admin" }, isDeleted: { $ne: true } }),
 
       // 4. Total Blogs
       Blog.countDocuments({ isDeleted: { $ne: true } }),
