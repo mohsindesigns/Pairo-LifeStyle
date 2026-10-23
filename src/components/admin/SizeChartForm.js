@@ -2,26 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Save,
-  X,
-  Plus,
-  Trash2,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  Download,
-  Upload,
-  Eye,
-  Sliders,
-  HelpCircle
-} from "lucide-react";
+import { X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import { Postbox } from "@/components/admin/ui";
 
-const inputClass =
-  "border border-[#8c8f94] bg-white text-[13px] px-3 py-2 rounded-[3px] outline-none focus:border-[#2271b1] w-full";
+// Compact button used inside the spreadsheet header/rows
+const miniBtn = { minHeight: 26, padding: "0 6px", lineHeight: 1 };
 
 export default function SizeChartForm({ initialId = null }) {
   const router = useRouter();
@@ -326,162 +313,146 @@ export default function SizeChartForm({ initialId = null }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-gray-500 font-medium">
-        Loading editor data...
-      </div>
+      <p className="wp-muted">Loading editor data…</p>
     );
   }
 
+  const selectedCategoryName = categories.find(c => c._id === assignmentTargetId)?.name;
+  const selectedProductName = products.find(p => p._id === assignmentTargetId)?.name;
+
   return (
-    <div className="space-y-4 md:space-y-6">
-
-      {/* Editor Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 sm:p-4 border border-[#ccd0d4] rounded-[4px] shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* CSV Import */}
-          <label className="flex items-center gap-1.5 px-3 py-1.5 border border-[#8c8f94] hover:bg-neutral-50 text-[13px] font-bold rounded-[3px] cursor-pointer text-gray-700">
-            <Upload className="w-4 h-4 text-gray-500" />
-            Import CSV
-            <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
-          </label>
-
-          {/* CSV Export */}
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#8c8f94] hover:bg-neutral-50 text-[13px] font-bold rounded-[3px] cursor-pointer text-gray-700"
-          >
-            <Download className="w-4 h-4 text-gray-500" />
-            Export CSV
-          </button>
-
-          {/* Preview Size Chart */}
-          <button
-            type="button"
-            onClick={() => setShowPreview(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#8c8f94] hover:bg-neutral-50 text-[13px] font-bold rounded-[3px] cursor-pointer text-gray-700"
-          >
-            <Eye className="w-4 h-4 text-gray-500" />
-            Preview Chart
-          </button>
+    <div className="wp-cols">
+      {/* Main column */}
+      <div className="wp-col-main">
+        <div className="wp-field">
+          <label htmlFor="sc-label" className="sr-only">Size chart label (admin name)</label>
+          <input
+            id="sc-label"
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Size chart label, e.g. Men's Shearling Jacket"
+            className="wp-title-input"
+          />
+          <p className="wp-desc">Admin name, required. Shoppers see the public heading instead.</p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/admin/products/size-charts")}
-            className="px-4 py-1.5 border border-[#8c8f94] text-black text-[13px] font-bold hover:bg-[#f6f7f7] rounded-[3px] cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={handleSave}
-            className="flex items-center gap-1.5 px-5 py-1.5 bg-[#2271b1] hover:bg-[#135e96] border border-[#135e96] text-white text-[13px] font-bold rounded-[3px] cursor-pointer disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? "Saving..." : "Save Chart"}
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-6 items-start">
-        
-        {/* Left Column: Spreadsheet Table Builder */}
-        <div className="lg:col-span-2 min-w-0 bg-white border border-[#ccd0d4] rounded-[4px] p-3 sm:p-4 md:p-6 shadow-sm space-y-4 md:space-y-6">
-          <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 border-b border-[#ccd0d4] pb-3.5">
-            <h2 className="text-[14px] font-bold text-[#1d2327] min-w-0 break-words">Size Measurements Spreadsheet</h2>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={handleAddColumn}
-                className="flex items-center gap-1 px-3 py-1 border border-[#2271b1] hover:bg-blue-50 text-[#2271b1] text-[12px] font-bold rounded-[3px] cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" /> Column
-              </button>
-              <button
-                type="button"
-                onClick={handleAddRow}
-                className="flex items-center gap-1 px-3 py-1 border border-[#2271b1] hover:bg-blue-50 text-[#2271b1] text-[12px] font-bold rounded-[3px] cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" /> Row
-              </button>
-            </div>
+        <Postbox title="Size chart details" id="sc-details">
+          <div className="wp-frow">
+            <label htmlFor="sc-heading" className="wp-flabel">Public heading <span style={{ color: "#d63638" }}>*</span></label>
+            <input
+              id="sc-heading"
+              type="text"
+              value={publicHeading}
+              onChange={(e) => setPublicHeading(e.target.value)}
+              placeholder="e.g. Shearling Jacket Size Guide"
+              className="wp-input"
+            />
           </div>
+          <div className="wp-frow" style={{ alignItems: "flex-start" }}>
+            <label htmlFor="sc-description" className="wp-flabel">Short description</label>
+            <textarea
+              id="sc-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Instructions on fitting or measurements..."
+              className="wp-textarea"
+              style={{ flex: "1 1 320px", minWidth: 0 }}
+            />
+            <span className="wp-hint">Optional.</span>
+          </div>
+        </Postbox>
 
-          {/* Spreadsheet Table */}
-          <div className="w-full max-w-full overflow-x-auto border border-[#ccd0d4] rounded bg-gray-50">
-            <table className="w-full text-left border-collapse min-w-[600px]">
+        <Postbox
+          title="Measurements"
+          id="sc-sheet"
+          aside={
+            <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 6 }}>
+              <button type="button" onClick={handleAddColumn} className="wp-btn">Add column</button>
+              <button type="button" onClick={handleAddRow} className="wp-btn">Add row</button>
+            </span>
+          }
+        >
+          <div className="wp-table-box">
+            <table className="wp-list-table" style={{ minWidth: Math.max(480, columns.length * 130 + 120) }}>
               <thead>
-                <tr className="bg-neutral-100 border-b border-[#ccd0d4]">
+                <tr>
                   {columns.map((col, idx) => (
-                    <th key={idx} className="p-2 border-r border-[#ccd0d4] group min-w-[120px] relative">
-                      <div className="flex items-center justify-between gap-1.5 px-1 py-1">
-                        <button
-                          type="button"
-                          onClick={() => handleRenameColumn(idx, col)}
-                          title="Click to rename"
-                          className="font-bold text-[12px] text-gray-700 hover:text-[#2271b1] truncate block text-left"
-                        >
-                          {col}
-                        </button>
-                        
-                        {/* Column actions */}
-                        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {idx > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => handleMoveColumn(idx, "left")}
-                              className="p-1.5 md:p-0.5 hover:bg-gray-200 rounded text-gray-500"
-                            >
-                              <ArrowLeft className="w-3 h-3" />
-                            </button>
-                          )}
-                          {idx < columns.length - 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleMoveColumn(idx, "right")}
-                              className="p-1.5 md:p-0.5 hover:bg-gray-200 rounded text-gray-500"
-                            >
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                          )}
+                    <th key={idx} scope="col" style={{ minWidth: 120, verticalAlign: "top" }}>
+                      <button
+                        type="button"
+                        onClick={() => handleRenameColumn(idx, col)}
+                        title="Click to rename"
+                        aria-label={`Rename column ${col}`}
+                        className="wp-link wp-strong"
+                        style={{ background: "none", border: 0, padding: 0, cursor: "pointer", textAlign: "left", wordBreak: "break-word" }}
+                      >
+                        {col}
+                      </button>
+                      <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                        {idx > 0 && (
                           <button
                             type="button"
-                            onClick={() => handleDeleteColumn(idx)}
-                            className="p-1.5 md:p-0.5 hover:bg-red-100 rounded text-red-500"
+                            onClick={() => handleMoveColumn(idx, "left")}
+                            className="wp-btn"
+                            style={miniBtn}
+                            aria-label={`Move column ${col} left`}
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <ArrowLeft className="w-3 h-3" />
                           </button>
-                        </div>
+                        )}
+                        {idx < columns.length - 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleMoveColumn(idx, "right")}
+                            className="wp-btn"
+                            style={miniBtn}
+                            aria-label={`Move column ${col} right`}
+                          >
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteColumn(idx)}
+                          className="wp-btn"
+                          style={{ ...miniBtn, color: "#d63638" }}
+                          aria-label={`Delete column ${col}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
                     </th>
                   ))}
-                  <th className="p-2 w-20 text-center text-[11px] font-bold text-gray-400">Actions</th>
+                  <th scope="col" style={{ width: 110 }}><span className="sr-only">Row actions</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#ccd0d4]">
+              <tbody>
                 {rows.map((row, rIdx) => (
-                  <tr key={rIdx} className="bg-white hover:bg-gray-50/50">
+                  <tr key={rIdx}>
                     {row.map((cell, cIdx) => (
-                      <td key={cIdx} className="p-1 border-r border-[#ccd0d4]">
+                      <td key={cIdx} style={{ padding: 4 }}>
                         <input
                           type="text"
                           value={cell}
                           onChange={(e) => handleCellChange(rIdx, cIdx, e.target.value)}
                           placeholder="—"
-                          className="w-full text-[13px] px-2 py-1.5 border-0 focus:ring-1 focus:ring-[#2271b1] outline-none rounded bg-transparent focus:bg-white text-gray-800"
+                          aria-label={`${columns[cIdx] || `Column ${cIdx + 1}`}, row ${rIdx + 1}`}
+                          className="wp-input"
+                          style={{ width: "100%", minWidth: 80, fontWeight: cIdx === 0 ? 600 : undefined }}
                         />
                       </td>
                     ))}
-                    <td className="p-1.5 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-0.5">
+                    <td style={{ whiteSpace: "nowrap", padding: 4 }}>
+                      <div style={{ display: "flex", gap: 4 }}>
                         {rIdx > 0 && (
                           <button
                             type="button"
                             onClick={() => handleMoveRow(rIdx, "up")}
-                            className="p-1.5 md:p-1 hover:bg-gray-100 rounded text-gray-500"
+                            className="wp-btn"
+                            style={miniBtn}
+                            aria-label={`Move row ${rIdx + 1} up`}
                           >
                             <ArrowUp className="w-3 h-3" />
                           </button>
@@ -490,7 +461,9 @@ export default function SizeChartForm({ initialId = null }) {
                           <button
                             type="button"
                             onClick={() => handleMoveRow(rIdx, "down")}
-                            className="p-1.5 md:p-1 hover:bg-gray-100 rounded text-gray-500"
+                            className="wp-btn"
+                            style={miniBtn}
+                            aria-label={`Move row ${rIdx + 1} down`}
                           >
                             <ArrowDown className="w-3 h-3" />
                           </button>
@@ -498,9 +471,11 @@ export default function SizeChartForm({ initialId = null }) {
                         <button
                           type="button"
                           onClick={() => handleDeleteRow(rIdx)}
-                          className="p-1.5 md:p-1 hover:bg-red-50 rounded text-red-500"
+                          className="wp-btn"
+                          style={{ ...miniBtn, color: "#d63638" }}
+                          aria-label={`Delete row ${rIdx + 1}`}
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <X className="w-3 h-3" />
                         </button>
                       </div>
                     </td>
@@ -509,122 +484,56 @@ export default function SizeChartForm({ initialId = null }) {
               </tbody>
             </table>
           </div>
-          <div className="text-[11px] text-gray-400 flex items-start gap-1">
-            <HelpCircle className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
-            <span>
-              Tip: Click on a column header name to rename it. Use the arrows to reorder rows and columns. Empty rows will be filtered out on save.
-            </span>
-          </div>
-        </div>
+          <p className="wp-desc">
+            Click a column header to rename it. Use the arrow buttons to reorder rows and columns. Empty rows are removed on save.
+          </p>
+        </Postbox>
 
-        {/* Right Column: Size Chart Details & Assignments */}
-        <div className="min-w-0 space-y-4 md:space-y-6">
-          
-          {/* General Configuration */}
-          <div className="bg-white border border-[#ccd0d4] rounded-[4px] p-3 sm:p-5 shadow-sm space-y-4">
-            <h2 className="text-[14px] font-bold text-[#1d2327] border-b border-[#ccd0d4] pb-2.5 mb-2">General Settings</h2>
-            
-            {/* Label (Admin Name) */}
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">
-                Size Chart Label (Admin Name) *
-              </label>
-              <input
-                type="text"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. Men's Shearling Jacket"
-                className={inputClass}
-              />
-            </div>
-
-            {/* Public Heading */}
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">
-                Public Heading *
-              </label>
-              <input
-                type="text"
-                value={publicHeading}
-                onChange={(e) => setPublicHeading(e.target.value)}
-                placeholder="e.g. Shearling Jacket Size Guide"
-                className={inputClass}
-              />
-            </div>
-
-            {/* Short Description */}
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">
-                Short Description (optional)
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                placeholder="Instructions on fitting or measurements..."
-                className={`${inputClass} resize-none`}
-              />
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="px-3 py-2 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] w-full cursor-pointer h-[38px]"
-              >
-                <option>Published</option>
-                <option>Draft</option>
-              </select>
-            </div>
+        <Postbox title="Assignment" id="sc-assign">
+          <div className="wp-frow">
+            <label htmlFor="sc-assign-type" className="wp-flabel">Apply size chart to</label>
+            <select
+              id="sc-assign-type"
+              value={assignmentType}
+              onChange={(e) => handleAssignmentTypeChange(e.target.value)}
+              className="wp-select"
+            >
+              <option value="none">Unassigned (None)</option>
+              <option value="category">Category</option>
+              <option value="product">Product</option>
+            </select>
           </div>
 
-          {/* Assignment Rules */}
-          <div className="bg-white border border-[#ccd0d4] rounded-[4px] p-3 sm:p-5 shadow-sm space-y-4">
-            <h2 className="text-[14px] font-bold text-[#1d2327] border-b border-[#ccd0d4] pb-2.5 mb-2">Assignment Rules</h2>
-            
-            {/* Apply Size Chart To */}
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">
-                Apply Size Chart To
-              </label>
-              <select
-                value={assignmentType}
-                onChange={(e) => handleAssignmentTypeChange(e.target.value)}
-                className="px-3 py-2 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] w-full cursor-pointer h-[38px]"
-              >
-                <option value="none">Unassigned (None)</option>
-                <option value="category">Category</option>
-                <option value="product">Product</option>
-              </select>
-            </div>
-
-            {/* If Category is chosen */}
-            {assignmentType === "category" && (
-              <div className="space-y-2 animate-in fade-in duration-300">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1">
-                  Select Category *
-                </label>
+          {assignmentType === "category" && (
+            <div className="wp-frow" style={{ alignItems: "flex-start" }}>
+              <label htmlFor="sc-target-filter" className="wp-flabel">Category <span style={{ color: "#d63638" }}>*</span></label>
+              <div style={{ flex: "1 1 320px", minWidth: 0, maxWidth: 420 }}>
                 <input
-                  type="text"
+                  id="sc-target-filter"
+                  type="search"
                   placeholder="Filter categories..."
                   value={searchTarget}
                   onChange={(e) => setSearchTarget(e.target.value)}
-                  className={`${inputClass} mb-2`}
+                  className="wp-input wp-full"
                 />
-                <div className="max-h-40 overflow-y-auto border border-[#ccd0d4] rounded bg-white divide-y divide-[#ccd0d4]">
+                <div role="listbox" aria-label="Categories" style={{ maxHeight: 160, overflowY: "auto", border: "1px solid #dcdcde", marginTop: 6, background: "#fff" }}>
                   {filteredCategories.length === 0 ? (
-                    <div className="p-3 text-[12px] text-gray-500 italic">No matching categories</div>
+                    <div className="wp-muted" style={{ padding: 8 }}>No matching categories</div>
                   ) : (
                     filteredCategories.map(cat => (
                       <button
                         key={cat._id}
                         type="button"
+                        role="option"
+                        aria-selected={assignmentTargetId === cat._id}
                         onClick={() => { setAssignmentTargetId(cat._id); setSearchTarget(cat.name); }}
-                        className={`w-full text-left break-words px-3 py-2 text-[13px] hover:bg-neutral-50 ${assignmentTargetId === cat._id ? "bg-blue-50 font-bold text-[#2271b1]" : "text-gray-700"}`}
+                        style={{
+                          display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0,
+                          borderBottom: "1px solid #f0f0f1", cursor: "pointer", wordBreak: "break-word",
+                          background: assignmentTargetId === cat._id ? "#f0f6fc" : "#fff",
+                          color: assignmentTargetId === cat._id ? "#2271b1" : "#1d2327",
+                          fontWeight: assignmentTargetId === cat._id ? 600 : 400,
+                        }}
                       >
                         {cat.name}
                       </button>
@@ -632,36 +541,42 @@ export default function SizeChartForm({ initialId = null }) {
                   )}
                 </div>
                 {assignmentTargetId && (
-                  <div className="text-[11px] text-green-700 font-bold flex items-center gap-1 mt-1 bg-green-50 px-2 py-1.5 border border-green-200 rounded">
-                    Selected category: {categories.find(c => c._id === assignmentTargetId)?.name}
-                  </div>
+                  <p className="wp-desc">Selected category: <span className="wp-strong">{selectedCategoryName}</span></p>
                 )}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* If Product is chosen */}
-            {assignmentType === "product" && (
-              <div className="space-y-2 animate-in fade-in duration-300">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1">
-                  Select Product *
-                </label>
+          {assignmentType === "product" && (
+            <div className="wp-frow" style={{ alignItems: "flex-start" }}>
+              <label htmlFor="sc-target-filter" className="wp-flabel">Product <span style={{ color: "#d63638" }}>*</span></label>
+              <div style={{ flex: "1 1 320px", minWidth: 0, maxWidth: 420 }}>
                 <input
-                  type="text"
+                  id="sc-target-filter"
+                  type="search"
                   placeholder="Filter products..."
                   value={searchTarget}
                   onChange={(e) => setSearchTarget(e.target.value)}
-                  className={`${inputClass} mb-2`}
+                  className="wp-input wp-full"
                 />
-                <div className="max-h-40 overflow-y-auto border border-[#ccd0d4] rounded bg-white divide-y divide-[#ccd0d4]">
+                <div role="listbox" aria-label="Products" style={{ maxHeight: 160, overflowY: "auto", border: "1px solid #dcdcde", marginTop: 6, background: "#fff" }}>
                   {filteredProducts.length === 0 ? (
-                    <div className="p-3 text-[12px] text-gray-500 italic">No matching products</div>
+                    <div className="wp-muted" style={{ padding: 8 }}>No matching products</div>
                   ) : (
                     filteredProducts.map(prod => (
                       <button
                         key={prod._id}
                         type="button"
+                        role="option"
+                        aria-selected={assignmentTargetId === prod._id}
                         onClick={() => { setAssignmentTargetId(prod._id); setSearchTarget(prod.name); }}
-                        className={`w-full text-left break-words px-3 py-2 text-[13px] hover:bg-neutral-50 ${assignmentTargetId === prod._id ? "bg-blue-50 font-bold text-[#2271b1]" : "text-gray-700"}`}
+                        style={{
+                          display: "block", width: "100%", textAlign: "left", padding: "8px 10px", border: 0,
+                          borderBottom: "1px solid #f0f0f1", cursor: "pointer", wordBreak: "break-word",
+                          background: assignmentTargetId === prod._id ? "#f0f6fc" : "#fff",
+                          color: assignmentTargetId === prod._id ? "#2271b1" : "#1d2327",
+                          fontWeight: assignmentTargetId === prod._id ? 600 : 400,
+                        }}
                       >
                         {prod.name}
                       </button>
@@ -669,54 +584,113 @@ export default function SizeChartForm({ initialId = null }) {
                   )}
                 </div>
                 {assignmentTargetId && (
-                  <div className="text-[11px] text-green-700 font-bold flex items-center gap-1 mt-1 bg-green-50 px-2 py-1.5 border border-green-200 rounded">
-                    Selected product: {products.find(p => p._id === assignmentTargetId)?.name}
-                  </div>
+                  <p className="wp-desc">Selected product: <span className="wp-strong">{selectedProductName}</span></p>
                 )}
               </div>
-            )}
-          </div>
-          
-        </div>
+            </div>
+          )}
+        </Postbox>
       </div>
 
-      {/* Preview Modal Component */}
-      {showPreview && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={() => setShowPreview(false)}>
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] flex flex-col overflow-hidden border border-black animate-sg-in" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-4 border-b border-black shrink-0">
-              <span className="text-[13px] font-bold uppercase tracking-widest text-black min-w-0 break-words">
-                {publicHeading || "Preview Size Guide"}
-              </span>
+      {/* Side column */}
+      <div className="wp-col-side">
+        <Postbox
+          title="Publish"
+          id="sc-publish"
+          footer={
+            <>
               <button
-                onClick={() => setShowPreview(false)}
-                className="w-8 h-8 shrink-0 flex items-center justify-center border border-black hover:bg-black hover:text-white transition-all text-black font-medium"
+                type="button"
+                onClick={() => router.push("/admin/products/size-charts")}
+                className="wp-btn"
               >
-                ×
+                Cancel
+              </button>
+              <span className="wp-spacer" />
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleSave}
+                className="wp-btn wp-btn-primary"
+              >
+                {saving ? "Saving..." : "Save Chart"}
+              </button>
+            </>
+          }
+        >
+          <div className="wp-field">
+            <label htmlFor="sc-status" className="wp-label">Status</label>
+            <select
+              id="sc-status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="wp-select wp-full"
+            >
+              <option>Published</option>
+              <option>Draft</option>
+            </select>
+          </div>
+          <button type="button" onClick={() => setShowPreview(true)} className="wp-btn">
+            Preview chart
+          </button>
+        </Postbox>
+
+        <Postbox title="Import / Export" id="sc-csv">
+          <p className="wp-desc" style={{ marginTop: 0, marginBottom: 10 }}>Importing a CSV replaces the current columns and rows.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <label className="wp-btn" style={{ cursor: "pointer" }}>
+              Import CSV
+              <input type="file" accept=".csv" onChange={handleImportCSV} className="sr-only" />
+            </label>
+            <button type="button" onClick={handleExportCSV} className="wp-btn">
+              Export CSV
+            </button>
+          </div>
+        </Postbox>
+      </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div className="wp-modal-backdrop" onClick={() => setShowPreview(false)}>
+          <div
+            className="wp-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sc-form-preview-title"
+            style={{ maxWidth: 720 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="wp-modal-head">
+              <h2 id="sc-form-preview-title" style={{ minWidth: 0, wordBreak: "break-word" }}>
+                {publicHeading || "Preview Size Guide"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowPreview(false)}
+                className="wp-notice-dismiss"
+                aria-label="Close preview"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
-            
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 space-y-4 sm:space-y-6">
+            <div className="wp-modal-body">
               {description && (
-                <p className="text-xs text-neutral-500 leading-relaxed italic">{description}</p>
+                <p className="wp-desc" style={{ marginTop: 0, marginBottom: 12 }}>{description}</p>
               )}
-              
-              <div className="w-full max-w-full overflow-x-auto border border-black rounded">
-                <table className="w-full text-left border-collapse text-[11px] sm:text-[12px]">
+              <div className="wp-table-box">
+                <table className="wp-list-table">
                   <thead>
-                    <tr className="bg-black/5 border-b border-black font-bold uppercase text-black">
+                    <tr>
                       {columns.map((col, idx) => (
-                        <th key={idx} className="px-3 py-2.5 whitespace-nowrap">{col}</th>
+                        <th key={idx} scope="col" style={{ whiteSpace: "nowrap" }}>{col}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-black/10">
+                  <tbody>
                     {rows.filter(row => row.some(cell => cell.trim() !== "")).map((row, rowIdx) => (
-                      <tr key={rowIdx} className="hover:bg-black/[0.02] text-black">
+                      <tr key={rowIdx}>
                         {row.map((cell, cellIdx) => (
-                          <td key={cellIdx} className={`px-3 py-2.5 ${cellIdx === 0 ? "font-bold" : ""}`}>
+                          <td key={cellIdx} className={cellIdx === 0 ? "wp-strong" : undefined}>
                             {cell || "—"}
                           </td>
                         ))}
@@ -726,17 +700,12 @@ export default function SizeChartForm({ initialId = null }) {
                 </table>
               </div>
             </div>
+            <div className="wp-modal-foot">
+              <button type="button" className="wp-btn" onClick={() => setShowPreview(false)}>Close</button>
+            </div>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes sgIn {
-          from { opacity: 0; transform: scale(0.96) translateY(10px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .animate-sg-in { animation: sgIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
-      `}</style>
     </div>
   );
 }

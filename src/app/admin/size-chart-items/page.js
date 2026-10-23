@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import { toast } from "react-hot-toast";
-import { Pencil, Trash2, X, Save, Loader2 } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
-
-const inputClass = "border border-[#8c8f94] bg-white text-[13px] px-3 py-2 rounded-[3px] outline-none focus:border-[#2271b1] w-full";
+import { Page, PageHeader } from "@/components/admin/ui";
 
 function SizeChartForm({ item, onSave, onClose, isNew }) {
   const [form, setForm] = useState({
@@ -52,55 +50,51 @@ function SizeChartForm({ item, onSave, onClose, isNew }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={onClose}>
+    <div className="wp-modal-backdrop" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-1rem)] sm:max-h-[90vh] overflow-y-auto"
+        className="wp-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="size-chart-item-title"
+        style={{ maxWidth: 520 }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2 p-4 sm:p-5 border-b border-gray-100">
-          <h2 className="font-bold text-[15px] text-[#1d2327] min-w-0 break-words">{isNew ? "Add Size Chart" : "Edit Size Chart"}</h2>
-          <button onClick={onClose} className="w-8 h-8 shrink-0 rounded-full hover:bg-gray-100 flex items-center justify-center">
-            <X className="w-4 h-4" />
+        <div className="wp-modal-head">
+          <h2 id="size-chart-item-title" style={{ minWidth: 0, wordBreak: "break-word" }}>{isNew ? "Add Size Chart" : "Edit Size Chart"}</h2>
+          <button type="button" onClick={onClose} className="wp-notice-dismiss" aria-label="Close dialog">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-4 sm:p-5 space-y-4">
-          {/* Title */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Title *</label>
-            <input type="text" name="title" value={form.title} onChange={handleChange} placeholder="e.g. Men's Jacket Size Chart" className={inputClass} />
+        <div className="wp-modal-body">
+          <div className="wp-field">
+            <label htmlFor="sci-title" className="wp-label">Title <span style={{ color: "#d63638" }}>*</span></label>
+            <input id="sci-title" type="text" name="title" value={form.title} onChange={handleChange} placeholder="e.g. Men's Jacket Size Chart" className="wp-input wp-full" />
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Description (optional)</label>
-            <textarea name="description" value={form.description} onChange={handleChange} rows={2} placeholder="Optional description or instructions..." className={`${inputClass} resize-none`} />
+          <div className="wp-field">
+            <label htmlFor="sci-description" className="wp-label">Description <span className="wp-muted">(optional)</span></label>
+            <textarea id="sci-description" name="description" value={form.description} onChange={handleChange} rows={2} placeholder="Optional description or instructions..." className="wp-textarea wp-full" />
           </div>
 
-          {/* Image */}
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-2">Size Chart Image *</label>
+          <div className="wp-field">
+            <span className="wp-label">Size chart image <span style={{ color: "#d63638" }}>*</span></span>
             {form.image && (
-              <img src={form.image} alt="Preview" className="w-full object-contain max-h-48 rounded-lg mb-2 border border-[#ccd0d4] bg-gray-50 p-2" />
+              <img src={form.image} alt="Preview" style={{ width: "100%", maxHeight: 192, objectFit: "contain", border: "1px solid #dcdcde", background: "#f6f7f7", padding: 8, marginBottom: 8 }} />
             )}
-            <button
-              type="button"
-              onClick={() => setMediaPicker(true)}
-              className="w-full border-2 border-dashed border-[#ccd0d4] py-2 text-[13px] text-[#2271b1] hover:border-[#2271b1] rounded-lg font-medium"
-            >
+            <button type="button" onClick={() => setMediaPicker(true)} className="wp-btn">
               {form.image ? "Change Image" : "Select from Media Library"}
             </button>
           </div>
 
-          {/* Order + Enabled */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Display Order</label>
-              <input type="number" name="order" value={form.order} onChange={handleChange} min={0} className={inputClass} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+            <div className="wp-field">
+              <label htmlFor="sci-order" className="wp-label">Display order</label>
+              <input id="sci-order" type="number" name="order" value={form.order} onChange={handleChange} min={0} className="wp-input wp-full" />
             </div>
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-1.5">Visible</label>
-              <select name="enabled" value={form.enabled ? "true" : "false"} onChange={e => setForm(prev => ({ ...prev, enabled: e.target.value === "true" }))} className={inputClass}>
+            <div className="wp-field">
+              <label htmlFor="sci-enabled" className="wp-label">Visible</label>
+              <select id="sci-enabled" name="enabled" value={form.enabled ? "true" : "false"} onChange={e => setForm(prev => ({ ...prev, enabled: e.target.value === "true" }))} className="wp-select wp-full">
                 <option value="true">Yes</option>
                 <option value="false">No</option>
               </select>
@@ -108,10 +102,10 @@ function SizeChartForm({ item, onSave, onClose, isNew }) {
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 border-t border-gray-100 flex flex-col-reverse xs:flex-row xs:justify-end gap-2 xs:gap-3">
-          <button onClick={onClose} className="w-full xs:w-auto border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="w-full xs:w-auto justify-center bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] flex items-center gap-2 disabled:opacity-60">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+        <div className="wp-modal-foot">
+          <button type="button" onClick={onClose} className="wp-btn">Cancel</button>
+          <button type="button" onClick={handleSave} disabled={saving} className="wp-btn wp-btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {saving ? "Saving..." : "Save Chart"}
           </button>
         </div>
@@ -190,62 +184,76 @@ export default function SizeChartItemsPage() {
 
   return (
     <RequirePermission permission="products.edit">
-    <AdminPageLayout title="Size Chart Items" addNewLabel="Add Size Chart" onAddNew={() => { setEditingItem(null); setFormOpen(true); }}>
-      <div className="space-y-4">
-        <p className="text-[13px] text-[#646970]">
-          Manage the size chart images displayed on your <strong>/size-chart</strong> page. Use the Display Order field to control the sequence.
-        </p>
+    <Page>
+      <PageHeader title="Size Chart Items" />
+      <p className="wp-desc" style={{ marginTop: 0 }}>
+        Manage the size chart images displayed on your <strong>/size-chart</strong> page. Use the Display Order field to control the sequence.
+      </p>
 
-        <div className="bg-white border border-[#ccd0d4] max-w-full overflow-x-auto shadow-sm">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[480px] md:min-w-[600px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Preview</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Title</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327] hidden md:table-cell">Order</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Visible</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={5} className="p-8 text-center italic text-gray-400">Loading...</td></tr>
-              ) : items.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center italic text-gray-400">No size charts yet. Click "Add Size Chart" to get started.</td></tr>
-              ) : (
-                items.map(item => (
-                  <tr key={item._id} className={`hover:bg-[#f6f7f7] group transition-colors ${!item.enabled ? "opacity-50" : ""}`}>
-                    <td className="px-4 py-3">
-                      {item.image ? (
-                        <img src={item.image} alt={item.title} className="h-14 w-20 object-contain rounded border border-[#ccd0d4] bg-gray-50" />
-                      ) : (
-                        <div className="h-14 w-20 bg-gray-100 rounded border border-[#ccd0d4]" />
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-[#1d2327]">{item.title}</p>
-                      {item.description && <p className="text-[#646970] text-[12px] line-clamp-1">{item.description}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-[#646970] hidden md:table-cell">{item.order}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => handleToggle(item)} className={`w-9 h-5 md:w-7 md:h-4 rounded-full transition-colors ${item.enabled ? "bg-[#2271b1]" : "bg-gray-300"}`} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setEditingItem(item); setFormOpen(true); }} className="text-[#2271b1] text-[12px] font-medium hover:text-[#135e96] flex items-center gap-1">
-                          <Pencil className="w-3.5 h-3.5" /> Edit
-                        </button>
-                        <button onClick={() => handleDelete(item._id)} className="text-[#d63638] text-[12px] font-medium hover:text-[#bc0b0d] flex items-center gap-1">
-                          <Trash2 className="w-3.5 h-3.5" /> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <span className="wp-pages">{items.length} item{items.length === 1 ? "" : "s"}</span>
+      </div>
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>
+            <tr>
+              <th scope="col" style={{ width: 100 }}>Preview</th>
+              <th scope="col">Title</th>
+              <th scope="col" className="wp-hide-sm wp-num">Order</th>
+              <th scope="col" style={{ width: 120 }}>Visible</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={4} className="wp-muted">Loading…</td></tr>
+            ) : items.length === 0 ? (
+              <tr><td colSpan={4} className="wp-muted">No size charts yet. Click &ldquo;Add Size Chart&rdquo; to get started.</td></tr>
+            ) : (
+              items.map(item => (
+                <tr key={item._id}>
+                  <td>
+                    {item.image ? (
+                      <img src={item.image} alt={item.title} style={{ height: 56, width: 80, objectFit: "contain", border: "1px solid #dcdcde", background: "#f6f7f7", opacity: item.enabled ? 1 : 0.5 }} />
+                    ) : (
+                      <div style={{ height: 56, width: 80, border: "1px solid #dcdcde", background: "#f0f0f1" }} />
+                    )}
+                  </td>
+                  <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                    <button type="button" className="wp-row-title" style={{ background: "none", border: 0, padding: 0, textAlign: "left", cursor: "pointer" }} onClick={() => { setEditingItem(item); setFormOpen(true); }}>
+                      {item.title}
+                    </button>
+                    {!item.enabled && <span className="wp-muted"> — Hidden</span>}
+                    {item.description && <div className="wp-muted wp-small line-clamp-1">{item.description}</div>}
+                    <div className="wp-mobile-meta">Order: {item.order}</div>
+                    <div className="wp-row-actions">
+                      <span><button type="button" onClick={() => { setEditingItem(item); setFormOpen(true); }}>Edit</button></span>
+                      <span><button type="button" onClick={() => handleDelete(item._id)} className="is-danger">Delete</button></span>
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm wp-num">{item.order}</td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle(item)}
+                      role="switch"
+                      aria-checked={!!item.enabled}
+                      aria-label={`${item.title}: ${item.enabled ? "visible" : "hidden"}`}
+                      className="wp-btn"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+                    >
+                      <span aria-hidden="true" style={{ position: "relative", width: 28, height: 16, borderRadius: 8, background: item.enabled ? "#2271b1" : "#c3c4c7", flex: "none" }}>
+                        <span style={{ position: "absolute", top: 2, left: item.enabled ? 14 : 2, width: 12, height: 12, borderRadius: "50%", background: "#fff" }} />
+                      </span>
+                      {item.enabled ? "Yes" : "No"}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {formOpen && (
@@ -256,7 +264,7 @@ export default function SizeChartItemsPage() {
           isNew={!editingItem}
         />
       )}
-    </AdminPageLayout>
+    </Page>
     </RequirePermission>
   );
 }

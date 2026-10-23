@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
-import { Star, Search, MessageSquare, Edit2, CornerDownRight, X, Square, CheckSquare } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { Page, PageHeader } from "@/components/admin/ui";
 
 // Helper to format date like WordPress: YYYY/MM/DD at hh:mm am/pm
 const formatDate = (dateString) => {
@@ -332,558 +332,486 @@ export default function AdminReviewsPage() {
     }
   };
 
-  // Get background color of row based on status and state
-  const getRowBgColor = (review) => {
-    if (review.isDeleted) return "bg-[#f6f7f7]/60 text-gray-500";
-    if (review.status === "Pending") return "bg-[#fffbdf]";
-    if (review.status === "Spam") return "bg-[#fcf0f1]";
-    if (review.status === "Rejected") return "bg-gray-50/50";
-    return "bg-white hover:bg-[#f6f7f7]/30";
+  // Row background, WordPress Comments style
+  const getRowStyle = (review) => {
+    if (review.isDeleted) return { color: "#646970" };
+    if (review.status === "Pending") return { background: "#fef7f1" };
+    if (review.status === "Spam") return { background: "#fcf0f1" };
+    return undefined;
   };
 
   // Render WP style row actions list
   const renderRowActions = (review) => {
-    const actions = [];
-    
     if (review.isDeleted) {
-      actions.push(
-        <button key="restore" onClick={() => handleRestoreSingle(review._id)} className="text-green-600 hover:text-green-800 hover:underline">
-          Restore
-        </button>
-      );
-      actions.push(
-        <button key="delete_perm" onClick={() => handleDeletePermanentlySingle(review._id)} className="text-[#d63638] hover:text-[#b32d2f] hover:underline">
-          Delete Permanently
-        </button>
-      );
-    } else {
-      // Approve / Unapprove
-      if (review.status === "Approved") {
-        actions.push(
-          <button key="unapprove" onClick={() => handleModerateSingle(review._id, "Pending")} className="text-amber-600 hover:underline font-semibold">
-            Unapprove
-          </button>
-        );
-      } else {
-        actions.push(
-          <button key="approve" onClick={() => handleModerateSingle(review._id, "Approved")} className="text-green-600 hover:underline font-bold">
-            Approve
-          </button>
-        );
-      }
-      
-      // Reply
-      actions.push(
-        <button key="reply" onClick={() => { setReplyingId(review._id); setInlineReplyText(""); setQuickEditingId(null); }} className="hover:underline">
-          Reply
-        </button>
-      );
-      
-      // Quick Edit / Edit (both open inline Quick Edit in WP Comments page)
-      actions.push(
-        <button key="quick-edit" onClick={() => handleStartQuickEdit(review)} className="hover:underline">
-          Quick Edit
-        </button>
-      );
-      
-      actions.push(
-        <button key="edit" onClick={() => handleStartQuickEdit(review)} className="hover:underline">
-          Edit
-        </button>
-      );
-      
-      // Spam / Not Spam
-      if (review.status === "Spam") {
-        actions.push(
-          <button key="not-spam" onClick={() => handleModerateSingle(review._id, "Pending")} className="text-green-600 hover:underline">
-            Not Spam
-          </button>
-        );
-      } else {
-        actions.push(
-          <button key="spam" onClick={() => handleModerateSingle(review._id, "Spam")} className="text-amber-600 hover:underline">
-            Spam
-          </button>
-        );
-      }
-      
-      // Trash
-      actions.push(
-        <button key="trash" onClick={() => handleTrashSingle(review._id)} className="text-[#d63638] hover:underline">
-          Trash
-        </button>
+      return (
+        <>
+          <span><button type="button" onClick={() => handleRestoreSingle(review._id)}>Restore</button></span>
+          <span><button type="button" onClick={() => handleDeletePermanentlySingle(review._id)} className="is-danger">Delete permanently</button></span>
+        </>
       );
     }
-    
-    return actions.map((action, i) => (
-      <React.Fragment key={i}>
-        {action}
-        {i < actions.length - 1 && <span className="text-gray-300 font-normal">|</span>}
-      </React.Fragment>
-    ));
+    return (
+      <>
+        {review.status === "Approved" ? (
+          <span><button type="button" onClick={() => handleModerateSingle(review._id, "Pending")} style={{ color: "#996800" }}>Unapprove</button></span>
+        ) : (
+          <span><button type="button" onClick={() => handleModerateSingle(review._id, "Approved")} style={{ color: "#007017" }}>Approve</button></span>
+        )}
+        <span><button type="button" onClick={() => { setReplyingId(review._id); setInlineReplyText(""); setQuickEditingId(null); }}>Reply</button></span>
+        <span><button type="button" onClick={() => handleStartQuickEdit(review)}>Quick Edit</button></span>
+        <span><button type="button" onClick={() => handleStartQuickEdit(review)}>Edit</button></span>
+        {review.status === "Spam" ? (
+          <span><button type="button" onClick={() => handleModerateSingle(review._id, "Pending")}>Not Spam</button></span>
+        ) : (
+          <span><button type="button" onClick={() => handleModerateSingle(review._id, "Spam")} className="is-danger">Spam</button></span>
+        )}
+        <span><button type="button" onClick={() => handleTrashSingle(review._id)} className="is-danger">Trash</button></span>
+      </>
+    );
   };
 
-  const inputClass = "w-full border border-[#ccd0d4] bg-white text-xs px-2.5 py-1.5 outline-none focus:border-[#2271b1] focus:ring-0 rounded-[3px] font-medium";
-  const btnClass = "bg-[#f6f7f7] border border-[#ccd0d4] hover:bg-[#f0f0f1] text-[#2c3338] text-xs font-semibold px-3 py-1.5 rounded-[3px] cursor-pointer inline-block transition-colors outline-none select-none";
-  const primaryBtnClass = "bg-[#2271b1] border border-[#135e96] hover:bg-[#135e96] text-white text-xs font-semibold px-4 py-1.5 rounded-[3px] cursor-pointer inline-block transition-colors outline-none select-none";
+  const statusTabs = [
+    { key: "All", label: "All", count: stats.allCount },
+    { key: "Pending", label: "Pending", count: stats.pendingCount },
+    { key: "Approved", label: "Approved", count: stats.approvedCount },
+    { key: "Rejected", label: "Rejected", count: stats.rejectedCount },
+    { key: "Spam", label: "Spam", count: stats.spamCount },
+    { key: "Trash", label: "Trash", count: stats.trashCount },
+  ];
+
+  const renderStars = (rating) => (
+    <span role="img" aria-label={`Rated ${rating || 0} out of 5`} style={{ display: "inline-flex", gap: 1, verticalAlign: "middle" }}>
+      {[...Array(5)].map((_, i) => (
+        <Star
+          key={i}
+          aria-hidden="true"
+          className="w-3.5 h-3.5"
+          style={i < rating ? { fill: "#dba617", color: "#dba617" } : { fill: "#dcdcde", color: "#dcdcde" }}
+        />
+      ))}
+    </span>
+  );
+
+  const renderPager = () =>
+    pagination.totalPages > 1 && (
+      <div className="wp-pages">
+        <span>{pagination.total} items</span>
+        <button
+          type="button"
+          className="wp-pager"
+          disabled={page <= 1}
+          onClick={() => setPage(page - 1)}
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span>{page} of {pagination.totalPages}</span>
+        <button
+          type="button"
+          className="wp-pager"
+          disabled={page >= pagination.totalPages}
+          onClick={() => setPage(page + 1)}
+          aria-label="Next page"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    );
+
+  const allSelected = selectedIds.length === reviews.length;
 
   return (
     <RequirePermission permission="reviews.view">
-    <AdminPageLayout
-      title="Comments"
-      breadcrumbs={[{ label: "Store", href: "/admin/orders" }, { label: "Reviews" }]}
-    >
-      <div className="flex flex-col gap-4 pb-20 items-start w-full">
-        
-        {/* Subsubsub Navigation & Search */}
-        <div className="flex flex-wrap items-center justify-between border-b border-[#c3c4c7] pb-2 w-full">
-          <ul className="flex flex-wrap items-center gap-1.5 text-[13px] text-[#2c3338] font-medium select-none">
-            <li>
-              <button 
-                onClick={() => { setStatusFilter("All"); setPage(1); }} 
-                className={`hover:text-[#2271b1] transition-colors ${statusFilter === "All" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-              >
-                All <span className="text-gray-400 text-xs font-normal">({stats.allCount || 0})</span>
-              </button>
-              <span className="text-gray-300 ml-1.5">|</span>
-            </li>
-            <li>
-              <button 
-                onClick={() => { setStatusFilter("Pending"); setPage(1); }} 
-                className={`hover:text-[#2271b1] transition-colors ${statusFilter === "Pending" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-              >
-                Pending <span className="text-[#d54e21] text-xs font-bold">({stats.pendingCount || 0})</span>
-              </button>
-              <span className="text-gray-300 ml-1.5">|</span>
-            </li>
-            <li>
-              <button 
-                onClick={() => { setStatusFilter("Approved"); setPage(1); }} 
-                className={`hover:text-[#2271b1] transition-colors ${statusFilter === "Approved" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-              >
-                Approved <span className="text-gray-400 text-xs">({stats.approvedCount || 0})</span>
-              </button>
-              <span className="text-gray-300 ml-1.5">|</span>
-            </li>
-            <li>
-              <button 
-                onClick={() => { setStatusFilter("Rejected"); setPage(1); }} 
-                className={`hover:text-[#2271b1] transition-colors ${statusFilter === "Rejected" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-              >
-                Rejected <span className="text-gray-400 text-xs">({stats.rejectedCount || 0})</span>
-              </button>
-              <span className="text-gray-300 ml-1.5">|</span>
-            </li>
-            <li>
-              <button 
-                onClick={() => { setStatusFilter("Spam"); setPage(1); }} 
-                className={`hover:text-[#2271b1] transition-colors ${statusFilter === "Spam" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-              >
-                Spam <span className="text-[#d63638] text-xs font-bold">({stats.spamCount || 0})</span>
-              </button>
-              <span className="text-gray-300 ml-1.5">|</span>
-            </li>
-            <li>
-              <button 
-                onClick={() => { setStatusFilter("Trash"); setPage(1); }} 
-                className={`hover:text-[#2271b1] transition-colors ${statusFilter === "Trash" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-              >
-                Trash <span className="text-gray-400 text-xs font-normal">({stats.trashCount || 0})</span>
-              </button>
-            </li>
-          </ul>
+    <Page>
+      <PageHeader title="Reviews" />
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-56 mt-2 md:mt-0">
-            <input
-              type="text"
-              placeholder="Search comments..."
-              value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
-              className="w-full text-xs pl-8 pr-3 py-1.5 border border-[#ccd0d4] bg-white outline-none focus:border-[#2271b1] rounded-[3px] font-medium"
-            />
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
-          </div>
-        </div>
-
-        {/* Filter Toolbar */}
-        <div className="flex flex-wrap gap-2 items-center justify-between w-full select-none">
-          <div className="flex items-center gap-1.5">
-            <select
-              value={bulkAction}
-              onChange={e => setBulkAction(e.target.value)}
-              className="text-xs border border-[#ccd0d4] bg-white px-2 py-1.5 outline-none text-[#2c3338] font-medium rounded-[3px] focus:border-[#2271b1]"
-            >
-              <option value="">Bulk Actions</option>
-              {statusFilter === "Trash" ? (
-                <>
-                  <option value="restore">Restore</option>
-                  <option value="delete_permanently">Delete Permanently</option>
-                </>
-              ) : (
-                <>
-                  <option value="approve">Approve</option>
-                  <option value="reject">Reject</option>
-                  <option value="spam">Mark as Spam</option>
-                  <option value="delete">Move to Trash</option>
-                </>
-              )}
-            </select>
-            <button onClick={handleBulkAction} disabled={selectedIds.length === 0} className={btnClass}>
-              Apply
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-bold text-gray-500">Filter:</span>
-            <select
-              value={ratingFilter}
-              onChange={e => { setRatingFilter(e.target.value); setPage(1); }}
-              className="text-xs border border-[#ccd0d4] bg-white px-2 py-1.5 outline-none text-[#2c3338] font-medium rounded-[3px] focus:border-[#2271b1]"
-            >
-              <option value="">All Ratings</option>
-              <option value="5">5 Stars</option>
-              <option value="4">4 Stars</option>
-              <option value="3">3 Stars</option>
-              <option value="2">2 Stars</option>
-              <option value="1">1 Star</option>
-            </select>
-
-            <span className="text-xs font-bold text-gray-500 ml-1">Date:</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-              max={dateTo || undefined}
-              className="text-xs border border-[#ccd0d4] bg-white px-2 py-1.5 outline-none text-[#2c3338] font-medium rounded-[3px] focus:border-[#2271b1]"
-            />
-            <span className="text-xs text-gray-400">to</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={e => { setDateTo(e.target.value); setPage(1); }}
-              min={dateFrom || undefined}
-              className="text-xs border border-[#ccd0d4] bg-white px-2 py-1.5 outline-none text-[#2c3338] font-medium rounded-[3px] focus:border-[#2271b1]"
-            />
-            {(dateFrom || dateTo) && (
-              <button
-                onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
-                className="text-xs text-[#2271b1] hover:underline"
-              >
-                Clear dates
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Table list */}
-        <div className="bg-white border border-[#c3c4c7] w-full overflow-hidden">
-          {loading ? (
-            <div className="p-16 text-center italic text-gray-400 font-medium">Loading comments database...</div>
-          ) : reviews.length === 0 ? (
-            <div className="p-16 text-center italic text-gray-400 font-medium">No comments found.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px] table-fixed text-[13px]">
-                <thead>
-                  <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338] font-bold select-none">
-                    <th className="py-2.5 px-3 w-10 text-center align-middle">
-                      <button onClick={toggleSelectAll} className="flex items-center justify-center w-full">
-                        {selectedIds.length === reviews.length ? (
-                          <CheckSquare className="w-4 h-4 text-[#2271b1]" />
-                        ) : (
-                          <Square className="w-4 h-4 text-gray-400" />
-                        )}
-                      </button>
-                    </th>
-                    <th className="py-2.5 px-3 w-48 font-bold text-[#1d2327]">Author</th>
-                    <th className="py-2.5 px-3 font-bold text-[#1d2327] w-[450px]">Comment</th>
-                    <th className="py-2.5 px-3 w-44 font-bold text-[#1d2327]">In Response To</th>
-                    <th className="py-2.5 px-3 w-40 font-bold text-[#1d2327]">Submitted On</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#c3c4c7]">
-                  {reviews.map(review => {
-                    const isSelected = selectedIds.includes(review._id);
-                    const isReplying = replyingId === review._id;
-                    const isQuickEditing = quickEditingId === review._id;
-                    const bgClass = getRowBgColor(review);
-                    
-                    if (isQuickEditing) {
-                      return (
-                        <tr key={review._id} className="bg-[#f6f7f7] border-y-2 border-[#c3c4c7]">
-                          <td colSpan={5} className="p-4 align-top">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-3">
-                                <h4 className="text-[12px] font-bold text-gray-800 uppercase tracking-wider border-b border-gray-200 pb-1 flex items-center gap-1.5 select-none">
-                                  <Edit2 className="w-3.5 h-3.5 text-gray-505" /> Edit Author Info
-                                </h4>
-                                <div className="space-y-3">
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Author Name</label>
-                                    <input 
-                                      type="text" 
-                                      className={inputClass}
-                                      value={quickEditData.customerName}
-                                      onChange={e => setQuickEditData({ ...quickEditData, customerName: e.target.value })}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Author Email</label>
-                                    <input 
-                                      type="email" 
-                                      className={inputClass}
-                                      value={quickEditData.customerEmail}
-                                      onChange={e => setQuickEditData({ ...quickEditData, customerEmail: e.target.value })}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="space-y-3">
-                                <h4 className="text-[12px] font-bold text-gray-800 uppercase tracking-wider border-b border-gray-200 pb-1 flex items-center gap-1.5 select-none">
-                                  <MessageSquare className="w-3.5 h-3.5 text-gray-505" /> Edit Comment Content
-                                </h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Rating</label>
-                                    <select
-                                      className="w-full border border-[#ccd0d4] bg-white text-xs p-1.5 outline-none rounded-[3px] focus:border-[#2271b1]"
-                                      value={quickEditData.rating}
-                                      onChange={e => setQuickEditData({ ...quickEditData, rating: parseInt(e.target.value) })}
-                                    >
-                                      <option value="5">5 Stars</option>
-                                      <option value="4">4 Stars</option>
-                                      <option value="3">3 Stars</option>
-                                      <option value="2">2 Stars</option>
-                                      <option value="1">1 Star</option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Status</label>
-                                    <select
-                                      className="w-full border border-[#ccd0d4] bg-white text-xs p-1.5 outline-none rounded-[3px] focus:border-[#2271b1]"
-                                      value={quickEditData.status}
-                                      onChange={e => setQuickEditData({ ...quickEditData, status: e.target.value })}
-                                    >
-                                      <option value="Pending">Pending</option>
-                                      <option value="Approved">Approved</option>
-                                      <option value="Rejected">Rejected</option>
-                                      <option value="Spam">Spam</option>
-                                    </select>
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Submitted On</label>
-                                  <input
-                                    type="datetime-local"
-                                    className={inputClass}
-                                    value={quickEditData.createdAt}
-                                    onChange={e => setQuickEditData({ ...quickEditData, createdAt: e.target.value })}
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Comment Content</label>
-                                  <textarea 
-                                    rows={3}
-                                    className={`${inputClass} resize-none`}
-                                    value={quickEditData.comment}
-                                    onChange={e => setQuickEditData({ ...quickEditData, comment: e.target.value })}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex justify-end gap-1.5 mt-3 select-none">
-                              <button 
-                                type="button" 
-                                onClick={() => setQuickEditingId(null)}
-                                className={btnClass}
-                              >
-                                Cancel
-                              </button>
-                              <button 
-                                type="button"
-                                onClick={() => handleQuickEditSubmit(review._id)}
-                                className={primaryBtnClass}
-                              >
-                                Update Comment
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    }
-
-                    return (
-                      <tr key={review._id} className={`group transition-colors ${bgClass} ${isSelected ? "bg-[#f0f6fa]/80" : ""}`}>
-                        {/* Checkbox column */}
-                        <td className={`py-4 px-3 align-top w-10 text-center ${review.status === "Pending" ? "border-l-4 border-l-[#d54e21]" : ""}`}>
-                          <button onClick={() => toggleSelectOne(review._id)} className="flex items-center justify-center w-full">
-                            {isSelected ? (
-                              <CheckSquare className="w-4 h-4 text-[#2271b1]" />
-                            ) : (
-                              <Square className="w-4 h-4 text-gray-300 group-hover:text-gray-400" />
-                            )}
-                          </button>
-                        </td>
-
-                        {/* Author column */}
-                        <td className="py-4 px-3 align-top text-xs">
-                          <div className="flex items-start gap-2.5">
-                            <img 
-                              src="https://secure.gravatar.com/avatar/?d=mm&s=32" 
-                              className="w-8 h-8 rounded-none border border-[#ccd0d4] shrink-0" 
-                              alt=""
-                            />
-                            <div className="space-y-0.5 min-w-0">
-                              <div className="font-bold text-[#1d2327]">
-                                {review.customerName}
-                              </div>
-                              <a href={`mailto:${review.customerEmail}`} className="text-[#2271b1] hover:underline font-mono text-[11px] truncate block" title={review.customerEmail}>
-                                {review.customerEmail}
-                              </a>
-                              <div className="text-[11px] text-gray-500 font-mono">
-                                {review.ipAddress || "127.0.0.1"}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Comment details column */}
-                        <td className="py-4 px-3 align-top">
-                          <div className="space-y-1.5 text-xs">
-                            {/* Rating & Title */}
-                            <div className="flex items-center gap-1.5 select-none">
-                              <div className="flex gap-0.5">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`w-3.5 h-3.5 ${
-                                      i < review.rating ? "fill-[#FFC633] text-[#FFC633]" : "fill-gray-200 text-gray-200"
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                              {review.title && (
-                                <span className="font-bold text-[#1d2327] text-[12px]">{review.title}</span>
-                              )}
-                            </div>
-
-                            {/* Comment text */}
-                            <p className="text-[#2c3338] text-[13px] leading-relaxed break-words whitespace-pre-wrap select-text">
-                              {review.comment}
-                            </p>
-
-                            {/* Staff Reply */}
-                            {review.replies && review.replies.length > 0 && (
-                              <div className="bg-[#f6f7f7] border border-[#d5d7d9] p-2 rounded-sm mt-2 relative text-[12px] text-[#2c3338] space-y-1">
-                                <div className="font-bold flex items-center gap-1 select-none">
-                                  <CornerDownRight className="w-3.5 h-3.5 text-gray-400" />
-                                  <span>Reply from {review.replies[0].staffName}</span>
-                                  <span className="text-[10px] text-gray-400 font-normal">on {formatDate(review.replies[0].createdAt)}</span>
-                                </div>
-                                <p className="text-gray-650 font-medium pl-4 select-text">
-                                  {review.replies[0].comment}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Hover Actions */}
-                            <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px] font-bold text-[#2271b1] select-none opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-150">
-                              {renderRowActions(review)}
-                            </div>
-                          </div>
-
-                          {/* Inline Reply Editor Drawer under comment content */}
-                          {isReplying && (
-                            <div className="bg-[#f0f6fa] border border-[#c3c4c7] p-3 rounded-sm mt-3 space-y-2">
-                              <label className="block text-[11px] font-bold text-gray-700 uppercase select-none">
-                                Submit Staff Reply
-                              </label>
-                              <textarea
-                                rows={2}
-                                placeholder="Write response..."
-                                className={`${inputClass} resize-none`}
-                                value={inlineReplyText}
-                                onChange={e => setInlineReplyText(e.target.value)}
-                              />
-                              <div className="flex justify-end gap-1.5 select-none">
-                                <button type="button" onClick={() => setReplyingId(null)} className={btnClass}>
-                                  Cancel
-                                </button>
-                                <button type="button" onClick={() => handleInlineReplySubmit(review._id)} className={primaryBtnClass}>
-                                  Submit Reply
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* In Response To column */}
-                        <td className="py-4 px-3 align-top text-xs">
-                          {review.productId ? (
-                            <div className="space-y-1">
-                              <a 
-                                href={getProductUrl(review.productId)} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="text-[#2271b1] hover:underline font-semibold block truncate max-w-[150px]"
-                                title={review.productId.name}
-                              >
-                                {review.productId.name}
-                              </a>
-                              <div className="flex items-center gap-1 select-none">
-                                <a 
-                                  href={getProductUrl(review.productId)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-gray-400 hover:text-[#2271b1] text-[11px]"
-                                >
-                                  View Product
-                                </a>
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-450 italic">Deleted Product</span>
-                          )}
-                        </td>
-
-                        {/* Submitted On column */}
-                        <td className="py-4 px-3 align-top text-gray-500 font-mono text-[11px] leading-relaxed">
-                          {formatDate(review.createdAt)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="flex justify-end gap-1.5 items-center text-xs text-[#2c3338] select-none w-full">
+      {/* Status filter links */}
+      <div className="wp-subsub" role="tablist" aria-label="Filter reviews by status">
+        {statusTabs.map((t, i) => (
+          <span key={t.key} style={{ display: "inline-flex", alignItems: "center" }}>
+            {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
             <button
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-              className={btnClass}
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === t.key}
+              className={statusFilter === t.key ? "is-current" : undefined}
+              onClick={() => { setStatusFilter(t.key); setPage(1); }}
             >
-              ‹ Prev
+              {t.label} <span className="wp-count">({t.count || 0})</span>
             </button>
-            <span className="font-medium">Page {page} of {pagination.totalPages}</span>
-            <button
-              disabled={page >= pagination.totalPages}
-              onClick={() => setPage(page + 1)}
-              className={btnClass}
-            >
-              Next ›
-            </button>
-          </div>
-        )}
+          </span>
+        ))}
       </div>
-    </AdminPageLayout>
+
+      {/* Toolbar */}
+      <div className="wp-toolbar">
+        <label htmlFor="reviews-bulk-action" className="sr-only">Select bulk action</label>
+        <select
+          id="reviews-bulk-action"
+          value={bulkAction}
+          onChange={e => setBulkAction(e.target.value)}
+          className="wp-select"
+        >
+          <option value="">Bulk actions</option>
+          {statusFilter === "Trash" ? (
+            <>
+              <option value="restore">Restore</option>
+              <option value="delete_permanently">Delete Permanently</option>
+            </>
+          ) : (
+            <>
+              <option value="approve">Approve</option>
+              <option value="reject">Reject</option>
+              <option value="spam">Mark as Spam</option>
+              <option value="delete">Move to Trash</option>
+            </>
+          )}
+        </select>
+        <button type="button" onClick={handleBulkAction} disabled={selectedIds.length === 0} className="wp-btn">
+          Apply
+        </button>
+
+        <label htmlFor="reviews-rating" className="sr-only">Filter by rating</label>
+        <select
+          id="reviews-rating"
+          value={ratingFilter}
+          onChange={e => { setRatingFilter(e.target.value); setPage(1); }}
+          className="wp-select"
+        >
+          <option value="">All ratings</option>
+          <option value="5">5 Stars</option>
+          <option value="4">4 Stars</option>
+          <option value="3">3 Stars</option>
+          <option value="2">2 Stars</option>
+          <option value="1">1 Star</option>
+        </select>
+
+        <label htmlFor="reviews-date-from" className="sr-only">Submitted from</label>
+        <input
+          id="reviews-date-from"
+          type="date"
+          value={dateFrom}
+          onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+          max={dateTo || undefined}
+          className="wp-input"
+        />
+        <span className="wp-muted">to</span>
+        <label htmlFor="reviews-date-to" className="sr-only">Submitted to</label>
+        <input
+          id="reviews-date-to"
+          type="date"
+          value={dateTo}
+          onChange={e => { setDateTo(e.target.value); setPage(1); }}
+          min={dateFrom || undefined}
+          className="wp-input"
+        />
+        {(dateFrom || dateTo) && (
+          <button
+            type="button"
+            onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
+            className="wp-btn"
+          >
+            Clear dates
+          </button>
+        )}
+
+        <span className="wp-spacer" />
+
+        <div className="wp-search" role="search">
+          <label htmlFor="reviews-search" className="sr-only">Search reviews</label>
+          <input
+            id="reviews-search"
+            type="search"
+            placeholder="Search reviews..."
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+            className="wp-input"
+          />
+        </div>
+      </div>
+
+      {pagination.totalPages > 1 && (
+        <div className="wp-toolbar">
+          <span className="wp-spacer" />
+          {renderPager()}
+        </div>
+      )}
+
+      {/* Table list */}
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>
+            <tr>
+              <th scope="col" className="wp-check-col">
+                <input
+                  type="checkbox"
+                  aria-label="Select all reviews"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                />
+              </th>
+              <th scope="col" className="wp-hide-sm" style={{ width: "20%" }}>Author</th>
+              <th scope="col">Review</th>
+              <th scope="col" className="wp-hide-sm" style={{ width: "18%" }}>In response to</th>
+              <th scope="col" className="wp-hide-sm" style={{ width: 150 }}>Submitted on</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="wp-muted">Loading reviews…</td></tr>
+            ) : reviews.length === 0 ? (
+              <tr><td colSpan={5} className="wp-muted">No reviews found.</td></tr>
+            ) : (
+              reviews.map(review => {
+                const isSelected = selectedIds.includes(review._id);
+                const isReplying = replyingId === review._id;
+                const isQuickEditing = quickEditingId === review._id;
+                const isPending = review.status === "Pending" && !review.isDeleted;
+
+                if (isQuickEditing) {
+                  return (
+                    <tr key={review._id} style={{ background: "#f6f7f7" }}>
+                      <td colSpan={5}>
+                        <fieldset style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+                          <legend className="wp-strong" style={{ marginBottom: 8 }}>Quick Edit</legend>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                            <div>
+                              <div className="wp-field">
+                                <label htmlFor={`qe-name-${review._id}`} className="wp-label">Name</label>
+                                <input
+                                  id={`qe-name-${review._id}`}
+                                  type="text"
+                                  className="wp-input wp-full"
+                                  value={quickEditData.customerName}
+                                  onChange={e => setQuickEditData({ ...quickEditData, customerName: e.target.value })}
+                                />
+                              </div>
+                              <div className="wp-field">
+                                <label htmlFor={`qe-email-${review._id}`} className="wp-label">Email</label>
+                                <input
+                                  id={`qe-email-${review._id}`}
+                                  type="email"
+                                  className="wp-input wp-full"
+                                  value={quickEditData.customerEmail}
+                                  onChange={e => setQuickEditData({ ...quickEditData, customerEmail: e.target.value })}
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-3">
+                                <div className="wp-field">
+                                  <label htmlFor={`qe-rating-${review._id}`} className="wp-label">Rating</label>
+                                  <select
+                                    id={`qe-rating-${review._id}`}
+                                    className="wp-select wp-full"
+                                    value={quickEditData.rating}
+                                    onChange={e => setQuickEditData({ ...quickEditData, rating: parseInt(e.target.value) })}
+                                  >
+                                    <option value="5">5 Stars</option>
+                                    <option value="4">4 Stars</option>
+                                    <option value="3">3 Stars</option>
+                                    <option value="2">2 Stars</option>
+                                    <option value="1">1 Star</option>
+                                  </select>
+                                </div>
+                                <div className="wp-field">
+                                  <label htmlFor={`qe-status-${review._id}`} className="wp-label">Status</label>
+                                  <select
+                                    id={`qe-status-${review._id}`}
+                                    className="wp-select wp-full"
+                                    value={quickEditData.status}
+                                    onChange={e => setQuickEditData({ ...quickEditData, status: e.target.value })}
+                                  >
+                                    <option value="Pending">Pending</option>
+                                    <option value="Approved">Approved</option>
+                                    <option value="Rejected">Rejected</option>
+                                    <option value="Spam">Spam</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="wp-field">
+                                <label htmlFor={`qe-date-${review._id}`} className="wp-label">Submitted on</label>
+                                <input
+                                  id={`qe-date-${review._id}`}
+                                  type="datetime-local"
+                                  className="wp-input wp-full"
+                                  value={quickEditData.createdAt}
+                                  onChange={e => setQuickEditData({ ...quickEditData, createdAt: e.target.value })}
+                                />
+                              </div>
+                              <div className="wp-field">
+                                <label htmlFor={`qe-comment-${review._id}`} className="wp-label">Review</label>
+                                <textarea
+                                  id={`qe-comment-${review._id}`}
+                                  rows={4}
+                                  className="wp-textarea wp-full"
+                                  value={quickEditData.comment}
+                                  onChange={e => setQuickEditData({ ...quickEditData, comment: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickEditSubmit(review._id)}
+                              className="wp-btn wp-btn-primary"
+                            >
+                              Update Comment
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQuickEditingId(null)}
+                              className="wp-btn"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </fieldset>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const productLink = review.productId ? (
+                  <a
+                    href={getProductUrl(review.productId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="wp-link"
+                    style={{ wordBreak: "break-word" }}
+                  >
+                    {review.productId.name}
+                  </a>
+                ) : (
+                  <span className="wp-muted" style={{ fontStyle: "italic" }}>Deleted product</span>
+                );
+
+                return (
+                  <tr key={review._id} className={isSelected ? "is-selected" : undefined} style={getRowStyle(review)}>
+                    {/* Checkbox column */}
+                    <td className="wp-check-col" style={isPending ? { boxShadow: "inset 4px 0 0 #d63638" } : undefined}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select review by ${review.customerName || "author"}`}
+                        checked={isSelected}
+                        onChange={() => toggleSelectOne(review._id)}
+                      />
+                    </td>
+
+                    {/* Author column */}
+                    <td className="wp-hide-sm" style={{ wordBreak: "break-word" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                        <img
+                          src="https://secure.gravatar.com/avatar/?d=mm&s=32"
+                          className="wp-avatar"
+                          style={{ width: 32, height: 32, borderRadius: 0 }}
+                          alt=""
+                        />
+                        <div style={{ minWidth: 0 }}>
+                          <div className="wp-strong">{review.customerName}</div>
+                          <a href={`mailto:${review.customerEmail}`} className="wp-link wp-small" style={{ wordBreak: "break-all" }} title={review.customerEmail}>
+                            {review.customerEmail}
+                          </a>
+                          <div className="wp-muted wp-small">{review.ipAddress || "127.0.0.1"}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Review column */}
+                    <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                      <div className="wp-mobile-meta" style={{ marginTop: 0, marginBottom: 4 }}>
+                        <span className="wp-strong">{review.customerName}</span> · {review.customerEmail}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        {renderStars(review.rating)}
+                        {review.title && <span className="wp-strong">{review.title}</span>}
+                        {review.isDeleted ? (
+                          <span className="wp-pill wp-pill-sm wp-st-cancelled">Trash</span>
+                        ) : review.status !== "Approved" ? (
+                          <span className={`wp-pill wp-pill-sm ${review.status === "Pending" ? "wp-st-pending" : review.status === "Spam" ? "wp-st-failed" : "wp-st-draft"}`}>{review.status}</span>
+                        ) : null}
+                      </div>
+
+                      <p style={{ margin: 0, whiteSpace: "pre-wrap", color: "#1d2327" }}>{review.comment}</p>
+
+                      {/* Staff Reply */}
+                      {review.replies && review.replies.length > 0 && (
+                        <div className="wp-note-body" style={{ marginTop: 8 }}>
+                          <div className="wp-small wp-muted">
+                            Reply from <span className="wp-strong">{review.replies[0].staffName}</span> on {formatDate(review.replies[0].createdAt)}
+                          </div>
+                          <div>{review.replies[0].comment}</div>
+                        </div>
+                      )}
+
+                      <div className="wp-mobile-meta">In response to: {productLink} · {formatDate(review.createdAt)}</div>
+
+                      <div className="wp-row-actions">
+                        {renderRowActions(review)}
+                      </div>
+
+                      {/* Inline reply box */}
+                      {isReplying && (
+                        <div style={{ marginTop: 10, border: "1px solid #c3c4c7", background: "#fff", padding: 10 }}>
+                          <label htmlFor={`reply-${review._id}`} className="wp-label">Reply to review</label>
+                          <textarea
+                            id={`reply-${review._id}`}
+                            rows={3}
+                            placeholder="Write response..."
+                            className="wp-textarea wp-full"
+                            value={inlineReplyText}
+                            onChange={e => setInlineReplyText(e.target.value)}
+                          />
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                            <button type="button" onClick={() => handleInlineReplySubmit(review._id)} className="wp-btn wp-btn-primary">
+                              Submit Reply
+                            </button>
+                            <button type="button" onClick={() => setReplyingId(null)} className="wp-btn">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* In Response To column */}
+                    <td className="wp-hide-sm" style={{ wordBreak: "break-word" }}>
+                      {productLink}
+                      {review.productId && (
+                        <div>
+                          <a
+                            href={getProductUrl(review.productId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="wp-link wp-small"
+                          >
+                            View Product
+                          </a>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Submitted On column */}
+                    <td className="wp-hide-sm wp-muted">
+                      {formatDate(review.createdAt)}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {pagination.totalPages > 1 && (
+        <div className="wp-toolbar">
+          <span className="wp-spacer" />
+          {renderPager()}
+        </div>
+      )}
+    </Page>
     </RequirePermission>
   );
 }

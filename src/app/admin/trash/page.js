@@ -1,18 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { 
-  Trash2, 
-  RefreshCw, 
-  X, 
-  Package, 
-  Layers, 
-  FileText,
-  AlertTriangle,
-  ArrowLeft
-} from "lucide-react";
+import { X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { Page, PageHeader, Notice } from "@/components/admin/ui";
 
 export default function AdminTrash() {
   const [activeTab, setActiveTab] = useState("products");
@@ -144,202 +136,171 @@ export default function AdminTrash() {
     activeTab === "categories" ? categories.length :
     blogs.length;
 
+  const tabs = [
+    { key: "products", label: "Products", count: products.length },
+    { key: "categories", label: "Categories", count: categories.length },
+    { key: "blogs", label: "Blogs", count: blogs.length },
+  ];
+  const colCount = activeTab === "products" ? 3 : activeTab === "categories" ? 2 : 1;
+
   return (
-    <div className="space-y-6 sm:space-y-10">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-2">
-          <Link href="/admin" className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-black/40 hover:text-black transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-          </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold uppercase tracking-tighter text-red-500">Trash Bin</h1>
-          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-black/30">Restore or permanently purge soft-deleted resources.</p>
-        </div>
-        <button onClick={fetchTrash} className="bg-gray-100 hover:bg-gray-200 text-black px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-colors w-fit">
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
-        </button>
+    <Page>
+      <PageHeader
+        title="Trash"
+        actions={<button type="button" onClick={fetchTrash} className="wp-btn">Refresh</button>}
+        aside={<Link href="/admin" className="wp-link">← Dashboard</Link>}
+      />
+      <p className="wp-desc" style={{ marginTop: 0 }}>Restore or permanently delete soft-deleted items.</p>
+
+      <div className="wp-subsub" role="tablist" aria-label="Filter trash by type">
+        {tabs.map((t, i) => (
+          <span key={t.key} style={{ display: "inline-flex", alignItems: "center" }}>
+            {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === t.key}
+              className={activeTab === t.key ? "is-current" : undefined}
+              onClick={() => setActiveTab(t.key)}
+            >
+              {t.label} <span className="wp-count">({t.count})</span>
+            </button>
+          </span>
+        ))}
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap border-b border-black/5 gap-4 sm:gap-8">
-        <button 
-          onClick={() => setActiveTab("products")}
-          className={`pb-3 sm:pb-4 text-[11px] font-bold uppercase tracking-widest transition-all relative ${activeTab === 'products' ? 'text-black font-black' : 'text-black/30 hover:text-black/60'}`}
-        >
-          Products ({products.length})
-          {activeTab === 'products' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500" />}
-        </button>
-        <button 
-          onClick={() => setActiveTab("categories")}
-          className={`pb-3 sm:pb-4 text-[11px] font-bold uppercase tracking-widest transition-all relative ${activeTab === 'categories' ? 'text-black font-black' : 'text-black/30 hover:text-black/60'}`}
-        >
-          Categories ({categories.length})
-          {activeTab === 'categories' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500" />}
-        </button>
-        <button 
-          onClick={() => setActiveTab("blogs")}
-          className={`pb-3 sm:pb-4 text-[11px] font-bold uppercase tracking-widest transition-all relative ${activeTab === 'blogs' ? 'text-black font-black' : 'text-black/30 hover:text-black/60'}`}
-        >
-          Blogs ({blogs.length})
-          {activeTab === 'blogs' && <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-red-500" />}
-        </button>
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <span className="wp-pages">{activeItemsCount} item{activeItemsCount === 1 ? "" : "s"}</span>
       </div>
 
-      {loading ? (
-        <div className="bg-white rounded-[24px] sm:rounded-[40px] border border-black/5 shadow-sm p-10 sm:p-20 text-center">
-          <RefreshCw className="w-8 h-8 animate-spin text-black/20 mx-auto" />
-          <p className="text-[11px] font-bold uppercase tracking-widest text-black/30 mt-4">Retrieving deleted items...</p>
-        </div>
-      ) : activeItemsCount === 0 ? (
-        <div className="bg-white rounded-[24px] sm:rounded-[40px] border border-black/5 shadow-sm p-10 sm:p-20 text-center space-y-6">
-          <div className="w-16 h-16 bg-gray-50 border border-black/5 text-black/30 rounded-full flex items-center justify-center mx-auto">
-            <Trash2 className="w-6 h-6" />
-          </div>
-          <div className="max-w-md mx-auto space-y-2">
-            <h2 className="text-[13px] font-bold uppercase tracking-[0.2em]">Trash is empty</h2>
-            <p className="text-[10px] text-black/30 font-bold uppercase tracking-wide leading-relaxed">No soft-deleted {activeTab} exist in the database.</p>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white rounded-[20px] sm:rounded-[32px] border border-black/5 shadow-sm overflow-x-auto max-w-full">
-          <table className="w-full text-left border-collapse min-w-[650px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-black/5 text-[9px] font-black uppercase tracking-widest text-black/40">
-                <th className="px-6 py-4">Resource Info</th>
-                {activeTab === "products" && <th className="px-6 py-4">SKU / Code</th>}
-                {activeTab === "products" && <th className="px-6 py-4">Price</th>}
-                {activeTab === "categories" && <th className="px-6 py-4">Type</th>}
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/5 text-xs">
-              {activeTab === "products" && products.map(p => (
-                <tr key={p._id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-12 bg-gray-100 rounded-lg overflow-hidden border border-black/5 shrink-0">
-                        {p.images?.[0] && <img src={p.images[0]} className="w-full h-full object-cover" />}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-black text-[13px]">{p.name}</h4>
-                        <p className="text-[9px] text-black/30 uppercase tracking-widest font-mono mt-1">ID: {p._id}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 font-mono text-[11px] text-black/50">{p.sku || "—"}</td>
-                  <td className="px-6 py-5 font-bold">${p.price?.toFixed(2)}</td>
-                  <td className="px-6 py-5 text-right space-x-2">
-                    <button onClick={() => handleRestore("product", p._id)} className="bg-black text-white hover:bg-black/80 px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Restore
-                    </button>
-                    <button onClick={() => openConfirmModal("product", p._id, p.name)} className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Delete Permanently
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              
-              {activeTab === "categories" && categories.map(c => (
-                <tr key={c._id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-5">
-                    <div>
-                      <h4 className="font-bold text-black text-[13px]">{c.name}</h4>
-                      <p className="text-[10px] text-black/40 mt-0.5">slug: {c.slug}</p>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 font-bold uppercase tracking-widest text-[9px] text-black/40">{c.type || "product"}</td>
-                  <td className="px-6 py-5 text-right space-x-2">
-                    <button onClick={() => handleRestore("category", c._id)} className="bg-black text-white hover:bg-black/80 px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Restore
-                    </button>
-                    <button onClick={() => openConfirmModal("category", c._id, c.name)} className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Delete Permanently
-                    </button>
-                  </td>
-                </tr>
-              ))}
-
-              {activeTab === "blogs" && blogs.map(b => (
-                <tr key={b._id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-4">
-                      {b.image && (
-                        <div className="w-12 h-10 bg-gray-100 rounded-lg overflow-hidden border border-black/5 shrink-0">
-                          <img src={b.image} className="w-full h-full object-cover" />
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>
+            <tr>
+              <th scope="col">{activeTab === "products" ? "Name" : activeTab === "categories" ? "Name" : "Title"}</th>
+              {activeTab === "products" && <th scope="col" className="wp-hide-sm">SKU</th>}
+              {activeTab === "products" && <th scope="col" className="wp-hide-sm">Price</th>}
+              {activeTab === "categories" && <th scope="col" className="wp-hide-sm">Type</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={colCount} className="wp-muted">Loading deleted items…</td></tr>
+            ) : activeItemsCount === 0 ? (
+              <tr><td colSpan={colCount} className="wp-muted">No {activeTab} found in Trash.</td></tr>
+            ) : (
+              <>
+                {activeTab === "products" && products.map(p => (
+                  <tr key={p._id}>
+                    <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <div className="wp-thumb">
+                          {p.images?.[0] && <img src={p.images[0]} alt="" />}
                         </div>
-                      )}
-                      <div>
-                        <h4 className="font-bold text-black text-[13px]">{b.title}</h4>
-                        <p className="text-[10px] text-black/40 mt-0.5">Author: {b.author || "Pairo Studio"}</p>
+                        <div style={{ minWidth: 0 }}>
+                          <span className="wp-row-title">{p.name}</span>
+                          <div className="wp-mobile-meta">
+                            {p.sku ? `SKU: ${p.sku} · ` : ""}<span className="wp-strong">${p.price?.toFixed(2)}</span>
+                          </div>
+                          <div className="wp-row-actions">
+                            <span className="is-muted">ID: {p._id}</span>
+                            <span><button type="button" onClick={() => handleRestore("product", p._id)}>Restore</button></span>
+                            <span><button type="button" onClick={() => openConfirmModal("product", p._id, p.name)} className="is-danger">Delete permanently</button></span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5 text-right space-x-2">
-                    <button onClick={() => handleRestore("blog", b._id)} className="bg-black text-white hover:bg-black/80 px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Restore
-                    </button>
-                    <button onClick={() => openConfirmModal("blog", b._id, b.title)} className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all">
-                      Delete Permanently
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    </td>
+                    <td className="wp-hide-sm wp-muted" style={{ wordBreak: "break-all" }}>{p.sku || "—"}</td>
+                    <td className="wp-hide-sm wp-strong">${p.price?.toFixed(2)}</td>
+                  </tr>
+                ))}
 
-      {/* Safety Alert */}
-      <div className="bg-red-50 border border-red-100 p-6 rounded-[24px] flex items-start gap-4">
-        <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <h4 className="text-[11px] font-bold uppercase tracking-widest text-red-900">Safety Notice</h4>
-          <p className="text-[10px] text-red-700/60 uppercase leading-relaxed font-bold tracking-tight">
-            Permanent purging removes documents from collections and cleans references across products, categories, blogs, and media usage indexes. This action is final and cannot be undone.
-          </p>
-        </div>
+                {activeTab === "categories" && categories.map(c => (
+                  <tr key={c._id}>
+                    <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                      <span className="wp-row-title">{c.name}</span>
+                      <div className="wp-muted wp-small">Slug: {c.slug}</div>
+                      <div className="wp-mobile-meta">Type: {c.type || "product"}</div>
+                      <div className="wp-row-actions">
+                        <span><button type="button" onClick={() => handleRestore("category", c._id)}>Restore</button></span>
+                        <span><button type="button" onClick={() => openConfirmModal("category", c._id, c.name)} className="is-danger">Delete permanently</button></span>
+                      </div>
+                    </td>
+                    <td className="wp-hide-sm">{c.type || "product"}</td>
+                  </tr>
+                ))}
+
+                {activeTab === "blogs" && blogs.map(b => (
+                  <tr key={b._id}>
+                    <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        {b.image && (
+                          <div className="wp-thumb">
+                            <img src={b.image} alt="" />
+                          </div>
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <span className="wp-row-title">{b.title}</span>
+                          <div className="wp-muted wp-small">Author: {b.author || "Pairo Studio"}</div>
+                          <div className="wp-row-actions">
+                            <span><button type="button" onClick={() => handleRestore("blog", b._id)}>Restore</button></span>
+                            <span><button type="button" onClick={() => openConfirmModal("blog", b._id, b.title)} className="is-danger">Delete permanently</button></span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <Notice type="warning">
+          <strong>Deleting permanently</strong> removes documents from their collections and cleans references across products, categories, blogs and media usage indexes. This cannot be undone.
+        </Notice>
       </div>
 
       {/* Confirmation Modal */}
       {confirmModal.open && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[999] p-2 sm:p-4">
-          <div className="bg-white rounded-[20px] sm:rounded-[32px] max-w-md w-full border border-black/5 shadow-2xl p-4 sm:p-8 space-y-4 sm:space-y-6">
-            <div className="flex items-center justify-between border-b border-black/5 pb-3 sm:pb-4">
-              <div className="flex items-center gap-2.5 text-red-500">
-                <AlertTriangle className="w-5 h-5" />
-                <h3 className="text-[12px] font-black uppercase tracking-widest">Confirm Purge</h3>
-              </div>
-              <button onClick={() => setConfirmModal({ open: false, type: "", id: null, name: "" })} className="p-1 text-black/30 hover:text-black">
-                <X className="w-4 h-4" />
+        <div className="wp-modal-backdrop">
+          <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="trash-confirm-title" style={{ maxWidth: 480 }}>
+            <div className="wp-modal-head">
+              <h2 id="trash-confirm-title">Delete permanently</h2>
+              <button type="button" onClick={() => setConfirmModal({ open: false, type: "", id: null, name: "" })} className="wp-notice-dismiss" aria-label="Close dialog">
+                <X className="w-5 h-5" />
               </button>
             </div>
-            
-            <div className="space-y-3">
-              <p className="text-[11px] text-black/50 font-bold uppercase tracking-wider">Are you sure you want to permanently delete this {confirmModal.type}?</p>
-              <p className="text-sm font-black text-black bg-gray-50 border border-black/[0.03] p-3 sm:p-4 rounded-xl font-mono truncate">{confirmModal.name}</p>
-              <p className="text-[10px] text-red-500 font-bold uppercase tracking-wide leading-relaxed">
-                * All references, media links, and relations will be severed. This operation is IRREVERSIBLE.
-              </p>
+            <div className="wp-modal-body">
+              <p style={{ marginTop: 0 }}>Are you sure you want to permanently delete this {confirmModal.type}?</p>
+              <p className="wp-strong" style={{ wordBreak: "break-word" }}>{confirmModal.name}</p>
+              <p className="wp-desc" style={{ color: "#d63638" }}>All references, media links and relations will be removed. This cannot be undone.</p>
             </div>
-
-            <div className="flex flex-col xs:flex-row gap-2 sm:gap-3 pt-2">
-              <button 
+            <div className="wp-modal-foot">
+              <button
+                type="button"
                 onClick={() => setConfirmModal({ open: false, type: "", id: null, name: "" })}
                 disabled={processing}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-black py-3 sm:py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                className="wp-btn"
               >
                 Cancel
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={handlePermanentDelete}
                 disabled={processing}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 sm:py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                className="wp-btn wp-btn-primary"
+                style={{ background: "#d63638", borderColor: "#d63638" }}
               >
-                {processing ? "Purging..." : "Purge Document"}
+                {processing ? "Deleting…" : "Delete permanently"}
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </Page>
   );
 }

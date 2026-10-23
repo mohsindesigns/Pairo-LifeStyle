@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
-import { Search, Loader2, Filter, ToggleLeft, ToggleRight, Eye, EyeOff } from "lucide-react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { Page, PageHeader } from "@/components/admin/ui";
 
 export default function CategoryFiltersPage() {
   const [categories, setCategories] = useState([]);
@@ -86,123 +86,96 @@ export default function CategoryFiltersPage() {
 
   return (
     <RequirePermission permission="products.view">
-    <AdminPageLayout title="Category Filters" subtitle="Manage which product categories appear in the shop filter tab">
-      <div className="bg-white border border-[#c3c4c7] rounded shadow-sm max-w-5xl">
-        {/* Header toolbar */}
-        <div className="p-3 sm:p-4 border-b border-[#f0f0f1] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 bg-[#f6f7f7]">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-foreground/60" />
-            <span className="font-bold text-[14px] text-[#1d2327]">Shop Filter Settings</span>
-          </div>
+    <Page>
+      <PageHeader title="Category Filters" />
+      <p className="wp-desc" style={{ marginTop: 0 }}>Manage which product categories appear in the shop filter tab.</p>
 
-          {/* Search */}
-          <div className="relative min-w-0 sm:max-w-xs w-full">
-            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-[#646970]" />
-            </span>
-            <input
-              type="text"
-              placeholder="Search categories..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
-            />
-          </div>
+      <div className="wp-toolbar">
+        <span className="wp-pages">{filteredCategories.length} item{filteredCategories.length === 1 ? "" : "s"}</span>
+        <span className="wp-spacer" />
+        <div className="wp-search" role="search">
+          <label htmlFor="filters-search" className="sr-only">Search categories</label>
+          <input
+            id="filters-search"
+            type="search"
+            placeholder="Search categories..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="wp-input"
+          />
         </div>
-
-        {/* Content Table */}
-        {loading ? (
-          <div className="p-6 md:p-12 flex items-center justify-center gap-3">
-            <Loader2 className="w-6 h-6 animate-spin text-[#2271b1]" />
-            <span className="text-[13px] text-[#646970]">Loading categories...</span>
-          </div>
-        ) : filteredCategories.length === 0 ? (
-          <div className="p-6 md:p-12 text-center text-[#646970] text-[13px]">
-            No categories found matching your query.
-          </div>
-        ) : (
-          <div className="overflow-x-auto max-w-full">
-            <table className="w-full min-w-[520px] md:min-w-[760px] border-collapse text-left text-[13px] text-[#2c3338]">
-              <thead>
-                <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7]">
-                  <th className="px-4 py-3 font-semibold text-[#1d2327] w-24">Image</th>
-                  <th className="px-4 py-3 font-semibold text-[#1d2327]">Category Name</th>
-                  <th className="hidden md:table-cell px-4 py-3 font-semibold text-[#1d2327] w-48">Slug</th>
-                  <th className="px-4 py-3 font-semibold text-[#1d2327] w-28">Status</th>
-                  <th className="hidden md:table-cell px-4 py-3 font-semibold text-[#1d2327] w-28">Products</th>
-                  <th className="px-4 py-3 font-semibold text-[#1d2327] text-center w-40">Show in Filters</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCategories.map((cat) => {
-                  const showFilters = cat.showInFilters !== false;
-                  const isSaving = savingId === cat._id;
-                  
-                  return (
-                    <tr key={cat._id} className="border-b border-[#f0f0f1] hover:bg-[#f6f7f7]/40 transition-colors">
-                      <td className="px-4 py-3.5 align-middle">
-                        {cat.image ? (
-                          <img
-                            src={cat.image}
-                            alt=""
-                            className="h-10 w-10 object-cover rounded-[3px] border border-[#c3c4c7] bg-[#f0f0f1]"
-                          />
-                        ) : (
-                          <div className="h-10 w-10 rounded-[3px] border border-dashed border-[#c3c4c7] bg-[#f6f7f7] flex items-center justify-center text-foreground/30">
-                            N/A
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 align-middle font-bold text-[#1d2327]">
-                        {cat.name}
-                      </td>
-                      <td className="hidden md:table-cell px-4 py-3.5 align-middle text-[#646970] font-mono text-[12px]">
-                        {cat.slug}
-                      </td>
-                      <td className="px-4 py-3.5 align-middle">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[3px] text-[11px] font-medium border ${
-                          cat.status === "Published" 
-                            ? "bg-[#e5f5fa] border-[#00a0d2] text-[#006787]" 
-                            : "bg-[#fcf0f1] border-[#f0c5c5] text-[#d63638]"
-                        }`}>
-                          {cat.status || "Published"}
-                        </span>
-                      </td>
-                      <td className="hidden md:table-cell px-4 py-3.5 align-middle font-bold text-foreground/75">
-                        {cat.productCount || 0}
-                      </td>
-                      <td className="px-4 py-3.5 align-middle text-center">
-                        <button
-                          type="button"
-                          onClick={() => !isSaving && handleToggleFilter(cat)}
-                          disabled={isSaving}
-                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-[3px] text-[12px] font-semibold transition-all border outline-none ${
-                            isSaving
-                              ? "opacity-50 cursor-not-allowed bg-white border-[#c3c4c7]"
-                              : showFilters
-                              ? "bg-[#e5f5fa] border-[#00a0d2] text-[#006787] hover:bg-[#d6f0fa]"
-                              : "bg-[#f6f7f7] border-[#8c8f94] text-[#2c3338] hover:bg-[#edeeee]"
-                          }`}
-                        >
-                          {isSaving ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : showFilters ? (
-                            <Eye className="w-3.5 h-3.5" />
-                          ) : (
-                            <EyeOff className="w-3.5 h-3.5" />
-                          )}
-                          {showFilters ? "Showing" : "Hidden"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
-    </AdminPageLayout>
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>
+            <tr>
+              <th scope="col" style={{ width: 56 }}><span className="sr-only">Image</span></th>
+              <th scope="col">Name</th>
+              <th scope="col" className="wp-hide-sm">Slug</th>
+              <th scope="col" className="wp-hide-sm">Status</th>
+              <th scope="col" className="wp-hide-sm wp-num">Products</th>
+              <th scope="col" style={{ width: 150 }}>Show in filters</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="wp-muted">Loading categories…</td></tr>
+            ) : filteredCategories.length === 0 ? (
+              <tr><td colSpan={6} className="wp-muted">No categories found matching your query.</td></tr>
+            ) : (
+              filteredCategories.map((cat) => {
+                const showFilters = cat.showInFilters !== false;
+                const isSaving = savingId === cat._id;
+
+                return (
+                  <tr key={cat._id}>
+                    <td>
+                      <div className="wp-thumb">
+                        {cat.image ? <img src={cat.image} alt="" /> : <span className="wp-small">N/A</span>}
+                      </div>
+                    </td>
+                    <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                      <span className="wp-row-title">{cat.name}</span>
+                      <div className="wp-mobile-meta">
+                        {cat.slug} · {cat.status || "Published"} · {cat.productCount || 0} products
+                      </div>
+                    </td>
+                    <td className="wp-hide-sm wp-muted" style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{cat.slug}</td>
+                    <td className="wp-hide-sm">
+                      <span className={`wp-pill wp-pill-sm ${cat.status === "Published" ? "wp-st-published" : "wp-st-draft"}`}>
+                        {cat.status || "Published"}
+                      </span>
+                    </td>
+                    <td className="wp-hide-sm wp-num">{cat.productCount || 0}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => !isSaving && handleToggleFilter(cat)}
+                        disabled={isSaving}
+                        aria-pressed={showFilters}
+                        aria-label={`${cat.name}: ${showFilters ? "showing in filters, click to hide" : "hidden from filters, click to show"}`}
+                        className={`wp-btn ${showFilters ? "wp-btn-primary" : ""}`}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                      >
+                        {isSaving ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : showFilters ? (
+                          <Eye className="w-3.5 h-3.5" />
+                        ) : (
+                          <EyeOff className="w-3.5 h-3.5" />
+                        )}
+                        {showFilters ? "Showing" : "Hidden"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </Page>
     </RequirePermission>
   );
 }

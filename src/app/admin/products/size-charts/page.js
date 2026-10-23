@@ -1,27 +1,13 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import {
-  Search,
-  Plus,
-  Copy,
-  Trash2,
-  Edit,
-  Eye,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  SlidersHorizontal,
-  Download,
-  Upload,
-  AlertCircle
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { Page, PageHeader } from "@/components/admin/ui";
 
 export default function AdminSizeCharts() {
   const router = useRouter();
@@ -211,263 +197,251 @@ export default function AdminSizeCharts() {
     });
   };
 
+  const statusCounts = {
+    "All statuses": sizeCharts.length,
+    Published: sizeCharts.filter((c) => c.status === "Published").length,
+    Draft: sizeCharts.filter((c) => c.status === "Draft").length,
+  };
+  const statusTabs = [
+    { value: "All statuses", label: "All" },
+    { value: "Published", label: "Published" },
+    { value: "Draft", label: "Draft" },
+  ];
+
+  const pager = (
+    <div className="wp-pages">
+      <span>{filteredCharts.length} items</span>
+      {totalPages > 1 && (
+        <>
+          <button
+            type="button"
+            className="wp-pager"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span>{currentPage} of {totalPages}</span>
+          <button
+            type="button"
+            className="wp-pager"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            aria-label="Next page"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <RequirePermission permission="products.view">
-    <AdminPageLayout
-      title="Size Charts"
-      subtitle="Manage reusable dynamic size charts and assignments"
-      addNewLink="/admin/products/size-charts/new"
-      addNewLabel="Add Size Chart"
-      breadcrumbs={[{ label: "Products", href: "/admin/products" }, { label: "Size Charts" }]}
-    >
-      <div className="bg-white border border-[#ccd0d4] rounded-[4px] shadow-sm">
-        
-        {/* Filters and Search Bar */}
-        <div className="p-3 sm:p-4 border-b border-[#ccd0d4] flex flex-col md:flex-row gap-2 md:gap-4 items-stretch md:items-center justify-between">
-          <div className="flex flex-wrap gap-2 items-center">
-            {/* Search */}
-            <div className="relative w-full sm:w-auto min-w-0 sm:min-w-[240px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search size charts..."
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="pl-9 pr-4 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] w-full"
-              />
-            </div>
+    <Page>
+      <PageHeader
+        title="Size Charts"
+        actions={<Link href="/admin/products/size-charts/new" className="wp-btn">Add Size Chart</Link>}
+      />
+      <p className="wp-desc" style={{ marginTop: 0 }}>Manage reusable dynamic size charts and assignments.</p>
 
-            {/* Status Filter */}
-            <select
-              value={selectedStatus}
-              onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer w-full sm:w-auto min-w-0"
-            >
-              <option>All statuses</option>
-              <option>Published</option>
-              <option>Draft</option>
-            </select>
-
-            {/* Assignment Filter */}
-            <select
-              value={selectedAssignment}
-              onChange={(e) => { setSelectedAssignment(e.target.value); setCurrentPage(1); }}
-              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer w-full sm:w-auto min-w-0"
-            >
-              <option>All assignments</option>
-              <option>Category</option>
-              <option>Product</option>
-              <option>Unassigned</option>
-            </select>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {/* Bulk Actions */}
-            <select
-              value={bulkAction}
-              onChange={(e) => setBulkAction(e.target.value)}
-              className="px-3 py-1.5 border border-[#8c8f94] bg-white text-[13px] rounded-[3px] outline-none focus:border-[#2271b1] h-[34px] cursor-pointer flex-1 sm:flex-none min-w-0"
-            >
-              <option>Bulk actions</option>
-              <option value="publish">Publish</option>
-              <option value="draft">Move to Draft</option>
-              <option value="delete">Delete</option>
-            </select>
+      {/* Status filter links */}
+      <div className="wp-subsub" role="tablist" aria-label="Filter size charts by status">
+        {statusTabs.map((t, i) => (
+          <span key={t.value} style={{ display: "inline-flex", alignItems: "center" }}>
+            {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
             <button
-              onClick={handleBulkSubmit}
-              className="bg-white border border-[#8c8f94] text-[#2c3338] px-4 py-1.5 rounded-[3px] text-[13px] font-bold hover:bg-[#f6f7f7] transition-all cursor-pointer h-[34px] shrink-0"
+              type="button"
+              role="tab"
+              aria-selected={selectedStatus === t.value}
+              className={selectedStatus === t.value ? "is-current" : undefined}
+              onClick={() => { setSelectedStatus(t.value); setCurrentPage(1); }}
             >
-              Apply
+              {t.label} <span className="wp-count">({statusCounts[t.value]})</span>
             </button>
-          </div>
+          </span>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="wp-toolbar">
+        <label htmlFor="sc-bulk-action" className="sr-only">Select bulk action</label>
+        <select
+          id="sc-bulk-action"
+          value={bulkAction}
+          onChange={(e) => setBulkAction(e.target.value)}
+          className="wp-select"
+        >
+          <option>Bulk actions</option>
+          <option value="publish">Publish</option>
+          <option value="draft">Move to Draft</option>
+          <option value="delete">Delete</option>
+        </select>
+        <button type="button" onClick={handleBulkSubmit} className="wp-btn">
+          Apply
+        </button>
+
+        <label htmlFor="sc-assignment" className="sr-only">Filter by assignment</label>
+        <select
+          id="sc-assignment"
+          value={selectedAssignment}
+          onChange={(e) => { setSelectedAssignment(e.target.value); setCurrentPage(1); }}
+          className="wp-select"
+        >
+          <option>All assignments</option>
+          <option>Category</option>
+          <option>Product</option>
+          <option>Unassigned</option>
+        </select>
+
+        <span className="wp-spacer" />
+
+        <div className="wp-search" role="search">
+          <label htmlFor="sc-search" className="sr-only">Search size charts</label>
+          <input
+            id="sc-search"
+            type="search"
+            placeholder="Search size charts..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            className="wp-input"
+          />
         </div>
+      </div>
 
-        {/* Table Content */}
-        <div className="w-full max-w-full overflow-x-auto">
-          {loading ? (
-            <div className="text-center py-12">
-              <span className="text-[13px] text-gray-500 font-medium">Loading size charts...</span>
-            </div>
-          ) : paginatedCharts.length === 0 ? (
-            <div className="text-center py-12">
-              <AlertCircle className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-              <span className="text-[13px] text-gray-500 font-medium block">No size charts found.</span>
-              <Link href="/admin/products/size-charts/new" className="text-[13px] text-[#2271b1] hover:underline mt-1 inline-block">
-                Create one now
-              </Link>
-            </div>
-          ) : (
-            <table className="w-full min-w-[640px] text-left border-collapse text-[13px]">
-              <thead>
-                <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4] text-[#2c3338] font-bold">
-                  <th className="p-3 w-10 text-center">
-                    <input
-                      type="checkbox"
-                      onChange={handleSelectAll}
-                      checked={selectedIds.length > 0 && selectedIds.length === filteredCharts.length}
-                    />
-                  </th>
-                  <th className="p-3 font-semibold">Label</th>
-                  <th className="p-3 font-semibold">Assigned To</th>
-                  <th className="p-3 font-semibold text-center hidden md:table-cell">Products Using</th>
-                  <th className="p-3 font-semibold hidden lg:table-cell">Last Updated</th>
-                  <th className="p-3 font-semibold">Status</th>
-                  <th className="p-3 font-semibold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#ccd0d4]">
-                {paginatedCharts.map((chart) => {
-                  const isChecked = selectedIds.includes(chart._id);
-                  return (
-                    <tr key={chart._id} className="hover:bg-[#f6f7f7]/50 transition-colors">
-                      <td className="p-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleSelectOne(chart._id)}
-                        />
-                      </td>
-                      <td className="p-3">
-                        <div className="font-bold text-[#1d2327]">
-                          <Link href={`/admin/products/size-charts/${chart._id}`} className="hover:text-[#2271b1]">
-                            {chart.label}
-                          </Link>
-                        </div>
-                        <div className="text-[11px] text-gray-400 mt-0.5">
-                          Heading: "{chart.publicHeading}"
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        {chart.assignedTo ? (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 border border-blue-200 text-blue-700">
-                              {chart.assignedTo.type}
-                            </span>
-                            <span className="font-medium text-[#2c3338]">{chart.assignedTo.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-[12px] text-gray-400 italic">Unassigned</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-center font-bold text-[#2c3338] hidden md:table-cell">{chart.usageCount}</td>
-                      <td className="p-3 text-gray-500 hidden lg:table-cell">{formatDate(chart.updatedAt)}</td>
-                      <td className="p-3">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[12px] text-[11px] font-medium leading-none ${
-                            chart.status === "Published"
-                              ? "bg-green-50 border border-green-200 text-green-700"
-                              : "bg-gray-50 border border-gray-200 text-gray-600"
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${chart.status === "Published" ? "bg-green-500" : "bg-gray-400"}`} />
-                          {chart.status}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => setPreviewChart(chart)}
-                            title="Preview"
-                            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-black transition-colors"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDuplicate(chart)}
-                            title="Duplicate"
-                            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-black transition-colors"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                          <Link
-                            href={`/admin/products/size-charts/${chart._id}`}
-                            title="Edit"
-                            className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-black transition-colors"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(chart._id)}
-                            title="Delete"
-                            className="p-1.5 rounded hover:bg-gray-100 text-red-500 hover:text-red-700 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pager}
+      </div>
 
-        {/* Pagination Footer */}
-        {totalPages > 1 && (
-          <div className="p-3 sm:p-4 border-t border-[#ccd0d4] flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 text-[13px] text-gray-500 bg-[#f6f7f7]/30">
-            <span>
-              Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredCharts.length)} of{" "}
-              {filteredCharts.length} items
-            </span>
-            <div className="flex gap-1">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="p-1 border border-[#ccd0d4] rounded bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="p-1 border border-[#ccd0d4] rounded bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Table */}
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>
+            <tr>
+              <th scope="col" className="wp-check-col">
+                <input
+                  type="checkbox"
+                  aria-label="Select all size charts"
+                  onChange={handleSelectAll}
+                  checked={selectedIds.length > 0 && selectedIds.length === filteredCharts.length}
+                />
+              </th>
+              <th scope="col">Label</th>
+              <th scope="col" className="wp-hide-sm">Assigned to</th>
+              <th scope="col" className="wp-hide-sm wp-num">Products using</th>
+              <th scope="col" className="wp-hide-sm">Last updated</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="wp-muted">Loading size charts…</td></tr>
+            ) : paginatedCharts.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="wp-muted">
+                  No size charts found. <Link href="/admin/products/size-charts/new" className="wp-link">Create one now</Link>
+                </td>
+              </tr>
+            ) : (
+              paginatedCharts.map((chart) => {
+                const isChecked = selectedIds.includes(chart._id);
+                return (
+                  <tr key={chart._id} className={isChecked ? "is-selected" : undefined}>
+                    <td className="wp-check-col">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${chart.label}`}
+                        checked={isChecked}
+                        onChange={() => handleSelectOne(chart._id)}
+                      />
+                    </td>
+                    <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                      <Link href={`/admin/products/size-charts/${chart._id}`} className="wp-row-title">
+                        {chart.label}
+                      </Link>
+                      <div className="wp-muted wp-small">Heading: &ldquo;{chart.publicHeading}&rdquo;</div>
+                      <div className="wp-mobile-meta">
+                        {chart.assignedTo ? `${chart.assignedTo.type}: ${chart.assignedTo.name}` : "Unassigned"} · {chart.usageCount} products
+                      </div>
+                      <div className="wp-row-actions">
+                        <span><Link href={`/admin/products/size-charts/${chart._id}`}>Edit</Link></span>
+                        <span><button type="button" onClick={() => setPreviewChart(chart)}>Preview</button></span>
+                        <span><button type="button" onClick={() => handleDuplicate(chart)}>Duplicate</button></span>
+                        <span><button type="button" onClick={() => handleDelete(chart._id)} className="is-danger">Delete</button></span>
+                      </div>
+                    </td>
+                    <td className="wp-hide-sm">
+                      {chart.assignedTo ? (
+                        <>
+                          <span className="wp-muted" style={{ textTransform: "capitalize" }}>{chart.assignedTo.type}: </span>
+                          <span>{chart.assignedTo.name}</span>
+                        </>
+                      ) : (
+                        <span className="wp-muted">Unassigned</span>
+                      )}
+                    </td>
+                    <td className="wp-hide-sm wp-num">{chart.usageCount}</td>
+                    <td className="wp-hide-sm wp-muted">{formatDate(chart.updatedAt)}</td>
+                    <td>
+                      <span className={`wp-pill wp-pill-sm ${chart.status === "Published" ? "wp-st-published" : "wp-st-draft"}`}>
+                        {chart.status}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pager}
       </div>
 
       {/* Preview Modal */}
       {previewChart && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={() => setPreviewChart(null)}>
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[85vh] flex flex-col overflow-hidden border border-black" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-3 sm:py-4 border-b border-black shrink-0">
-              <span className="text-[13px] font-bold uppercase tracking-widest text-black min-w-0 break-words">
-                {previewChart.publicHeading}
-              </span>
+        <div className="wp-modal-backdrop" onClick={() => setPreviewChart(null)}>
+          <div
+            className="wp-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sc-preview-title"
+            style={{ maxWidth: 720 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="wp-modal-head">
+              <h2 id="sc-preview-title" style={{ minWidth: 0, wordBreak: "break-word" }}>{previewChart.publicHeading}</h2>
               <button
+                type="button"
                 onClick={() => setPreviewChart(null)}
-                className="w-8 h-8 shrink-0 flex items-center justify-center border border-black hover:bg-black hover:text-white transition-all text-black"
+                className="wp-notice-dismiss"
+                aria-label="Close preview"
               >
-                ×
+                <X className="w-5 h-5" />
               </button>
             </div>
-            
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 space-y-4 sm:space-y-6">
+            <div className="wp-modal-body">
               {previewChart.description && (
-                <p className="text-xs text-neutral-500 leading-relaxed italic">{previewChart.description}</p>
+                <p className="wp-desc" style={{ marginTop: 0, marginBottom: 12 }}>{previewChart.description}</p>
               )}
-              
-              <div className="w-full max-w-full overflow-x-auto border border-black rounded">
-                <table className="w-full text-left border-collapse text-[11px] sm:text-[12px]">
+              <div className="wp-table-box">
+                <table className="wp-list-table">
                   <thead>
-                    <tr className="bg-black/5 border-b border-black font-bold uppercase text-black">
+                    <tr>
                       {previewChart.columns.map((col, idx) => (
-                        <th key={idx} className="px-3 py-2.5 whitespace-nowrap">{col}</th>
+                        <th key={idx} scope="col" style={{ whiteSpace: "nowrap" }}>{col}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-black/10">
+                  <tbody>
                     {previewChart.rows.map((row, rowIdx) => (
-                      <tr key={rowIdx} className="hover:bg-black/[0.02] text-black">
+                      <tr key={rowIdx}>
                         {row.map((cell, cellIdx) => (
-                          <td key={cellIdx} className={`px-3 py-2.5 ${cellIdx === 0 ? "font-bold" : ""}`}>
+                          <td key={cellIdx} className={cellIdx === 0 ? "wp-strong" : undefined}>
                             {cell || "—"}
                           </td>
                         ))}
@@ -477,10 +451,13 @@ export default function AdminSizeCharts() {
                 </table>
               </div>
             </div>
+            <div className="wp-modal-foot">
+              <button type="button" className="wp-btn" onClick={() => setPreviewChart(null)}>Close</button>
+            </div>
           </div>
         </div>
       )}
-    </AdminPageLayout>
+    </Page>
     </RequirePermission>
   );
 }
