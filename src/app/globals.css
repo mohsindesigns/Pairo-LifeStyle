@@ -889,3 +889,86 @@ body.pairo-security-blur {
   pointer-events: none !important;
   transition: filter 0.05s ease, opacity 0.05s ease !important;
 }
+
+/* ───────── ThemedSelect: the site-wide dropdown (src/components/ui/ThemedSelect.js) ─────────
+   Replaces the native <select> so no browser/OS dropdown is ever shown. Everything uses the theme variables set in
+   Admin > Appearance (--primary, --secondary, --card, --foreground, --radius), so it follows the active theme on
+   the public site and in the dashboard. The trigger keeps the caller classes; these are only the base behaviours
+   (in a layer, so Tailwind utilities and the dashboard wp-* classes still win). */
+@layer components {
+  .pairo-select-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    max-width: 100%;
+    text-align: left;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: none;
+  }
+  .pairo-select-trigger:disabled { cursor: not-allowed; opacity: 0.6; }
+  .pairo-select-trigger:focus-visible { outline: 2px solid var(--primary, currentColor); outline-offset: 1px; }
+}
+.pairo-select-value { position: relative; display: inline-grid; flex: 1 1 auto; min-width: 0; text-align: left; }
+.pairo-select-value > * { grid-area: 1 / 1; min-width: 0; }
+.pairo-select-sizer { display: grid; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }
+.pairo-select-sizer > span { grid-area: 1 / 1; white-space: nowrap; }
+.pairo-select-shown { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pairo-select-trigger[data-placeholder="true"] .pairo-select-shown { opacity: 0.6; }
+.pairo-select-chevron { width: 16px; height: 16px; flex: none; color: var(--primary, currentColor); opacity: 0.75; transition: transform 0.15s ease; }
+.pairo-select-chevron[data-open="true"] { transform: rotate(180deg); }
+
+.pairo-select-popup {
+  position: fixed;
+  z-index: 100000;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  background: var(--card, #fff);
+  color: var(--foreground, #1a1a1a);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid color-mix(in srgb, var(--primary, #1a1a1a) 28%, transparent);
+  border-radius: min(var(--radius, 10px), 14px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 14px;
+  line-height: 1.35;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.pairo-select-group {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.pairo-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: calc(min(var(--radius, 10px), 14px) - 3px);
+  cursor: pointer;
+  color: inherit;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pairo-select-option-label { min-width: 0; overflow-wrap: anywhere; }
+.pairo-select-option[data-empty="true"] .pairo-select-option-label { opacity: 0.6; }
+.pairo-select-option[data-active="true"] { background: var(--secondary, #f4f4f4); }
+.pairo-select-option[aria-selected="true"] { background: var(--primary, #1a1a1a); color: var(--primary-foreground, #fff); font-weight: 600; }
+/* the empty "Select..." row is a placeholder, not a real choice: never paint it as the selected option */
+.pairo-select-option[data-empty="true"][aria-selected="true"] { background: transparent; color: inherit; font-weight: 400; }
+.pairo-select-option[data-empty="true"][aria-selected="true"][data-active="true"] { background: var(--secondary, #f4f4f4); filter: none; }
+.pairo-select-option[data-empty="true"] .pairo-select-check { display: none; }
+.pairo-select-option[aria-selected="true"][data-active="true"] { filter: brightness(1.12); }
+.pairo-select-option[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; }
+.pairo-select-check { width: 16px; height: 16px; flex: none; }
+@media (max-width: 782px) {
+  .pairo-select-option { padding: 12px 14px; font-size: 16px; }
+}

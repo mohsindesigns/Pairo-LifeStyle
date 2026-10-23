@@ -94,6 +94,12 @@ const InvoiceTemplate = ({ order }) => {
               {order.financials.shippingCost > 0 ? formatMoney(order.financials.shippingCost, currency) : "Complimentary"}
             </span>
           </div>
+          {Number(order.financials?.tax) > 0 ? (
+            <div className="flex justify-between text-sm text-black/40">
+              <span>Tax</span>
+              <span className="font-bold text-black">{formatMoney(Number(order.financials.tax), currency)}</span>
+            </div>
+          ) : null}
           <div className="pt-4 border-t-2 border-black flex justify-between items-end">
             <span className="text-[10px] font-bold uppercase tracking-widest">Balance Total</span>
             <span className="text-3xl font-black tracking-tighter">{formatMoney(order.financials.total, currency)}</span>

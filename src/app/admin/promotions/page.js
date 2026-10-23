@@ -8,6 +8,7 @@ import { Page, PageHeader, Notice, Skeleton, formatDate, formatMoney } from "@/c
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { paginate } from "@/lib/admin-products-utils";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Status views. "Archived" is the promotions' trash: archived promotions never run, can be
 // restored (as a Draft) and only an archived promotion can be deleted permanently.
@@ -303,7 +304,7 @@ export default function PromotionsDashboard() {
       {/* Toolbar */}
       <div className="wp-toolbar">
         <label htmlFor="promotions-bulk-action" className="sr-only">Select bulk action</label>
-        <select
+        <ThemedSelect
           id="promotions-bulk-action"
           className="wp-select"
           value={bulkAction}
@@ -321,7 +322,7 @@ export default function PromotionsDashboard() {
               <option>Archive</option>
             </>
           )}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkAction} disabled={selectedIds.length === 0 || bulkAction === "Bulk actions"} className="wp-btn">Apply</button>
 
         <span className="wp-spacer" />

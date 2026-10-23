@@ -18,13 +18,19 @@ const NON_REFERRED = {
 // Status tabs on the list. "Completed" = Delivered (the final, successful status).
 export const ORDER_STATUS_TABS = ["all", "Processing", "Delivered", "Cancelled", "affiliate", "trash"];
 
+// The search box text is matched literally (never as a pattern) and capped in length: a pattern such as "(a+)+$"
+// can otherwise tie the database up.
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 function searchClause(search) {
-  if (!search) return null;
+  const term = typeof search === "string" ? search.trim().slice(0, 100) : "";
+  if (!term) return null;
+  const rx = { $regex: escapeRegex(term), $options: "i" };
   return {
     $or: [
-      { orderNumber: { $regex: search, $options: "i" } },
-      { "customer.email": { $regex: search, $options: "i" } },
-      { "shippingAddress.fullName": { $regex: search, $options: "i" } },
+      { orderNumber: rx },
+      { "customer.email": rx },
+      { "shippingAddress.fullName": rx },
     ],
   };
 }

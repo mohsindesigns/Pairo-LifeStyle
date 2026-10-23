@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Customer from "@/models/Customer";
 import Order from "@/models/Order";
 import { can } from "@/lib/rbac";
+import { CUSTOMER_PRIVATE_FIELDS } from "@/lib/customerFields";
 import { sanitizeText } from "@/lib/sanitize";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
@@ -75,7 +76,7 @@ export async function GET(req) {
     // Legacy shape (no ?page): full array, used by Topbar search and New Order screen.
     if (!paginated) {
       const customers = await Customer.find({ role: { $ne: "admin" }, isDeleted: { $ne: true } })
-          .select('-password')
+          .select(CUSTOMER_PRIVATE_FIELDS)
           .sort({ createdAt: -1 })
           .lean();
 
@@ -103,7 +104,7 @@ export async function GET(req) {
     const pages = totalPages(total, limit);
     const currentPage = Math.min(page, pages);
     const customers = await Customer.find(listFilter)
-        .select('-password')
+        .select(CUSTOMER_PRIVATE_FIELDS)
         .sort({ createdAt: -1 })
         .skip((currentPage - 1) * limit)
         .limit(limit)
@@ -231,7 +232,7 @@ export async function PUT(req) {
       { _id: id, role: { $ne: "admin" } },
       { $set: { isDeleted: false, deletedAt: null } },
       { new: true }
-    ).select("-password").lean();
+    ).select(CUSTOMER_PRIVATE_FIELDS).lean();
     if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
     return NextResponse.json({ success: true, customer });
   } catch (error) {

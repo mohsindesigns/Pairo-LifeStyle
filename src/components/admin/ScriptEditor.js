@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Postbox } from "@/components/admin/ui";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 export default function ScriptEditor({ initialData = null, isEdit = false }) {
   const router = useRouter();
@@ -174,7 +175,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
             </div>
             <div className="wp-frow">
               <label htmlFor="script-type" className="wp-flabel">Type</label>
-              <select
+              <ThemedSelect
                 id="script-type"
                 value={formData.type}
                 onChange={(e) => setFormData({...formData, type: e.target.value})}
@@ -189,11 +190,11 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                  <option value="verification">Verification Meta Tag</option>
                  <option value="hotjar">Hotjar Template</option>
                  <option value="clarity">MS Clarity Template</option>
-              </select>
+              </ThemedSelect>
             </div>
             <div className="wp-frow">
               <label htmlFor="script-location" className="wp-flabel">Placement</label>
-              <select
+              <ThemedSelect
                 id="script-location"
                 value={formData.location}
                 onChange={(e) => setFormData({...formData, location: e.target.value})}
@@ -202,7 +203,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                  <option value="head">Header (&lt;head&gt;)</option>
                  <option value="body_top">Body Start (&lt;body&gt;)</option>
                  <option value="body_bottom">Body End (Footer)</option>
-              </select>
+              </ThemedSelect>
             </div>
             <div className="wp-frow">
               <span className="wp-flabel" id="script-status-label">Status</span>
@@ -242,7 +243,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                 {formData.type === 'verification' && (
                   <div className="wp-frow">
                     <label htmlFor="script-verification-provider" className="wp-flabel">Verification provider</label>
-                    <select
+                    <ThemedSelect
                       id="script-verification-provider"
                       value={formData.templateConfig.verificationProvider || 'google'}
                       onChange={(e) => setFormData({
@@ -258,7 +259,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                       <option value="pinterest">Pinterest (p:domain_verify)</option>
                       <option value="bing">Bing Webmaster (msvalidate.01)</option>
                       <option value="facebook">Facebook Domain Verification (facebook-domain-verification)</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
                 )}
                 <div className="wp-frow">
@@ -371,7 +372,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
         <Postbox title="Advanced placement">
           <div className="wp-field">
             <label htmlFor="script-load-strategy" className="wp-label">Load strategy</label>
-            <select
+            <ThemedSelect
               id="script-load-strategy"
               value={formData.loadStrategy}
               onChange={(e) => setFormData({...formData, loadStrategy: e.target.value})}
@@ -382,7 +383,7 @@ export default function ScriptEditor({ initialData = null, isEdit = false }) {
                <option value="lazyOnload">Lazy Onload (Non-critical)</option>
                <option value="async">Native Async</option>
                <option value="defer">Native Defer</option>
-            </select>
+            </ThemedSelect>
           </div>
           <div className="wp-field" style={{ marginBottom: 0 }}>
             <label htmlFor="script-priority" className="wp-label">Execution priority</label>

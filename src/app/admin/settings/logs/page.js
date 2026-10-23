@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { Page, PageHeader, Notice, Skeleton } from "@/components/admin/ui";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // RFC 4180 CSV cell: wrap in quotes when it contains a quote, comma or newline,
 // doubling embedded quotes. Also neutralise spreadsheet formula injection.
@@ -190,15 +191,15 @@ function AuditLogsView() {
 
       <form className="wp-toolbar" onSubmit={applyFilters} aria-label="Filter audit log">
         <label htmlFor="logs-action" className="sr-only">Action</label>
-        <select id="logs-action" className="wp-select w-full sm:w-auto" value={draft.action} onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value }))}>
+        <ThemedSelect id="logs-action" className="wp-select w-full sm:w-auto" value={draft.action} onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value }))}>
           <option value="">All actions</option>
           {facets.actions.map((a) => <option key={a} value={a}>{prettyAction(a)}</option>)}
-        </select>
+        </ThemedSelect>
         <label htmlFor="logs-resource" className="sr-only">Target</label>
-        <select id="logs-resource" className="wp-select w-full sm:w-auto" value={draft.resource} onChange={(e) => setDraft((d) => ({ ...d, resource: e.target.value }))}>
+        <ThemedSelect id="logs-resource" className="wp-select w-full sm:w-auto" value={draft.resource} onChange={(e) => setDraft((d) => ({ ...d, resource: e.target.value }))}>
           <option value="">All targets</option>
           {facets.resources.map((r) => <option key={r} value={r}>{r}</option>)}
-        </select>
+        </ThemedSelect>
         <div className="flex items-center gap-2 w-full sm:w-auto">
         <label htmlFor="logs-from" className="sr-only">From date</label>
         <input id="logs-from" type="date" className="wp-input flex-1 min-w-0 sm:flex-none" value={draft.from} max={draft.to || undefined} onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))} aria-label="From date" />

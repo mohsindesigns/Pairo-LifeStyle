@@ -8,6 +8,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Skeleton } from "@/components/admin/ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 export async function readError(res, fallback) {
   try {
@@ -206,10 +207,10 @@ export function BulkActions({ id, options, value, onChange, onApply, disabled })
   return (
     <>
       <label htmlFor={id} className="sr-only">Select bulk action</label>
-      <select id={id} className="wp-select" value={value} onChange={(e) => onChange(e.target.value)}>
+      <ThemedSelect id={id} className="wp-select" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Bulk actions</option>
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
+      </ThemedSelect>
       <button type="button" className="wp-btn" onClick={onApply} disabled={disabled}>Apply</button>
     </>
   );

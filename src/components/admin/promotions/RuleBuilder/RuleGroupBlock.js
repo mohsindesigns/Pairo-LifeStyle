@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import ConditionRow from './ConditionRow';
 import { childRulePath, joinPath, parentOfGroupPath } from '../promotionEditorUtils';
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const OPERATOR_HINT = {
   AND: 'all of the following',
@@ -45,7 +46,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
         </button>
 
         <label htmlFor={operatorId} className="wp-strong">Match</label>
-        <select
+        <ThemedSelect
           id={operatorId}
           value={group.operator || 'AND'}
           onChange={(e) => onUpdate(joinPath(path, 'operator'), e.target.value)}
@@ -54,7 +55,7 @@ export default function RuleGroupBlock({ group, path = "", index = 0, onUpdate, 
           <option value="AND">AND</option>
           <option value="OR">OR</option>
           <option value="NOT">NOT</option>
-        </select>
+        </ThemedSelect>
         <span className="wp-muted">{OPERATOR_HINT[group.operator || 'AND']}</span>
 
         <span className="flex-1" />

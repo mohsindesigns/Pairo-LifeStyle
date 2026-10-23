@@ -9,6 +9,7 @@ import { usePopup } from "@/context/PopupContext";
 import { useRBAC } from "@/hooks/useRBAC";
 import RequirePermission from "@/components/admin/RequirePermission";
 import PermissionMatrix, { countPermissions, TOTAL_PERMISSIONS } from "./PermissionMatrix";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 async function readError(res, fallback) {
   try {
@@ -261,7 +262,7 @@ function RoleManagementScreen() {
       {canManage && (
         <div className="wp-toolbar">
           <label htmlFor="roles-bulk" className="sr-only">Select bulk action</label>
-          <select id="roles-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+          <ThemedSelect id="roles-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
             <option>Bulk actions</option>
             {isTrash ? (
               <>
@@ -271,7 +272,7 @@ function RoleManagementScreen() {
             ) : (
               <option>Move to Trash</option>
             )}
-          </select>
+          </ThemedSelect>
           <button type="button" className="wp-btn" onClick={handleBulk}>Apply</button>
           <span className="wp-spacer" />
           <span className="wp-pages">{visible.length} item{visible.length === 1 ? "" : "s"}</span>

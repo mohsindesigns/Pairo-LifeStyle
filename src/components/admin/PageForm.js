@@ -66,6 +66,7 @@ import SEOConfigPanel from "./SEOConfigPanel";
 import { useRBAC } from "@/hooks/useRBAC";
 import { planTemplateChange } from "./builder/templateChange";
 import * as LucideIcons from "lucide-react";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const QuillEditor = dynamic(() => import("@/components/admin/QuillEditor"), { ssr: false });
 
@@ -571,7 +572,7 @@ export default function PageForm({ pageId }) {
             return <IconPicker value={value} onChange={onChange} />;
          case "select":
             return (
-               <select value={value || ""} onChange={(e) => onChange(e.target.value)} className="wp-select wp-full">
+               <ThemedSelect value={value || ""} onChange={(e) => onChange(e.target.value)} className="wp-select wp-full">
                   <option value="">— Select —</option>
                   {(field.options === 'categories' ? dynamicOptions.categories :
                      field.options === 'products' ? dynamicOptions.products :
@@ -579,7 +580,7 @@ export default function PageForm({ pageId }) {
                            Array.isArray(field.options) ? field.options : []).map(opt => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
                            ))}
-               </select>
+               </ThemedSelect>
             );
          case "multiselect": {
             const selected = Array.isArray(value) ? value : [];
@@ -869,7 +870,7 @@ export default function PageForm({ pageId }) {
                      <div className="wp-misc-row">
                         <label htmlFor="page-status-select" className="wp-muted">Status:</label>
                         <strong className="wp-strong">{page.status}</strong>
-                        <select
+                        <ThemedSelect
                            id="page-status-select"
                            className="wp-select"
                            style={{ marginLeft: "auto" }}
@@ -878,13 +879,13 @@ export default function PageForm({ pageId }) {
                         >
                            <option value="Draft">Draft</option>
                            <option value="Published">Published</option>
-                        </select>
+                        </ThemedSelect>
                      </div>
                      <div className="wp-misc-row">
                         {pageId === "new" ? (
                            <>
                               <label htmlFor="page-template-select" className="wp-muted">Template:</label>
-                              <select
+                              <ThemedSelect
                                  id="page-template-select"
                                  className="wp-select"
                                  style={{ marginLeft: "auto", maxWidth: "100%" }}
@@ -894,7 +895,7 @@ export default function PageForm({ pageId }) {
                                  {Object.entries(TEMPLATE_REGISTRY).map(([key, t]) => (
                                     <option key={key} value={key}>{t.name || key}</option>
                                  ))}
-                              </select>
+                              </ThemedSelect>
                            </>
                         ) : (
                            <>

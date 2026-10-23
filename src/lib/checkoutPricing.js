@@ -11,6 +11,26 @@ import { shippingService } from "@/services/shipping/ShippingService";
 
 const withSession = (query, mongoSession) => mongoSession ? query.session(mongoSession) : query;
 
+// Real carts are tiny; these limits only exist so a forged request can never ask for an absurd number of lines or units.
+export const MAX_LINE_QUANTITY = 1000;
+export const MAX_CART_LINES = 100;
+
+// The cart comes from the browser, so it is checked before anything is priced. A negative or fractional quantity would
+// subtract from (or bend) the total: one jacket plus one jacket at quantity -1 adds up to $0, and the order used to be
+// created as paid. Every checkout path (COD order, card PaymentIntent, webhook fulfilment) prices through
+// computeAuthoritativeCheckout, which calls this first. Throws an Error whose message is safe to show the customer.
+export function assertValidCartItems(items) {
+  if (!Array.isArray(items) || items.length === 0) throw new Error("Your cart is empty.");
+  if (items.length > MAX_CART_LINES) throw new Error(`Your cart has too many different items (the maximum is ${MAX_CART_LINES}).`);
+  for (const item of items) {
+    const quantity = item?.quantity;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_LINE_QUANTITY) {
+      const name = String(item?.name || "an item").slice(0, 60);
+      throw new Error(`Invalid quantity for "${name}": quantities must be whole numbers from 1 to ${MAX_LINE_QUANTITY}. Please update your cart and try again.`);
+    }
+  }
+}
+
 // Recomputes the cart subtotal from real DB prices rather than trusting the
 // client-submitted financials.subtotal (or per-item price fields) — otherwise a
 // forged request can claim any subtotal for a cart of real products, letting
@@ -19,16 +39,21 @@ const withSession = (query, mongoSession) => mongoSession ? query.session(mongoS
 // base product price) since a variant can legitimately cost more or less.
 async function resolveAuthoritativeSubtotal({ items, mongoSession }) {
   const productIds = items.map(item => item.id || item._id).filter(Boolean);
-  const dbProducts = await withSession(Product.find({ _id: { $in: productIds } }).select("price variantCombinations attributes corporateGifting"), mongoSession);
+  const dbProducts = await withSession(Product.find({ _id: { $in: productIds } }).select("name price variantCombinations attributes corporateGifting"), mongoSession);
   const productById = new Map(dbProducts.map(p => [p._id.toString(), p]));
 
   return items.reduce((sum, item) => {
     const id = (item.id || item._id)?.toString();
     const product = productById.get(id);
-    // Falls back to the client price only for an item that no longer exists in
-    // the DB (e.g. deleted after being added to cart) — a real product's price
-    // always comes from the DB, never from the request body.
-    const price = product ? resolveAuthoritativePrice(product, item) : item.price;
+    // A line that is not a real product (deleted after it went into the cart, or made up) is refused. It used to be
+    // priced at whatever the request said, so a forged line with a negative price could cancel out real ones.
+    if (!product) {
+      throw new Error(`"${String(item?.name || "An item").slice(0, 60)}" is no longer available. Please remove it from your cart and try again.`);
+    }
+    const price = resolveAuthoritativePrice(product, item);
+    if (!Number.isFinite(price) || price < 0) {
+      throw new Error(`"${product.name}" cannot be purchased right now.`);
+    }
     return sum + price * item.quantity;
   }, 0);
 }
@@ -47,8 +72,12 @@ export async function resolveAuthoritativeShippingCost({ shippingAddress, shippi
 
   const matchedRate = result.rates.find(r => String(r.methodId) === String(shippingSnapshot?.methodId));
   if (!matchedRate) {
-    if (shippingSnapshot?.methodId === 'free-delivery' || shippingSnapshot?.methodId === 'free-order') {
-      return 0;
+    // 'free-delivery' / 'free-order' are placeholders the checkout page uses when shipping is switched off or the order
+    // is already $0. Both are settled before this point (shipping-disabled just above, a $0 order in
+    // computeAuthoritativeCheckout), so reaching here with one of them while real rates exist means the client's idea
+    // of the order no longer matches the server's. It must never be honoured as free shipping.
+    if (shippingSnapshot?.methodId === 'free-order') {
+      throw new Error("Your order total has changed and is no longer $0. Please review your order and choose a shipping method.");
     }
     throw new Error("Selected shipping method is no longer available for this address. Please refresh and choose a shipping method again.");
   }
@@ -68,6 +97,8 @@ export async function computeAuthoritativeCheckout({
   log = null,
   ipAddress = null,
 }) {
+  assertValidCartItems(items);
+
   let customerType = 'guest';
   if (orderUserId) customerType = 'logged_in';
 

@@ -8,6 +8,7 @@ import { useRBAC } from "@/hooks/useRBAC";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const VIEWS = [
   ["all", "All"],
@@ -250,10 +251,10 @@ function ScriptsList() {
         {showChecks && (
           <>
             <label htmlFor="scripts-bulk-action" className="sr-only">Select bulk action</label>
-            <select id="scripts-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} disabled={busy}>
+            <ThemedSelect id="scripts-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} disabled={busy}>
               <option value="">Bulk actions</option>
               {bulkChoices.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+            </ThemedSelect>
             <button type="button" className="wp-btn" onClick={applyBulkAction} disabled={busy}>
               {busy ? "Applying…" : "Apply"}
             </button>

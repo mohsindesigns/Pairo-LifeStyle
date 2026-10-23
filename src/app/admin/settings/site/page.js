@@ -13,6 +13,7 @@ import { migrateLegalLinks, normalizePublishedProducts } from "@/components/admi
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
 
@@ -180,14 +181,14 @@ function GeneralTab({ config, onChange, onGoToTab }) {
         <div className="wp-frow">
           <label className="wp-flabel" htmlFor="site-store-currency">Store currency</label>
           <div style={ctrlWrap}>
-            <select
+            <ThemedSelect
               id="site-store-currency"
               className="wp-select"
               value={storeCurrency}
               onChange={e => onChange({ ...config, commerce: { ...(config.commerce || {}), storeCurrency: e.target.value } })}
             >
               {currencyOptions.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-            </select>
+            </ThemedSelect>
             {storeCurrency !== CHECKOUT_CURRENCY && (
               <div className="wp-notice wp-notice-warning" role="alert" style={{ marginTop: 8, maxWidth: 560 }}>
                 <p>Checkout charges cards in {CHECKOUT_CURRENCY}, so orders are recorded in {CHECKOUT_CURRENCY}. With {storeCurrency} selected, reports will label those {CHECKOUT_CURRENCY} amounts as {storeCurrency}. Keep this on {CHECKOUT_CURRENCY} unless checkout is changed too.</p>
@@ -356,7 +357,7 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                   {/* Type */}
                   <div className="md:col-span-3 min-w-0">
                     <label className="wp-label" htmlFor={`nav-${idx}-type`}>Type</label>
-                    <select id={`nav-${idx}-type`} className="wp-select wp-full" value={item.type} onChange={e => updateNav(idx, { type: e.target.value, value: e.target.value === 'blog_list' ? '/blog' : '' })}>
+                    <ThemedSelect id={`nav-${idx}-type`} className="wp-select wp-full" value={item.type} onChange={e => updateNav(idx, { type: e.target.value, value: e.target.value === 'blog_list' ? '/blog' : '' })}>
                       <option value="custom_url">Custom Link</option>
                       <option value="page">Page</option>
                       <option value="blog_list">Blog List Page</option>
@@ -365,7 +366,7 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                       <option value="mega_menu">Mega Menu</option>
                       <option value="dropdown_product">Dropdown List of Product</option>
                       <option value="dropdown_category">Dropdown List of Category</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
                   {/* Value */}
                   <div className="md:col-span-4 min-w-0">
@@ -377,21 +378,21 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                         Auto-routes to <code className="ml-1">/blog</code>
                       </div>
                     ) : item.type === 'page' ? (
-                      <select id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
+                      <ThemedSelect id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
                         <option value="">— Select Page —</option>
                         <option value="/blog">Blog List (System Page)</option>
                         {dbPages.map(p => <option key={p._id} value={p._id}>{p.title}</option>)}
-                      </select>
+                      </ThemedSelect>
                     ) : item.type === 'product' ? (
-                      <select id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
+                      <ThemedSelect id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
                         <option value="">— Select Product —</option>
                         {dbProducts.map(p => <option key={p._id} value={p._id}>{p.name || p.title}</option>)}
-                      </select>
+                      </ThemedSelect>
                     ) : item.type === 'product_category' ? (
-                      <select id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
+                      <ThemedSelect id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
                         <option value="">— Select Category —</option>
                         {dbCategories.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-                      </select>
+                      </ThemedSelect>
                     ) : ['mega_menu', 'dropdown_product', 'dropdown_category'].includes(item.type) ? (
                       <div className="wp-desc m-0 min-h-[30px] flex items-center">See options below</div>
                     ) : (
@@ -596,14 +597,14 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
           placeholder="Column Heading"
         />
         <label htmlFor={`footer-col-${idx}-type`} className="sr-only">{colName} type</label>
-        <select
+        <ThemedSelect
           id={`footer-col-${idx}-type`}
           className="wp-select min-w-0 flex-[1_1_140px] max-w-[200px] max-[782px]:max-w-none"
           value={col.type}
           onChange={e => onChange({ type: e.target.value })}
         >
           {COLUMN_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-        </select>
+        </ThemedSelect>
         <span className="flex-1" />
         <div className="flex items-center gap-1 shrink-0">
           <button type="button" disabled={idx === 0} onClick={() => onMove(idx, -1)}
@@ -829,7 +830,7 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
               <div className="min-w-0">
                 <label className="wp-label" htmlFor="footer-privacy-page">CMS page</label>
-                <select
+                <ThemedSelect
                   id="footer-privacy-page"
                   value={fc.privacyPageSlug || ""}
                   onChange={e => setFc({ privacyPageSlug: e.target.value })}
@@ -839,7 +840,7 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
                   {(dbPages || []).map(p => (
                     <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
                   ))}
-                </select>
+                </ThemedSelect>
               </div>
               <div className="min-w-0">
                 <label className="wp-label" htmlFor="footer-privacy-url">Or custom URL (optional)</label>
@@ -884,7 +885,7 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
               <div className="min-w-0">
                 <label className="wp-label" htmlFor="footer-terms-page">CMS page</label>
-                <select
+                <ThemedSelect
                   id="footer-terms-page"
                   value={fc.termsPageSlug || ""}
                   onChange={e => setFc({ termsPageSlug: e.target.value })}
@@ -894,7 +895,7 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
                   {(dbPages || []).map(p => (
                     <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
                   ))}
-                </select>
+                </ThemedSelect>
               </div>
               <div className="min-w-0">
                 <label className="wp-label" htmlFor="footer-terms-url">Or custom URL (optional)</label>
@@ -1187,7 +1188,7 @@ function RedirectsTab() {
           </div>
           <div className="wp-frow">
             <label className="wp-flabel" htmlFor="redirect-type">Redirect type</label>
-            <select
+            <ThemedSelect
               id="redirect-type"
               value={redirectForm.statusCode}
               onChange={e => setRedirectForm({ ...redirectForm, statusCode: parseInt(e.target.value, 10) })}
@@ -1195,7 +1196,7 @@ function RedirectsTab() {
             >
               <option value={301}>301 Permanent Redirect</option>
               <option value={302}>302 Temporary Redirect</option>
-            </select>
+            </ThemedSelect>
           </div>
         </div>
 

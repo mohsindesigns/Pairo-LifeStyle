@@ -1,5 +1,6 @@
 import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
+import { getNextOrderNumber } from "@/lib/orderNumber";
 import mongoose from "mongoose";
 import { sendCustomOrderConfirmation, sendAdminCustomOrderNotification } from "@/lib/email";
 import { NextResponse } from "next/server";
@@ -33,8 +34,9 @@ export async function POST(req) {
     }
 
     // ── Safe order number generation ──────────────────────────────────
-    const count = await Order.countDocuments({});
-    const orderNumber = `PAI-${1000 + count + 1}`;
+    // The shared atomic counter, like checkout. Counting documents gave numbers that collided with the
+    // counter's and were reused after a permanent delete (the order number is unique).
+    const orderNumber = await getNextOrderNumber();
 
     // ── Generate unique idempotencyKey to avoid duplicate-index conflicts ─
     // The Order schema has a unique index on idempotencyKey.

@@ -67,15 +67,16 @@ export async function POST(req) {
     if (!sourceUrl || !targetUrl) {
       return NextResponse.json({ error: "Source path and target path are required." }, { status: 400 });
     }
+    // Checked before the path is normalised: a number or object would make normalizePath throw (a 500).
+    if (typeof sourceUrl !== "string" || typeof targetUrl !== "string") {
+      return NextResponse.json({ error: "Source path and target path must be text." }, { status: 400 });
+    }
 
     const cleanSource = normalizePath(sourceUrl);
     if (isReservedPath(cleanSource)) {
       return NextResponse.json({ error: "Cannot redirect from a reserved system path." }, { status: 400 });
     }
 
-    if (typeof sourceUrl !== "string" || typeof targetUrl !== "string") {
-      return NextResponse.json({ error: "Source path and target path must be text." }, { status: 400 });
-    }
     const record = await registerRedirect(sourceUrl, targetUrl, parseStatus(statusCode));
     if (!record) {
       return NextResponse.json({ error: "Invalid redirect rule or circular loop detected." }, { status: 400 });

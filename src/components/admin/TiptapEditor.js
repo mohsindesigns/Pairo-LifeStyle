@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import MediaPickerModal from './MediaPickerModal';
 import { usePopup } from '@/context/PopupContext';
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // --- CUSTOM FONT SIZE EXTENSION ---
 const FontSize = Extension.create({
@@ -218,7 +219,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
     <div className="bg-[#f6f7f7] px-2 py-1.5 select-none max-w-full">
       <div className="flex flex-wrap items-center gap-1 tiptap-toolbar max-w-full min-w-0" role="toolbar" aria-label="Formatting">
         {/* Block / Headings Type */}
-        <select 
+        <ThemedSelect 
           value={getHeadingValue()} 
           onChange={handleHeadingChange}
           className={selectClass}
@@ -231,10 +232,10 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           <option value="h4">Heading 4</option>
           <option value="h5">Heading 5</option>
           <option value="h6">Heading 6</option>
-        </select>
+        </ThemedSelect>
 
         {/* Font Size Dropdown */}
-        <select 
+        <ThemedSelect 
           onChange={handleFontSizeChange}
           className={selectClass}
           title="Font Size"
@@ -251,7 +252,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           <option value="30px">30px</option>
           <option value="36px">36px</option>
           <option value="48px">48px</option>
-        </select>
+        </ThemedSelect>
 
         <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
@@ -300,7 +301,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
         <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
         {/* Color Selectors */}
-        <select 
+        <ThemedSelect 
           onChange={handleColorChange}
           className={selectClass}
           title="Text Color"
@@ -316,9 +317,9 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           <option value="#8b5cf6">Purple</option>
           <option value="#ec4899">Pink</option>
           <option value="#ffffff">White</option>
-        </select>
+        </ThemedSelect>
 
-        <select 
+        <ThemedSelect 
           onChange={handleHighlightChange}
           className={selectClass}
           title="Background Highlight"
@@ -331,7 +332,7 @@ const MenuBar = ({ editor, onInsertImage, selectedImage, onOpenImageEditor }) =>
           <option value="#bfdbfe">Blue</option>
           <option value="#fbcfe8">Pink</option>
           <option value="#e9d5ff">Purple</option>
-        </select>
+        </ThemedSelect>
 
         <span aria-hidden="true" className="w-px h-6 bg-[#dcdcde] mx-1" />
 
@@ -530,7 +531,7 @@ const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose 
           {/* Width Preset / Custom */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <label htmlFor={`${uid}-width`} className="text-[13px] text-[#1d2327]">Width:</label>
-            <select
+            <ThemedSelect
               value={['auto', '25%', '33%', '50%', '75%', '100%'].includes(selectedImage.width) ? selectedImage.width : 'custom'}
               onChange={(e) => {
                 const val = e.target.value;
@@ -548,7 +549,7 @@ const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose 
               <option value="75%">75% Width</option>
               <option value="100%">100% Full Width</option>
               <option value="custom">Custom (px/%)</option>
-            </select>
+            </ThemedSelect>
             <input
               type="text"
               placeholder="e.g. 400px"
@@ -579,7 +580,7 @@ const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose 
           {/* Alignment & Text Wrap */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <label htmlFor={`${uid}-align`} className="text-[13px] text-[#1d2327]">Align:</label>
-            <select
+            <ThemedSelect
               value={selectedImage.align || 'center'}
               onChange={(e) => onUpdate({ align: e.target.value })}
               id={`${uid}-align`}
@@ -590,7 +591,7 @@ const ImageEditPanel = ({ selectedImage, onUpdate, onReplace, onRemove, onClose 
               <option value="right">Right Block (No wrap)</option>
               <option value="float-left">Wrap Left (Float)</option>
               <option value="float-right">Wrap Right (Float)</option>
-            </select>
+            </ThemedSelect>
           </div>
 
           {/* Alt Text */}

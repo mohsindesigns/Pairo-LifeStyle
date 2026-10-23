@@ -6,6 +6,7 @@ import { sendQuestionConfirmationEmail, sendAdminQuestionNotification } from "@/
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { sanitizeText, sanitizeObject } from "@/lib/sanitize";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import { toPublicQuestion } from "@/lib/publicReviewData";
 import mongoose from "mongoose";
 
 export async function GET(req, { params }) {
@@ -49,7 +50,7 @@ export async function GET(req, { params }) {
       .lean();
 
     return NextResponse.json({
-      questions,
+      questions: questions.map(toPublicQuestion),
       pagination: {
         total,
         page,
@@ -147,7 +148,7 @@ export async function POST(req, { params }) {
 
     return NextResponse.json({
       success: true,
-      question: newQuestion
+      question: { _id: newQuestion._id, status: newQuestion.status }
     });
   } catch (error) {
     console.error("POST Product Question Public Error:", error);

@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import { Page, PageHeader, formatMoney, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 async function readError(res, fallback) {
   try {
@@ -280,7 +281,7 @@ export default function AdminCustomers() {
       {/* Action Bar */}
       <div className="wp-toolbar">
         <label htmlFor="customer-bulk-action" className="sr-only">Select bulk action</label>
-        <select id="customer-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <ThemedSelect id="customer-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
           <option>Bulk actions</option>
           {isTrash ? (
             <>
@@ -290,7 +291,7 @@ export default function AdminCustomers() {
           ) : (
             <option>Move to Trash</option>
           )}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkAction} className="wp-btn">Apply</button>
         <span className="wp-spacer" />
         <span className="wp-pages">{itemsLabel}</span>

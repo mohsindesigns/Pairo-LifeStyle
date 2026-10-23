@@ -23,6 +23,40 @@ describe("escapeCsvField (RFC 4180)", () => {
   });
 });
 
+describe("escapeCsvField: spreadsheet formula injection", () => {
+  it.each([
+    ['=HYPERLINK("http://evil.example","click")', `"'=HYPERLINK(""http://evil.example"",""click"")"`],
+    ["=1+1", "'=1+1"],
+    ["+cmd|' /C calc'!A0", "'+cmd|' /C calc'!A0"],
+    ["-2+3+cmd", "'-2+3+cmd"],
+    ["@SUM(A1:A9)", "'@SUM(A1:A9)"],
+    ["\t=1+1", "'\t=1+1"],
+    ["\r=1+1", `"'\r=1+1"`],
+    ["- need a quote", "'- need a quote"],
+  ])("neutralises %j", (input, expected) => {
+    expect(escapeCsvField(input)).toBe(expected);
+  });
+
+  it("leaves real numbers, numeric strings and phone numbers alone", () => {
+    expect(escapeCsvField(-5)).toBe("-5");
+    expect(escapeCsvField(-5.5)).toBe("-5.5");
+    expect(escapeCsvField("-5.00")).toBe("-5.00");
+    expect(escapeCsvField("+923001234567")).toBe("+923001234567");
+    expect(escapeCsvField("+1 (555) 123-4567")).toBe('+1 (555) 123-4567');
+    expect(escapeCsvField("555-123-4567")).toBe("555-123-4567");
+  });
+
+  it("only prefixes values that START with a formula character", () => {
+    expect(escapeCsvField("a=1")).toBe("a=1");
+    expect(escapeCsvField("Jane - Doe")).toBe("Jane - Doe");
+    expect(escapeCsvField("name@example.com")).toBe("name@example.com");
+  });
+
+  it("is applied to every cell of a built document, header included", () => {
+    expect(buildCsv([["=Name", "Note"], ["x", "@evil"]])).toBe("﻿'=Name,Note\r\nx,'@evil");
+  });
+});
+
 describe("addressFromCustomer", () => {
   const customer = {
     name: "Jane Doe",

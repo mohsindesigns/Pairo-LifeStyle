@@ -9,6 +9,7 @@ import {
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 
 import { Postbox, Notice } from "@/components/admin/ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const ctrlWrap = { flex: "1 1 320px", minWidth: 0 };
 
@@ -306,7 +307,7 @@ export default function PopupTab({ config, onChange }) {
           <Postbox title="Display rules and timing">
             <div className="wp-frow">
               <label className="wp-flabel" htmlFor="popup-frequency">Display frequency</label>
-              <select
+              <ThemedSelect
                 id="popup-frequency"
                 value={popup.frequency || "session"}
                 onChange={(e) => update("frequency", e.target.value)}
@@ -315,7 +316,7 @@ export default function PopupTab({ config, onChange }) {
                 <option value="session">Once per session (Recommended)</option>
                 <option value="daily">Once every 24 hours</option>
                 <option value="always">Every page load (Testing mode)</option>
-              </select>
+              </ThemedSelect>
               <p className="wp-hint">Controls how frequently the popup appears to the same visitor.</p>
             </div>
 

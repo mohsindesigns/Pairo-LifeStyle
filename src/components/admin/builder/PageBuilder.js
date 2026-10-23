@@ -56,6 +56,7 @@ import { TEMPLATE_REGISTRY } from "@/lib/templates";
 import Link from "next/link";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import SectionRenderer from "@/components/common/SectionRenderer";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 /**
  * PRODUCTION-GRADE UUID GENERATOR
@@ -375,7 +376,7 @@ export default function PageBuilder({ initialPage }) {
         return <IconPicker value={value} onChange={onChange} />;
       case "select":
         return (
-          <select value={value || field.default || ""} onChange={(e) => onChange(e.target.value)} className="wp-select wp-full">
+          <ThemedSelect value={value || field.default || ""} onChange={(e) => onChange(e.target.value)} className="wp-select wp-full">
             <option value="">— Select —</option>
             {(field.options === 'categories' ? dynamicOptions.categories : 
               field.options === 'products' ? dynamicOptions.products :
@@ -383,7 +384,7 @@ export default function PageBuilder({ initialPage }) {
               Array.isArray(field.options) ? field.options : []).map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
-          </select>
+          </ThemedSelect>
         );
       case "multiselect":
         const selected = Array.isArray(value) ? value : [];
@@ -526,10 +527,10 @@ export default function PageBuilder({ initialPage }) {
                       </div>
                       <div className="wp-field sm:w-32" style={{ marginBottom: 0 }}>
                          <label htmlFor="builder-status" className="wp-label">Status</label>
-                         <select id="builder-status" value={page.status} onChange={(e) => setPage({ ...page, status: e.target.value })} className="wp-select wp-full">
+                         <ThemedSelect id="builder-status" value={page.status} onChange={(e) => setPage({ ...page, status: e.target.value })} className="wp-select wp-full">
                             <option value="Draft">Draft</option>
                             <option value="Published">Published</option>
-                         </select>
+                         </ThemedSelect>
                       </div>
                    </div>
                 </div>
@@ -611,7 +612,7 @@ export default function PageBuilder({ initialPage }) {
              </div>
 
              <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#f0f0f1] p-2 sm:p-4 flex justify-center items-start">
-                <div className={`bg-white transition-all duration-500 origin-top max-w-full ${previewMode === 'desktop' ? 'w-full' : previewMode === 'tablet' ? 'w-[768px]' : 'w-[375px]'} min-h-full border border-[#dcdcde] overflow-hidden`}>
+                <div className={`builder-preview bg-white transition-all duration-500 origin-top max-w-full ${previewMode === 'desktop' ? 'w-full' : previewMode === 'tablet' ? 'w-[768px]' : 'w-[375px]'} min-h-full border border-[#dcdcde] overflow-hidden`}>
                    <SectionRenderer sections={page.sections} />
                 </div>
              </div>

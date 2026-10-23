@@ -10,9 +10,9 @@ import { reconcilePromotionUsage, isUsageReleasingTransition } from "@/lib/promo
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     await dbConnect();
-    
+
     // Fetch Customer
     let customer = await Customer.findById(session.user.id).select("-password").lean();
     if (!customer) {
@@ -101,7 +101,7 @@ export async function GET() {
 export async function POST(req) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const body = await req.json();
     const { action, data } = body;
     await dbConnect();
@@ -207,7 +207,8 @@ export async function POST(req) {
         const oldStatus = order.status;
 
         // Restore stock, matching the dedicated /api/profile/orders/[id]/cancel route.
-        const stockRollbacks = order.items.map((item) => {
+        // (A duplicated draft never took any stock, so there is nothing to give back.)
+        const stockRollbacks = (order.stockDeducted === false ? [] : order.items).map((item) => {
           const variantTitle = item.selectedVariant?.title || "Standard";
           if (variantTitle !== "Standard") {
             return Product.updateOne(

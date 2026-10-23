@@ -10,7 +10,8 @@ export async function GET(req, { params }) {
     await dbConnect();
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    // Needs a real account id: a missing id would be sent to MongoDB as null and match every guest order.
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

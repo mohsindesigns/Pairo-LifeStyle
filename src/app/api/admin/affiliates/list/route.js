@@ -50,11 +50,19 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Password hashes and reset tokens never leave the server. Bank details are shown only to staff who can manage
+    // affiliates or process payouts (a view-only role used to receive every affiliate's account number and IBAN).
+    const canSeeBanking = can(session.user, "affiliates.manage") || can(session.user, "affiliates.payouts");
     const rawAffiliates = await Affiliate.find({ isDeleted: { $ne: true } })
+      .select("-password -resetPasswordToken -resetPasswordExpires")
       .sort({ createdAt: -1 })
       .lean();
 
-    const affiliates = rawAffiliates.map(aff => decryptAffiliate(aff));
+    const affiliates = rawAffiliates.map(aff => {
+      const decrypted = decryptAffiliate(aff);
+      if (!canSeeBanking) delete decrypted.bankingInfo;
+      return decrypted;
+    });
 
     const { searchParams } = new URL(req.url);
     if (searchParams.get("includeTrashed") !== "1") {
@@ -184,7 +192,9 @@ export async function PUT(req) {
     await affiliate.save();
     console.log(`[AdminAffiliateUpdate] Updated settings for affiliate: ${affiliate.referralCode}. New version: ${affiliate.__v}`);
 
-    return NextResponse.json({ success: true, affiliate });
+    // The saved document carries the password hash and reset token: send back everything else.
+    const { password: _hash, resetPasswordToken: _resetToken, resetPasswordExpires: _resetExpires, ...saved } = affiliate.toObject();
+    return NextResponse.json({ success: true, affiliate: saved });
   } catch (error) {
     console.error("[AdminAffiliatesList PUT Error]", error);
     // Handle duplicate key errors cleanly (e.g. couponCode already registered)

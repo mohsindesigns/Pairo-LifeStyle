@@ -11,6 +11,7 @@ import { can } from "@/lib/rbac";
 import { usePopup } from "@/context/PopupContext";
 import { addressFromCustomer, isSameAddress } from "@/lib/order-address-prefill";
 import CustomizationEditor, { defaultCustomization } from "./CustomizationEditor";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const inputClass = "wp-input wp-full";
 const selectClass = "wp-select wp-full";
@@ -167,7 +168,7 @@ function ProductPicker({ onAdd }) {
             {(pendingProduct.attributes || []).map(attr => (
               <div key={attr.name} className="wp-field">
                 <label htmlFor={`new-order-attr-${attr.name}`} className={labelClass}>{attr.name} *</label>
-                <select
+                <ThemedSelect
                   id={`new-order-attr-${attr.name}`}
                   className={selectClass}
                   value={selectedOptions[attr.name] || ""}
@@ -177,7 +178,7 @@ function ProductPicker({ onAdd }) {
                   {(attr.values || []).map(v => (
                     <option key={v.value} value={v.value}>{v.label || v.value}</option>
                   ))}
-                </select>
+                </ThemedSelect>
               </div>
             ))}
             <div className="wp-field">
@@ -408,7 +409,7 @@ export default function AdminNewOrderPage() {
                 {customerMode === "existing" ? (
                   <div className="wp-field">
                     <label htmlFor="new-order-customer" className={labelClass}>Select customer *</label>
-                    <select
+                    <ThemedSelect
                       id="new-order-customer"
                       className={selectClass}
                       value={selectedCustomerId}
@@ -419,7 +420,7 @@ export default function AdminNewOrderPage() {
                       {customers.map(c => (
                         <option key={c._id} value={c._id}>{c.name} — {c.email}</option>
                       ))}
-                    </select>
+                    </ThemedSelect>
                     {customersError && (
                       <div className="wp-notice wp-notice-error" role="alert" style={{ margin: "8px 0 0" }}>
                         <p>Couldn&apos;t load customers: {customersError}</p>
@@ -436,10 +437,10 @@ export default function AdminNewOrderPage() {
 
                 <div className="wp-field">
                   <label htmlFor="new-order-payment-status" className={labelClass}>Payment status</label>
-                  <select id="new-order-payment-status" className={selectClass} value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
+                  <ThemedSelect id="new-order-payment-status" className={selectClass} value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
                     <option value="Paid">Paid</option>
                     <option value="Pending">Pending</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
               </div>
 

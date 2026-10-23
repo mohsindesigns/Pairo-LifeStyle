@@ -58,7 +58,10 @@ export default function usePromotionEditor(initialData) {
   const updateAction = (index, field, value) => {
     setFormData(prev => {
       const newActions = [...prev.actions];
-      newActions[index] = { ...newActions[index], [field]: value };
+      const next = { ...newActions[index], [field]: value };
+      // Fixed Product Price only ever applies to specific products (see ActionBlock), so keep the stored target in step.
+      if (next.type === 'fixed_product_price' && next.target !== 'product') next.target = 'product';
+      newActions[index] = next;
       return { ...prev, actions: newActions };
     });
   };

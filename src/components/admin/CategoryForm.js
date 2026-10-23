@@ -13,6 +13,7 @@ import { toast } from "react-hot-toast";
 import { getCategoryUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import { confirmSlugChange } from "@/components/admin/slugChange";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 export default function CategoryForm({ categoryId = null, type = "product" }) {
   const router = useRouter();
@@ -582,10 +583,10 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
               <div className="wp-misc">
                 <div className="wp-misc-row">
                   <label htmlFor="category-status">Status:</label>
-                  <select id="category-status" className="wp-select" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
+                  <ThemedSelect id="category-status" className="wp-select" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}>
                     <option>Published</option>
                     <option>Draft</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
                 <div className="wp-misc-row">
                   <button
@@ -646,7 +647,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
             {type === "product" && (
               <Postbox id="category-size-chart" title="Default Size Chart">
                 <label htmlFor="category-size-chart-select" className="sr-only">Default size chart</label>
-                <select
+                <ThemedSelect
                   id="category-size-chart-select"
                   className="wp-select wp-full"
                   value={formData.sizeChart || ""}
@@ -658,7 +659,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                       {sc.label}
                     </option>
                   ))}
-                </select>
+                </ThemedSelect>
                 <p className="wp-desc">
                   Products in this category will automatically inherit this size chart unless overridden.
                 </p>

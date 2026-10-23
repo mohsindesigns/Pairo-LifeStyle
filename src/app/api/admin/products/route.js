@@ -223,10 +223,13 @@ export async function PUT(req) {
       await Product.updateOne({ _id: id }, { $unset: { statusBeforeTrash: 1 } }, { strict: false });
     }
 
-    // Sync SizeChart assignment if changed
-    const sizeChartChanged = 
-      String(oldProduct.sizeChart || "") !== String(data.sizeChart || "") ||
-      oldProduct.sizeChartSource !== data.sizeChartSource;
+    // Sync SizeChart assignment if changed. Partial updates (Restore from the Trash, the list's status toggle, Quick Edit)
+    // do not send the size-chart fields, and must leave the chart's assignment alone: an absent field is not "cleared".
+    const sizeChartSent = "sizeChart" in data || "sizeChartSource" in data;
+    const sizeChartChanged = sizeChartSent && (
+      ("sizeChart" in data && String(oldProduct.sizeChart || "") !== String(data.sizeChart || "")) ||
+      ("sizeChartSource" in data && oldProduct.sizeChartSource !== data.sizeChartSource)
+    );
 
     if (sizeChartChanged) {
       const SizeChart = (await import("@/models/SizeChart")).default;

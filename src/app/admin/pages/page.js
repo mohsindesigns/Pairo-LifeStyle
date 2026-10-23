@@ -10,6 +10,7 @@ import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import { useRBAC } from "@/hooks/useRBAC";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const VIEWS = ["all", "published", "draft", "trash"];
 
@@ -282,10 +283,10 @@ export default function PagesManagementPage() {
         <label htmlFor="pages-bulk-action" className="sr-only">Select bulk action</label>
         {bulkOptions.length > 0 && (
           <>
-            <select id="pages-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+            <ThemedSelect id="pages-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
               <option>Bulk actions</option>
               {bulkOptions.map(o => <option key={o}>{o}</option>)}
-            </select>
+            </ThemedSelect>
             <button type="button" onClick={handleBulkAction} className="wp-btn">Apply</button>
           </>
         )}

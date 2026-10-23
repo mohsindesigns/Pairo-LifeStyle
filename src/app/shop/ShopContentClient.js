@@ -11,6 +11,7 @@ import { trackViewItemList } from "@/lib/analytics";
 import { sanitizeRichHtml } from "@/lib/sanitize";
 import { useSiteData } from "@/context/SiteContext";
 import { getSwatchBackground } from "@/lib/swatchRenderer";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const ITEMS_PER_PAGE = 24;
 
@@ -851,7 +852,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
-                  <select
+                  <ThemedSelect
                     value={sortBy}
                     onChange={(e) => { scrollToGridTop(); setSortBy(e.target.value); setCurrentPage(1); }}
                     className="font-bold text-xs bg-transparent focus:outline-none cursor-pointer uppercase text-foreground max-w-[130px] sm:max-w-none"
@@ -862,7 +863,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                     <option>Price: High to Low</option>
                     <option>Name: A to Z</option>
                     <option>Name: Z to A</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
                 <button
                   type="button"
@@ -908,7 +909,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
             <div className="flex items-center justify-between gap-3 border-t border-border md:border-none pt-6 md:pt-0 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
-                <select
+                <ThemedSelect
                   value={sortBy}
                   onChange={(e) => { scrollToGridTop(); setSortBy(e.target.value); setCurrentPage(1); }}
                   className="font-bold text-xs bg-transparent focus:outline-none cursor-pointer uppercase text-foreground max-w-[130px] sm:max-w-none"
@@ -919,7 +920,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   <option>Price: High to Low</option>
                   <option>Name: A to Z</option>
                   <option>Name: Z to A</option>
-                </select>
+                </ThemedSelect>
               </div>
               <button
                 type="button"

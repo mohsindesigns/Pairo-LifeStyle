@@ -175,6 +175,12 @@ export async function DELETE(req) {
          return NextResponse.json({ error: "Move the post to Trash before deleting it permanently." }, { status: 400 });
       }
 
+      // ?mode=trash never deletes: a post that is already in the Trash just stays there (idempotent), so a stale
+      // "Move to Trash" click can no longer permanently delete it.
+      if (searchParams.get("mode") === "trash" && blog.isDeleted) {
+         return NextResponse.json({ message: "Blog is already in the Trash", success: true });
+      }
+
       if (blog.isDeleted) {
          // Clean up media usage references
          try {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Trash2, GripVertical, ChevronDown } from 'lucide-react';
 import { childRulePath, joinPath } from '../promotionEditorUtils';
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 
 // Each condition field maps to ONE sensible comparison automatically, so admins never
@@ -169,7 +170,7 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
         <GripVertical className="w-4 h-4" />
       </span>
 
-      <select
+      <ThemedSelect
         value={rule.field}
         onChange={(e) => handleFieldChange(e.target.value)}
         aria-label="Condition field"
@@ -182,7 +183,7 @@ export default function ConditionRow({ rule, path, index, onUpdate, onRemove, ca
         {Object.entries(FIELD_CONFIG).map(([value, c]) => (
           <option key={value} value={value}>{c.label}</option>
         ))}
-      </select>
+      </ThemedSelect>
 
       <span className="wp-muted whitespace-nowrap shrink-0">{config.phrase}</span>
 

@@ -72,6 +72,7 @@ import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import { confirmSlugChange } from "@/components/admin/slugChange";
 import { validatePrices, priceWarning, buildVariantSku } from "@/lib/admin-products-utils";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Tiny inline image button — opens MediaPickerModal without the full MediaPicker drop-zone UI
 function InlinePick({ value, onChange, label = "+ Image", doneLabel = "✓ Change", title = "Pick image" }) {
@@ -770,7 +771,7 @@ export default function ProductForm({ productId = null }) {
                            <h2 id="pf-data-title" style={{ flex: "none" }}>Product data</h2>
                            <span className="wp-muted" aria-hidden="true">—</span>
                            <label htmlFor="product-type-select" className="sr-only">Product type</label>
-                           <select
+                           <ThemedSelect
                               id="product-type-select"
                               className="wp-select"
                               value={formData.productType}
@@ -784,7 +785,7 @@ export default function ProductForm({ productId = null }) {
                               <option value="simple">Simple product</option>
                               <option value="variable">Variable product</option>
                               <option value="gifting">Gifting product</option>
-                           </select>
+                           </ThemedSelect>
                         </div>
                         <div className="wp-vtabs">
                            {/* Vertical Tabs */}
@@ -827,12 +828,12 @@ export default function ProductForm({ productId = null }) {
                                     </div>
                                     <div className="wp-frow">
                                        <label htmlFor="shipping-type-select" className="wp-flabel">Shipping type</label>
-                                       <select id="shipping-type-select" className="wp-select" value={formData.shippingType} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, shippingType: v })); }}>
+                                       <ThemedSelect id="shipping-type-select" className="wp-select" value={formData.shippingType} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, shippingType: v })); }}>
                                           <option value="Express">Express Shipping</option>
                                           <option value="Standard">Standard Shipping</option>
                                           <option value="Free">Free Shipping</option>
                                           <option value="Priority">Priority Mail</option>
-                                       </select>
+                                       </ThemedSelect>
                                     </div>
                                     <div className="wp-frow">
                                        <label htmlFor="product-color-input" className="wp-flabel">Color</label>
@@ -846,7 +847,7 @@ export default function ProductForm({ productId = null }) {
                                     </div>
                                     <div className="wp-frow">
                                        <label htmlFor="product-gender-select" className="wp-flabel">Gender</label>
-                                       <select
+                                       <ThemedSelect
                                           id="product-gender-select"
                                           className="wp-select"
                                           value={formData.gender || "unisex"}
@@ -855,11 +856,11 @@ export default function ProductForm({ productId = null }) {
                                           <option value="unisex">Unisex</option>
                                           <option value="male">Male</option>
                                           <option value="female">Female</option>
-                                       </select>
+                                       </ThemedSelect>
                                     </div>
                                     <div className="wp-frow">
                                        <label htmlFor="product-age-select" className="wp-flabel">Age group</label>
-                                       <select
+                                       <ThemedSelect
                                           id="product-age-select"
                                           className="wp-select"
                                           value={formData.ageGroup || "adult"}
@@ -870,7 +871,7 @@ export default function ProductForm({ productId = null }) {
                                           <option value="toddler">Toddler</option>
                                           <option value="infant">Infant</option>
                                           <option value="newborn">Newborn</option>
-                                       </select>
+                                       </ThemedSelect>
                                     </div>
                                  </div>
                               )}
@@ -920,11 +921,11 @@ export default function ProductForm({ productId = null }) {
                                                 <label htmlFor={`attr-${aIdx}-name`} className="sr-only">Attribute name</label>
                                                 <input id={`attr-${aIdx}-name`} className="wp-input wp-strong" style={{ width: 160 }} placeholder="Attribute name" value={attr.name} onChange={e=>updateAttr("name",e.target.value)} />
                                                 <label htmlFor={`attr-${aIdx}-type`} className="sr-only">Attribute type</label>
-                                                <select id={`attr-${aIdx}-type`} className="wp-select" value={attr.type} onChange={e=>updateAttr("type",e.target.value)}>
+                                                <ThemedSelect id={`attr-${aIdx}-type`} className="wp-select" value={attr.type} onChange={e=>updateAttr("type",e.target.value)}>
                                                    <option value="color">Color</option>
                                                    <option value="size">Size</option>
                                                    <option value="custom">Custom</option>
-                                                </select>
+                                                </ThemedSelect>
                                                 <button type="button" aria-label={`Remove attribute ${attr.name || ""}`.trim()} title="Remove attribute" onClick={()=>{ setFormData(prev=>({...prev,attributes:(prev.attributes||[]).filter((_,i)=>i!==aIdx)})); setAttrValueDrafts({}); }} className="hover:text-red-700" style={{ ...iconBtnStyle, marginLeft: "auto" }}><X className="w-4 h-4" aria-hidden="true" /></button>
                                              </div>
                                              <div>
@@ -975,7 +976,7 @@ export default function ProductForm({ productId = null }) {
                                                                       <div className="flex flex-col gap-1">
                                                                          <div className="flex items-center gap-2">
                                                                             <label htmlFor={`${vid}-mode`} className="wp-small wp-muted" style={{ width: 52 }}>Mode</label>
-                                                                            <select
+                                                                            <ThemedSelect
                                                                                id={`${vid}-mode`}
                                                                                value={val.colorMode || "single"}
                                                                                onChange={e=>updateVal(vIdx,"colorMode",e.target.value)}
@@ -985,11 +986,11 @@ export default function ProductForm({ productId = null }) {
                                                                                <option value="dual">Dual</option>
                                                                                <option value="triple">Triple</option>
                                                                                <option value="quad">Quad</option>
-                                                                            </select>
+                                                                            </ThemedSelect>
                                                                          </div>
                                                                          <div className="flex items-center gap-2">
                                                                             <label htmlFor={`${vid}-texture`} className="wp-small wp-muted" style={{ width: 52 }}>Texture</label>
-                                                                            <select
+                                                                            <ThemedSelect
                                                                                id={`${vid}-texture`}
                                                                                value={val.texture || ""}
                                                                                onChange={e=>updateVal(vIdx,"texture",e.target.value)}
@@ -1006,7 +1007,7 @@ export default function ProductForm({ productId = null }) {
                                                                                <option value="technical-softshell">Softshell</option>
                                                                                <option value="luxury-velvet">Velvet</option>
                                                                                <option value="knit-cable">Cable</option>
-                                                                            </select>
+                                                                            </ThemedSelect>
                                                                          </div>
                                                                       </div>
                                                                    </div>
@@ -1321,7 +1322,7 @@ export default function ProductForm({ productId = null }) {
                                          {/* Size Chart Source */}
                                          <div className="wp-field">
                                             <label htmlFor="size-chart-source-select" className="wp-label">Size chart source</label>
-                                            <select
+                                            <ThemedSelect
                                                id="size-chart-source-select"
                                                className="wp-select wp-full"
                                                value={formData.sizeChartSource || "category_default"}
@@ -1341,7 +1342,7 @@ export default function ProductForm({ productId = null }) {
                                                <option value="custom">Select Reusable Size Chart</option>
                                                <option value="product_custom">Create Custom Size Chart for this Product</option>
                                                <option value="none">No Size Chart (Disabled)</option>
-                                            </select>
+                                            </ThemedSelect>
                                             <p className="wp-desc">
                                                {formData.sizeChartSource === "category_default"
                                                   ? "This product will automatically inherit the size chart assigned to its primary category."
@@ -1358,7 +1359,7 @@ export default function ProductForm({ productId = null }) {
                                          {formData.sizeChartSource === "custom" && (
                                             <div className="wp-field">
                                                <label htmlFor="size-chart-select" className="wp-label">Select reusable size chart</label>
-                                               <select
+                                               <ThemedSelect
                                                   id="size-chart-select"
                                                   className="wp-select wp-full"
                                                   value={formData.sizeChart || ""}
@@ -1370,7 +1371,7 @@ export default function ProductForm({ productId = null }) {
                                                         {sc.label}
                                                      </option>
                                                   ))}
-                                               </select>
+                                               </ThemedSelect>
                                                {sizeCharts.length === 0 && (
                                                   <p className="wp-desc" style={{ color: "#b32d2e" }}>
                                                      No published size charts found. <a href="/admin/products/size-charts/new" className="wp-link" style={{ textDecoration: "underline" }} target="_blank" rel="noopener noreferrer">Create one here</a>
@@ -1727,7 +1728,7 @@ export default function ProductForm({ productId = null }) {
                      <div className="wp-misc-row">
                         <label htmlFor="product-status-select" className="wp-muted">Status:</label>
                         <strong className="wp-strong">{formData.status}</strong>
-                        <select
+                        <ThemedSelect
                            id="product-status-select"
                            className="wp-select"
                            style={{ marginLeft: "auto" }}
@@ -1736,7 +1737,7 @@ export default function ProductForm({ productId = null }) {
                         >
                            <option value="Draft">Draft</option>
                            <option value="Published">Published</option>
-                        </select>
+                        </ThemedSelect>
                      </div>
                      <div className="wp-misc-row">
                         <span className="wp-muted">Visibility:</span> <strong className="wp-strong">Public</strong>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Play, CheckCircle2, XCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import { formatMoney } from '@/components/admin/ui';
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 export default function SimulationPanel({ promotionData }) {
   const [cart, setCart] = useState({
@@ -103,7 +104,7 @@ export default function SimulationPanel({ promotionData }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <label className="block min-w-0">
                 <span className="wp-label">Customer type</span>
-                <select
+                <ThemedSelect
                   value={cart.customerType}
                   onChange={(e) => setCart({...cart, customerType: e.target.value})}
                   className="wp-select wp-full"
@@ -112,7 +113,7 @@ export default function SimulationPanel({ promotionData }) {
                   <option value="logged_in">Logged In</option>
                   <option value="new">New Customer</option>
                   <option value="returning">Returning Customer</option>
-                </select>
+                </ThemedSelect>
               </label>
               <label className="block min-w-0">
                 <span className="wp-label">Email address</span>

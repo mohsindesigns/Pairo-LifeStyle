@@ -6,6 +6,7 @@ import { X, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import { Postbox, Notice, Skeleton } from "@/components/admin/ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Compact button used inside the spreadsheet header/rows
 const miniBtn = { minHeight: 26, padding: "0 6px", lineHeight: 1 };
@@ -549,7 +550,7 @@ export default function SizeChartForm({ initialId = null }) {
         <Postbox title="Assignment" id="sc-assign">
           <div className="wp-frow">
             <label htmlFor="sc-assign-type" className="wp-flabel">Apply size chart to</label>
-            <select
+            <ThemedSelect
               id="sc-assign-type"
               value={assignmentType}
               onChange={(e) => handleAssignmentTypeChange(e.target.value)}
@@ -558,7 +559,7 @@ export default function SizeChartForm({ initialId = null }) {
               <option value="none">Unassigned (None)</option>
               <option value="category">Category</option>
               <option value="product">Product</option>
-            </select>
+            </ThemedSelect>
           </div>
 
           {assignmentType === "category" && (
@@ -677,7 +678,7 @@ export default function SizeChartForm({ initialId = null }) {
         >
           <div className="wp-field">
             <label htmlFor="sc-status" className="wp-label">Status</label>
-            <select
+            <ThemedSelect
               id="sc-status"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
@@ -685,7 +686,7 @@ export default function SizeChartForm({ initialId = null }) {
             >
               <option>Published</option>
               <option>Draft</option>
-            </select>
+            </ThemedSelect>
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <button type="button" onClick={() => handleSave("Draft")} disabled={saving || isTrashed} className="wp-btn">

@@ -13,7 +13,8 @@ export async function PATCH(req, { params }) {
     const session = await getServerSession(authOptions);
     const { id } = await params;
 
-    if (!session) {
+    // Needs a real account id: a missing id would be sent to MongoDB as null and match every guest order.
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -38,8 +39,8 @@ export async function PATCH(req, { params }) {
 
     const oldStatus = order.status;
 
-    // 1. Restore Stock Atomically
-    const stockRollbacks = order.items.map(async (item) => {
+    // 1. Restore Stock Atomically (a duplicated draft never took any, so there is nothing to give back)
+    const stockRollbacks = (order.stockDeducted === false ? [] : order.items).map(async (item) => {
       const variantTitle = item.selectedVariant?.title || "Standard";
       if (variantTitle !== "Standard") {
          return Product.updateOne(

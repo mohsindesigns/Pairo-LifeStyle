@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Helper to generate initials from customer name
 const getInitials = (name) => {
@@ -730,7 +731,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
           </span>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Sort:</span>
-            <select
+            <ThemedSelect
               value={sort}
               onChange={e => setSort(e.target.value)}
               className="border-none bg-transparent text-xs font-bold text-black uppercase tracking-wider focus:ring-0 outline-none p-1 pr-6 cursor-pointer"
@@ -739,7 +740,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
               <option value="most_helpful">Most Helpful</option>
               <option value="highest_rated">Highest Rated</option>
               <option value="lowest_rated">Lowest Rated</option>
-            </select>
+            </ThemedSelect>
           </div>
         </div>
       )}
@@ -796,11 +797,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
               ? `${review.comment.substring(0, 280)}...` 
               : review.comment;
             
-            // Check if reviewer is owner of this review to allow editing
-            const isOwner = session && (
-              review.customerId === session.user.id || 
-              review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase()
-            );
+            // The server says whether this review belongs to the signed-in visitor (it no longer sends authors' emails).
+            const isOwner = !!session && !!review.isOwner;
 
             return (
               <div key={review._id} className="border-b border-black/5 pb-8 last:border-0 last:pb-0 space-y-4">

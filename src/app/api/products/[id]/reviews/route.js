@@ -6,6 +6,7 @@ import Product from "@/models/Product";
 import Review from "@/models/Review";
 import Order from "@/models/Order";
 import { sanitizeText, sanitizeObject } from "@/lib/sanitize";
+import { toPublicReview } from "@/lib/publicReviewData";
 import mongoose from "mongoose";
 
 /**
@@ -64,7 +65,8 @@ export async function GET(req, { params }) {
         { _id: mongoose.isValidObjectId(paramId) ? paramId : null },
         { id: /^\d+$/.test(paramId) ? parseInt(paramId) : -1 },
         { slug: paramId }
-      ]
+      ],
+      isDeleted: { $ne: true }
     }).select("_id rating reviewCount ratingBreakdown name").lean();
 
     if (!product) {
@@ -125,6 +127,10 @@ export async function GET(req, { params }) {
 
     const reviews = await reviewsQuery.limit(limit).lean();
 
+    // Only used to tell the signed-in visitor which reviews are theirs (so they get an Edit button).
+    const viewerSession = await getServerSession(authOptions).catch(() => null);
+    const viewer = viewerSession?.user?.id ? { id: viewerSession.user.id, email: viewerSession.user.email } : null;
+
     let nextCursor = null;
     if (reviews.length === limit) {
       const lastReview = reviews[reviews.length - 1];
@@ -138,7 +144,7 @@ export async function GET(req, { params }) {
     }
 
     return NextResponse.json({
-      reviews,
+      reviews: reviews.map((review) => toPublicReview(review, viewer)),
       pagination: {
         page,
         limit,
@@ -183,7 +189,8 @@ export async function POST(req, { params }) {
         { _id: mongoose.isValidObjectId(paramId) ? paramId : null },
         { id: /^\d+$/.test(paramId) ? parseInt(paramId) : -1 },
         { slug: paramId }
-      ]
+      ],
+      isDeleted: { $ne: true }
     }).select("_id name").lean();
 
     if (!product) {
@@ -245,10 +252,11 @@ export async function POST(req, { params }) {
       spamScore
     });
 
+    // The stored review (email, IP, spam score...) is not echoed back: the page reloads the public list itself.
     return NextResponse.json({
       success: true,
       message: "Review created successfully.",
-      review
+      review: { _id: review._id, status: review.status }
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -262,7 +270,8 @@ export async function PUT(req, { params }) {
     // Editing a review requires being logged in as its owner. There is no reliable way to
     // verify a guest's identity after the fact (the guest email at submission time is
     // client-supplied and unverified), so guest-submitted reviews cannot be edited later.
-    if (!session) {
+    // A session without an id must not pass the ownership test below (undefined === undefined on guest reviews).
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "You must be logged in to edit a review." }, { status: 401 });
     }
 
@@ -328,7 +337,7 @@ export async function PUT(req, { params }) {
     return NextResponse.json({
       success: true,
       message: "Review updated successfully.",
-      review
+      review: { _id: review._id, status: review.status }
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

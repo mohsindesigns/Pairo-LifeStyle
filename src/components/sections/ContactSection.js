@@ -3,9 +3,10 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { toast } from "react-hot-toast";
-import { Mail, Phone, MapPin, ArrowRight, User, Tag, MessageSquare, ChevronDown } from "lucide-react";
+import { Mail, Phone, MapPin, ArrowRight, User, Tag, MessageSquare } from "lucide-react";
 import { useSiteData } from "@/context/SiteContext";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const InstagramIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -378,7 +379,7 @@ export default function ContactSection({
                       <div className="absolute left-5 top-1/2 -translate-y-1/2 text-black/60 pointer-events-none">
                         <Tag className="w-4 h-4" />
                       </div>
-                      <select
+                      <ThemedSelect
                         value={formData.subject}
                         onChange={e => setFormData({ ...formData, subject: e.target.value })}
                         className="w-full bg-secondary/50 backdrop-blur-sm border border-border/50 hover:border-border focus:bg-background focus:border-primary focus:ring-4 focus:ring-primary/5 py-4 pl-12 pr-12 rounded-2xl transition-all duration-300 text-sm text-foreground appearance-none cursor-pointer outline-none shadow-sm"
@@ -386,10 +387,7 @@ export default function ContactSection({
                         {subjectList.map(sub => (
                           <option key={sub} className="bg-background text-foreground">{sub}</option>
                         ))}
-                      </select>
-                      <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-black/60">
-                        <ChevronDown className="w-4 h-4" />
-                      </div>
+                      </ThemedSelect>
                     </div>
                   </div>
 

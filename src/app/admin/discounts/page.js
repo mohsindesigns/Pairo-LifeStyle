@@ -12,6 +12,7 @@ import CouponViewModal from "@/components/admin/discounts/CouponViewModal";
 import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
 import { paginate } from "@/lib/admin-products-utils";
 import { deriveCustomerEmailsString, buildDuplicatePayload, isValidUsageLimitInput } from "@/components/admin/discounts/couponUtils";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const EMPTY_FORM = {
   code: "",
@@ -695,7 +696,7 @@ function CouponsContent() {
                   >
                     <div className="wp-frow">
                       <label htmlFor="coupon-type" className="wp-flabel">Discount type</label>
-                      <select
+                      <ThemedSelect
                         id="coupon-type"
                         className="wp-select"
                         value={formData.type}
@@ -703,7 +704,7 @@ function CouponsContent() {
                       >
                         <option value="percentage">Percentage Discount</option>
                         <option value="fixed">Fixed Cart Discount</option>
-                      </select>
+                      </ThemedSelect>
                     </div>
 
                     <div className="wp-frow">
@@ -1095,7 +1096,7 @@ function CouponsContent() {
       {/* Toolbar: bulk actions + search */}
       <div className="wp-toolbar">
         <label htmlFor="coupons-bulk-action" className="sr-only">Select bulk action</label>
-        <select
+        <ThemedSelect
           id="coupons-bulk-action"
           className="wp-select"
           value={bulkAction}
@@ -1113,7 +1114,7 @@ function CouponsContent() {
               <option>Duplicate</option>
             </>
           )}
-        </select>
+        </ThemedSelect>
         <button
           type="button"
           onClick={handleBulkAction}
@@ -1191,7 +1192,7 @@ function CouponsContent() {
                             </div>
                             <div className="wp-field">
                               <label htmlFor="qe-coupon-type" className="wp-label">Type</label>
-                              <select
+                              <ThemedSelect
                                 id="qe-coupon-type"
                                 className="wp-select wp-full"
                                 value={quickEditData.type}
@@ -1199,7 +1200,7 @@ function CouponsContent() {
                               >
                                 <option value="percentage">Percentage</option>
                                 <option value="fixed">Fixed Cart</option>
-                              </select>
+                              </ThemedSelect>
                             </div>
                             <div className="wp-field">
                               <label htmlFor="qe-coupon-amount" className="wp-label">Amount</label>

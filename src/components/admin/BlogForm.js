@@ -12,6 +12,7 @@ import MediaPicker from "@/components/admin/MediaPicker";
 import { Page, PageHeader, Postbox } from "@/components/admin/ui";
 import SEOConfigPanel from "@/components/admin/SEOConfigPanel";
 import { toast } from "react-hot-toast";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 export default function BlogForm({ blogId }) {
    const router = useRouter();
@@ -132,7 +133,7 @@ export default function BlogForm({ blogId }) {
       if (!blogId) return;
       if (!(await showConfirm("Are you sure you want to move this post to trash?", "Move to trash", { confirmText: "Move to trash", danger: true }))) return;
       try {
-         const res = await fetch(`/api/admin/blogs?id=${blogId}`, {
+         const res = await fetch(`/api/admin/blogs?id=${blogId}&mode=trash`, {
             method: "DELETE"
          });
          if (res.ok) {
@@ -415,7 +416,9 @@ export default function BlogForm({ blogId }) {
                {activeFormTab === "content" && (
                   <>
                      {/* Editor box */}
-                     <div className="wp-postbox" role="group" aria-label="Post content" style={{ overflow: "hidden" }}>
+                     {/* overflow "clip" (not "hidden"): "hidden" makes this box a scroll container, which stops the editor's
+                         sticky toolbar from ever sticking to the top of the screen while the post is scrolled. */}
+                     <div className="wp-postbox" role="group" aria-label="Post content" style={{ overflow: "clip" }}>
                         <div className="flex flex-wrap items-center gap-2" style={{ justifyContent: "flex-end", padding: "6px 8px 0", background: "#f6f7f7", borderBottom: "1px solid #dcdcde" }}>
                            <span className="sr-only" id="bf-editor-mode-label">Editor mode</span>
                            <div className="wp-tabs" role="group" aria-labelledby="bf-editor-mode-label" style={{ margin: 0, borderBottom: 0 }}>
@@ -590,7 +593,7 @@ export default function BlogForm({ blogId }) {
                         <Globe className="w-4 h-4" aria-hidden="true" style={{ color: "#8c8f94" }} />
                         <label htmlFor="bf-status-select" className="wp-muted">Status:</label>
                         <strong className="wp-strong">{formData.status}</strong>
-                        <select
+                        <ThemedSelect
                            id="bf-status-select"
                            className="wp-select"
                            style={{ marginLeft: "auto" }}
@@ -599,7 +602,7 @@ export default function BlogForm({ blogId }) {
                         >
                            <option value="Draft">Draft</option>
                            <option value="Published">Published</option>
-                        </select>
+                        </ThemedSelect>
                      </div>
                      <div className="wp-misc-row">
                         <Calendar className="w-4 h-4" aria-hidden="true" style={{ color: "#8c8f94" }} />
@@ -674,7 +677,7 @@ export default function BlogForm({ blogId }) {
                {/* Featured Product Box */}
                <Postbox title="Featured product" id="bf-featured-product">
                   <label htmlFor="bf-featured-product-select" className="wp-label">Select product</label>
-                  <select
+                  <ThemedSelect
                      id="bf-featured-product-select"
                      className="wp-select wp-full"
                      value={formData.featuredProductId || ""}
@@ -686,7 +689,7 @@ export default function BlogForm({ blogId }) {
                            {product.name}
                         </option>
                      ))}
-                  </select>
+                  </ThemedSelect>
                   <p className="wp-desc">Choose a product to feature in the sidebar.</p>
                </Postbox>
 

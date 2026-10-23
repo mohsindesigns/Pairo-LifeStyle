@@ -51,6 +51,13 @@ const AbandonedCartSchema = new mongoose.Schema({
     sent: { type: Boolean, default: false },
     sentAt: { type: Date, default: null },
     voucherCode: { type: String, default: null },
+    // Delivery tracking: a failed send is retried with a back-off and eventually given up on.
+    attempts: { type: Number, default: 0 },
+    lastAttemptAt: { type: Date, default: null },
+    nextAttemptAt: { type: Date, default: null },
+    lastError: { type: String, default: null },
+    messageId: { type: String, default: null },
+    gaveUp: { type: Boolean, default: false },
   },
 
   // Admin Trash (soft delete). Trashed carts are hidden from the admin list (except the

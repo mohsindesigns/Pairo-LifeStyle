@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
@@ -24,8 +25,10 @@ function escapeRegex(string) {
 }
 
 /**
- * Validates the CRM API Key if configured in environment.
- * If CRM_API_KEY is not set in .env.local, access is permitted so the endpoint works out of the box.
+ * Validates the CRM API Key from the environment.
+ * On a production server the key is REQUIRED: with none set, every request is refused. (It used to be left open "out of
+ * the box", which let anyone on the internet read every customer's name, email, address and phone, and change order
+ * statuses.) While developing or testing, an unset key still allows access so the endpoint is easy to try.
  * Supports:
  * - Header: x-api-key: <key>
  * - Header: Authorization: Bearer <key>
@@ -34,8 +37,7 @@ function escapeRegex(string) {
 function validateCrmAuth(req) {
   const configuredKey = process.env.CRM_API_KEY;
   if (!configuredKey) {
-    // If no key is set, allow access out-of-the-box
-    return true;
+    return process.env.NODE_ENV !== "production";
   }
 
   const { searchParams } = new URL(req.url);
@@ -45,7 +47,10 @@ function validateCrmAuth(req) {
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.substring(7).trim() : null;
 
   const providedKey = apiKeyHeader || bearerToken || queryKey;
-  return providedKey && providedKey === configuredKey;
+  if (!providedKey) return false;
+  const a = Buffer.from(String(providedKey));
+  const b = Buffer.from(configuredKey);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**
@@ -73,7 +78,8 @@ export async function GET(req) {
     const orderNumber = searchParams.get("orderNumber");
     const email = searchParams.get("email");
 
-    const query = {};
+    // Orders an admin moved to the Trash are treated as gone, here as everywhere else.
+    const query = { isDeleted: { $ne: true } };
 
     if (status && status !== "all") {
       query.status = status;
@@ -204,7 +210,7 @@ export async function PATCH(req) {
       );
     }
 
-    const order = await Order.findOne({ orderNumber });
+    const order = await Order.findOne({ orderNumber, isDeleted: { $ne: true } });
     if (!order) {
       return NextResponse.json(
         { success: false, error: `Order not found with number ${orderNumber}` },

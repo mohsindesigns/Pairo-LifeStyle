@@ -52,6 +52,19 @@ export function staffPermanentDeleteError({ actorId, actorRoleSlug, target }) {
   return null;
 }
 
+/**
+ * Can `actor` bring `target` back from the Trash? A Super Admin account is restored only by a Super Admin, the same
+ * rule as trashing and deleting one: otherwise anyone who may restore users could hand a trashed Super Admin their
+ * full access back. Returns an error message, or null when allowed.
+ */
+export function staffRestoreError({ actorRoleSlug, target }) {
+  if (!target) return "Staff member not found";
+  if (roleSlugOf(target) === SUPER_ADMIN_SLUG && actorRoleSlug !== SUPER_ADMIN_SLUG) {
+    return "Only a Super Admin can restore a Super Admin";
+  }
+  return null;
+}
+
 // Mongo update that moves a staff member to the Trash. Status goes to Suspended so the
 // auth route's status checks refuse sign-in and end any live session.
 export function staffTrashUpdate(staff, now = new Date()) {

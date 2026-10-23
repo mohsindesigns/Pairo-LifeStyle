@@ -9,6 +9,7 @@ import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { paginate } from "@/lib/admin-products-utils";
 import { moveItem } from "@/app/api/admin/gallery-items/helpers";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const inputClass = "wp-input wp-full";
 
@@ -175,10 +176,10 @@ function GalleryItemForm({ item, products, onSave, onClose, isNew }) {
             </div>
             <div className="wp-field">
               <label htmlFor="gi-enabled" className="wp-label">Visible</label>
-              <select id="gi-enabled" name="enabled" value={form.enabled ? "true" : "false"} onChange={e => setForm(prev => ({ ...prev, enabled: e.target.value === "true" }))} className="wp-select wp-full">
+              <ThemedSelect id="gi-enabled" name="enabled" value={form.enabled ? "true" : "false"} onChange={e => setForm(prev => ({ ...prev, enabled: e.target.value === "true" }))} className="wp-select wp-full">
                 <option value="true">Yes</option>
                 <option value="false">No</option>
-              </select>
+              </ThemedSelect>
             </div>
           </div>
         </div>
@@ -504,10 +505,10 @@ export default function GalleryItemsPage() {
 
       <div className="wp-toolbar">
         <label htmlFor="gallery-bulk-action" className="sr-only">Select bulk action</label>
-        <select id="gallery-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <ThemedSelect id="gallery-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
           <option>Bulk actions</option>
           {bulkOptions.map((o) => <option key={o}>{o}</option>)}
-        </select>
+        </ThemedSelect>
         <button type="button" className="wp-btn" onClick={handleBulkAction} disabled={busy}>Apply</button>
 
         <span className="wp-spacer" />

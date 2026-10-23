@@ -65,7 +65,10 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!can(session.user, "orders.edit")) {
+    // "orders.update" is the permission roles can actually be given (the role editor offers view / create / update /
+    // refund) and what every other order action uses. This route asked for "orders.edit", which no role can hold, so
+    // only a Super Admin could change an order's status or add a note.
+    if (!can(session.user, "orders.update")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -83,7 +86,7 @@ export async function PATCH(req, { params }) {
     }
 
     // 1. If status is changing to Cancelled, revert stock ONLY if it wasn't already cancelled
-    if (status === "Cancelled" && oldStatus !== "Cancelled") {
+    if (status === "Cancelled" && oldStatus !== "Cancelled" && order.stockDeducted !== false) {
       for (const item of order.items) {
         if (item.selectedVariant?.title && item.selectedVariant.title !== "Standard") {
            await Product.updateOne(

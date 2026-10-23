@@ -198,6 +198,18 @@ export async function DELETE(req, { params }) {
 
     const beforeState = JSON.parse(JSON.stringify(review));
 
+    // ?mode=trash only ever moves a review to the Trash (never deletes), ?mode=permanent only ever deletes one that is
+    // already there. Without a mode the older "toggle" behaviour stays for existing callers: a live review is trashed,
+    // a trashed one is deleted. The Reviews screen and the Trash page send an explicit mode, so a stale click on
+    // "Move to Trash" can no longer destroy a review that someone else already trashed.
+    const mode = new URL(req.url).searchParams.get("mode");
+    if (mode === "permanent" && !review.isDeleted) {
+      return NextResponse.json({ error: "Move the review to the Trash before deleting it permanently." }, { status: 409 });
+    }
+    if (mode === "trash" && review.isDeleted) {
+      return NextResponse.json({ success: true, message: "Review is already in the Trash" });
+    }
+
     if (review.isDeleted === true) {
       // Permanent delete
       await Review.findByIdAndDelete(id);

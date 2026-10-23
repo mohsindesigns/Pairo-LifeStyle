@@ -3,6 +3,7 @@
 import { Trash2 } from "lucide-react";
 import { COUNTRIES } from "@/lib/countries";
 import { inp } from "./taxStyles";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // One row of a WooCommerce-style tax rate table. Location fields left blank
 // mean "matches any value" — see TaxSettings model for the full contract.
@@ -10,7 +11,7 @@ export default function TaxRateRow({ row, onChange, onDelete }) {
   return (
     <tr>
       <td style={{ minWidth: 170 }}>
-        <select
+        <ThemedSelect
           className="wp-select wp-full"
           value={row.country}
           onChange={(e) => onChange({ country: e.target.value })}
@@ -20,7 +21,7 @@ export default function TaxRateRow({ row, onChange, onDelete }) {
           {COUNTRIES.map((c) => (
             <option key={c.code} value={c.code}>{c.name}</option>
           ))}
-        </select>
+        </ThemedSelect>
       </td>
       <td style={{ minWidth: 130 }}>
         <input

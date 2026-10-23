@@ -8,6 +8,7 @@ import Link from "next/link";
 import { getCategoryUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import { buildCategoryDuplicate } from "@/app/api/admin/categories/helpers";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const PER_PAGE = 20;
 const VIEWS = [
@@ -346,7 +347,7 @@ export default function CategoryManager({ type = "product", title = "Categories"
 
       <div className="wp-toolbar">
         <label htmlFor="category-bulk-action" className="sr-only">Select bulk action</label>
-        <select id="category-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <ThemedSelect id="category-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
           <option>Bulk actions</option>
           {view === "trash" ? (
             <>
@@ -359,7 +360,7 @@ export default function CategoryManager({ type = "product", title = "Categories"
               <option>Duplicate</option>
             </>
           )}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkAction} className="wp-btn" disabled={busy}>Apply</button>
 
         <span className="wp-spacer" />

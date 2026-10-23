@@ -16,6 +16,7 @@ import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Postbox, Skeleton, Notice } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import { useRBAC } from "@/hooks/useRBAC";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Read a JSON error message from a failed response, falling back to `fallback`.
 async function errorMessage(res, fallback) {
@@ -494,7 +495,7 @@ export default function AppearanceManagement() {
                           <div className="px-4 py-3">
                              <div className="wp-field">
                                 <label className="wp-label" htmlFor="theme-heading-font">Heading font</label>
-                                <select
+                                <ThemedSelect
                                   id="theme-heading-font"
                                   value={editingTheme.config.typography.headingFont}
                                   onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, typography: {...editingTheme.config.typography, headingFont: e.target.value}}})}
@@ -504,11 +505,11 @@ export default function AppearanceManagement() {
                                   {SUPPORTED_FONTS.map(font => (
                                     <option key={font} value={font}>{font}</option>
                                   ))}
-                                </select>
+                                </ThemedSelect>
                              </div>
                              <div className="wp-field">
                                 <label className="wp-label" htmlFor="theme-body-font">Body font</label>
-                                <select
+                                <ThemedSelect
                                   id="theme-body-font"
                                   value={editingTheme.config.typography.bodyFont}
                                   onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, typography: {...editingTheme.config.typography, bodyFont: e.target.value}}})}
@@ -518,11 +519,11 @@ export default function AppearanceManagement() {
                                   {SUPPORTED_FONTS.map(font => (
                                     <option key={font} value={font}>{font}</option>
                                   ))}
-                                </select>
+                                </ThemedSelect>
                              </div>
                              <div className="mb-0">
                                 <label className="wp-label" htmlFor="theme-heading-scale">Heading scale</label>
-                                <select
+                                <ThemedSelect
                                   id="theme-heading-scale"
                                   value={editingTheme.config.typography.headingScale}
                                   onChange={(e) => setEditingTheme({...editingTheme, config: {...editingTheme.config, typography: {...editingTheme.config.typography, headingScale: parseFloat(e.target.value)}}})}
@@ -534,7 +535,7 @@ export default function AppearanceManagement() {
                                   <option value="1.250">1.250x (Major Third)</option>
                                   <option value="1.333">1.333x (Perfect Fourth)</option>
                                   <option value="1.414">1.414x (Augmented Fourth)</option>
-                                </select>
+                                </ThemedSelect>
                              </div>
                           </div>
                        </section>

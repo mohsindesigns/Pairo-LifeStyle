@@ -11,6 +11,7 @@ import {
   useInboxList, runBulk, readError, StatusViews, Pager, BulkActions, SearchForm,
   SkeletonRows, SelectAllBox, Drawer, DangerLink, KV, formatDateTime,
 } from "./_shared/inbox-ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const API = "/api/admin/submissions";
 
@@ -226,7 +227,7 @@ function SubmissionDrawer({ initial, onClose, onChanged, onTrash, onRestore, onD
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0 12px" }}>
           <div className="wp-field">
             <label htmlFor="submission-status" className="wp-label">Status</label>
-            <select
+            <ThemedSelect
               id="submission-status"
               className="wp-select wp-full"
               value={item.status === "Trash" ? "Read" : item.status}
@@ -238,11 +239,11 @@ function SubmissionDrawer({ initial, onClose, onChanged, onTrash, onRestore, onD
               <option value="Replied">Replied</option>
               <option value="Archived">Archived</option>
               <option value="Spam">Spam</option>
-            </select>
+            </ThemedSelect>
           </div>
           <div className="wp-field">
             <label htmlFor="submission-priority" className="wp-label">Priority</label>
-            <select
+            <ThemedSelect
               id="submission-priority"
               className="wp-select wp-full"
               value={item.priority || "Medium"}
@@ -252,7 +253,7 @@ function SubmissionDrawer({ initial, onClose, onChanged, onTrash, onRestore, onD
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
-            </select>
+            </ThemedSelect>
           </div>
         </div>
         <KV label="Phone" value={item.phone} />

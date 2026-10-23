@@ -3,11 +3,11 @@ import { sendAbandonedCartRecoveryEmails, getAbandonedCartDiagnostics } from "@/
 
 /**
  * Triggers a scan for abandoned checkout sessions and sends each one a win-back voucher email
- * (see src/lib/abandonedCartService.js). Next.js on this VPS has no built-in cron/scheduler, so
- * this route is meant to be hit periodically by the VPS's own crontab (e.g. every 15-30 minutes)
- * via curl — see the exact crontab line in the project notes / agent report that introduced this
- * route. Re-running it is always safe: carts that already received the email are skipped via
- * their `recoveryEmail.sent` flag.
+ * (see src/lib/abandonedCartService.js). The server already runs this scan itself every 5 minutes
+ * (src/lib/abandonedCartScheduler.js, started from src/instrumentation.js), so a crontab entry is
+ * no longer required; this route stays as an optional external trigger and for diagnosing, because
+ * its response explains why each cart is or is not being emailed. Re-running it is always safe:
+ * every cart is claimed atomically before it is emailed, so nobody gets the same email twice.
  *
  * Gated by a shared secret so random callers can't trigger it. Required: set CRON_SECRET in
  * .env.local/.env.production and send it back as the `x-cron-secret` header (or `?secret=`
@@ -34,12 +34,13 @@ export async function POST(req) {
 
   try {
     // Optional overrides for testing, e.g. ?windowMinutes=1 sends to carts idle for just 1 minute
-    // (default 60). Still requires the cron secret.
+    // (default: the idle time in the admin settings). Still requires the cron secret.
     const { searchParams } = new URL(req.url);
     const w = Number(searchParams.get("windowMinutes"));
-    const windowMinutes = Number.isFinite(w) && searchParams.get("windowMinutes") !== null ? Math.min(Math.max(w, 0), 1440) : 60;
+    // No override: the idle time from the admin settings (default 30 minutes) is used.
+    const windowMinutes = Number.isFinite(w) && searchParams.get("windowMinutes") !== null ? Math.min(Math.max(w, 0), 1440) : undefined;
 
-    const summary = await sendAbandonedCartRecoveryEmails({ windowMinutes });
+    const summary = await sendAbandonedCartRecoveryEmails({ trigger: "cron", windowMinutes });
     const diagnostics = await getAbandonedCartDiagnostics({ windowMinutes });
     console.log(`[Cron] Abandoned cart scan: scanned=${summary.scanned} sent=${summary.sent} smtp=${diagnostics.smtpConfigured}`);
     return NextResponse.json({ success: true, ...summary, diagnostics });

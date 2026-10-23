@@ -12,7 +12,7 @@ export async function GET() {
 
     const items = await GalleryItem
       .find({ enabled: true, isDeleted: { $ne: true } })
-      .populate("linkedProduct", "slug name") // Only fetch slug and name from Product
+      .populate({ path: "linkedProduct", select: "slug name", match: { isDeleted: { $ne: true } } }) // slug and name only, never a trashed product
       .sort({ order: 1, createdAt: -1 })
       .lean();
 

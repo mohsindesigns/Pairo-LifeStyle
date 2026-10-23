@@ -47,3 +47,24 @@ describe("section defaults (what the page builder shows)", () => {
     expect(merged.subtitle).toMatch(/Handcrafted/);
   });
 });
+
+describe("empty lists that would break the page fall back to the live defaults", () => {
+  it("an empty required list (dropdown options, steps) is treated as not set", () => {
+    const f = hydrateSectionDefaults({ type: "corporate_gifting_form", config: { brandingStyles: [], occasions: [] } });
+    expect(f.config.brandingStyles.length).toBeGreaterThan(0);
+    expect(f.config.occasions[0]).toEqual({ label: "Employee appreciation" });
+    const p = hydrateSectionDefaults({ type: "corporate_gifting_process", config: { steps: [] } });
+    expect(p.config.steps).toHaveLength(4);
+  });
+
+  it("an empty OPTIONAL list stays empty (the admin removed the hint tags on purpose)", () => {
+    const f = hydrateSectionDefaults({ type: "corporate_gifting_form", config: { referenceTags: [] } });
+    expect(f.config.referenceTags).toEqual([]);
+  });
+
+  it("the storefront component props get the same fallback", () => {
+    const merged = withSectionDefaults("corporate_gifting_form", { brandingStyles: [], referenceTags: [] });
+    expect(merged.brandingStyles.length).toBeGreaterThan(0);
+    expect(merged.referenceTags).toEqual([]);
+  });
+});

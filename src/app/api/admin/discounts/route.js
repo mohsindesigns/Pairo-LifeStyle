@@ -118,9 +118,11 @@ export async function GET(req) {
 
     // 2. Search Filter
     if (search) {
+      // Matched literally and length-capped (the text is typed by the user, never a pattern).
+      const term = String(search).trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       query.$or = [
-        { code: { $regex: search.trim(), $options: "i" } },
-        { type: { $regex: search.trim(), $options: "i" } }
+        { code: { $regex: term, $options: "i" } },
+        { type: { $regex: term, $options: "i" } }
       ];
     }
 

@@ -9,6 +9,7 @@ import { usePopup } from "@/context/PopupContext";
 import { COUNTRIES } from "@/lib/countries";
 import RequirePermission from "@/components/admin/RequirePermission";
 import ShippingTaxTabs from "@/components/admin/settings/ShippingTaxTabs";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // ─── Shared WordPress input styles (kept identical to the shipping/tax pages) ─
 const inp  = "wp-input wp-full";
@@ -94,10 +95,10 @@ function LocationModal({ initial, onClose, onSaved }) {
             <input id="loc-zip" className={inp} value={loc.address.zip} onChange={e => setAddr("zip", e.target.value)} placeholder="e.g. 54000" />
           </FRow>
           <FRow label="Country" htmlFor="loc-country">
-            <select id="loc-country" className={sel} value={loc.address.country} onChange={e => setAddr("country", e.target.value)}>
+            <ThemedSelect id="loc-country" className={sel} value={loc.address.country} onChange={e => setAddr("country", e.target.value)}>
               <option value="">— Select country —</option>
               {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
-            </select>
+            </ThemedSelect>
           </FRow>
           <FRow label="Phone" htmlFor="loc-phone">
             <input id="loc-phone" className={inp} value={loc.phone} onChange={e => set("phone", e.target.value)} placeholder="Optional" />
@@ -106,10 +107,10 @@ function LocationModal({ initial, onClose, onSaved }) {
             <input id="loc-email" className={inp} value={loc.email} onChange={e => set("email", e.target.value)} placeholder="Optional" />
           </FRow>
           <FRow label="Status" htmlFor="loc-status" hint="Inactive locations will not be offered as a pickup option at checkout.">
-            <select id="loc-status" className={sel} style={{ maxWidth: 200 }} value={loc.status} onChange={e => set("status", e.target.value)}>
+            <ThemedSelect id="loc-status" className={sel} style={{ maxWidth: 200 }} value={loc.status} onChange={e => set("status", e.target.value)}>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
-            </select>
+            </ThemedSelect>
           </FRow>
         </div>
 

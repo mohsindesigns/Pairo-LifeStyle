@@ -143,6 +143,47 @@ describe("CRM & Orders Integration Suite", () => {
       expect(data.error).toContain("Unauthorized");
     });
 
+    it("on a production server with no CRM_API_KEY set, refuses everyone instead of leaving every order open", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      try {
+        const { GET, PATCH } = await import("@/app/api/crm/orders/route");
+        const res = await GET(new Request("http://localhost:3000/api/crm/orders"));
+        expect(res.status).toBe(401);
+        expect((await res.json()).success).toBe(false);
+
+        const patch = await PATCH(new Request("http://localhost:3000/api/crm/orders", {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderNumber: "PL-1001", status: "Cancelled" }),
+        }));
+        expect(patch.status).toBe(401);
+
+        // A guessed or empty key does not help either.
+        const guess = await GET(new Request("http://localhost:3000/api/crm/orders?api_key=", { headers: { "x-api-key": "" } }));
+        expect(guess.status).toBe(401);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("on a production server the configured key still works, and a key of the wrong length is refused", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      process.env.CRM_API_KEY = "secret-crm-key-123";
+      try {
+        const { GET } = await import("@/app/api/crm/orders/route");
+        expect((await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "secret-crm-key-123" } }))).status).toBe(200);
+        expect((await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "secret-crm-key-12" } }))).status).toBe(401);
+        expect((await GET(new Request("http://localhost:3000/api/crm/orders?api_key=secret-crm-key-123"))).status).toBe(200);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("never lists orders that were moved to the Trash", async () => {
+      const { GET } = await import("@/app/api/crm/orders/route");
+      const Order = (await import("@/models/Order")).default;
+      await GET(new Request("http://localhost:3000/api/crm/orders"));
+      expect(Order.find).toHaveBeenCalledWith(expect.objectContaining({ isDeleted: { $ne: true } }));
+    });
+
     it("should authorize request when CRM_API_KEY matches via header or bearer token", async () => {
       process.env.CRM_API_KEY = "secret-crm-key-123";
       const { GET } = await import("@/app/api/crm/orders/route");

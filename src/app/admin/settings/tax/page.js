@@ -12,6 +12,7 @@ import { inp } from "@/components/admin/tax/taxStyles";
 import TaxRateRow from "@/components/admin/tax/TaxRateRow";
 import RequirePermission from "@/components/admin/RequirePermission";
 import ShippingTaxTabs from "@/components/admin/settings/ShippingTaxTabs";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const defaultSettings = {
   enabled: false,
@@ -353,7 +354,7 @@ export default function TaxSettingsPage() {
           {settings.enabled && (
             <>
               <SettingsRow label="Calculation method" htmlFor="tax-calc" hint="Inclusive means prices already include tax. Exclusive adds tax on top of your prices.">
-                <select
+                <ThemedSelect
                   id="tax-calc"
                   className="wp-select wp-full"
                   value={settings.calculationMethod}
@@ -361,11 +362,11 @@ export default function TaxSettingsPage() {
                 >
                   <option value="exclusive">Exclusive — tax added on top of product prices</option>
                   <option value="inclusive">Inclusive — tax is included in product prices</option>
-                </select>
+                </ThemedSelect>
               </SettingsRow>
 
               <SettingsRow label="Rounding mode" htmlFor="tax-rounding" hint="Determines how fractional cents are rounded in tax calculations.">
-                <select
+                <ThemedSelect
                   id="tax-rounding"
                   className="wp-select wp-full"
                   value={settings.taxRoundingMode}
@@ -374,7 +375,7 @@ export default function TaxSettingsPage() {
                   <option value="round">Round to nearest (standard)</option>
                   <option value="floor">Floor (always round down)</option>
                   <option value="ceil">Ceil (always round up)</option>
-                </select>
+                </ThemedSelect>
               </SettingsRow>
 
               <SettingsRow label="Price display suffix" htmlFor="tax-suffix" hint="Optional text appended after displayed prices, e.g. 'excl. tax' — cosmetic only, purely for how prices are labeled once tax is live.">

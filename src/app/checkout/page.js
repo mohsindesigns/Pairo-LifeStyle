@@ -15,6 +15,7 @@ import { usePopup } from "@/context/PopupContext";
 import { getProductUrl } from "@/lib/routes";
 import { trackBeginCheckout, trackAddShippingInfo, trackAddPaymentInfo } from "@/lib/analytics";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -1062,7 +1063,7 @@ export default function CheckoutPage() {
                   <div className="space-y-1 bg-[#FAF9F6] border border-black/[0.04] p-4 rounded-[4px] mb-2">
                     <label className={`${labelClass} text-black font-bold`}>Use Saved Address for Faster Checkout</label>
                     <div className="relative">
-                      <select
+                      <ThemedSelect
                         onChange={(e) => {
                           const idx = parseInt(e.target.value);
                           if (!isNaN(idx) && savedAddresses[idx]) {
@@ -1093,8 +1094,7 @@ export default function CheckoutPage() {
                             {addr.fullName} — {addr.street}, {addr.city} ({addr.type})
                           </option>
                         ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-black absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </ThemedSelect>
                     </div>
                   </div>
                 )}

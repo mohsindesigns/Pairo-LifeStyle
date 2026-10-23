@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import ProductQuestion from "@/models/ProductQuestion";
-import "@/models/Product"; // registers the model used by populate("productId")
+import Product from "@/models/Product";
 import { can } from "@/lib/rbac";
 import { sendQuestionReplyEmail } from "@/lib/email";
 import { logAction } from "@/lib/audit";
@@ -31,7 +31,9 @@ export async function PUT(req, { params }) {
     const { action, status, replyText } = body;
 
     await dbConnect();
-    const question = await ProductQuestion.findById(id).populate("productId");
+    // Not populated: once the product is gone a populated productId becomes null, and saving then fails the
+    // "productId is required" check, which left such questions impossible to restore, approve or answer.
+    const question = await ProductQuestion.findById(id);
     if (!question) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
     }
@@ -88,7 +90,7 @@ export async function PUT(req, { params }) {
       await question.save();
 
       // Send email to customer
-      const product = question.productId;
+      const product = question.productId ? await Product.findById(question.productId).select("name slug").lean() : null;
       if (product) {
         await sendQuestionReplyEmail({
           customerEmail: question.customerEmail,

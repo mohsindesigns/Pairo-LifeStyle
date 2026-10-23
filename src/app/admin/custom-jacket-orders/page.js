@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Page, PageHeader, Notice, Skeleton, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Custom orders are ordinary orders (payment method "Custom Order" / "Custom Inquiry"),
 // so every action here goes through the Orders API: Duplicate, Trash (orders soft
@@ -281,7 +282,7 @@ export default function CustomJacketOrdersPage() {
 
         <div className="wp-toolbar">
           <label htmlFor="custom-orders-bulk" className="sr-only">Bulk actions</label>
-          <select
+          <ThemedSelect
             id="custom-orders-bulk"
             className="wp-select"
             value={bulkAction}
@@ -299,7 +300,7 @@ export default function CustomJacketOrdersPage() {
                 <option>Move to Trash</option>
               </>
             )}
-          </select>
+          </ThemedSelect>
           <button type="button" className="wp-btn" onClick={handleBulkAction}>Apply</button>
           <span className="wp-spacer" />
           <form className="wp-search" role="search" onSubmit={runSearchNow}>

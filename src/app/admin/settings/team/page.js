@@ -8,6 +8,7 @@ import { useRBAC } from "@/hooks/useRBAC";
 import { usePopup } from "@/context/PopupContext";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const PAGE_SIZE = 20;
 
@@ -321,7 +322,7 @@ function StaffList() {
         {canDelete && (
           <>
             <label htmlFor="team-bulk" className="sr-only">Select bulk action</label>
-            <select id="team-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+            <ThemedSelect id="team-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
               <option>Bulk actions</option>
               {isTrash ? (
                 <>
@@ -331,12 +332,12 @@ function StaffList() {
               ) : (
                 <option>Move to Trash</option>
               )}
-            </select>
+            </ThemedSelect>
             <button type="button" className="wp-btn" onClick={handleBulk}>Apply</button>
           </>
         )}
         <label htmlFor="team-role-filter" className="sr-only">Filter by role</label>
-        <select
+        <ThemedSelect
           id="team-role-filter"
           className="wp-select"
           value={roleFilter}
@@ -344,7 +345,7 @@ function StaffList() {
         >
           <option value="">All roles</option>
           {roleOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select>
+        </ThemedSelect>
         <span className="wp-spacer" />
         <span className="wp-pages">{itemsLabel}</span>
       </div>

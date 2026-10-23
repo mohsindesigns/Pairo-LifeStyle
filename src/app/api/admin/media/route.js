@@ -12,7 +12,9 @@ export const dynamic = "force-dynamic";
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!can(session.user, "media.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // "media.manage" is the only media permission a role can be given (and what the Media menu itself requires);
+  // "media.view" does not exist, so asking for it locked everyone but the Super Admin out of the library.
+  if (!can(session.user, "media.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await dbConnect();
   const { searchParams } = new URL(req.url);

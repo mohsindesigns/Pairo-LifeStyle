@@ -7,6 +7,7 @@ import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/adm
 import { usePopup } from "@/context/PopupContext";
 import { useRBAC } from "@/hooks/useRBAC";
 import { allowed, visibleModules, groupModules, filterItems, paginate, summarize, responseResult } from "./trashModules";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const PER_PAGE = 20;
 
@@ -286,7 +287,7 @@ export default function AdminTrash() {
       {/* Phones: one select, grouped. */}
       <div className="trash-tabs-sm">
         <label htmlFor="trash-section" className="wp-muted wp-small">Section</label>
-        <select id="trash-section" className="wp-select" value={current.key} onChange={(e) => selectTab(e.target.value)}>
+        <ThemedSelect id="trash-section" className="wp-select" value={current.key} onChange={(e) => selectTab(e.target.value)}>
           {groups.map((g) => (
             <optgroup key={g.key} label={g.label}>
               {g.modules.map((m) => (
@@ -294,7 +295,7 @@ export default function AdminTrash() {
               ))}
             </optgroup>
           ))}
-        </select>
+        </ThemedSelect>
       </div>
 
       {/* Desktop: one row of WP status links, only for sections that have something in the Trash. */}
@@ -326,10 +327,10 @@ export default function AdminTrash() {
         {showChecks && (
           <>
             <label htmlFor="trash-bulk" className="sr-only">Select bulk action</label>
-            <select id="trash-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} disabled={busy}>
+            <ThemedSelect id="trash-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} disabled={busy}>
               <option value="">Bulk actions</option>
               {bulkOptions.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+            </ThemedSelect>
             <button type="button" className="wp-btn" onClick={applyBulk} disabled={busy}>{busy ? "Working…" : "Apply"}</button>
           </>
         )}

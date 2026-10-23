@@ -7,6 +7,7 @@ import { X, Loader2 } from "lucide-react";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Notice, Skeleton } from "@/components/admin/ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 function SizeChartForm({ item, onSave, onClose, isNew }) {
   const [form, setForm] = useState({
@@ -94,10 +95,10 @@ function SizeChartForm({ item, onSave, onClose, isNew }) {
             </div>
             <div className="wp-field">
               <label htmlFor="sci-enabled" className="wp-label">Visible</label>
-              <select id="sci-enabled" name="enabled" value={form.enabled ? "true" : "false"} onChange={e => setForm(prev => ({ ...prev, enabled: e.target.value === "true" }))} className="wp-select wp-full">
+              <ThemedSelect id="sci-enabled" name="enabled" value={form.enabled ? "true" : "false"} onChange={e => setForm(prev => ({ ...prev, enabled: e.target.value === "true" }))} className="wp-select wp-full">
                 <option value="true">Yes</option>
                 <option value="false">No</option>
-              </select>
+              </ThemedSelect>
             </div>
           </div>
         </div>
@@ -365,7 +366,7 @@ export default function SizeChartItemsPage() {
 
       <div className="wp-toolbar">
         <label htmlFor="sci-bulk-action" className="sr-only">Select bulk action</label>
-        <select id="sci-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <ThemedSelect id="sci-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
           <option>Bulk actions</option>
           {view === "trash" ? (
             <>
@@ -380,7 +381,7 @@ export default function SizeChartItemsPage() {
               <option>Move to Trash</option>
             </>
           )}
-        </select>
+        </ThemedSelect>
         <button type="button" className="wp-btn" onClick={handleBulk} disabled={busy}>Apply</button>
         <span className="wp-spacer" />
         <form className="wp-search" role="search" onSubmit={(e) => { e.preventDefault(); setSearchTerm(searchInput); }}>

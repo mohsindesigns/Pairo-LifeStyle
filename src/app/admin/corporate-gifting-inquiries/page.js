@@ -10,6 +10,7 @@ import {
   useInboxList, runBulk, readError, StatusViews, Pager, BulkActions, SearchForm,
   SkeletonRows, SelectAllBox, Drawer, DangerLink, KV, formatDateTime,
 } from "../contact/_shared/inbox-ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const API = "/api/admin/corporate-gifting-inquiries";
 
@@ -93,15 +94,15 @@ function GiftingDrawer({ inquiry, onClose, onSaved, onTrash, onRestore, onDelete
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0 12px" }}>
               <div className="wp-field">
                 <label htmlFor="gifting-status" className="wp-label">Status</label>
-                <select id="gifting-status" value={status} onChange={(e) => setStatus(e.target.value)} className="wp-select wp-full">
+                <ThemedSelect id="gifting-status" value={status} onChange={(e) => setStatus(e.target.value)} className="wp-select wp-full">
                   {ALL_STATUSES.map((s) => <option key={s}>{s}</option>)}
-                </select>
+                </ThemedSelect>
               </div>
               <div className="wp-field">
                 <label htmlFor="gifting-priority" className="wp-label">Priority</label>
-                <select id="gifting-priority" value={priority} onChange={(e) => setPriority(e.target.value)} className="wp-select wp-full">
+                <ThemedSelect id="gifting-priority" value={priority} onChange={(e) => setPriority(e.target.value)} className="wp-select wp-full">
                   {PRIORITIES.map((s) => <option key={s}>{s}</option>)}
-                </select>
+                </ThemedSelect>
               </div>
             </div>
             <div className="wp-field" style={{ marginBottom: 0 }}>

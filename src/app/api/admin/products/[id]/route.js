@@ -40,6 +40,10 @@ export async function PUT(req, { params }) {
   await dbConnect();
   try {
     const data = await req.json();
+    // A plain save never trashes or restores: that goes through DELETE and the restore action (which also record the
+    // status the product had). Without this, anyone with products.edit could trash any product, or bring one back
+    // from the Trash as Published, by adding the trash fields to the body.
+    delete data.isDeleted; delete data.deletedAt; delete data.statusBeforeTrash;
     
     const oldProduct = await Product.findById(id).populate('categories').populate('primaryCategory');
     if (!oldProduct) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -29,6 +29,8 @@ import {
   History,
   X
 } from "lucide-react";
+import ThemedSelect from "@/components/ui/ThemedSelect";
+import { escapeCsvField } from "@/lib/csv-escape";
 
 const TAB_GROUPS = [
   {
@@ -220,10 +222,8 @@ const daysAgoIso = (n) => new Date(Date.now() - n * 86400000).toISOString().slic
 function downloadCsv(filename, columns = [], rows = []) {
   const safeRows = Array.isArray(rows) ? rows : [];
   const safeColumns = Array.isArray(columns) ? columns : [];
-  const esc = (v) => {
-    const s = v === null || v === undefined ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
+  // Shared escaping: also stops visitor-controlled text (utm_campaign, referrers...) from running as a spreadsheet formula.
+  const esc = escapeCsvField;
   const header = safeColumns.map((c) => esc(c.label)).join(",");
   const lines = safeRows.map((r) => safeColumns.map((c) => esc(c.csv ? c.csv(r) : r[c.key])).join(","));
   const blob = new Blob([[header, ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
@@ -801,7 +801,7 @@ function FilterSelect({ label, paramKey, value, onChange, options = [] }) {
   return (
     <label className="flex flex-col min-w-0">
       <span className="wp-label">{label}</span>
-      <select
+      <ThemedSelect
         value={value || "all"}
         onChange={(e) => onChange(paramKey, e.target.value)}
         className="wp-select wp-full"
@@ -810,7 +810,7 @@ function FilterSelect({ label, paramKey, value, onChange, options = [] }) {
         {(options || []).map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
-      </select>
+      </ThemedSelect>
     </label>
   );
 }
@@ -1055,7 +1055,7 @@ function SiteAnalyticsView() {
         )}
 
         {/* Shopper type */}
-        <select
+        <ThemedSelect
           aria-label="Shopper type"
           value={paramsState.get("segment") || "all"}
           onChange={(e) => onFilter("segment", e.target.value)}
@@ -1064,10 +1064,10 @@ function SiteAnalyticsView() {
           <option value="all">All Shoppers</option>
           <option value="customer">Logged-in Customers</option>
           <option value="guest">Guests</option>
-        </select>
+        </ThemedSelect>
 
         {/* Device */}
-        <select
+        <ThemedSelect
           aria-label="Device"
           value={paramsState.get("device") || "all"}
           onChange={(e) => onFilter("device", e.target.value)}
@@ -1079,7 +1079,7 @@ function SiteAnalyticsView() {
               {d}
             </option>
           ))}
-        </select>
+        </ThemedSelect>
 
         {/* Toggle more filters */}
         <button

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, Mail, Phone, MapPin, Clock } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Page, PageHeader, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Read-mostly screen: the records are written by the storefront checkout. The admin can
 // view them and move them to the Trash (no Add new / Duplicate — they are shopper data).
@@ -239,9 +241,9 @@ export default function AbandonedCartsPage() {
   return (
     <RequirePermission permission="orders.view">
       <Page>
-        <PageHeader title="Abandoned Carts" />
+        <PageHeader title="Abandoned Carts" actions={<Link href="/admin/abandoned-carts/emails" className="wp-btn">Recovery emails</Link>} />
         <p className="wp-desc" style={{ margin: "0 0 8px" }}>
-          Checkout sessions where a shopper started entering their details. Completed ones turned into an order.
+          Checkout sessions where a shopper started entering their details. Completed ones turned into an order. The emails sent to them, and when each goes out, are under Recovery emails.
         </p>
 
         <nav className="wp-subsub" aria-label="Filter abandoned carts by status">
@@ -262,7 +264,7 @@ export default function AbandonedCartsPage() {
 
         <div className="wp-toolbar">
           <label htmlFor="abandoned-carts-bulk" className="sr-only">Bulk actions</label>
-          <select
+          <ThemedSelect
             id="abandoned-carts-bulk"
             className="wp-select"
             value={bulkAction}
@@ -277,7 +279,7 @@ export default function AbandonedCartsPage() {
             ) : (
               <option>Move to Trash</option>
             )}
-          </select>
+          </ThemedSelect>
           <button type="button" className="wp-btn" onClick={handleBulkAction}>Apply</button>
           <span className="wp-spacer" />
           <form className="wp-search" role="search" onSubmit={runSearchNow}>

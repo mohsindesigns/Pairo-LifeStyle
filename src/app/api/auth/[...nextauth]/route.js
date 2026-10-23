@@ -205,13 +205,19 @@ export const authOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (token && token.id) {
-        session.user.id = token.id;
-        session.user.isStaff = token.isStaff;
-        session.user.isAffiliate = token.isAffiliate || false;
-        if (token.isStaff) {
-            session.user.role = token.role;
-        }
+      // The jwt callback above signs someone out (expired staff session, suspended / trashed / deleted account) by
+      // returning {} - but next-auth still builds { user: { name, email } } from the raw cookie and hands it to this
+      // callback, so without this line getServerSession() would return a "signed in" user that has no id. Routes that
+      // only check `if (!session)` then run queries with `session.user.id === undefined`, which Mongoose sends as null
+      // and which matches every guest order. An empty object is what next-auth treats as "no session" everywhere
+      // (getServerSession returns null, useSession reports unauthenticated).
+      if (!token?.id) return {};
+
+      session.user.id = token.id;
+      session.user.isStaff = token.isStaff;
+      session.user.isAffiliate = token.isAffiliate || false;
+      if (token.isStaff) {
+          session.user.role = token.role;
       }
       return session;
     }

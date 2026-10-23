@@ -7,6 +7,7 @@ import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Notice, Skeleton } from "@/components/admin/ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Helper to format date like WordPress: YYYY/MM/DD at hh:mm am/pm
 const formatDate = (dateString) => {
@@ -238,7 +239,7 @@ export default function AdminReviewsPage() {
     const ok = await showConfirm("Move this review to the Trash? It will be hidden from the product page until restored.", "Move to Trash", { confirmText: "Move to Trash" });
     if (ok) {
       try {
-        const res = await fetch(`/api/admin/reviews/${reviewId}`, {
+        const res = await fetch(`/api/admin/reviews/${reviewId}?mode=trash`, {
           method: "DELETE"
         });
         if (res.ok) {
@@ -281,7 +282,7 @@ export default function AdminReviewsPage() {
     const ok = await showConfirm("Permanently delete this review? This cannot be undone.", "Delete Permanently", { confirmText: "Delete Permanently", danger: true });
     if (ok) {
       try {
-        const res = await fetch(`/api/admin/reviews/${reviewId}`, {
+        const res = await fetch(`/api/admin/reviews/${reviewId}?mode=permanent`, {
           method: "DELETE"
         });
         if (res.ok) {
@@ -537,7 +538,7 @@ export default function AdminReviewsPage() {
       {/* Toolbar */}
       <div className="wp-toolbar">
         <label htmlFor="reviews-bulk-action" className="sr-only">Select bulk action</label>
-        <select
+        <ThemedSelect
           id="reviews-bulk-action"
           value={bulkAction}
           onChange={e => setBulkAction(e.target.value)}
@@ -557,13 +558,13 @@ export default function AdminReviewsPage() {
               <option value="delete">Move to Trash</option>
             </>
           )}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkAction} disabled={selectedIds.length === 0 || bulkBusy} className="wp-btn">
           Apply
         </button>
 
         <label htmlFor="reviews-rating" className="sr-only">Filter by rating</label>
-        <select
+        <ThemedSelect
           id="reviews-rating"
           value={ratingFilter}
           onChange={e => { setRatingFilter(e.target.value); resetPaging(); }}
@@ -575,7 +576,7 @@ export default function AdminReviewsPage() {
           <option value="3">3 Stars</option>
           <option value="2">2 Stars</option>
           <option value="1">1 Star</option>
-        </select>
+        </ThemedSelect>
 
         <label htmlFor="reviews-date-from" className="sr-only">Submitted from</label>
         <input
@@ -705,7 +706,7 @@ export default function AdminReviewsPage() {
                               <div className="grid grid-cols-2 gap-x-3">
                                 <div className="wp-field">
                                   <label htmlFor={`qe-rating-${review._id}`} className="wp-label">Rating</label>
-                                  <select
+                                  <ThemedSelect
                                     id={`qe-rating-${review._id}`}
                                     className="wp-select wp-full"
                                     value={quickEditData.rating}
@@ -716,11 +717,11 @@ export default function AdminReviewsPage() {
                                     <option value="3">3 Stars</option>
                                     <option value="2">2 Stars</option>
                                     <option value="1">1 Star</option>
-                                  </select>
+                                  </ThemedSelect>
                                 </div>
                                 <div className="wp-field">
                                   <label htmlFor={`qe-status-${review._id}`} className="wp-label">Status</label>
-                                  <select
+                                  <ThemedSelect
                                     id={`qe-status-${review._id}`}
                                     className="wp-select wp-full"
                                     value={quickEditData.status}
@@ -730,7 +731,7 @@ export default function AdminReviewsPage() {
                                     <option value="Approved">Approved</option>
                                     <option value="Rejected">Rejected</option>
                                     <option value="Spam">Spam</option>
-                                  </select>
+                                  </ThemedSelect>
                                 </div>
                               </div>
                             </div>
@@ -951,22 +952,22 @@ export default function AdminReviewsPage() {
                 </div>
                 <div className="wp-field">
                   <label htmlFor="re-rating" className="wp-label">Rating</label>
-                  <select id="re-rating" className="wp-select wp-full" value={editDialog.rating} onChange={e => setEditDialog({ ...editDialog, rating: parseInt(e.target.value) })}>
+                  <ThemedSelect id="re-rating" className="wp-select wp-full" value={editDialog.rating} onChange={e => setEditDialog({ ...editDialog, rating: parseInt(e.target.value) })}>
                     <option value="5">5 Stars</option>
                     <option value="4">4 Stars</option>
                     <option value="3">3 Stars</option>
                     <option value="2">2 Stars</option>
                     <option value="1">1 Star</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
                 <div className="wp-field">
                   <label htmlFor="re-status" className="wp-label">Status</label>
-                  <select id="re-status" className="wp-select wp-full" value={editDialog.status} onChange={e => setEditDialog({ ...editDialog, status: e.target.value })}>
+                  <ThemedSelect id="re-status" className="wp-select wp-full" value={editDialog.status} onChange={e => setEditDialog({ ...editDialog, status: e.target.value })}>
                     <option value="Pending">Pending</option>
                     <option value="Approved">Approved</option>
                     <option value="Rejected">Rejected</option>
                     <option value="Spam">Spam</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
               </div>
               <div className="wp-field">

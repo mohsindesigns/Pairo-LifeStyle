@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { Upload, X, Check, AlertCircle, ArrowRight, Loader2, ImageIcon } from "lucide-react";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const JACKET_TYPES = ["Biker Jacket", "Bomber Jacket", "Racer Jacket", "Aviator / Shearling", "Trench Coat", "Blazer", "Vest / Gilet", "Custom / Other"];
 const LEATHER_TYPES = ["Full-Grain Cowhide", "Top-Grain Lambskin", "Genuine Suede", "Shearling", "Nappa Leather", "Distressed Leather", "Vegan Leather", "Custom Specification"];
@@ -230,10 +231,10 @@ export default function CustomJacketForm({
                     <input type="tel" name="phone" value={form.phone} onChange={handleChange} placeholder="+1 (555) 000-0000" className={inputClass} />
                   </InputField>
                   <InputField label="Country" error={errors.country}>
-                    <select name="country" value={form.country} onChange={handleChange} className={selectClass}>
+                    <ThemedSelect name="country" value={form.country} onChange={handleChange} className={selectClass}>
                       <option value="">Select country...</option>
                       {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    </ThemedSelect>
                   </InputField>
                   <InputField label="City" error={errors.city}>
                     <input type="text" name="city" value={form.city} onChange={handleChange} placeholder="New York" className={inputClass} />
@@ -252,34 +253,34 @@ export default function CustomJacketForm({
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <InputField label="Jacket Type" required error={errors.jacketType}>
-                    <select name="jacketType" value={form.jacketType} onChange={handleChange} className={selectClass}>
+                    <ThemedSelect name="jacketType" value={form.jacketType} onChange={handleChange} className={selectClass}>
                       <option value="">Select jacket type...</option>
                       {JACKET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                    </ThemedSelect>
                   </InputField>
                   <InputField label="Gender" error={errors.gender}>
-                    <select name="gender" value={form.gender} onChange={handleChange} className={selectClass}>
+                    <ThemedSelect name="gender" value={form.gender} onChange={handleChange} className={selectClass}>
                       <option value="">Select gender...</option>
                       <option value="Men">Men</option>
                       <option value="Women">Women</option>
                       <option value="Unisex">Unisex</option>
-                    </select>
+                    </ThemedSelect>
                   </InputField>
                   <InputField label="Preferred Leather" required error={errors.preferredLeather}>
-                    <select name="preferredLeather" value={form.preferredLeather} onChange={handleChange} className={selectClass}>
+                    <ThemedSelect name="preferredLeather" value={form.preferredLeather} onChange={handleChange} className={selectClass}>
                       <option value="">Select leather type...</option>
                       {LEATHER_TYPES.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
+                    </ThemedSelect>
                   </InputField>
                   <InputField label="Preferred Color" error={errors.preferredColor}>
                     <input type="text" name="preferredColor" value={form.preferredColor} onChange={handleChange} placeholder="e.g. Cognac Brown, Jet Black" className={inputClass} />
                   </InputField>
                   <div className="sm:col-span-2">
                     <InputField label="Size" error={errors.size}>
-                      <select name="size" value={form.size} onChange={handleChange} className={selectClass}>
+                      <ThemedSelect name="size" value={form.size} onChange={handleChange} className={selectClass}>
                         <option value="">Select size...</option>
                         {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                      </ThemedSelect>
                     </InputField>
                   </div>
                 </div>

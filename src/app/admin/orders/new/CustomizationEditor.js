@@ -7,6 +7,7 @@ import {
   CHANGE_FUR_TYPES, CHANGE_FUR_COLORS, CHANGE_FUR_PLACEMENTS, CHANGE_FUR_DENSITIES,
   ARTWORK_SLOTS, ARTWORK_ACCEPTED_FORMATS,
 } from "@/lib/customizationOptions";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const inputClass = "wp-select wp-full";
 const textClass = "wp-input wp-full";
@@ -122,36 +123,36 @@ export default function CustomizationEditor({ value, onChange }) {
       <div style={grid}>
         <div className="wp-field">
           <label htmlFor={fid("leather-color")} className={labelClass}>Leather color</label>
-          <select id={fid("leather-color")} className={inputClass} value={c.leatherColor} onChange={(e) => set({ leatherColor: e.target.value })}>
+          <ThemedSelect id={fid("leather-color")} className={inputClass} value={c.leatherColor} onChange={(e) => set({ leatherColor: e.target.value })}>
             {CHANGE_LEATHER_COLORS.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          </ThemedSelect>
           {c.leatherColor === "Other" && (
             <input type="text" aria-label="Custom leather color" placeholder="Describe custom color..." value={c.leatherColorNote} onChange={(e) => set({ leatherColorNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
         </div>
         <div className="wp-field">
           <label htmlFor={fid("leather-type")} className={labelClass}>Leather type</label>
-          <select id={fid("leather-type")} className={inputClass} value={c.leatherType} onChange={(e) => set({ leatherType: e.target.value })}>
+          <ThemedSelect id={fid("leather-type")} className={inputClass} value={c.leatherType} onChange={(e) => set({ leatherType: e.target.value })}>
             {CHANGE_LEATHER_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          </ThemedSelect>
           {c.leatherType === "Other" && (
             <input type="text" aria-label="Custom leather type" placeholder="Describe custom type..." value={c.leatherTypeNote} onChange={(e) => set({ leatherTypeNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
         </div>
         <div className="wp-field">
           <label htmlFor={fid("inner-lining")} className={labelClass}>Inner lining</label>
-          <select id={fid("inner-lining")} className={inputClass} value={c.innerLining} onChange={(e) => set({ innerLining: e.target.value })}>
+          <ThemedSelect id={fid("inner-lining")} className={inputClass} value={c.innerLining} onChange={(e) => set({ innerLining: e.target.value })}>
             {CHANGE_INNER_LININGS.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          </ThemedSelect>
           {c.innerLining === "Other" && (
             <input type="text" aria-label="Custom inner lining" placeholder="Describe custom lining..." value={c.innerLiningNote} onChange={(e) => set({ innerLiningNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
         </div>
         <div className="wp-field">
           <label htmlFor={fid("hardware")} className={labelClass}>Hardware tone</label>
-          <select id={fid("hardware")} className={inputClass} value={c.hardwareColor} onChange={(e) => set({ hardwareColor: e.target.value })}>
+          <ThemedSelect id={fid("hardware")} className={inputClass} value={c.hardwareColor} onChange={(e) => set({ hardwareColor: e.target.value })}>
             {CHANGE_HARDWARE_COLORS.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          </ThemedSelect>
           {c.hardwareColor === "Other" && (
             <input type="text" aria-label="Custom hardware finish" placeholder="Describe custom finish..." value={c.hardwareColorNote} onChange={(e) => set({ hardwareColorNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
@@ -161,9 +162,9 @@ export default function CustomizationEditor({ value, onChange }) {
       <div style={section}>
         <div className="wp-field">
           <label htmlFor={fid("fur-type")} className={labelClass}>Fur accent (optional)</label>
-          <select id={fid("fur-type")} className={inputClass} value={c.fur.type} onChange={(e) => setFur({ type: e.target.value })}>
+          <ThemedSelect id={fid("fur-type")} className={inputClass} value={c.fur.type} onChange={(e) => setFur({ type: e.target.value })}>
             {CHANGE_FUR_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
+          </ThemedSelect>
           {c.fur.type === "Other" && (
             <input type="text" aria-label="Custom fur type" placeholder="Describe custom fur type..." value={c.fur.typeNote} onChange={(e) => setFur({ typeNote: e.target.value })} className={textClass} style={{ marginTop: 6 }} />
           )}
@@ -174,21 +175,21 @@ export default function CustomizationEditor({ value, onChange }) {
             <div style={grid}>
               <div className="wp-field">
                 <label htmlFor={fid("fur-color")} className={labelClass}>Fur color</label>
-                <select id={fid("fur-color")} className={inputClass} value={c.fur.color} onChange={(e) => setFur({ color: e.target.value })}>
+                <ThemedSelect id={fid("fur-color")} className={inputClass} value={c.fur.color} onChange={(e) => setFur({ color: e.target.value })}>
                   <option value="">Select...</option>
                   {CHANGE_FUR_COLORS.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                </ThemedSelect>
               </div>
               <div className="wp-field">
                 <label htmlFor={fid("fur-density")} className={labelClass}>Fur density</label>
-                <select id={fid("fur-density")} className={inputClass} value={c.fur.density} onChange={(e) => setFur({ density: e.target.value })}>
+                <ThemedSelect id={fid("fur-density")} className={inputClass} value={c.fur.density} onChange={(e) => setFur({ density: e.target.value })}>
                   <option value="">Select...</option>
                   {CHANGE_FUR_DENSITIES.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                </ThemedSelect>
               </div>
               <div className="wp-field">
                 <label htmlFor={fid("fur-removable")} className={labelClass}>Removable?</label>
-                <select
+                <ThemedSelect
                   id={fid("fur-removable")}
                   className={inputClass}
                   value={c.fur.removable === true ? "Yes" : c.fur.removable === false ? "No" : ""}
@@ -197,7 +198,7 @@ export default function CustomizationEditor({ value, onChange }) {
                   <option value="">Select...</option>
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
-                </select>
+                </ThemedSelect>
               </div>
             </div>
             <fieldset className="wp-field" style={{ border: 0, padding: 0, margin: 0 }}>

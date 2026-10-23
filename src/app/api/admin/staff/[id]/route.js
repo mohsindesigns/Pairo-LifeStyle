@@ -19,6 +19,7 @@ import {
     staffPermanentDeleteError,
     staffTrashUpdate,
     staffRestoreUpdate,
+    staffRestoreError,
 } from "../helpers";
 
 // Active, non-trashed Super Admins other than `excludeId`.
@@ -61,6 +62,9 @@ async function restoreStaff(req, session, id) {
     const staff = await Staff.findById(id).populate("roleId");
     if (!staff) return NextResponse.json({ error: "Staff member not found" }, { status: 404 });
     if (!staff.isDeleted) return NextResponse.json({ message: "Staff member is not in the Trash" });
+
+    const restoreError = staffRestoreError({ actorRoleSlug: actorRoleSlug(session), target: staff });
+    if (restoreError) return NextResponse.json({ error: restoreError }, { status: 403 });
 
     await Staff.updateOne({ _id: id, isDeleted: true }, staffRestoreUpdate(staff));
 
@@ -144,7 +148,9 @@ export async function PUT(req, { params }) {
             if (taken) return NextResponse.json({ error: "Another user already uses this email" }, { status: 400 });
         }
 
-        const before = JSON.parse(JSON.stringify(staff));
+        // The audit log must never receive a password hash (it is readable by anyone who can view the log).
+        const withoutPassword = (doc) => { const { password: _hash, ...rest } = doc.toObject(); return rest; };
+        const before = JSON.parse(JSON.stringify(withoutPassword(staff)));
 
         if (name) staff.name = name;
         if (email) staff.email = email;
@@ -160,8 +166,8 @@ export async function PUT(req, { params }) {
 
         await logAction(req, session, 'UPDATE_STAFF', 'staff', {
             before,
-            after: staff,
-            message: `Updated staff member: ${staff.email}`
+            after: withoutPassword(staff),
+            message: `Updated staff member: ${staff.email}${password ? " (password changed)" : ""}`
         });
 
         return NextResponse.json({ message: "Staff updated successfully" });

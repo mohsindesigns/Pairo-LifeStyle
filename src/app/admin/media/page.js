@@ -9,6 +9,7 @@ import { Page, PageHeader, Notice } from "@/components/admin/ui";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // WordPress media modal: near full-screen, grey preview pane, 300px details sidebar.
 const MEDIA_MODAL_CSS = `
@@ -441,7 +442,7 @@ export default function AdminMedia() {
         </div>
 
         <label htmlFor="media-filter-type" className="sr-only">Filter by type</label>
-        <select
+        <ThemedSelect
           id="media-filter-type"
           value={query.type}
           onChange={(e) => { const type = e.target.value; setQuery(q => ({ ...q, type, page: 1 })); }}
@@ -449,10 +450,10 @@ export default function AdminMedia() {
         >
           <option value="all">All media items</option>
           <option value="image">Images</option>
-        </select>
+        </ThemedSelect>
 
         <label htmlFor="media-sort" className="sr-only">Sort media</label>
-        <select
+        <ThemedSelect
           id="media-sort"
           value={query.sort}
           onChange={(e) => { const sort = e.target.value; setQuery(q => ({ ...q, sort, page: 1 })); }}
@@ -461,7 +462,7 @@ export default function AdminMedia() {
           <option value="newest">Sort: Newest</option>
           <option value="oldest">Sort: Oldest</option>
           <option value="name">Sort: Name A-Z</option>
-        </select>
+        </ThemedSelect>
 
         <button type="button" onClick={() => { setBulkMode(!bulkMode); setSelected(new Set()); }}
           aria-pressed={bulkMode}

@@ -11,6 +11,7 @@ import {
   useInboxList, runBulk, readError, StatusViews, Pager, BulkActions, SearchForm,
   SkeletonRows, SelectAllBox, Drawer, DangerLink, KV, formatDateTime,
 } from "../contact/_shared/inbox-ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const API = "/api/admin/custom-jacket-inquiries";
 
@@ -175,9 +176,9 @@ function InquiryDrawer({ inquiry, onClose, onSaved, onConverted, onTrash, onRest
           <Postbox title="Status" id="jacket-status-box">
             <div className="wp-field">
               <label htmlFor="inquiry-status" className="wp-label">Status</label>
-              <select id="inquiry-status" value={status} onChange={(e) => setStatus(e.target.value)} className="wp-select wp-full">
+              <ThemedSelect id="inquiry-status" value={status} onChange={(e) => setStatus(e.target.value)} className="wp-select wp-full">
                 {statusOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </ThemedSelect>
             </div>
             <div className="wp-field" style={{ marginBottom: 0 }}>
               <label htmlFor="inquiry-admin-notes" className="wp-label">Admin notes</label>

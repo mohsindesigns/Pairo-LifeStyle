@@ -10,7 +10,7 @@ Documentation for connecting Pairo Lifestyle orders with your CRM (`app.mohsinde
 **URL:** `https://pairolifestyle.com/api/orders` *(also available at `https://pairolifestyle.com/api/crm/orders`)*  
 **Content-Type:** `application/json`  
 **CORS:** Cross-origin requests are supported (`Access-Control-Allow-Origin: *`). Can be called from CRM backend or frontend directly without cookies or credentials.  
-**Authentication:** Optional. If `CRM_API_KEY` is configured in the website environment, pass it via header `x-api-key: <key>`, `Authorization: Bearer <key>`, or query parameter `?api_key=<key>`. If unset, public read access is enabled.
+**Authentication:** Required on the live site. Set `CRM_API_KEY` in the website environment and pass it with every request via header `x-api-key: <key>`, `Authorization: Bearer <key>`, or query parameter `?api_key=<key>`. If the key is not set, the live site refuses all requests (only a local development server allows access without a key).
 
 ### Query Parameters
 

@@ -52,6 +52,7 @@ export function buildDuplicateOrderDoc(source, { orderNumber, staffName = "Admin
   const doc = {
     orderNumber,
     status: "Pending",
+    stockDeducted: false, // see Order.stockDeducted: cancelling this copy must not restock
     items,
     financials,
     payment: {

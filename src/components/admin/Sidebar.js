@@ -40,6 +40,7 @@ export const MENUS = [
     { href: "/admin/orders/new", label: "Add New", perm: "orders.create" },
     { href: "/admin/custom-jacket-orders", label: "Custom Orders" },
     { href: "/admin/abandoned-carts", label: "Abandoned Carts" },
+    { href: "/admin/abandoned-carts/emails", label: "Recovery Emails" },
     { href: "/admin/size-confirmations", label: "Size Confirmations" },
   ] },
   { id: "products", title: "Products", icon: Tag, perm: "products.view", items: [

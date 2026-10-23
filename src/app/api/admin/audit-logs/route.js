@@ -4,8 +4,12 @@ import dbConnect from "@/lib/db";
 import AuditLog from "@/models/AuditLog";
 import Staff from "@/models/Staff";
 import { can } from "@/lib/rbac";
+import { redactSecrets } from "@/lib/audit";
 import { NextResponse } from "next/server";
 import { parseAuditParams, buildAuditFilter, totalPages, escapeRegex } from "./query";
+
+// Entries written before secrets were redacted at write time (e.g. UPDATE_STAFF kept a bcrypt hash) are cleaned here.
+const cleanLog = (log) => ({ ...log, details: redactSecrets(log.details) });
 
 // GET /api/admin/audit-logs (read-only)
 //   ?q=        search user name/email, action, target, target id, message
@@ -37,7 +41,7 @@ export async function GET(req) {
                 .sort({ timestamp: -1 })
                 .limit(100)
                 .lean();
-            return NextResponse.json(logs);
+            return NextResponse.json(logs.map(cleanLog));
         }
 
         const total = await AuditLog.countDocuments(filter);
@@ -55,7 +59,7 @@ export async function GET(req) {
         ]);
 
         return NextResponse.json({
-            logs,
+            logs: logs.map(cleanLog),
             total,
             page,
             pages,

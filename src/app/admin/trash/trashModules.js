@@ -196,7 +196,7 @@ export const TRASH_MODULES = [
     // Restored reviews go back to Pending for moderation (the API's rule).
     restore: (d) => ({ url: `/api/admin/reviews/${enc(d._id)}`, method: "PUT", body: { restore: true } }),
     // DELETE on a review that is already in the Trash deletes it permanently.
-    destroy: (d) => ({ url: `/api/admin/reviews/${enc(d._id)}`, method: "DELETE" }),
+    destroy: (d) => ({ url: `/api/admin/reviews/${enc(d._id)}?mode=permanent`, method: "DELETE" }),
     item: (d) => ({
       id: d._id,
       title: clip(d.title || d.comment) || "(no text)",
@@ -384,7 +384,7 @@ export const TRASH_MODULES = [
     noun: "file",
     group: "content",
     href: "/admin/media",
-    permissions: { view: "media.view", restore: "media.manage", delete: "media.manage" },
+    permissions: { view: "media.manage", restore: "media.manage", delete: "media.manage" },
     load: pagedList(
       (p) => `/api/admin/media?trash=true&limit=100&page=${p}`,
       (data) => data?.items,

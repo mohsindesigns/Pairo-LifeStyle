@@ -96,6 +96,18 @@ export const SECTION_DEFAULTS = {
 };
 
 /**
+ * Lists that are useless when empty (an empty dropdown, no steps, no item tiles). If the saved page has one of these
+ * as an empty list, it is treated as "not set" so the live defaults show in the editor and on the page.
+ * Optional decorations (for example the reference hint tags) are NOT listed: empty is a valid choice for them.
+ */
+const EMPTY_MEANS_UNSET = {
+  corporate_gifting_process: ["steps"],
+  corporate_gifting_form: ["packItems", "occasions", "budgets", "brandingStyles", "packagingOptions", "leatherTypes", "countries"],
+};
+const isUnset = (type, key, value) =>
+  value === undefined || value === null || (Array.isArray(value) && value.length === 0 && (EMPTY_MEANS_UNSET[type] || []).includes(key));
+
+/**
  * Returns the section with any missing config keys filled from SECTION_DEFAULTS.
  * Only keys that are undefined are filled: a field the admin deliberately cleared ("" or an
  * empty list they saved) is left alone. Sections without defaults are returned unchanged.
@@ -105,7 +117,7 @@ export function hydrateSectionDefaults(section) {
   if (!defaults) return section;
   const config = { ...(section.config || {}) };
   for (const [key, value] of Object.entries(defaults)) {
-    if (config[key] === undefined || config[key] === null) {
+    if (isUnset(section.type, key, config[key])) {
       config[key] = JSON.parse(JSON.stringify(value));
     }
   }
@@ -121,7 +133,7 @@ export function hydratePageDefaults(page) {
 export function withSectionDefaults(type, props = {}) {
   const merged = { ...(SECTION_DEFAULTS[type] || {}) };
   for (const [key, value] of Object.entries(props)) {
-    if (value !== undefined && value !== null) merged[key] = value;
+    if (!isUnset(type, key, value)) merged[key] = value;
   }
   return merged;
 }

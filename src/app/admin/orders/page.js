@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Page, PageHeader, Notice, Skeleton, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // "Completed" = Delivered (an order that reached its final, successful status).
 const STATUS_TABS = [
@@ -303,7 +304,7 @@ export default function AdminOrdersPage() {
 
       <div className="wp-toolbar">
         <label htmlFor="orders-bulk-action" className="sr-only">Bulk actions</label>
-        <select
+        <ThemedSelect
           id="orders-bulk-action"
           className="wp-select"
           value={bulkAction}
@@ -321,12 +322,12 @@ export default function AdminOrdersPage() {
               <option>Move to Trash</option>
             </>
           )}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkAction} className="wp-btn">
           Apply
         </button>
         <label htmlFor="orders-referral-filter" className="sr-only">Filter by referral</label>
-        <select
+        <ThemedSelect
           id="orders-referral-filter"
           className="wp-select"
           value={referralFilter}
@@ -335,7 +336,7 @@ export default function AdminOrdersPage() {
           <option value="all">All referral states</option>
           <option value="referred">Referred only</option>
           <option value="non-referred">Non-referred</option>
-        </select>
+        </ThemedSelect>
         <span className="wp-spacer" />
         <form className="wp-search" role="search" onSubmit={runSearchNow}>
           <label htmlFor="orders-search" className="sr-only">Search orders</label>

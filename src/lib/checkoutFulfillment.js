@@ -4,11 +4,11 @@ import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import Customer from "@/models/Customer";
-import Counter from "@/models/Counter";
 import AbandonedCart from "@/models/AbandonedCart";
+import { ensureOrderCounter, getNextOrderNumber } from "@/lib/orderNumber";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 import pairoEvents from "@/lib/events";
-import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { assertValidCartItems, computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
 import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
@@ -19,47 +19,9 @@ import {
 } from "@/lib/guestCheckoutAccount";
 import { resolveIpLocation } from "@/lib/geoIp";
 
-/**
- * Ensures the order-number counter exists, seeded from the highest existing
- * order number so numbering stays continuous with any orders created before this counter
- * was introduced. Idempotent and safe to call concurrently (a duplicate-key from a racing
- * seed is harmless). Runs OUTSIDE the order transaction so first-ever concurrent orders
- * don't collide on the counter's insert.
- */
-async function ensureOrderCounter() {
-  const counterId = 'order:global';
-  const existing = await Counter.findById(counterId);
-  if (existing) return;
-
-  const lastOrder = await Order.findOne().sort({ createdAt: -1 }).select("orderNumber");
-  const lastSeq = parseInt(String(lastOrder?.orderNumber || "").match(/(\d+)\s*$/)?.[1] || "1000", 10);
-  try {
-    await Counter.updateOne(
-      { _id: counterId },
-      { $setOnInsert: { seq: Number.isFinite(lastSeq) ? lastSeq : 1000 } },
-      { upsert: true }
-    );
-  } catch (e) {
-    // Another concurrent checkout seeded it first — that's fine.
-    if (e?.code !== 11000) throw e;
-  }
-}
-
-/**
- * Atomic, race-safe order number generation, shared by customer checkout and
- * admin-created orders so numbering stays single-sourced. Two concurrent
- * callers $inc the same counter doc, which produces a WriteConflict (retried
- * by the caller's transaction) rather than duplicate order numbers.
- */
-export async function getNextOrderNumber(mongoSession = null) {
-  await ensureOrderCounter();
-  const bumped = await Counter.findByIdAndUpdate(
-    'order:global',
-    { $inc: { seq: 1 } },
-    { session: mongoSession, new: true, upsert: true }
-  );
-  return `PAI-${bumped.seq}`;
-}
+// Order numbering lives in its own module so lightweight routes can use it without loading checkout; re-exported
+// here because the admin order routes import it from this file.
+export { getNextOrderNumber };
 
 export async function createOrderFromCheckoutPayload(payload, {
   orderUserId = null,
@@ -86,6 +48,8 @@ export async function createOrderFromCheckoutPayload(payload, {
   if (isRestrictedCountry(shippingAddress?.country, shippingAddress?.countryCode)) {
     throw new Error(RESTRICTED_COUNTRY_MESSAGE);
   }
+  // Same rule as the pricing step, checked first so a bad cart fails before a database transaction is even opened.
+  assertValidCartItems(items);
   const resolvedEmail = (customerEmail || checkoutEmail || '').trim();
   if (!resolvedEmail) {
     throw new Error('A valid email address is required to place an order.');

@@ -12,6 +12,7 @@ import { COUNTRIES, countryName } from "@/lib/countries";
 import RequirePermission from "@/components/admin/RequirePermission";
 import ShippingTaxTabs from "@/components/admin/settings/ShippingTaxTabs";
 import { normalizeMethodSettings } from "./methodSettings";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // ─── Shared WordPress input styles ─────────────────────────────────────────────
 const inp  = "wp-input wp-full";
@@ -139,9 +140,9 @@ function CountryMultiSelect({ values, onChange }) {
 function RuleTypeSelect({ value, onChange }) {
   const options = value === "region" ? [LEGACY_REGION_TYPE, ...RULE_TYPES] : RULE_TYPES;
   return (
-    <select className={sel} value={value} onChange={e => onChange(e.target.value)} aria-label="Rule type">
+    <ThemedSelect className={sel} value={value} onChange={e => onChange(e.target.value)} aria-label="Rule type">
       {options.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-    </select>
+    </ThemedSelect>
   );
 }
 
@@ -270,12 +271,12 @@ function ProviderSettings({ provider, settings, onChange }) {
         <input id="method-fee" type="number" min="0" className={inp} style={{ maxWidth: 200 }} value={settings.cost ?? ""} onChange={e => s("cost", e.target.value)} placeholder="0" />
       </FRow>
       <FRow label="Pickup location" htmlFor="method-pickup">
-        <select id="method-pickup" className={sel} value={settings.pickupLocationId ?? ""} onChange={e => s("pickupLocationId", e.target.value || null)} disabled={loadingLocations}>
+        <ThemedSelect id="method-pickup" className={sel} value={settings.pickupLocationId ?? ""} onChange={e => s("pickupLocationId", e.target.value || null)} disabled={loadingLocations}>
           <option value="">— No specific location —</option>
           {pickupLocations.map(loc => (
             <option key={loc._id} value={loc._id}>{loc.name}{loc.address?.city ? ` (${loc.address.city})` : ""}</option>
           ))}
-        </select>
+        </ThemedSelect>
         <p className={hint}>
           {loadingLocations ? (
             "Loading pickup locations…"
@@ -368,10 +369,10 @@ function MethodModal({ zoneId, initial, onClose, onSaved }) {
             <input id="method-sort" type="number" className={inp} style={{ maxWidth: 120 }} value={m.sortOrder ?? 0} onChange={e => set("sortOrder", Number(e.target.value))} />
           </FRow>
           <FRow label="Status" htmlFor="method-status">
-            <select id="method-status" className={sel} style={{ maxWidth: 200 }} value={m.status} onChange={e => set("status", e.target.value)}>
+            <ThemedSelect id="method-status" className={sel} style={{ maxWidth: 200 }} value={m.status} onChange={e => set("status", e.target.value)}>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
-            </select>
+            </ThemedSelect>
           </FRow>
         </div>
 
@@ -597,10 +598,10 @@ function ZoneCard({ zone: initZone, onDelete, onUpdate, onDuplicate, dragHandle,
                   <input id={`zone-${zid}-priority`} type="number" className={inp} style={{ maxWidth: 120 }} value={form.priority ?? 0} onChange={e => setForm(p => ({ ...p, priority: Number(e.target.value) }))} />
                 </FRow>
                 <FRow label="Status" htmlFor={`zone-${zid}-status`}>
-                  <select id={`zone-${zid}-status`} className={sel} style={{ maxWidth: 200 }} value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
+                  <ThemedSelect id={`zone-${zid}-status`} className={sel} style={{ maxWidth: 200 }} value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
-                  </select>
+                  </ThemedSelect>
                 </FRow>
 
                 {zone.isCatchAll && (
@@ -754,7 +755,7 @@ function AddZoneForm({ onCreated, open, setOpen }) {
           <input id="new-zone-priority" type="number" className={inp} style={{ maxWidth: 120 }} value={form.priority} onChange={e => setForm(p => ({ ...p, priority: Number(e.target.value) }))} />
         </FRow>
         <FRow label="Status" htmlFor="new-zone-status">
-          <select id="new-zone-status" className={sel} style={{ maxWidth: 200 }} value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+          <ThemedSelect id="new-zone-status" className={sel} style={{ maxWidth: 200 }} value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}><option value="Active">Active</option><option value="Inactive">Inactive</option></ThemedSelect>
         </FRow>
         <FRow label="Zone regions">
           <CoverageRulesEditor matchRules={form.matchRules} onChange={matchRules => setForm(p => ({ ...p, matchRules }))} variant="create" />

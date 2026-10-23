@@ -9,6 +9,7 @@ import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { useRBAC } from "@/hooks/useRBAC";
 import { usePopup } from "@/context/PopupContext";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 async function readError(res, fallback) {
   try {
@@ -278,7 +279,7 @@ function EditStaffForm() {
             <div className="wp-misc">
               <div className="wp-misc-row">
                 <label htmlFor="edit-user-role" style={{ minWidth: 48 }}>Role:</label>
-                <select
+                <ThemedSelect
                   id="edit-user-role"
                   required
                   disabled={readOnly || !canChangeRole}
@@ -291,14 +292,14 @@ function EditStaffForm() {
                   {roleOptions.map((role) => (
                     <option key={role._id} value={role._id}>{role.name}</option>
                   ))}
-                </select>
+                </ThemedSelect>
               </div>
               <div className="wp-misc-row">
                 <label htmlFor="edit-user-status" style={{ minWidth: 48 }}>Status:</label>
                 {isTrashed ? (
                   <span className="wp-strong">In Trash</span>
                 ) : (
-                  <select
+                  <ThemedSelect
                     id="edit-user-status"
                     disabled={readOnly || lockStatus}
                     className="wp-select"
@@ -309,7 +310,7 @@ function EditStaffForm() {
                     <option value="Active">Active</option>
                     <option value="Suspended">Suspended</option>
                     <option value="Locked">Locked</option>
-                  </select>
+                  </ThemedSelect>
                 )}
               </div>
               <div className="wp-misc-row"><span>Last login:</span><span className="wp-strong">{staff.security?.lastLogin ? formatDate(staff.security.lastLogin) : "Never"}</span></div>

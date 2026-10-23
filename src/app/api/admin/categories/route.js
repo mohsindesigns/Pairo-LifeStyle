@@ -189,9 +189,24 @@ export async function PUT(req) {
       if (!collisionCheck.valid) {
         return NextResponse.json({ error: collisionCheck.error }, { status: 400 });
       }
+      // validateSlug skips categories in the Trash, but they still own their slug (unique index): refuse it too
+      const heldByAnother = await Category.exists({ slug: data.slug, type: oldCategory.type, _id: { $ne: id } });
+      if (heldByAnother) {
+        return NextResponse.json({ error: "Another category (possibly one in the Trash) already uses this URL." }, { status: 400 });
+      }
     }
 
-    // Register redirect if slug changed
+    // Restoring a trashed category brings its old slug back: it must not have been taken in the meantime
+    if (data.isDeleted === false && oldCategory.isDeleted) {
+      const taken = await Category.exists({ slug: data.slug || oldCategory.slug, type: oldCategory.type, _id: { $ne: id }, isDeleted: { $ne: true } });
+      if (taken) {
+        return NextResponse.json({ error: "Another category now uses this category's URL, so it can't be restored. Rename one of them first." }, { status: 409 });
+      }
+    }
+
+    const category = await Category.findByIdAndUpdate(id, data, { new: true });
+
+    // Register redirect if slug changed. Only after the update succeeded: a failed save must not leave redirects behind.
     if (data.slug && oldCategory.slug && oldCategory.slug !== data.slug) {
       const { registerRedirect } = await import("@/lib/redirect-resolver");
       await registerRedirect(`/shop/${oldCategory.slug}`, `/collections/${data.slug}`);
@@ -210,8 +225,6 @@ export async function PUT(req) {
         }
       }
     }
-
-    const category = await Category.findByIdAndUpdate(id, data, { new: true });
 
     // Sync SizeChart assignment if changed
     // Partial payloads (e.g. restore from trash: { id, isDeleted: false }) must not

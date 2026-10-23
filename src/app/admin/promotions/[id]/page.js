@@ -15,6 +15,7 @@ import RevisionHistory from "@/components/admin/promotions/History/RevisionHisto
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { toLocalDateInput, fromLocalDateInput, parsePriority } from "@/components/admin/promotions/promotionEditorUtils";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 export default function PromotionEditor({ isNew = false } = {}) {
   const params = useParams();
@@ -368,7 +369,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
             <div className="wp-misc">
               <div className="wp-misc-row">
                 <label htmlFor="promo-status">Status:</label>
-                <select
+                <ThemedSelect
                   id="promo-status"
                   value={formData.adminStatus}
                   onChange={(e) => updateField('adminStatus', e.target.value)}
@@ -378,7 +379,7 @@ export default function PromotionEditor({ isNew = false } = {}) {
                   <option value="Active">Active</option>
                   <option value="Paused">Paused</option>
                   <option value="Archived">Archived</option>
-                </select>
+                </ThemedSelect>
               </div>
               <div className="wp-misc-row">
                 <span>Visibility:</span>

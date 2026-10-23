@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 function generatePassword(length = 16) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*()-_=+";
@@ -49,6 +50,10 @@ function InviteStaffForm() {
     setError("");
     if (formData.password.length < 6) {
       setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (!formData.roleId) {
+      setError("Choose a role for this user.");
       return;
     }
     setLoading(true);
@@ -159,7 +164,7 @@ function InviteStaffForm() {
             <div className="wp-misc">
               <div className="wp-misc-row">
                 <label htmlFor="new-user-role" style={{ minWidth: 48 }}>Role:</label>
-                <select
+                <ThemedSelect
                   id="new-user-role"
                   required
                   className="wp-select"
@@ -171,7 +176,7 @@ function InviteStaffForm() {
                   {roles.map((role) => (
                     <option key={role._id} value={role._id}>{role.name}</option>
                   ))}
-                </select>
+                </ThemedSelect>
               </div>
               <div className="wp-misc-row"><span style={{ minWidth: 48 }}>Status:</span><span className="wp-strong">Active</span></div>
             </div>

@@ -452,3 +452,26 @@
   .admin-dashboard-container .wp-order-cols { grid-template-columns: minmax(0, 1fr); gap: 18px; }
   .admin-dashboard-container .wp-check { min-height: 36px; }
 }
+
+/* ---------- page builder live preview ----------
+   Sections reveal themselves with scroll animations (framer-motion whileInView starts them at opacity: 0). Inside the
+   builder preview most sections are below the fold of its own scroll box, so they stayed invisible and the preview
+   looked blank. Show everything immediately here; the real site keeps its animations. */
+.admin-dashboard-container .builder-preview [style*="opacity:0;"],
+.admin-dashboard-container .builder-preview [style*="opacity: 0;"],
+.admin-dashboard-container .builder-preview [style$="opacity:0"],
+.admin-dashboard-container .builder-preview [style$="opacity: 0"] {
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+/* ---------- themed dropdowns: use the site theme (brand) colour for hover/focus instead of the WordPress blue ---------- */
+.admin-dashboard-container .pairo-select-trigger.wp-select:hover { border-color: var(--primary, #8c8f94); }
+.admin-dashboard-container .pairo-select-trigger.wp-select:focus,
+.admin-dashboard-container .pairo-select-trigger.wp-select:focus-visible {
+  border-color: var(--primary, var(--wp-accent));
+  box-shadow: 0 0 0 1px var(--primary, var(--wp-accent));
+  outline: 2px solid transparent;
+}
+.admin-dashboard-container .pairo-select-trigger.wp-select { display: inline-flex; }

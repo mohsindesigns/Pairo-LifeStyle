@@ -8,6 +8,7 @@ import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/comp
 import { Eye, X, ExternalLink, FileText, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { paginate } from "@/lib/admin-products-utils";
 import { joinReasons } from "@/app/api/admin/affiliates/list/trash-utils";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const AFFILIATE_TABS = ["overview", "requests", "list", "links", "orders", "conversions", "commissions", "payouts", "analytics", "settings"];
 
@@ -738,7 +739,7 @@ export default function AffiliatesManagerClient() {
             c.affiliateId?.name?.toLowerCase().includes(q) ||
             c.affiliateId?.referralCode?.toLowerCase().includes(q) ||
             c.referralCode?.toLowerCase().includes(q) ||
-            c.ipAddress?.toLowerCase().includes(q);
+            c.ip?.toLowerCase().includes(q);
         });
         return (
           <div>
@@ -790,11 +791,11 @@ export default function AffiliatesManagerClient() {
                         <td>
                           <span className="wp-strong">{c.affiliateId?.name || '—'}</span>
                           <div className="wp-mobile-meta">
-                            {c.affiliateId?.referralCode || c.referralCode || '—'} · {c.ipAddress || '—'}
+                            {c.affiliateId?.referralCode || c.referralCode || '—'} · {c.ip || '—'}
                           </div>
                         </td>
                         <td className="wp-hide-sm font-mono">{c.affiliateId?.referralCode || c.referralCode || '—'}</td>
-                        <td className="wp-hide-sm font-mono wp-muted wp-small">{c.ipAddress || '—'}</td>
+                        <td className="wp-hide-sm font-mono wp-muted wp-small">{c.ip || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -857,7 +858,7 @@ export default function AffiliatesManagerClient() {
                         </div>
                       </td>
                       <td className="wp-hide-sm font-mono">{c.orderNumber || '—'}</td>
-                      <td className="wp-hide-sm">{c.commissionType === 'Fixed' ? `$${c.commissionRate}` : `${c.commissionRate}%`}</td>
+                      <td className="wp-hide-sm">{(c.snapshot?.commissionType || c.commissionType) === 'Fixed' ? `$${c.snapshot?.commissionRate ?? c.commissionRate ?? 0}` : `${c.snapshot?.commissionRate ?? c.commissionRate ?? 0}%`}</td>
                       <td className="wp-num wp-strong">{formatMoney(c.commissionAmount ?? 0)}</td>
                       <td><AffPill status={c.status} /></td>
                       <td className="wp-hide-sm wp-muted">{new Date(c.createdAt).toLocaleDateString()}</td>
@@ -1487,15 +1488,15 @@ export default function AffiliatesManagerClient() {
               <section>
                 <SectionTitle>Marketing strategy &amp; reach</SectionTitle>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                  <KV label="Company name">{viewingApplication.companyName || "—"}</KV>
+                  <KV label="Company name">{viewingApplication.businessInfo?.companyName || viewingApplication.companyName || "—"}</KV>
                   <KV label="Website">
-                    {viewingApplication.website ? (
-                      <a href={viewingApplication.website} target="_blank" rel="noreferrer" className="wp-link inline-flex items-center gap-1" style={{ fontWeight: 400 }}>
-                        {viewingApplication.website} <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                    {(viewingApplication.businessInfo?.website || viewingApplication.website) ? (
+                      <a href={viewingApplication.businessInfo?.website || viewingApplication.website} target="_blank" rel="noreferrer" className="wp-link inline-flex items-center gap-1" style={{ fontWeight: 400 }}>
+                        {viewingApplication.businessInfo?.website || viewingApplication.website} <ExternalLink className="w-3 h-3" aria-hidden="true" />
                       </a>
                     ) : "—"}
                   </KV>
-                  <KV label="Social media channels">{viewingApplication.socialLinks || "—"}</KV>
+                  <KV label="Social media channels">{(Array.isArray(viewingApplication.businessInfo?.socialLinks) ? viewingApplication.businessInfo.socialLinks.filter(Boolean).join(", ") : viewingApplication.socialLinks) || "—"}</KV>
                   <KV label="Monthly reach / traffic">{viewingApplication.marketingAnswers?.audienceSize || "—"}</KV>
                   <KV label="Affiliate experience">{viewingApplication.marketingAnswers?.experience || "—"}</KV>
                 </div>
@@ -1569,7 +1570,7 @@ export default function AffiliatesManagerClient() {
               <div className="wp-modal-body">
                 <div className="wp-field">
                   <label htmlFor="aff-rv-action" className="wp-label">Action *</label>
-                  <select
+                  <ThemedSelect
                     id="aff-rv-action"
                     value={reviewAction}
                     onChange={(e) => setReviewAction(e.target.value)}
@@ -1577,14 +1578,14 @@ export default function AffiliatesManagerClient() {
                   >
                     <option value="Approve">Approve and Register Account</option>
                     <option value="Reject">Reject Application</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
 
                 {reviewAction === "Approve" ? (
                   <>
                     <div className="wp-field">
                       <label htmlFor="aff-rv-ctype" className="wp-label">Commission type *</label>
-                      <select
+                      <ThemedSelect
                         id="aff-rv-ctype"
                         value={commissionType}
                         onChange={(e) => {
@@ -1595,7 +1596,7 @@ export default function AffiliatesManagerClient() {
                       >
                         <option value="Percentage">Percentage Commission (%)</option>
                         <option value="Fixed">Fixed Commission ($)</option>
-                      </select>
+                      </ThemedSelect>
                     </div>
 
                     <div className="wp-field">
@@ -1619,7 +1620,7 @@ export default function AffiliatesManagerClient() {
                       <legend className="wp-strong pr-2">Customer discount (optional)</legend>
                       <div className="wp-field">
                         <label htmlFor="aff-rv-dtype" className="wp-label">Discount type</label>
-                        <select
+                        <ThemedSelect
                           id="aff-rv-dtype"
                           value={reviewDiscountType}
                           onChange={(e) => {
@@ -1631,7 +1632,7 @@ export default function AffiliatesManagerClient() {
                           <option value="None">None — No customer discount</option>
                           <option value="Percentage">Percentage Discount (%)</option>
                           <option value="Fixed">Fixed Amount Discount ($)</option>
-                        </select>
+                        </ThemedSelect>
                       </div>
                       {reviewDiscountType !== "None" && (
                         <div className="wp-field">
@@ -1796,7 +1797,7 @@ export default function AffiliatesManagerClient() {
                   </div>
                   <div className="wp-field">
                     <label htmlFor="aff-ed-status" className="wp-label">Status</label>
-                    <select
+                    <ThemedSelect
                       id="aff-ed-status"
                       value={editForm.status}
                       onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
@@ -1804,7 +1805,7 @@ export default function AffiliatesManagerClient() {
                     >
                       <option value="Active">Active</option>
                       <option value="Suspended">Suspended</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
                   <div className="wp-field">
                     <label htmlFor="aff-ed-pass" className="wp-label">Reset password</label>
@@ -1823,7 +1824,7 @@ export default function AffiliatesManagerClient() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                   <div className="wp-field">
                     <label htmlFor="aff-ed-ctype" className="wp-label">Commission type</label>
-                    <select
+                    <ThemedSelect
                       id="aff-ed-ctype"
                       value={editForm.commissionType}
                       onChange={(e) => setEditForm({ ...editForm, commissionType: e.target.value })}
@@ -1831,7 +1832,7 @@ export default function AffiliatesManagerClient() {
                     >
                       <option value="Percentage">Percentage Commission (%)</option>
                       <option value="Fixed">Fixed Commission ($)</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
                   <div className="wp-field">
                     <label htmlFor="aff-ed-rate" className="wp-label">
@@ -1891,7 +1892,7 @@ export default function AffiliatesManagerClient() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                   <div className="wp-field">
                     <label htmlFor="aff-ed-dtype" className="wp-label">Discount type</label>
-                    <select
+                    <ThemedSelect
                       id="aff-ed-dtype"
                       value={editForm.customerDiscountType}
                       onChange={(e) => setEditForm({ ...editForm, customerDiscountType: e.target.value, customerDiscountValue: "" })}
@@ -1900,7 +1901,7 @@ export default function AffiliatesManagerClient() {
                       <option value="None">None — No customer discount</option>
                       <option value="Percentage">Percentage Discount (%)</option>
                       <option value="Fixed">Fixed Amount Discount ($)</option>
-                    </select>
+                    </ThemedSelect>
                   </div>
                   {editForm.customerDiscountType !== "None" && (
                     <div className="wp-field">
@@ -2085,7 +2086,7 @@ export default function AffiliatesManagerClient() {
               <div className="wp-modal-body">
                 <div className="wp-field">
                   <label htmlFor="aff-po-action" className="wp-label">Action *</label>
-                  <select
+                  <ThemedSelect
                     id="aff-po-action"
                     value={payoutAction}
                     onChange={(e) => setPayoutAction(e.target.value)}
@@ -2093,7 +2094,7 @@ export default function AffiliatesManagerClient() {
                   >
                     <option value="Approve">Mark Payout as Paid</option>
                     <option value="Reject">Reject Request (Refund Balance)</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
 
                 {payoutAction === "Approve" && (

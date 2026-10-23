@@ -10,6 +10,7 @@ import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { paginate, parseRequiredPrice, slugify } from "@/lib/admin-products-utils";
 import { confirmSlugChange } from "@/components/admin/slugChange";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 export default function AdminProducts() {
   const { showConfirm } = usePopup();
@@ -445,7 +446,7 @@ export default function AdminProducts() {
       {/* Toolbar */}
       <div className="wp-toolbar">
         <label htmlFor="products-bulk-action" className="sr-only">Select bulk action</label>
-        <select
+        <ThemedSelect
           id="products-bulk-action"
           className="wp-select"
           value={bulkAction}
@@ -463,13 +464,13 @@ export default function AdminProducts() {
               <option>Duplicate</option>
             </>
           )}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkAction} disabled={bulkRunning} className="wp-btn">
           {bulkRunning ? "Applying…" : "Apply"}
         </button>
 
         <label htmlFor="products-filter-category" className="sr-only">Filter by category</label>
-        <select
+        <ThemedSelect
           id="products-filter-category"
           className="wp-select"
           value={selectedCategory}
@@ -480,10 +481,10 @@ export default function AdminProducts() {
           {selectedCategory !== "All categories" && !categories.some(c => String(c._id) === selectedCategory) && (
             <option value={selectedCategory}>Linked category</option>
           )}
-        </select>
+        </ThemedSelect>
 
         <label htmlFor="products-filter-stock" className="sr-only">Filter by stock status</label>
-        <select
+        <ThemedSelect
           id="products-filter-stock"
           className="wp-select"
           value={selectedStock}
@@ -493,10 +494,10 @@ export default function AdminProducts() {
           <option>In stock</option>
           <option>Low stock</option>
           <option>Out of stock</option>
-        </select>
+        </ThemedSelect>
 
         <label htmlFor="products-filter-type" className="sr-only">Filter by product type</label>
-        <select
+        <ThemedSelect
           id="products-filter-type"
           className="wp-select"
           value={selectedType}
@@ -506,7 +507,7 @@ export default function AdminProducts() {
           <option value="simple">Simple product</option>
           <option value="variable">Variable product</option>
           <option value="gifting">Gifting product</option>
-        </select>
+        </ThemedSelect>
 
         <span className="wp-spacer" />
 
@@ -696,10 +697,10 @@ export default function AdminProducts() {
                 </div>
                 <div className="wp-field">
                   <label htmlFor="qe-status" className="wp-label">Status</label>
-                  <select id="qe-status" className="wp-select wp-full" value={quickEditData.status} onChange={e => setQuickEditData({...quickEditData, status: e.target.value})}>
+                  <ThemedSelect id="qe-status" className="wp-select wp-full" value={quickEditData.status} onChange={e => setQuickEditData({...quickEditData, status: e.target.value})}>
                     <option value="Draft">Draft</option>
                     <option value="Published">Published</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
               </div>
             </div>

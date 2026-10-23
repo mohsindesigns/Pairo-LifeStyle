@@ -8,6 +8,7 @@ import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { toast } from "react-hot-toast";
 import { paginate } from "@/lib/admin-products-utils";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const VIEWS = [
   { key: "all", label: "All" },
@@ -81,7 +82,7 @@ export default function AdminBlogs() {
   }, [fetchBlogs]);
 
   // ---- Single-row actions ----
-  const trashRequest = (id) => fetch(`/api/admin/blogs?id=${id}`, { method: "DELETE" });
+  const trashRequest = (id) => fetch(`/api/admin/blogs?id=${id}&mode=trash`, { method: "DELETE" });
   const restoreRequest = (id) =>
     fetch("/api/admin/blogs", {
       method: "PUT",
@@ -265,14 +266,14 @@ export default function AdminBlogs() {
       {/* Bulk actions, filters, search */}
       <div className="wp-toolbar">
         <label htmlFor="blogs-bulk-action" className="sr-only">Select bulk action</label>
-        <select id="blogs-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+        <ThemedSelect id="blogs-bulk-action" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
           <option>Bulk actions</option>
           {bulkOptions.map((opt) => <option key={opt}>{opt}</option>)}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkAction} className="wp-btn" disabled={busy}>Apply</button>
 
         <label htmlFor="blogs-filter-category" className="sr-only">Filter by category</label>
-        <select
+        <ThemedSelect
           id="blogs-filter-category"
           className="wp-select"
           value={selectedCategory}
@@ -281,7 +282,7 @@ export default function AdminBlogs() {
           <option>All categories</option>
           {categoryOptions.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
           <option value="Uncategorized">Uncategorized</option>
-        </select>
+        </ThemedSelect>
 
         <span className="wp-spacer" />
 

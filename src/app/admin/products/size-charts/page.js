@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const PER_PAGE = 20;
 const VIEWS = [
@@ -300,7 +301,7 @@ export default function AdminSizeCharts() {
 
       <div className="wp-toolbar">
         <label htmlFor="sc-bulk-action" className="sr-only">Select bulk action</label>
-        <select id="sc-bulk-action" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} className="wp-select">
+        <ThemedSelect id="sc-bulk-action" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)} className="wp-select">
           <option>Bulk actions</option>
           {view === "trash" ? (
             <>
@@ -315,11 +316,11 @@ export default function AdminSizeCharts() {
               <option>Move to Trash</option>
             </>
           )}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkSubmit} className="wp-btn" disabled={busy}>Apply</button>
 
         <label htmlFor="sc-assignment" className="sr-only">Filter by assignment</label>
-        <select
+        <ThemedSelect
           id="sc-assignment"
           value={selectedAssignment}
           onChange={(e) => { setSelectedAssignment(e.target.value); goToPage(1); }}
@@ -329,7 +330,7 @@ export default function AdminSizeCharts() {
           <option>Category</option>
           <option>Product</option>
           <option>Unassigned</option>
-        </select>
+        </ThemedSelect>
 
         <span className="wp-spacer" />
 

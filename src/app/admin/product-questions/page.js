@@ -7,6 +7,7 @@ import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
 import { getProductUrl } from "@/lib/routes";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const PER_PAGE = 20;
 const VIEWS = [
@@ -326,7 +327,7 @@ export default function AdminProductQuestionsPage() {
 
       <div className="wp-toolbar">
         <label htmlFor="questions-bulk-action" className="sr-only">Select bulk action</label>
-        <select
+        <ThemedSelect
           id="questions-bulk-action"
           className="wp-select"
           value={bulkAction}
@@ -334,7 +335,7 @@ export default function AdminProductQuestionsPage() {
         >
           <option value="">Bulk actions</option>
           {bulkOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        </ThemedSelect>
         <button type="button" onClick={handleBulkApply} disabled={bulkRunning} className="wp-btn">
           {bulkRunning ? "Applying…" : "Apply"}
         </button>

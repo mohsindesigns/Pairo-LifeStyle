@@ -4,6 +4,7 @@ import dbConnect from "@/lib/db";
 import Customer from "@/models/Customer";
 import Order from "@/models/Order";
 import { can } from "@/lib/rbac";
+import { CUSTOMER_PRIVATE_FIELDS } from "@/lib/customerFields";
 import { sanitizeText } from "@/lib/sanitize";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
@@ -20,7 +21,7 @@ export async function GET(req, { params }) {
   await dbConnect();
 
   try {
-    const customer = await Customer.findById(id).select("-password").lean();
+    const customer = await Customer.findById(id).select(CUSTOMER_PRIVATE_FIELDS).lean();
     if (!customer) return NextResponse.json({ error: "Customer not found" }, { status: 404 });
 
     // Fetch all orders for this user
@@ -72,7 +73,7 @@ export async function PATCH(req, { params }) {
       delete value.email;
     }
 
-    const updated = await Customer.findByIdAndUpdate(id, { $set: value }, { new: true }).select("-password").lean();
+    const updated = await Customer.findByIdAndUpdate(id, { $set: value }, { new: true }).select(CUSTOMER_PRIVATE_FIELDS).lean();
     return NextResponse.json({ success: true, customer: updated });
   } catch (error) {
     if (error?.code === 11000) return NextResponse.json({ error: "Another account already uses this email." }, { status: 409 });

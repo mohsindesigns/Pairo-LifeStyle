@@ -7,6 +7,7 @@ import * as LucideIcons from "lucide-react";
 import { Upload, X, Check, AlertCircle, ArrowRight, Loader2, FileText, Gift } from "lucide-react";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
 import { withSectionDefaults } from "@/lib/section-defaults";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Builder repeaters store [{ label }]; accept plain strings too.
 const toList = (value) =>
@@ -302,10 +303,10 @@ export default function CorporateGiftingForm(props) {
                   <input type="tel" name="phone" value={form.phone} onChange={change} placeholder="+1 (555) 000-0000" className={inputClass} />
                 </Field>
                 <Field label="Country">
-                  <select name="country" value={form.country} onChange={change} className={selectClass}>
+                  <ThemedSelect name="country" value={form.country} onChange={change} className={selectClass}>
                     <option value="">Select country...</option>
                     {countries.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  </ThemedSelect>
                 </Field>
                 <Field label="City">
                   <input name="city" value={form.city} onChange={change} placeholder="New York" className={inputClass} />
@@ -317,10 +318,10 @@ export default function CorporateGiftingForm(props) {
               <CardTitle n="2">{packTitle}</CardTitle>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <Field label="Occasion" required error={errors.occasion}>
-                  <select name="occasion" value={form.occasion} onChange={change} className={selectClass}>
+                  <ThemedSelect name="occasion" value={form.occasion} onChange={change} className={selectClass}>
                     <option value="">Select occasion...</option>
                     {occasions.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
+                  </ThemedSelect>
                 </Field>
                 <Field label="Number of packs" required error={errors.quantity}>
                   <input
@@ -336,10 +337,10 @@ export default function CorporateGiftingForm(props) {
                   />
                 </Field>
                 <Field label="Budget per pack">
-                  <select name="budget" value={form.budget} onChange={change} className={selectClass}>
+                  <ThemedSelect name="budget" value={form.budget} onChange={change} className={selectClass}>
                     <option value="">Select budget...</option>
                     {budgets.map((b) => <option key={b} value={b}>{b}</option>)}
-                  </select>
+                  </ThemedSelect>
                 </Field>
                 <Field label="Required delivery date">
                   <input type="date" name="deliveryDate" value={form.deliveryDate} onChange={change} className={inputClass} />
@@ -388,22 +389,22 @@ export default function CorporateGiftingForm(props) {
               <CardTitle n="3">{brandingTitle}</CardTitle>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <Field label="Branding style">
-                  <select name="branding" value={form.branding} onChange={change} className={selectClass}>
+                  <ThemedSelect name="branding" value={form.branding} onChange={change} className={selectClass}>
                     <option value="">Select branding...</option>
                     {brandings.map((b) => <option key={b} value={b}>{b}</option>)}
-                  </select>
+                  </ThemedSelect>
                 </Field>
                 <Field label="Packaging">
-                  <select name="packaging" value={form.packaging} onChange={change} className={selectClass}>
+                  <ThemedSelect name="packaging" value={form.packaging} onChange={change} className={selectClass}>
                     <option value="">Select packaging...</option>
                     {packagings.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                  </ThemedSelect>
                 </Field>
                 <Field label="Preferred leather">
-                  <select name="leather" value={form.leather} onChange={change} className={selectClass}>
+                  <ThemedSelect name="leather" value={form.leather} onChange={change} className={selectClass}>
                     <option value="">Select leather type...</option>
                     {leathers.map((l) => <option key={l} value={l}>{l}</option>)}
-                  </select>
+                  </ThemedSelect>
                 </Field>
                 <Field label="Brand colors">
                   <input name="brandColors" value={form.brandColors} onChange={change} placeholder="Navy and gold" className={inputClass} />

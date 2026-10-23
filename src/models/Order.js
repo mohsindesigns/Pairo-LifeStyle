@@ -203,6 +203,10 @@ const OrderSchema = new mongoose.Schema({
   isDeleted: { type: Boolean, default: false, index: true },
   deletedAt: { type: Date, default: null },
 
+  // False only for an admin "Duplicate" draft, which never took stock out of inventory. Cancelling such an order must
+  // not put stock back (it would invent inventory). Every other order took its stock when it was created.
+  stockDeducted: { type: Boolean, default: true },
+
   timeline: [{
     status: String,
     message: String,

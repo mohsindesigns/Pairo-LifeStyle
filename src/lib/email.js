@@ -1171,7 +1171,7 @@ export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, o
   if (!isSmtpConfigured()) throw new Error('SMTP is not configured (SMTP_USER / SMTP_PASS missing) - email was not sent');
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
   const { subject, html } = buildAbandonedCartEmail(cartSnapshot, voucherCode, options);
-  return dispatchEmail({
+  const info = await dispatchEmail({
     to: email,
     subject,
     html,
@@ -1179,6 +1179,8 @@ export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, o
     label: `Abandoned cart recovery (${email})`,
     critical: true,
   });
+  // Hand back the mail server response (messageId, accepted...) plus the subject, for the activity log.
+  return { ...(info || {}), subject };
 }
 
 // ─── CUSTOMER-SPECIFIC COUPON EMAILS ────────────────────────────────────────────
