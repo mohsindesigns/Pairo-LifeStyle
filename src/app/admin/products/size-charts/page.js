@@ -109,6 +109,11 @@ export default function AdminSizeCharts() {
     }
   };
 
+  const reportBulk = (successMsg, successes, failures, verb = "updated") => {
+    if (successes > 0) toast.success(successMsg);
+    if (failures > 0) toast.error(`${failures} size chart${failures === 1 ? "" : "s"} could not be ${verb}`);
+  };
+
   // Handle Bulk Actions
   const handleBulkSubmit = async () => {
     if (selectedIds.length === 0) return toast.error("No items selected");
@@ -118,18 +123,23 @@ export default function AdminSizeCharts() {
       const ok = await showConfirm(`Are you sure you want to bulk-delete ${selectedIds.length} size charts?`);
       if (!ok) return;
       let successes = 0;
+      let failures = 0;
       for (const id of selectedIds) {
         try {
           const res = await fetch(`/api/admin/size-charts/${id}`, { method: "DELETE" });
           if (res.ok) successes++;
-        } catch (e) {}
+          else failures++;
+        } catch (e) {
+          failures++;
+        }
       }
-      toast.success(`Deleted ${successes} size charts`);
+      reportBulk(`Deleted ${successes} size chart${successes === 1 ? "" : "s"}`, successes, failures, "deleted");
       setSelectedIds([]);
       fetchSizeCharts();
     } else if (bulkAction === "publish" || bulkAction === "draft") {
       const newStatus = bulkAction === "publish" ? "Published" : "Draft";
       let successes = 0;
+      let failures = 0;
       for (const id of selectedIds) {
         try {
           const res = await fetch(`/api/admin/size-charts/${id}`, {
@@ -138,17 +148,27 @@ export default function AdminSizeCharts() {
             body: JSON.stringify({ status: newStatus })
           });
           if (res.ok) successes++;
-        } catch (e) {}
+          else failures++;
+        } catch (e) {
+          failures++;
+        }
       }
-      toast.success(`Updated ${successes} size charts to ${newStatus}`);
+      reportBulk(`Updated ${successes} size chart${successes === 1 ? "" : "s"} to ${newStatus}`, successes, failures);
       setSelectedIds([]);
       fetchSizeCharts();
     }
   };
 
+  // Changing page or filters clears the selection so bulk actions only ever
+  // apply to rows the admin can actually see.
+  const changePage = (next) => {
+    setCurrentPage(next);
+    setSelectedIds([]);
+  };
+
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedIds(filteredCharts.map((c) => c._id));
+      setSelectedIds(paginatedCharts.map((c) => c._id));
     } else {
       setSelectedIds([]);
     }
@@ -217,7 +237,7 @@ export default function AdminSizeCharts() {
             type="button"
             className="wp-pager"
             disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => changePage((p) => Math.max(1, p - 1))}
             aria-label="Previous page"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -227,7 +247,7 @@ export default function AdminSizeCharts() {
             type="button"
             className="wp-pager"
             disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => changePage((p) => Math.min(totalPages, p + 1))}
             aria-label="Next page"
           >
             <ChevronRight className="w-4 h-4" />
@@ -256,7 +276,7 @@ export default function AdminSizeCharts() {
               role="tab"
               aria-selected={selectedStatus === t.value}
               className={selectedStatus === t.value ? "is-current" : undefined}
-              onClick={() => { setSelectedStatus(t.value); setCurrentPage(1); }}
+              onClick={() => { setSelectedStatus(t.value); changePage(1); }}
             >
               {t.label} <span className="wp-count">({statusCounts[t.value]})</span>
             </button>
@@ -286,7 +306,7 @@ export default function AdminSizeCharts() {
         <select
           id="sc-assignment"
           value={selectedAssignment}
-          onChange={(e) => { setSelectedAssignment(e.target.value); setCurrentPage(1); }}
+          onChange={(e) => { setSelectedAssignment(e.target.value); changePage(1); }}
           className="wp-select"
         >
           <option>All assignments</option>
@@ -304,7 +324,7 @@ export default function AdminSizeCharts() {
             type="search"
             placeholder="Search size charts..."
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => { setSearchTerm(e.target.value); changePage(1); }}
             className="wp-input"
           />
         </div>
@@ -325,7 +345,7 @@ export default function AdminSizeCharts() {
                   type="checkbox"
                   aria-label="Select all size charts"
                   onChange={handleSelectAll}
-                  checked={selectedIds.length > 0 && selectedIds.length === filteredCharts.length}
+                  checked={paginatedCharts.length > 0 && paginatedCharts.every((c) => selectedIds.includes(c._id))}
                 />
               </th>
               <th scope="col">Label</th>

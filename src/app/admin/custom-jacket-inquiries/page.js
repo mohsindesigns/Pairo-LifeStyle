@@ -18,6 +18,8 @@ const STATUS_COLORS = {
 };
 
 const ALL_STATUSES = ["New", "Contacted", "In Progress", "Converted", "Completed", "Cancelled"];
+// Statuses an inquiry may not return to once it has been converted to an order.
+const PRE_CONVERSION_STATUSES = ["New", "Contacted", "In Progress"];
 
 function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
   const [status, setStatus] = useState(inquiry.status);
@@ -25,6 +27,10 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
   const [saving, setSaving] = useState(false);
   const [quoteAmount, setQuoteAmount] = useState("");
   const [converting, setConverting] = useState(false);
+  const isConverted = !!inquiry.orderId || inquiry.status === "Converted";
+  const statusOptions = isConverted
+    ? ALL_STATUSES.filter(s => !PRE_CONVERSION_STATUSES.includes(s))
+    : ALL_STATUSES;
 
   const handleConvert = async () => {
     const amount = Number(quoteAmount);
@@ -42,6 +48,8 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
       const data = await res.json();
       if (res.ok) {
         toast.success(`Order #${data.order.orderNumber} created`);
+        // Keep the dialog's own status in sync so "Save Changes" doesn't revert it.
+        setStatus("Converted");
         onConverted(inquiry._id, data.order);
       } else {
         toast.error(data.error || "Failed to convert inquiry");
@@ -54,6 +62,10 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
   };
 
   const handleSave = async () => {
+    if (isConverted && PRE_CONVERSION_STATUSES.includes(status)) {
+      toast.error("A converted inquiry can't be moved back to an earlier status");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/custom-jacket-inquiries/${inquiry._id}`, {
@@ -66,7 +78,8 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
         onStatusChange(inquiry._id, status, notes);
         onClose();
       } else {
-        toast.error("Failed to update");
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to update");
       }
     } catch {
       toast.error("Error saving changes");
@@ -204,7 +217,7 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
               onChange={e => setStatus(e.target.value)}
               className="wp-select wp-full"
             >
-              {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div className="wp-field" style={{ marginBottom: 0 }}>

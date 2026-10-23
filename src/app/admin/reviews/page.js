@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
@@ -66,6 +66,10 @@ export default function AdminReviewsPage() {
     status: "Pending",
     createdAt: ""
   });
+
+  // Full "Edit" dialog (all editable review fields, as opposed to inline Quick Edit)
+  const [editDialog, setEditDialog] = useState(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   // Format a date/datetime value for an <input type="datetime-local">
   const toDatetimeLocal = (dateString) => {
@@ -332,6 +336,51 @@ export default function AdminReviewsPage() {
     }
   };
 
+  const handleOpenEditDialog = (review) => {
+    setQuickEditingId(null);
+    setReplyingId(null);
+    setEditDialog({
+      id: review._id,
+      customerName: review.customerName || "",
+      customerEmail: review.customerEmail || "",
+      rating: review.rating || 5,
+      title: review.title || "",
+      comment: review.comment || "",
+      status: review.status || "Pending",
+      isFeatured: !!review.isFeatured
+    });
+  };
+
+  const handleEditDialogSubmit = async () => {
+    if (!editDialog) return;
+    if (!editDialog.customerName.trim() || !editDialog.customerEmail.trim() || !editDialog.comment.trim()) {
+      toast.error("Author name, email, and review text are required");
+      return;
+    }
+    const { id, ...payload } = editDialog;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/reviews/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        toast.success("Review updated successfully");
+        setEditDialog(null);
+        fetchReviews();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to update review");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   // Row background, WordPress Comments style
   const getRowStyle = (review) => {
     if (review.isDeleted) return { color: "#646970" };
@@ -359,7 +408,7 @@ export default function AdminReviewsPage() {
         )}
         <span><button type="button" onClick={() => { setReplyingId(review._id); setInlineReplyText(""); setQuickEditingId(null); }}>Reply</button></span>
         <span><button type="button" onClick={() => handleStartQuickEdit(review)}>Quick Edit</button></span>
-        <span><button type="button" onClick={() => handleStartQuickEdit(review)}>Edit</button></span>
+        <span><button type="button" onClick={() => handleOpenEditDialog(review)}>Edit</button></span>
         {review.status === "Spam" ? (
           <span><button type="button" onClick={() => handleModerateSingle(review._id, "Pending")}>Not Spam</button></span>
         ) : (
@@ -714,7 +763,7 @@ export default function AdminReviewsPage() {
                           <a href={`mailto:${review.customerEmail}`} className="wp-link wp-small" style={{ wordBreak: "break-all" }} title={review.customerEmail}>
                             {review.customerEmail}
                           </a>
-                          <div className="wp-muted wp-small">{review.ipAddress || "127.0.0.1"}</div>
+                          <div className="wp-muted wp-small">{review.ipAddress || "—"}</div>
                         </div>
                       </div>
                     </td>
@@ -809,6 +858,77 @@ export default function AdminReviewsPage() {
         <div className="wp-toolbar">
           <span className="wp-spacer" />
           {renderPager()}
+        </div>
+      )}
+
+      {editDialog && (
+        <div className="wp-modal-backdrop" onClick={() => !editSaving && setEditDialog(null)}>
+          <div
+            className="wp-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-edit-title"
+            style={{ maxWidth: 600 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="wp-modal-head">
+              <h2 id="review-edit-title">Edit Review</h2>
+              <button type="button" onClick={() => setEditDialog(null)} className="wp-notice-dismiss" aria-label="Close dialog" disabled={editSaving}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="wp-modal-body">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                <div className="wp-field">
+                  <label htmlFor="re-name" className="wp-label">Author name</label>
+                  <input id="re-name" type="text" className="wp-input wp-full" value={editDialog.customerName} onChange={e => setEditDialog({ ...editDialog, customerName: e.target.value })} />
+                </div>
+                <div className="wp-field">
+                  <label htmlFor="re-email" className="wp-label">Author email</label>
+                  <input id="re-email" type="email" className="wp-input wp-full" value={editDialog.customerEmail} onChange={e => setEditDialog({ ...editDialog, customerEmail: e.target.value })} />
+                </div>
+                <div className="wp-field">
+                  <label htmlFor="re-rating" className="wp-label">Rating</label>
+                  <select id="re-rating" className="wp-select wp-full" value={editDialog.rating} onChange={e => setEditDialog({ ...editDialog, rating: parseInt(e.target.value) })}>
+                    <option value="5">5 Stars</option>
+                    <option value="4">4 Stars</option>
+                    <option value="3">3 Stars</option>
+                    <option value="2">2 Stars</option>
+                    <option value="1">1 Star</option>
+                  </select>
+                </div>
+                <div className="wp-field">
+                  <label htmlFor="re-status" className="wp-label">Status</label>
+                  <select id="re-status" className="wp-select wp-full" value={editDialog.status} onChange={e => setEditDialog({ ...editDialog, status: e.target.value })}>
+                    <option value="Pending">Pending</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                    <option value="Spam">Spam</option>
+                  </select>
+                </div>
+              </div>
+              <div className="wp-field">
+                <label htmlFor="re-title" className="wp-label">Review title</label>
+                <input id="re-title" type="text" className="wp-input wp-full" value={editDialog.title} onChange={e => setEditDialog({ ...editDialog, title: e.target.value })} />
+              </div>
+              <div className="wp-field">
+                <label htmlFor="re-comment" className="wp-label">Review text</label>
+                <textarea id="re-comment" rows={6} className="wp-textarea wp-full" value={editDialog.comment} onChange={e => setEditDialog({ ...editDialog, comment: e.target.value })} />
+              </div>
+              <div className="wp-field">
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <input type="checkbox" checked={editDialog.isFeatured} onChange={e => setEditDialog({ ...editDialog, isFeatured: e.target.checked })} />
+                  Featured review
+                </label>
+              </div>
+            </div>
+            <div className="wp-modal-foot">
+              <button type="button" onClick={() => setEditDialog(null)} className="wp-btn" disabled={editSaving}>Cancel</button>
+              <button type="button" onClick={handleEditDialogSubmit} className="wp-btn wp-btn-primary" disabled={editSaving}>
+                {editSaving ? "Saving..." : "Update Review"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </Page>

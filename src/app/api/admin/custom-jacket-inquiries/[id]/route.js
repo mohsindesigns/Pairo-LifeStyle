@@ -40,6 +40,20 @@ export async function PATCH(req, { params }) {
       if (body[key] !== undefined) update[key] = body[key];
     }
 
+    // Once an inquiry has been converted to an order it must not be moved back to a
+    // pre-conversion status (e.g. a stale dialog saving "New" over "Converted").
+    const PRE_CONVERSION_STATUSES = ["New", "Contacted", "In Progress"];
+    if (update.status !== undefined && PRE_CONVERSION_STATUSES.includes(update.status)) {
+      const existing = await CustomJacketInquiry.findById(id).select("status orderId").lean();
+      if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      if (existing.orderId || existing.status === "Converted") {
+        return NextResponse.json(
+          { error: "This inquiry has been converted to an order and can't be moved back to an earlier status" },
+          { status: 409 }
+        );
+      }
+    }
+
     const updated = await CustomJacketInquiry.findByIdAndUpdate(
       id, { $set: update }, { new: true }
     ).lean();

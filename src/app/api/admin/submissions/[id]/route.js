@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
  * Fetch detailed submission with full history
  */
 export async function GET(req, { params }) {
-  const { id } = params;
+  const { id } = await params;
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!can(session.user, "submissions.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -41,7 +41,7 @@ export async function GET(req, { params }) {
  * Update status, priority, assignment, or internal notes
  */
 export async function PATCH(req, { params }) {
-  const { id } = params;
+  const { id } = await params;
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -78,6 +78,7 @@ export async function PATCH(req, { params }) {
     }
 
     const item = await Submission.findByIdAndUpdate(id, updateQuery, { new: true });
+    if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
     
     // Audit Log
     await AuditLog.create({
@@ -99,7 +100,7 @@ export async function PATCH(req, { params }) {
  * Permanent deletion (requiressubmissions.delete permission)
  */
 export async function DELETE(req, { params }) {
-  const { id } = params;
+  const { id } = await params;
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!can(session.user, "submissions.delete")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });

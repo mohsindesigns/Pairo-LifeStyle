@@ -10,9 +10,34 @@ import { copySlugCandidate, restoreStatus } from "@/lib/admin-products-utils";
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!can(session.user, "products.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
   const { searchParams } = new URL(req.url);
+
+  // "Add new order" needs a product picker. Staff who can create orders but not view
+  // products get a reduced, order-building-only projection of live (non-trashed) products.
+  if (!can(session.user, "products.view")) {
+    if (searchParams.get("forOrder") !== "true" || !can(session.user, "orders.create")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    await dbConnect();
+    try {
+      const orderId = searchParams.get("id");
+      if (orderId) {
+        const product = await Product.findOne({ _id: orderId, isDeleted: { $ne: true } })
+          .select("name slug price image images attributes variantCombinations stock manageStock productType status")
+          .lean();
+        if (!product) return NextResponse.json({ error: "Product not found" }, { status: 404 });
+        return NextResponse.json(product);
+      }
+      const products = await Product.find({ isDeleted: { $ne: true } })
+        .select("name price image images stock manageStock status")
+        .sort({ createdAt: -1 })
+        .lean();
+      return NextResponse.json(products);
+    } catch (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
   const id = searchParams.get("id");
   const isDeleted = searchParams.get("isDeleted") === "true";
   const status = searchParams.get("status");

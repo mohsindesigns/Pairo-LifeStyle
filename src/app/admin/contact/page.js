@@ -11,6 +11,7 @@ import {
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { buildCsv } from "@/lib/csv-escape";
 
 export default function AdminContact() {
   // --- State: Data & Pagination ---
@@ -79,17 +80,41 @@ export default function AdminContact() {
   // --- CRM Actions ---
   const handleAction = async (id, action, payload = {}) => {
     try {
-      const res = await fetch(`/api/admin/submissions/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, action })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setItems(items.map(it => it._id === id ? updated : it));
-        if (selectedItem?._id === id) setSelectedItem(updated);
-        toast.success(`Action: ${action} successful`);
+      // "trash" isn't a field update — it goes through the bulk endpoint, which sets
+      // isDeleted/status and checks the delete permission.
+      const res = action === 'trash'
+        ? await fetch('/api/admin/submissions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'trash', ids: [id] })
+          })
+        : await fetch(`/api/admin/submissions/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, action })
+          });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // Nothing was changed locally, so controlled fields (e.g. the status select)
+        // stay on their previous value.
+        toast.error(data?.error || "Action failed");
+        return;
       }
+      if (action === 'trash') {
+        if (selectedItem?._id === id) {
+          setIsDetailOpen(false);
+          setSelectedItem(null);
+        }
+        toast.success("Moved to Trash");
+      } else {
+        if (data && data._id) {
+          setItems(prev => prev.map(it => it && it._id === id ? { ...it, ...data } : it));
+          if (selectedItem?._id === id) setSelectedItem(prev => prev ? { ...prev, ...data } : prev);
+        }
+        toast.success("Submission updated");
+      }
+      // Refresh list + status counts (the row may have left the current filter).
+      fetchSubmissions(true);
     } catch (err) {
       toast.error("Action failed");
     }
@@ -159,9 +184,13 @@ export default function AdminContact() {
       });
       if (res.ok) {
         const updated = await res.json();
-        setSelectedItem(updated);
+        setSelectedItem(prev => prev ? { ...prev, ...updated } : updated);
+        setItems(prev => prev.map(it => it && it._id === updated._id ? { ...it, ...updated } : it));
         setInternalNote("");
         toast.success("Note added");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to add note");
       }
     } catch (err) {
       toast.error("Failed to add note");
@@ -179,18 +208,26 @@ export default function AdminContact() {
       it.priority,
       new Date(it.createdAt).toLocaleString()
     ]);
-    
-    let csvContent = "data:text/csv;charset=utf-8," 
-      + headers.join(",") + "\n"
-      + rows.map(e => e.join(",")).join("\n");
-      
-    const encodedUri = encodeURI(csvContent);
+
+    // RFC 4180: CRLF line endings; fields containing commas, quotes or newlines are
+    // quoted with inner quotes doubled. BOM so Excel opens it as UTF-8.
+    const csvContent = buildCsv([headers, ...rows]);
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", `submissions_export_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
+  // New filter/search always starts from the first page.
+  const runSearch = () => {
+    setSearchQuery(searchTerm);
+    setPagination(p => ({ ...p, page: 1 }));
   };
 
   // --- Helpers ---
@@ -288,7 +325,7 @@ export default function AdminContact() {
               role="tab"
               aria-selected={status === val}
               className={status === val ? "is-current" : undefined}
-              onClick={() => setStatus(val)}
+              onClick={() => { setStatus(val); setSelectedIds([]); setPagination(p => ({ ...p, page: 1 })); }}
             >
               {label} <span className="wp-count">({count})</span>
             </button>
@@ -342,10 +379,10 @@ export default function AdminContact() {
             placeholder="Search submissions..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && setSearchQuery(searchTerm)}
+            onKeyDown={(e) => e.key === 'Enter' && runSearch()}
             className="wp-input"
           />
-          <button type="button" onClick={() => setSearchQuery(searchTerm)} className="wp-btn">
+          <button type="button" onClick={runSearch} className="wp-btn">
             Search submissions
           </button>
         </div>
@@ -638,7 +675,7 @@ export default function AdminContact() {
                       </div>
                       <div className="wp-kv">
                         <span className="wp-kv-k wp-muted">IP address</span>
-                        <span className="wp-kv-v font-mono" style={{ wordBreak: "break-all" }}>{selectedItem.ipAddress || '127.0.0.1'}</span>
+                        <span className="wp-kv-v font-mono" style={{ wordBreak: "break-all" }}>{selectedItem.ipAddress || 'Not recorded'}</span>
                       </div>
                       <div className="wp-kv">
                         <span className="wp-kv-k wp-muted">Last viewed</span>

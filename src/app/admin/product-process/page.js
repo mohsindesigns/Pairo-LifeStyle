@@ -9,6 +9,14 @@ import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Postbox } from "@/components/admin/ui";
 
+// Unique id for a new process step (crypto.randomUUID where available).
+function makeStepId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 11)}`;
+}
+
 export default function AdminProductProcessPage() {
   const { showConfirm } = usePopup();
   const [loading, setLoading] = useState(true);
@@ -65,7 +73,7 @@ export default function AdminProductProcessPage() {
   // Add Step
   const handleAddStep = () => {
     const newStep = {
-      id: Math.random().toString(36).substring(2, 11),
+      id: makeStepId(),
       image: "",
       heading: "New Step Heading",
       subheading: "Step Subheading",
@@ -190,10 +198,12 @@ export default function AdminProductProcessPage() {
 
   if (loading) {
     return (
+      <RequirePermission permission="products.view">
       <Page>
         <PageHeader title="Product Process" />
         <p className="wp-muted">Loading product process settings…</p>
       </Page>
+      </RequirePermission>
     );
   }
 

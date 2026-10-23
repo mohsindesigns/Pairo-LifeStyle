@@ -185,7 +185,10 @@ export default function SizeChartItemsPage() {
   return (
     <RequirePermission permission="products.edit">
     <Page>
-      <PageHeader title="Size Chart Items" />
+      <PageHeader
+        title="Size Chart Items"
+        actions={<button type="button" className="wp-btn" onClick={() => { setEditingItem(null); setFormOpen(true); }}>Add Size Chart</button>}
+      />
       <p className="wp-desc" style={{ marginTop: 0 }}>
         Manage the size chart images displayed on your <strong>/size-chart</strong> page. Use the Display Order field to control the sequence.
       </p>
@@ -209,7 +212,7 @@ export default function SizeChartItemsPage() {
             {loading ? (
               <tr><td colSpan={4} className="wp-muted">Loading…</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={4} className="wp-muted">No size charts yet. Click &ldquo;Add Size Chart&rdquo; to get started.</td></tr>
+              <tr><td colSpan={4} className="wp-muted">No size charts yet. Use the &ldquo;Add Size Chart&rdquo; button above to add one.</td></tr>
             ) : (
               items.map(item => (
                 <tr key={item._id}>

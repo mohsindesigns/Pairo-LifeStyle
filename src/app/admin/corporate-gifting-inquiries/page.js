@@ -226,8 +226,18 @@ export default function CorporateGiftingInquiriesPage() {
 
   const remove = async (id) => {
     if (!(await showConfirm("Move this inquiry to trash?"))) return;
-    const res = await fetch(`/api/admin/corporate-gifting-inquiries/${id}`, { method: "DELETE" });
-    if (res.ok) { toast.success("Inquiry removed"); load(); } else toast.error("Failed to delete");
+    try {
+      const res = await fetch(`/api/admin/corporate-gifting-inquiries/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Inquiry removed");
+        load();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to delete");
+      }
+    } catch {
+      toast.error("Failed to delete");
+    }
   };
 
   const headerRow = (

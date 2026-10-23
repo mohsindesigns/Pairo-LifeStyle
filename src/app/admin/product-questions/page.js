@@ -6,6 +6,7 @@ import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader } from "@/components/admin/ui";
+import { getProductUrl } from "@/lib/routes";
 
 export default function AdminProductQuestionsPage() {
   const { showConfirm } = usePopup();
@@ -215,7 +216,7 @@ export default function AdminProductQuestionsPage() {
                 const isReplying = replyingQuestion?._id === q._id;
                 const dateLabel = new Date(q.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
                 const productLink = q.productId ? (
-                  <a href={`/product/${q.productId.slug}`} target="_blank" rel="noopener noreferrer" className="wp-link" style={{ wordBreak: "break-word" }}>
+                  <a href={getProductUrl(q.productId)} target="_blank" rel="noopener noreferrer" className="wp-link" style={{ wordBreak: "break-word" }}>
                     {q.productId.name}
                   </a>
                 ) : (

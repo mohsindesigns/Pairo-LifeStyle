@@ -1,12 +1,14 @@
 "use client";
 
-import { Fragment, useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Plus, X, Search, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { can } from "@/lib/rbac";
+import { usePopup } from "@/context/PopupContext";
+import { addressFromCustomer, isSameAddress } from "@/lib/order-address-prefill";
 import CustomizationEditor, { defaultCustomization } from "./CustomizationEditor";
 
 const inputClass = "wp-input wp-full";
@@ -36,11 +38,21 @@ function ProductPicker({ onAdd }) {
   const [price, setPrice] = useState(0);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  const [loadError, setLoadError] = useState("");
+
   useEffect(() => {
-    fetch("/api/admin/products")
-      .then(r => r.json())
+    // forOrder=true lets staff with orders.create (but not products.view) load the picker.
+    fetch("/api/admin/products?forOrder=true")
+      .then(async r => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(data?.error || "Failed to load products");
+        return data;
+      })
       .then(data => setAllProducts(Array.isArray(data) ? data : []))
-      .catch(() => setAllProducts([]))
+      .catch((err) => {
+        setAllProducts([]);
+        setLoadError(err?.message || "Failed to load products");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -54,14 +66,15 @@ function ProductPicker({ onAdd }) {
     setSearch("");
     setLoadingDetail(true);
     try {
-      const res = await fetch(`/api/admin/products?id=${productStub._id}`);
+      const res = await fetch(`/api/admin/products?id=${productStub._id}&forOrder=true`);
       const product = await res.json();
+      if (!res.ok || !product) throw new Error(product?.error || "Failed to load product details");
       setPendingProduct(product);
       setSelectedOptions({});
       setQuantity(1);
       setPrice(product.price || 0);
-    } catch {
-      toast.error("Failed to load product details");
+    } catch (err) {
+      toast.error(err?.message || "Failed to load product details");
     } finally {
       setLoadingDetail(false);
     }
@@ -92,6 +105,11 @@ function ProductPicker({ onAdd }) {
 
   return (
     <div>
+      {loadError && (
+        <div className="wp-notice wp-notice-error" role="alert" style={{ margin: "0 0 10px" }}>
+          <p>Couldn&apos;t load products: {loadError}</p>
+        </div>
+      )}
       <label htmlFor="new-order-product-search" className={labelClass}>Add product</label>
       <div style={{ position: "relative" }}>
         <Search className="w-4 h-4" aria-hidden="true" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "#646970", pointerEvents: "none" }} />
@@ -209,6 +227,13 @@ export default function AdminNewOrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [customersError, setCustomersError] = useState("");
+  const { showConfirm } = usePopup();
+  // The last address we filled in automatically (initially the blank form), so we can tell
+  // whether the admin has edited the shipping fields themselves.
+  const lastAutoAddress = useRef({
+    fullName: "", street: "", city: "", state: "", zip: "", country: "United States", phone: ""
+  });
 
   // Generated once per visit to this form so a double-click (or a retried network request)
   // on "Create Order" can't create two orders with two separate stock decrements — the API
@@ -218,12 +243,41 @@ export default function AdminNewOrderPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/admin/customers")
-      .then(r => r.json())
+    // forOrder=true lets staff with orders.create (but not customers.view) load the picker.
+    fetch("/api/admin/customers?forOrder=true")
+      .then(async r => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(data?.error || "Failed to load customers");
+        return data;
+      })
       .then(data => setCustomers(Array.isArray(data) ? data : []))
-      .catch(() => setCustomers([]))
+      .catch((err) => {
+        setCustomers([]);
+        setCustomersError(err?.message || "Failed to load customers");
+      })
       .finally(() => setLoadingCustomers(false));
   }, []);
+
+  // Choosing an existing customer prefills the shipping address from their default (or
+  // first) saved address. If the admin has already typed something different, ask first.
+  const handleSelectCustomer = async (id) => {
+    setSelectedCustomerId(id);
+    const customer = customers.find(c => c._id === id);
+    if (!customer) return;
+    const prefill = addressFromCustomer(customer, shippingAddress);
+    if (!prefill || isSameAddress(prefill, shippingAddress)) return;
+    const untouched = isSameAddress(shippingAddress, lastAutoAddress.current);
+    if (!untouched) {
+      const ok = await showConfirm(
+        "Replace the shipping address you've entered with this customer's saved address?",
+        "Use saved address?",
+        { confirmText: "Replace" }
+      );
+      if (!ok) return;
+    }
+    setShippingAddress(prefill);
+    lastAutoAddress.current = prefill;
+  };
 
   const removeItem = (key) => setLineItems(prev => prev.filter(i => i.key !== key));
   const updateItem = (key, patch) => setLineItems(prev => prev.map(i => i.key === key ? { ...i, ...patch } : i));
@@ -343,7 +397,7 @@ export default function AdminNewOrderPage() {
                       id="new-order-customer"
                       className={selectClass}
                       value={selectedCustomerId}
-                      onChange={(e) => setSelectedCustomerId(e.target.value)}
+                      onChange={(e) => handleSelectCustomer(e.target.value)}
                       disabled={loadingCustomers}
                     >
                       <option value="">{loadingCustomers ? "Loading customers..." : "Select a customer..."}</option>
@@ -351,6 +405,11 @@ export default function AdminNewOrderPage() {
                         <option key={c._id} value={c._id}>{c.name} — {c.email}</option>
                       ))}
                     </select>
+                    {customersError && (
+                      <div className="wp-notice wp-notice-error" role="alert" style={{ margin: "8px 0 0" }}>
+                        <p>Couldn&apos;t load customers: {customersError}</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="wp-field">
