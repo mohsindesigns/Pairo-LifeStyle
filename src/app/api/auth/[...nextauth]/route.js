@@ -48,6 +48,8 @@ export const authOptions = {
         if (!credentials.loginType || credentials.loginType === 'staff') {
             const staff = await Staff.findOne({ email: cleanEmail }).populate('roleId').lean();
             if (staff) {
+                // A staff member in the Trash can't sign in (trashing also suspends them).
+                if (staff.isDeleted) throw new Error("Invalid email or password");
                 if (staff.status !== 'Active') {
                     throw new Error(staff.status === 'Suspended' ? "Account suspended" : "Account locked");
                 }
@@ -84,7 +86,7 @@ export const authOptions = {
         if (!credentials.loginType || credentials.loginType === 'affiliate') {
             const affiliate = await Affiliate.findOne({ email: cleanEmail }).lean();
             if (affiliate) {
-                if (affiliate.status !== 'Active') {
+                if (affiliate.isDeleted || affiliate.status !== 'Active') {
                     throw new Error("Affiliate account is suspended or inactive");
                 }
 
@@ -164,8 +166,8 @@ export const authOptions = {
               // property access, which silently returns undefined on a real Map (it needs
               // .get()) — every fine-grained permission check was returning false for every
               // non-super-admin role, every request, with no error anywhere to reveal it.
-              const staff = await Staff.findById(token.id).select('status roleId').populate('roleId').lean();
-              if (!staff || staff.status !== 'Active') {
+              const staff = await Staff.findById(token.id).select('status roleId isDeleted').populate('roleId').lean();
+              if (!staff || staff.isDeleted || staff.status !== 'Active') {
                   return {};
               }
               token.role = staff.roleId || token.role;
@@ -178,9 +180,9 @@ export const authOptions = {
       if (token?.isAffiliate && token.id) {
           try {
               await dbConnect();
-              const affiliate = await Affiliate.findById(token.id).select('status');
+              const affiliate = await Affiliate.findById(token.id).select('status isDeleted');
               console.log("[NextAuth] Re-verifying affiliate:", token.id, "Found:", !!affiliate, "Status:", affiliate?.status);
-              if (!affiliate || affiliate.status !== 'Active') {
+              if (!affiliate || affiliate.isDeleted || affiliate.status !== 'Active') {
                   console.log("[NextAuth] Clearing token because affiliate is missing or inactive!");
                   return {};
               }

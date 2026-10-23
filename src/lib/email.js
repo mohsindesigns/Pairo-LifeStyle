@@ -226,7 +226,7 @@ async function resolveAdminEmail(label) {
       await dbConnect();
       const superAdminRole = await Role.findOne({ slug: 'super-admin' });
       if (superAdminRole) {
-        const superAdmin = await Staff.findOne({ roleId: superAdminRole._id });
+        const superAdmin = await Staff.findOne({ roleId: superAdminRole._id, status: 'Active', isDeleted: { $ne: true } });
         if (superAdmin) adminEmail = superAdmin.email;
       }
     } catch (e) {
