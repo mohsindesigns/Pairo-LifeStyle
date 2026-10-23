@@ -1,42 +1,45 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
-  Save, Globe, Layout, AlignLeft, Share2,
-  Plus, GripVertical, X, Eye, EyeOff,
+  Globe, Share2, Plus, X, Eye, EyeOff,
   Camera, MessageSquare, Link2, Users, ChevronDown, ChevronUp,
-  RefreshCw, Trash2, Search, Sparkles
 } from "lucide-react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import PopupTab from "@/components/admin/settings/PopupTab";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
 
 const generateId = () => Math.random().toString(36).substring(2, 11);
 
-const inputClass = "w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white";
-const labelClass = "block text-[13px] font-semibold text-[#1d2327] mb-[4px]";
-const descClass = "text-[12px] text-[#646970] mt-[2px]";
-const sectionTitle = "text-[14px] font-bold text-[#1d2327] pb-2 mb-4 border-b border-[#c3c4c7]";
+/* Presentational helpers (classes only) */
+const ctrlWrap = { flex: "1 1 320px", minWidth: 0 };
+const iconBtn = "inline-flex items-center justify-center w-[30px] h-[30px] max-[782px]:w-10 max-[782px]:h-10 rounded-[3px] text-[#646970] hover:text-[#1d2327] hover:bg-[#f0f0f1] disabled:opacity-30 disabled:cursor-default shrink-0";
+const okIconBtn = "inline-flex items-center justify-center w-[30px] h-[30px] max-[782px]:w-10 max-[782px]:h-10 rounded-[3px] text-[#2f6f1a] hover:bg-[#f0f0f1] shrink-0";
+const dangerIconBtn = "inline-flex items-center justify-center w-[30px] h-[30px] max-[782px]:w-10 max-[782px]:h-10 rounded-[3px] text-[#b32d2e] hover:bg-[#fcf0f1] shrink-0";
+const linkBtn = "inline-flex items-center gap-1 min-h-[30px] max-[782px]:min-h-10 text-[#2271b1] hover:text-[#135e96] hover:underline";
+const dangerLinkBtn = "inline-flex items-center min-h-[30px] max-[782px]:min-h-10 px-1 text-[#b32d2e] hover:underline";
 
 /* ── Media Picker ───────────────────────────────────────────── */
 function ImagePicker({ value, onChange, label, description }) {
   const [open, setOpen] = useState(false);
+  const uid = useId();
   return (
-    <tr className="border-b border-[#f0f0f1]">
-      <th className="text-left px-3 py-4 align-top w-52"><label className={labelClass}>{label}</label>{description && <p className={descClass}>{description}</p>}</th>
-      <td className="px-3 py-4">
-        <div className="flex items-center gap-3">
+    <>
+      <div className="wp-frow">
+        <span className="wp-flabel" id={`${uid}-label`}>{label}</span>
+        <div className="flex flex-wrap items-center gap-3" style={ctrlWrap}>
           {value && <img src={value} alt="" className="h-12 w-auto border border-[#c3c4c7] rounded-[3px] bg-[#f0f0f1]" />}
-          <button type="button" onClick={() => setOpen(true)} className="border border-[#2271b1] text-[#2271b1] rounded-[3px] px-3 py-[5px] text-[13px] font-medium hover:bg-[#f6f7f7]">{value ? 'Replace Image' : 'Select Image'}</button>
-          {value && <button type="button" onClick={() => onChange('')} className="text-[#d63638] text-[12px] hover:underline">Remove</button>}
+          <button type="button" onClick={() => setOpen(true)} className="wp-btn" aria-describedby={`${uid}-label`}>{value ? 'Replace image' : 'Select image'}</button>
+          {value && <button type="button" onClick={() => onChange('')} className={dangerLinkBtn} aria-label={`Remove ${label}`}>Remove</button>}
         </div>
-        {open && <MediaPickerModal open onClose={() => setOpen(false)} onSelect={(sel) => { onChange(sel.url); setOpen(false); }} title={`Select ${label}`} />}
-      </td>
-    </tr>
+        {description && <p className="wp-hint">{description}</p>}
+      </div>
+      {open && <MediaPickerModal open onClose={() => setOpen(false)} onSelect={(sel) => { onChange(sel.url); setOpen(false); }} title={`Select ${label}`} />}
+    </>
   );
 }
 
@@ -48,15 +51,16 @@ function MegaBannerImagePicker({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="border border-[#2271b1] text-[#2271b1] rounded-[3px] px-3 py-[5px] text-[12px] font-medium hover:bg-[#f0f6fb] transition-colors"
+        className="wp-btn"
       >
-        {value ? 'Replace Image' : 'Select Image'}
+        {value ? 'Replace image' : 'Select image'}
       </button>
       {value && (
         <button
           type="button"
           onClick={() => onChange('')}
-          className="text-[#d63638] text-[12px] hover:underline"
+          className={dangerLinkBtn}
+          aria-label="Remove banner image"
         >
           Remove
         </button>
@@ -73,16 +77,21 @@ function MegaBannerImagePicker({ value, onChange }) {
   );
 }
 
-/* ── Table row helpers ───────────────────────────────────────── */
+/* ── Settings row helpers ───────────────────────────────────── */
 function TextRow({ label, description, value, onChange, placeholder, textarea }) {
+  const uid = useId();
   return (
-    <tr className="border-b border-[#f0f0f1]">
-      <th className="text-left px-3 py-4 align-top w-52"><label className={labelClass}>{label}</label>{description && <p className={descClass}>{description}</p>}</th>
-      <td className="px-3 py-4">
-        {textarea ? <textarea className={`${inputClass} resize-none`} rows={3} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
-          : <input className={inputClass} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />}
-      </td>
-    </tr>
+    <div className="wp-frow">
+      <label className="wp-flabel" htmlFor={uid}>{label}</label>
+      {textarea ? (
+        <div style={ctrlWrap}>
+          <textarea id={uid} className="wp-textarea" rows={3} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+        </div>
+      ) : (
+        <input id={uid} className="wp-input" value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      )}
+      {description && <p className="wp-hint">{description}</p>}
+    </div>
   );
 }
 
@@ -110,59 +119,69 @@ function GeneralTab({ config, onChange }) {
   const cardEnabled = pm.cardEnabled !== false;
   const codEnabled = pm.codEnabled !== false;
   return (
-    <table className="form-table w-full"><tbody>
-      <TextRow label="Site Title" value={b.name} onChange={v => set('name', v)} placeholder="Pairo" />
-      <ImagePicker label="Favicon" description="Upload a square icon (e.g. 512x512) for the browser tab." value={b.faviconUrl} onChange={v => set('faviconUrl', v)} />
-      <TextRow label="Tagline" value={b.tagline} onChange={v => set('tagline', v)} placeholder="Premium Shearling" description="In a few words, explain what this site is about." />
-      <TextRow label="Footer Brand Name" value={b.footerBrandName} onChange={v => set('footerBrandName', v)} placeholder="PAiRO" description="Large animated text shown at the bottom of the footer." />
-      <TextRow label="Copyright Text" value={b.copyrightText} onChange={v => set('copyrightText', v)} placeholder="PAIRO — ALL RIGHTS RESERVED © 2026." />
-      <TextRow label="Privacy Policy URL" value={b.privacyUrl} onChange={v => set('privacyUrl', v)} placeholder="/privacy" />
-      <TextRow label="Terms of Service URL" value={b.termsUrl} onChange={v => set('termsUrl', v)} placeholder="/terms" />
-      <TextRow label="WhatsApp Number" value={b.whatsappNumber} onChange={v => set('whatsappNumber', v)} placeholder="+1234567890" description="Atelier WhatsApp contact number with country code." />
-      <TextRow label="WhatsApp Chat URL" value={b.whatsappUrl} onChange={v => set('whatsappUrl', v)} placeholder="https://wa.me/..." description="Direct WhatsApp chat link." />
-      <tr className="border-b border-[#f0f0f1]">
-        <th className="text-left px-3 py-4 align-top w-52">
-          <label className={labelClass}>Disable Search Indexing</label>
-          <p className={descClass}>Discourage search engines from indexing this site (applies noindex, nofollow globally).</p>
-        </th>
-        <td className="px-3 py-4">
-          <input
-            type="checkbox"
-            checked={!!config.disableSearchEngineIndexing}
-            onChange={e => onChange({ ...config, disableSearchEngineIndexing: e.target.checked })}
-            className="w-4 h-4 accent-[#2271b1] cursor-pointer"
-          />
-        </td>
-      </tr>
-      <tr className="border-b border-[#f0f0f1]">
-        <th className="text-left px-3 py-4 align-top w-52">
-          <label className={labelClass}>Payment Methods</label>
-          <p className={descClass}>Choose which payment methods customers can select at checkout. At least one must stay on.</p>
-        </th>
-        <td className="px-3 py-4 space-y-2">
-          <label className="flex items-center gap-2 text-[13px] text-[#1d2327] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={cardEnabled}
-              onChange={e => setPm('cardEnabled', e.target.checked)}
-              disabled={cardEnabled && !codEnabled}
-              className="w-4 h-4 accent-[#2271b1] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-            />
-            Card (Stripe)
-          </label>
-          <label className="flex items-center gap-2 text-[13px] text-[#1d2327] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={codEnabled}
-              onChange={e => setPm('codEnabled', e.target.checked)}
-              disabled={codEnabled && !cardEnabled}
-              className="w-4 h-4 accent-[#2271b1] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-            />
-            Cash on Delivery (COD)
-          </label>
-        </td>
-      </tr>
-    </tbody></table>
+    <>
+      <Postbox title="Site identity">
+        <TextRow label="Site Title" value={b.name} onChange={v => set('name', v)} placeholder="Pairo" />
+        <ImagePicker label="Favicon" description="Upload a square icon (e.g. 512x512) for the browser tab." value={b.faviconUrl} onChange={v => set('faviconUrl', v)} />
+        <TextRow label="Tagline" value={b.tagline} onChange={v => set('tagline', v)} placeholder="Premium Shearling" description="In a few words, explain what this site is about." />
+        <TextRow label="Footer Brand Name" value={b.footerBrandName} onChange={v => set('footerBrandName', v)} placeholder="PAiRO" description="Large animated text shown at the bottom of the footer." />
+        <TextRow label="Copyright Text" value={b.copyrightText} onChange={v => set('copyrightText', v)} placeholder="PAIRO — ALL RIGHTS RESERVED © 2026." />
+      </Postbox>
+
+      <Postbox title="Links and contact">
+        <TextRow label="Privacy Policy URL" value={b.privacyUrl} onChange={v => set('privacyUrl', v)} placeholder="/privacy" />
+        <TextRow label="Terms of Service URL" value={b.termsUrl} onChange={v => set('termsUrl', v)} placeholder="/terms" />
+        <TextRow label="WhatsApp Number" value={b.whatsappNumber} onChange={v => set('whatsappNumber', v)} placeholder="+1234567890" description="Atelier WhatsApp contact number with country code." />
+        <TextRow label="WhatsApp Chat URL" value={b.whatsappUrl} onChange={v => set('whatsappUrl', v)} placeholder="https://wa.me/..." description="Direct WhatsApp chat link." />
+      </Postbox>
+
+      <Postbox title="Search engines and checkout">
+        <div className="wp-frow">
+          <span className="wp-flabel">Search engine visibility</span>
+          <div style={ctrlWrap}>
+            <label className="wp-check" htmlFor="site-noindex">
+              <input
+                id="site-noindex"
+                type="checkbox"
+                checked={!!config.disableSearchEngineIndexing}
+                onChange={e => onChange({ ...config, disableSearchEngineIndexing: e.target.checked })}
+              />
+              Disable search indexing
+            </label>
+          </div>
+          <p className="wp-hint">Discourage search engines from indexing this site (applies noindex, nofollow globally).</p>
+        </div>
+        <fieldset className="wp-frow m-0 border-0 p-0 py-2">
+          <legend className="sr-only">Payment Methods</legend>
+          <span className="wp-flabel" aria-hidden="true">Payment Methods</span>
+          <div style={ctrlWrap}>
+            <label className="wp-check" htmlFor="site-pm-card">
+              <input
+                id="site-pm-card"
+                type="checkbox"
+                checked={cardEnabled}
+                onChange={e => setPm('cardEnabled', e.target.checked)}
+                disabled={cardEnabled && !codEnabled}
+                className="disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              Card (Stripe)
+            </label>
+            <label className="wp-check" htmlFor="site-pm-cod">
+              <input
+                id="site-pm-cod"
+                type="checkbox"
+                checked={codEnabled}
+                onChange={e => setPm('codEnabled', e.target.checked)}
+                disabled={codEnabled && !cardEnabled}
+                className="disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              Cash on Delivery (COD)
+            </label>
+          </div>
+          <p className="wp-hint">Choose which payment methods customers can select at checkout. At least one must stay on.</p>
+        </fieldset>
+      </Postbox>
+    </>
   );
 }
 
@@ -220,255 +239,260 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
   const removeOffer = (idx) => setHc({ topOffers: topOffers.filter((_, i) => i !== idx) });
 
   return (
-    <div className="space-y-8">
+    <>
       {/* Logo */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">Header Logo</h3>
-        <table className="w-full"><tbody>
-          <ImagePicker label="Logo" description="Upload or select from Media Library." value={hc.logoUrl} onChange={v => setHc({ logoUrl: v })} />
-        </tbody></table>
-      </div>
+      <Postbox title="Header logo">
+        <ImagePicker label="Logo" description="Upload or select from Media Library." value={hc.logoUrl} onChange={v => setHc({ logoUrl: v })} />
+      </Postbox>
 
       {/* Top Announcement Bar */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex items-center justify-between">
-          <h3 className="text-[13px] font-bold text-[#1d2327]">Announcement Bar</h3>
-          <button type="button" onClick={addOffer} className="text-[#2271b1] text-[12px] font-medium hover:underline flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add Message</button>
-        </div>
-        <div className="p-4 space-y-2">
-          {topOffers.length === 0 && <p className="text-[12px] text-[#646970] italic">No announcement messages. Click "Add Message" to create one.</p>}
+      <Postbox
+        title="Announcement bar"
+        aside={<button type="button" onClick={addOffer} className="wp-btn"><Plus className="w-3.5 h-3.5" aria-hidden="true" /> Add message</button>}
+      >
+        <div className="space-y-2">
+          {topOffers.length === 0 && <p className="wp-muted m-0">No announcement messages. Click &quot;Add message&quot; to create one.</p>}
           {topOffers.map((msg, i) => (
-            <div key={i} className="flex gap-2">
-              <input className={`${inputClass} flex-1`} value={msg} onChange={e => updateOffer(i, e.target.value)} placeholder="e.g. FREE EXPRESS SHIPPING ON ALL ORDERS" />
-              <button type="button" onClick={() => removeOffer(i)} className="text-[#d63638] p-1 hover:bg-red-50 rounded-[3px]"><X className="w-4 h-4" /></button>
+            <div key={i} className="flex items-center gap-2">
+              <label htmlFor={`offer-${i}`} className="sr-only">Announcement message {i + 1}</label>
+              <input id={`offer-${i}`} className="wp-input flex-1 min-w-0" value={msg} onChange={e => updateOffer(i, e.target.value)} placeholder="e.g. FREE EXPRESS SHIPPING ON ALL ORDERS" />
+              <button type="button" onClick={() => removeOffer(i)} className={dangerIconBtn} aria-label={`Remove announcement message ${i + 1}`}><X className="w-4 h-4" aria-hidden="true" /></button>
             </div>
           ))}
         </div>
-      </div>
+      </Postbox>
 
       {/* Navigation Menu */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex items-center justify-between">
-          <h3 className="text-[13px] font-bold text-[#1d2327]">Navigation Menu</h3>
-          <button type="button" onClick={addNavItem} className="bg-[#2271b1] text-white text-[12px] font-medium px-3 py-[4px] rounded-[3px] hover:bg-[#135e96] flex items-center gap-1"><Plus className="w-3 h-3" /> Add Menu Item</button>
-        </div>
-        <div className="p-4 space-y-3">
-          {navItems.length === 0 && <p className="text-[12px] text-[#646970] italic">No menu items yet. Click "Add Menu Item" to get started.</p>}
-          {navItems.map((item, idx) => (
-            <div key={item.id || idx} className="border border-[#c3c4c7] rounded-[3px] bg-white">
-              {/* Item header bar */}
-              <div className="flex items-center gap-2 px-3 py-2 bg-[#f6f7f7] border-b border-[#c3c4c7]">
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => moveNav(idx, -1)} disabled={idx === 0} className="p-0.5 text-[#646970] hover:text-[#1d2327] disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => moveNav(idx, 1)} disabled={idx === navItems.length - 1} className="p-0.5 text-[#646970] hover:text-[#1d2327] disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+      <Postbox
+        title="Navigation menu"
+        aside={<button type="button" onClick={addNavItem} className="wp-btn"><Plus className="w-3.5 h-3.5" aria-hidden="true" /> Add menu item</button>}
+      >
+        <div className="space-y-3">
+          {navItems.length === 0 && <p className="wp-muted m-0">No menu items yet. Click &quot;Add menu item&quot; to get started.</p>}
+          {navItems.map((item, idx) => {
+            const itemName = item.label || '(untitled)';
+            const valueIsControl = !['blog_list', 'mega_menu', 'dropdown_product', 'dropdown_category'].includes(item.type);
+            const valueLabel = item.type === 'page' ? 'Page' : item.type === 'product' ? 'Product' : item.type === 'product_category' ? 'Category' : ['mega_menu', 'dropdown_product', 'dropdown_category', 'blog_list'].includes(item.type) ? 'Configuration' : 'URL';
+            return (
+              <div key={item.id || idx} className="border border-[#c3c4c7] bg-white">
+                {/* Item header bar */}
+                <div className="flex flex-wrap items-center gap-1 px-2 py-1 bg-[#f6f7f7] border-b border-[#dcdcde]">
+                  <span className="wp-strong flex-1 min-w-0 truncate px-1">{itemName}</span>
+                  <span className="wp-chip wp-small">{item.type?.replace('_', ' ')}</span>
+                  <button type="button" onClick={() => moveNav(idx, -1)} disabled={idx === 0} className={iconBtn} aria-label={`Move ${itemName} up`}><ChevronUp className="w-4 h-4" aria-hidden="true" /></button>
+                  <button type="button" onClick={() => moveNav(idx, 1)} disabled={idx === navItems.length - 1} className={iconBtn} aria-label={`Move ${itemName} down`}><ChevronDown className="w-4 h-4" aria-hidden="true" /></button>
+                  <button type="button" onClick={() => updateNav(idx, { enabled: !item.enabled })} className={item.enabled ? okIconBtn : iconBtn} title={item.enabled ? 'Visible' : 'Hidden'} aria-label={item.enabled ? `${itemName} is visible. Hide it` : `${itemName} is hidden. Show it`} aria-pressed={!!item.enabled}>
+                    {item.enabled ? <Eye className="w-4 h-4" aria-hidden="true" /> : <EyeOff className="w-4 h-4" aria-hidden="true" />}
+                  </button>
+                  <button type="button" onClick={() => removeNav(idx)} className={dangerIconBtn} aria-label={`Remove ${itemName}`}><X className="w-4 h-4" aria-hidden="true" /></button>
                 </div>
-                <span className="text-[12px] font-bold text-[#1d2327] flex-1 truncate">{item.label || '(untitled)'}</span>
-                <span className="text-[10px] text-[#646970] uppercase tracking-wider bg-white border border-[#c3c4c7] px-2 py-0.5 rounded-[3px]">{item.type?.replace('_', ' ')}</span>
-                <button type="button" onClick={() => updateNav(idx, { enabled: !item.enabled })} className={`p-1 rounded-[3px] ${item.enabled ? 'text-green-600' : 'text-[#646970]'}`} title={item.enabled ? 'Visible' : 'Hidden'}>
-                  {item.enabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                </button>
-                <button type="button" onClick={() => removeNav(idx)} className="p-1 text-[#d63638] hover:bg-red-50 rounded-[3px]"><X className="w-3.5 h-3.5" /></button>
-              </div>
-              {/* Item body */}
-              <div className="p-3 grid grid-cols-1 md:grid-cols-12 gap-3">
-                {/* Label */}
-                <div className="md:col-span-3">
-                  <label className="text-[11px] font-semibold text-[#646970] uppercase tracking-wider block mb-1">Label</label>
-                  <input className={inputClass} value={item.label} onChange={e => updateNav(idx, { label: e.target.value })} placeholder="Menu label" />
-                </div>
-                {/* Type */}
-                <div className="md:col-span-3">
-                  <label className="text-[11px] font-semibold text-[#646970] uppercase tracking-wider block mb-1">Type</label>
-                  <select className={inputClass} value={item.type} onChange={e => updateNav(idx, { type: e.target.value, value: e.target.value === 'blog_list' ? '/blog' : '' })}>
-                    <option value="custom_url">Custom Link</option>
-                    <option value="page">Page</option>
-                    <option value="blog_list">Blog List Page</option>
-                    <option value="product">Only 1 Product</option>
-                    <option value="product_category">Any 1 Product Category</option>
-                    <option value="mega_menu">Mega Menu</option>
-                    <option value="dropdown_product">Dropdown List of Product</option>
-                    <option value="dropdown_category">Dropdown List of Category</option>
-                  </select>
-                </div>
-                {/* Value */}
-                <div className="md:col-span-4">
-                  <label className="text-[11px] font-semibold text-[#646970] uppercase tracking-wider block mb-1">
-                    {item.type === 'page' ? 'Page' : item.type === 'product' ? 'Product' : item.type === 'product_category' ? 'Category' : ['mega_menu', 'dropdown_product', 'dropdown_category', 'blog_list'].includes(item.type) ? 'Configuration' : 'URL'}
-                  </label>
-                  {item.type === 'blog_list' ? (
-                    <div className="text-[12px] text-[#2271b1] font-mono py-[6px] font-bold">
-                      Auto-routes to /blog
-                    </div>
-                  ) : item.type === 'page' ? (
-                    <select className={inputClass} value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
-                      <option value="">— Select Page —</option>
-                      <option value="/blog">Blog List (System Page)</option>
-                      {dbPages.map(p => <option key={p._id} value={p._id}>{p.title}</option>)}
-                    </select>
-                  ) : item.type === 'product' ? (
-                    <select className={inputClass} value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
-                      <option value="">— Select Product —</option>
-                      {dbProducts.map(p => <option key={p._id} value={p._id}>{p.title}</option>)}
-                    </select>
-                  ) : item.type === 'product_category' ? (
-                    <select className={inputClass} value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
-                      <option value="">— Select Category —</option>
-                      {dbCategories.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-                    </select>
-                  ) : ['mega_menu', 'dropdown_product', 'dropdown_category'].includes(item.type) ? (
-                    <div className="text-[12px] text-[#646970] py-[6px]">See options below</div>
-                  ) : (
-                    <input className={inputClass} value={item.value} onChange={e => updateNav(idx, { value: e.target.value })} placeholder={item.type === 'external_url' ? 'https://...' : '/page-slug'} />
-                  )}
-                </div>
-                {/* Options */}
-                <div className="md:col-span-2 flex flex-col justify-end gap-1.5">
-                  {(item.type === 'custom_url' || item.type === 'external_url') && (
-                    <label className="flex items-center gap-1.5 text-[11px] text-[#1d2327] cursor-pointer mt-1">
-                      <input type="checkbox" checked={item.openInNewTab || false} onChange={e => updateNav(idx, { openInNewTab: e.target.checked })} /> New tab
-                    </label>
-                  )}
-                </div>
-              </div>
-
-              {/* Mega Menu Sub-Items Builder */}
-              {item.type === 'mega_menu' && (
-                <div className="border-t border-[#c3c4c7] bg-[#fbfbfc] p-4 pl-8 space-y-5">
-
-                  {/* Label Link */}
-                  <div>
-                    <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-1">Label Link URL</h4>
-                    <p className="text-[11px] text-[#646970] mb-2">Optional. Makes the mega menu label itself a clickable link (e.g. <code>/shop</code> or <code>/collections/all</code>).</p>
-                    <input
-                      type="text"
-                      value={item.labelHref || ''}
-                      onChange={e => updateNav(idx, { labelHref: e.target.value })}
-                      placeholder="e.g. /shop or /collections/all"
-                      className="w-full max-w-sm border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
-                    />
+                {/* Item body */}
+                <div className="p-3 grid grid-cols-1 md:grid-cols-12 gap-3">
+                  {/* Label */}
+                  <div className="md:col-span-3 min-w-0">
+                    <label className="wp-label" htmlFor={`nav-${idx}-label`}>Navigation label</label>
+                    <input id={`nav-${idx}-label`} className="wp-input wp-full" value={item.label} onChange={e => updateNav(idx, { label: e.target.value })} placeholder="Menu label" />
                   </div>
+                  {/* Type */}
+                  <div className="md:col-span-3 min-w-0">
+                    <label className="wp-label" htmlFor={`nav-${idx}-type`}>Type</label>
+                    <select id={`nav-${idx}-type`} className="wp-select wp-full" value={item.type} onChange={e => updateNav(idx, { type: e.target.value, value: e.target.value === 'blog_list' ? '/blog' : '' })}>
+                      <option value="custom_url">Custom Link</option>
+                      <option value="page">Page</option>
+                      <option value="blog_list">Blog List Page</option>
+                      <option value="product">Only 1 Product</option>
+                      <option value="product_category">Any 1 Product Category</option>
+                      <option value="mega_menu">Mega Menu</option>
+                      <option value="dropdown_product">Dropdown List of Product</option>
+                      <option value="dropdown_category">Dropdown List of Category</option>
+                    </select>
+                  </div>
+                  {/* Value */}
+                  <div className="md:col-span-4 min-w-0">
+                    {valueIsControl
+                      ? <label className="wp-label" htmlFor={`nav-${idx}-value`}>{valueLabel}</label>
+                      : <span className="wp-label">{valueLabel}</span>}
+                    {item.type === 'blog_list' ? (
+                      <div className="wp-desc m-0 min-h-[30px] flex items-center">
+                        Auto-routes to <code className="ml-1">/blog</code>
+                      </div>
+                    ) : item.type === 'page' ? (
+                      <select id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
+                        <option value="">— Select Page —</option>
+                        <option value="/blog">Blog List (System Page)</option>
+                        {dbPages.map(p => <option key={p._id} value={p._id}>{p.title}</option>)}
+                      </select>
+                    ) : item.type === 'product' ? (
+                      <select id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
+                        <option value="">— Select Product —</option>
+                        {dbProducts.map(p => <option key={p._id} value={p._id}>{p.title}</option>)}
+                      </select>
+                    ) : item.type === 'product_category' ? (
+                      <select id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
+                        <option value="">— Select Category —</option>
+                        {dbCategories.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+                      </select>
+                    ) : ['mega_menu', 'dropdown_product', 'dropdown_category'].includes(item.type) ? (
+                      <div className="wp-desc m-0 min-h-[30px] flex items-center">See options below</div>
+                    ) : (
+                      <input id={`nav-${idx}-value`} className="wp-input wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })} placeholder={item.type === 'external_url' ? 'https://...' : '/page-slug'} />
+                    )}
+                  </div>
+                  {/* Options */}
+                  <div className="md:col-span-2 flex flex-col justify-end gap-1.5">
+                    {(item.type === 'custom_url' || item.type === 'external_url') && (
+                      <label className="wp-check" htmlFor={`nav-${idx}-newtab`}>
+                        <input id={`nav-${idx}-newtab`} type="checkbox" checked={item.openInNewTab || false} onChange={e => updateNav(idx, { openInNewTab: e.target.checked })} /> Open in new tab
+                      </label>
+                    )}
+                  </div>
+                </div>
 
-                  {/* Category Selection */}
-                  <div>
-                    <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-3">Mega Menu — Featured Categories</h4>
-                    <p className="text-[11px] text-[#646970] mb-3">Select which categories appear inside the mega menu dropdown for this item.</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-2">
+                {/* Mega Menu Sub-Items Builder */}
+                {item.type === 'mega_menu' && (
+                  <div className="border-t border-[#dcdcde] bg-[#f6f7f7] p-3 sm:p-4 space-y-5">
+
+                    {/* Label Link */}
+                    <div>
+                      <label className="wp-label" htmlFor={`nav-${idx}-labelhref`}>Label link URL</label>
+                      <input
+                        id={`nav-${idx}-labelhref`}
+                        type="text"
+                        value={item.labelHref || ''}
+                        onChange={e => updateNav(idx, { labelHref: e.target.value })}
+                        placeholder="e.g. /shop or /collections/all"
+                        className="wp-input wp-full max-w-sm"
+                        aria-describedby={`nav-${idx}-labelhref-desc`}
+                      />
+                      <p className="wp-desc" id={`nav-${idx}-labelhref-desc`}>Optional. Makes the mega menu label itself a clickable link (e.g. <code>/shop</code> or <code>/collections/all</code>).</p>
+                    </div>
+
+                    {/* Category Selection */}
+                    <fieldset className="m-0 border-0 p-0">
+                      <legend className="wp-label">Mega menu featured categories</legend>
+                      <p className="wp-desc mt-0 mb-2">Select which categories appear inside the mega menu dropdown for this item.</p>
+                      <div className="wp-checklist grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4">
+                        {dbCategories.map(cat => {
+                          const megaIds = item.megaCategoryIds || [];
+                          const selected = megaIds.includes(cat.slug);
+                          return (
+                            <label key={cat.slug} className="wp-check min-w-0">
+                              <input type="checkbox" checked={selected} onChange={() => {
+                                const updated = selected ? megaIds.filter(s => s !== cat.slug) : [...megaIds, cat.slug];
+                                updateNav(idx, { megaCategoryIds: updated });
+                              }} />
+                              {cat.image && <img src={cat.image} alt="" className="w-6 h-6 rounded-[2px] object-cover shrink-0" />}
+                              <span className="truncate">{cat.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {dbCategories.length === 0 && <p className="wp-desc">No categories found.</p>}
+                    </fieldset>
+
+                    {/* Promotional Banner */}
+                    <div className="border-t border-[#dcdcde] pt-4">
+                      <h3 className="wp-strong m-0">Promotional banner</h3>
+                      <p className="wp-desc mt-1 mb-3">This banner fills the right side of the mega menu. On hover over a category, it crossfades to that category&apos;s image.</p>
+
+                      {/* Banner Image */}
+                      <div className="wp-field">
+                        <span className="wp-label">Banner image</span>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {item.megaBannerImage && (
+                            <img src={item.megaBannerImage} alt="Banner preview" className="h-20 w-auto border border-[#c3c4c7] object-cover bg-[#f0f0f1]" />
+                          )}
+                          <MegaBannerImagePicker
+                            value={item.megaBannerImage}
+                            onChange={url => updateNav(idx, { megaBannerImage: url })}
+                          />
+                        </div>
+                        <p className="wp-desc">Recommended: portrait ratio (3:4). Should be high quality.</p>
+                      </div>
+
+                      {/* Banner Heading */}
+                      <div className="wp-field">
+                        <label className="wp-label" htmlFor={`nav-${idx}-bheading`}>Banner heading</label>
+                        <input
+                          id={`nav-${idx}-bheading`}
+                          type="text"
+                          value={item.megaBannerHeading || ''}
+                          onChange={e => updateNav(idx, { megaBannerHeading: e.target.value })}
+                          placeholder="e.g. New Arrivals"
+                          className="wp-input wp-full"
+                        />
+                      </div>
+
+                      {/* Banner Description */}
+                      <div className="mb-0">
+                        <label className="wp-label" htmlFor={`nav-${idx}-bdesc`}>Banner description</label>
+                        <textarea
+                          id={`nav-${idx}-bdesc`}
+                          rows={2}
+                          value={item.megaBannerDesc || ''}
+                          onChange={e => updateNav(idx, { megaBannerDesc: e.target.value })}
+                          placeholder="e.g. Explore our latest collection of premium shearling jackets."
+                          className="wp-textarea"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dropdown Category List Builder */}
+                {item.type === 'dropdown_category' && (
+                  <div className="border-t border-[#dcdcde] bg-[#f6f7f7] p-3 sm:p-4"><fieldset className="m-0 border-0 p-0">
+                    <legend className="sr-only">Dropdown categories</legend>
+                    <h3 className="wp-strong m-0" aria-hidden="true">Dropdown categories</h3>
+                    <p className="wp-desc mt-1 mb-2">Select which categories appear inside the dropdown list for this item.</p>
+                    <div className="wp-checklist grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4">
                       {dbCategories.map(cat => {
-                        const megaIds = item.megaCategoryIds || [];
-                        const selected = megaIds.includes(cat.slug);
+                        const selectedIds = item.dropdownCategoryIds || [];
+                        const selected = selectedIds.includes(cat.slug);
                         return (
-                          <label key={cat.slug} className={`flex items-center gap-2.5 p-2.5 border rounded-[3px] cursor-pointer transition-colors text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
+                          <label key={cat.slug} className="wp-check min-w-0">
                             <input type="checkbox" checked={selected} onChange={() => {
-                              const updated = selected ? megaIds.filter(s => s !== cat.slug) : [...megaIds, cat.slug];
-                              updateNav(idx, { megaCategoryIds: updated });
+                              const updated = selected ? selectedIds.filter(s => s !== cat.slug) : [...selectedIds, cat.slug];
+                              updateNav(idx, { dropdownCategoryIds: updated });
                             }} />
-                            {cat.image && <img src={cat.image} alt="" className="w-6 h-6 rounded object-cover" />}
-                            <span className="font-medium text-[#1d2327]">{cat.name}</span>
+                            <span className="truncate">{cat.name}</span>
                           </label>
                         );
                       })}
                     </div>
-                    {dbCategories.length === 0 && <p className="text-[11px] text-[#646970] italic">No categories found.</p>}
-                  </div>
+                  </fieldset></div>
+                )}
 
-                  {/* Promotional Banner */}
-                  <div className="border-t border-[#e0e0e0] pt-5">
-                    <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-1">Promotional Banner</h4>
-                    <p className="text-[11px] text-[#646970] mb-4">This banner fills the right side of the mega menu. On hover over a category, it crossfades to that category's image.</p>
-
-                    {/* Banner Image */}
-                    <div className="mb-4">
-                      <label className="block text-[12px] font-semibold text-[#1d2327] mb-2">Banner Image</label>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        {item.megaBannerImage && (
-                          <img src={item.megaBannerImage} alt="Banner preview" className="h-20 w-auto rounded-[4px] border border-[#c3c4c7] object-cover bg-[#f0f0f1]" />
-                        )}
-                        <MegaBannerImagePicker
-                          value={item.megaBannerImage}
-                          onChange={url => updateNav(idx, { megaBannerImage: url })}
-                        />
-                      </div>
-                      <p className="text-[11px] text-[#646970] mt-1">Recommended: portrait ratio (3:4). Should be high quality.</p>
+                {/* Dropdown Product List Builder */}
+                {item.type === 'dropdown_product' && (
+                  <div className="border-t border-[#dcdcde] bg-[#f6f7f7] p-3 sm:p-4"><fieldset className="m-0 border-0 p-0">
+                    <legend className="sr-only">Dropdown products</legend>
+                    <h3 className="wp-strong m-0" aria-hidden="true">Dropdown products</h3>
+                    <p className="wp-desc mt-1 mb-2">Select which products appear inside the dropdown list for this item.</p>
+                    <div className="wp-checklist grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                      {dbProducts.map(prod => {
+                        const selectedIds = item.dropdownProductIds || [];
+                        const selected = selectedIds.includes(prod._id);
+                        return (
+                          <label key={prod._id} className="wp-check min-w-0">
+                            <input type="checkbox" checked={selected} onChange={() => {
+                              const updated = selected ? selectedIds.filter(s => s !== prod._id) : [...selectedIds, prod._id];
+                              updateNav(idx, { dropdownProductIds: updated });
+                            }} />
+                            <span className="truncate">{prod.title}</span>
+                          </label>
+                        );
+                      })}
                     </div>
+                  </fieldset></div>
+                )}
 
-                    {/* Banner Heading */}
-                    <div className="mb-3">
-                      <label className="block text-[12px] font-semibold text-[#1d2327] mb-1">Banner Heading</label>
-                      <input
-                        type="text"
-                        value={item.megaBannerHeading || ''}
-                        onChange={e => updateNav(idx, { megaBannerHeading: e.target.value })}
-                        placeholder="e.g. New Arrivals"
-                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white"
-                      />
-                    </div>
-
-                    {/* Banner Description */}
-                    <div>
-                      <label className="block text-[12px] font-semibold text-[#1d2327] mb-1">Banner Description</label>
-                      <textarea
-                        rows={2}
-                        value={item.megaBannerDesc || ''}
-                        onChange={e => updateNav(idx, { megaBannerDesc: e.target.value })}
-                        placeholder="e.g. Explore our latest collection of premium shearling jackets."
-                        className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] focus:shadow-[0_0_0_1px_#2271b1] bg-white resize-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Dropdown Category List Builder */}
-              {item.type === 'dropdown_category' && (
-                <div className="border-t border-[#c3c4c7] bg-[#fbfbfc] p-4 pl-8">
-                  <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-3">Dropdown Categories</h4>
-                  <p className="text-[11px] text-[#646970] mb-3">Select which categories appear inside the dropdown list for this item.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-2">
-                    {dbCategories.map(cat => {
-                      const selectedIds = item.dropdownCategoryIds || [];
-                      const selected = selectedIds.includes(cat.slug);
-                      return (
-                        <label key={cat.slug} className={`flex items-center gap-2.5 p-2.5 border rounded-[3px] cursor-pointer transition-colors text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
-                          <input type="checkbox" checked={selected} onChange={() => {
-                            const updated = selected ? selectedIds.filter(s => s !== cat.slug) : [...selectedIds, cat.slug];
-                            updateNav(idx, { dropdownCategoryIds: updated });
-                          }} />
-                          <span className="font-medium text-[#1d2327] truncate">{cat.name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Dropdown Product List Builder */}
-              {item.type === 'dropdown_product' && (
-                <div className="border-t border-[#c3c4c7] bg-[#fbfbfc] p-4 pl-8">
-                  <h4 className="text-[11px] font-bold text-[#1d2327] uppercase tracking-wider mb-3">Dropdown Products</h4>
-                  <p className="text-[11px] text-[#646970] mb-3">Select which products appear inside the dropdown list for this item.</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2">
-                    {dbProducts.map(prod => {
-                      const selectedIds = item.dropdownProductIds || [];
-                      const selected = selectedIds.includes(prod._id);
-                      return (
-                        <label key={prod._id} className={`flex items-center gap-2.5 p-2.5 border rounded-[3px] cursor-pointer transition-colors text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
-                          <input type="checkbox" checked={selected} onChange={() => {
-                            const updated = selected ? selectedIds.filter(s => s !== prod._id) : [...selectedIds, prod._id];
-                            updateNav(idx, { dropdownProductIds: updated });
-                          }} />
-                          <span className="font-medium text-[#1d2327] truncate">{prod.title}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
-      </div>
-    </div>
+      </Postbox>
+    </>
   );
 }
 
@@ -495,133 +519,141 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
   const toggleBlog = (id) => { const ids = col.blogIds || []; onChange({ blogIds: ids.includes(id) ? ids.filter(s => s !== id) : [...ids, id] }); };
   const togglePage = (id) => { const ids = col.pageIds || []; onChange({ pageIds: ids.includes(id) ? ids.filter(s => s !== id) : [...ids, id] }); };
 
+  const colName = `Column ${idx + 1}`;
+  const bodyId = `footer-col-${idx}-body`;
+
   return (
-    <div className="bg-white border border-[#c3c4c7] rounded-[3px] overflow-hidden">
+    <div className="border border-[#c3c4c7] bg-white">
       {/* Column Card Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 sm:px-4 sm:py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] gap-2">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 flex-1 min-w-0">
-          <span className="text-[11px] font-bold text-[#646970] uppercase tracking-wider shrink-0">Col {idx + 1}</span>
-          <input
-            className={`${inputClass} w-full xs:w-44 text-[13px] font-semibold`}
-            value={col.heading}
-            onChange={e => onChange({ heading: e.target.value })}
-            placeholder="Column Heading"
-          />
-          <select
-            className={`${inputClass} w-full xs:w-36 text-[12px]`}
-            value={col.type}
-            onChange={e => onChange({ type: e.target.value })}
-          >
-            {COLUMN_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        </div>
-        <div className="flex items-center justify-end gap-1 shrink-0">
+      <div className="flex flex-wrap items-center gap-2 px-2 py-2 bg-[#f6f7f7] border-b border-[#dcdcde]">
+        <span className="wp-strong shrink-0 px-1">{colName}</span>
+        <label htmlFor={`footer-col-${idx}-heading`} className="sr-only">{colName} heading</label>
+        <input
+          id={`footer-col-${idx}-heading`}
+          className="wp-input min-w-0 flex-[1_1_160px] max-w-[240px] max-[782px]:max-w-none"
+          value={col.heading}
+          onChange={e => onChange({ heading: e.target.value })}
+          placeholder="Column Heading"
+        />
+        <label htmlFor={`footer-col-${idx}-type`} className="sr-only">{colName} type</label>
+        <select
+          id={`footer-col-${idx}-type`}
+          className="wp-select min-w-0 flex-[1_1_140px] max-w-[200px] max-[782px]:max-w-none"
+          value={col.type}
+          onChange={e => onChange({ type: e.target.value })}
+        >
+          {COLUMN_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+        <span className="flex-1" />
+        <div className="flex items-center gap-1 shrink-0">
           <button type="button" disabled={idx === 0} onClick={() => onMove(idx, -1)}
-            className="p-1.5 rounded-[3px] text-[#646970] hover:bg-[#e5e5e5] disabled:opacity-30 transition-colors" title="Move Up">
-            <ChevronUp className="w-3.5 h-3.5" />
+            className={iconBtn} title="Move Up" aria-label={`Move ${colName} up`}>
+            <ChevronUp className="w-4 h-4" aria-hidden="true" />
           </button>
           <button type="button" disabled={idx === total - 1} onClick={() => onMove(idx, 1)}
-            className="p-1.5 rounded-[3px] text-[#646970] hover:bg-[#e5e5e5] disabled:opacity-30 transition-colors" title="Move Down">
-            <ChevronDown className="w-3.5 h-3.5" />
+            className={iconBtn} title="Move Down" aria-label={`Move ${colName} down`}>
+            <ChevronDown className="w-4 h-4" aria-hidden="true" />
           </button>
           <button type="button" onClick={() => setExpanded(v => !v)}
-            className="p-1.5 rounded-[3px] text-[#646970] hover:bg-[#e5e5e5] transition-colors">
-            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            className={iconBtn} aria-expanded={expanded} aria-controls={bodyId} aria-label={expanded ? `Collapse ${colName}` : `Expand ${colName}`}>
+            {expanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
           </button>
           <button type="button" onClick={onDelete}
-            className="p-1.5 rounded-[3px] text-[#d63638] hover:bg-red-50 transition-colors" title="Remove Column">
-            <X className="w-3.5 h-3.5" />
+            className={dangerIconBtn} title="Remove Column" aria-label={`Remove ${colName}`}>
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>
 
       {/* Column Body */}
       {expanded && (
-        <div className="p-4">
+        <div className="p-3" id={bodyId}>
 
           {/* Newsletter */}
           {col.type === 'newsletter' && (
-            <p className="text-[12px] text-[#646970] italic">Newsletter signup form will render in this column. Customize the heading above — email input and submit are automatic.</p>
+            <p className="wp-muted m-0">Newsletter signup form will render in this column. Customize the heading above — email input and submit are automatic.</p>
           )}
 
           {/* Collections */}
           {col.type === 'collections' && (
-            <div>
-              <p className="text-[12px] text-[#646970] mb-3">Select which categories appear in this column.</p>
+            <fieldset className="m-0 border-0 p-0">
+              <legend className="wp-desc mt-0 mb-2">Select which categories appear in this column.</legend>
               {dbCategories.length === 0
-                ? <p className="text-[12px] text-[#646970] italic">No published categories found.</p>
-                : <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                ? <p className="wp-muted m-0">No published categories found.</p>
+                : <div className="wp-checklist grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                   {dbCategories.map(cat => {
                     const selected = (col.categoryIds || []).includes(cat.slug);
                     return (
-                      <label key={cat.slug} className={`flex items-center gap-2 p-2.5 border rounded-[3px] cursor-pointer text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
+                      <label key={cat.slug} className="wp-check min-w-0">
                         <input type="checkbox" checked={selected} onChange={() => toggleCat(cat.slug)} />
-                        <span className="font-medium text-[#1d2327]">{cat.name}</span>
+                        <span className="truncate">{cat.name}</span>
                       </label>
                     );
                   })}
                 </div>
               }
-            </div>
+            </fieldset>
           )}
 
           {/* Blog Posts */}
           {col.type === 'blog_posts' && (
-            <div>
-              <p className="text-[12px] text-[#646970] mb-3">Select which blog posts appear in this column.</p>
+            <fieldset className="m-0 border-0 p-0">
+              <legend className="wp-desc mt-0 mb-2">Select which blog posts appear in this column.</legend>
               {dbBlogs.length === 0
-                ? <p className="text-[12px] text-[#646970] italic">No published blog posts found.</p>
-                : <div className="max-h-48 overflow-y-auto border border-[#c3c4c7] rounded-[3px] divide-y divide-[#f0f0f1]">
+                ? <p className="wp-muted m-0">No published blog posts found.</p>
+                : <div className="wp-checklist">
                   {dbBlogs.map(blog => {
                     const id = blog._id?.toString();
                     const selected = (col.blogIds || []).includes(id);
                     return (
-                      <label key={id} className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-[12px] transition-colors ${selected ? 'bg-[#f0f6fb]' : 'hover:bg-[#f6f7f7]'}`}>
+                      <label key={id} className="wp-check min-w-0">
                         <input type="checkbox" checked={selected} onChange={() => toggleBlog(id)} />
-                        <span className="text-[#1d2327] truncate">{blog.title}</span>
+                        <span className="truncate">{blog.title}</span>
                       </label>
                     );
                   })}
                 </div>
               }
-            </div>
+            </fieldset>
           )}
 
           {/* Pages */}
           {col.type === 'pages' && (
-            <div>
-              <p className="text-[12px] text-[#646970] mb-3">Select which pages appear in this column.</p>
+            <fieldset className="m-0 border-0 p-0">
+              <legend className="wp-desc mt-0 mb-2">Select which pages appear in this column.</legend>
               {dbPages.length === 0
-                ? <p className="text-[12px] text-[#646970] italic">No published pages found.</p>
-                : <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                ? <p className="wp-muted m-0">No published pages found.</p>
+                : <div className="wp-checklist grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                   {dbPages.map(page => {
                     const id = page._id?.toString();
                     const selected = (col.pageIds || []).includes(id);
                     return (
-                      <label key={id} className={`flex items-center gap-2 p-2.5 border rounded-[3px] cursor-pointer text-[12px] ${selected ? 'border-[#2271b1] bg-[#f0f6fb]' : 'border-[#c3c4c7] hover:bg-[#f6f7f7]'}`}>
+                      <label key={id} className="wp-check min-w-0">
                         <input type="checkbox" checked={selected} onChange={() => togglePage(id)} />
-                        <span className="font-medium text-[#1d2327]">{page.title || page.slug}</span>
+                        <span className="truncate">{page.title || page.slug}</span>
                       </label>
                     );
                   })}
                 </div>
               }
-            </div>
+            </fieldset>
           )}
 
           {/* Custom Links */}
           {col.type === 'custom_links' && (
             <div className="space-y-2">
-              {(col.customLinks || []).length === 0 && <p className="text-[12px] text-[#646970] italic">No links yet. Add one below.</p>}
+              {(col.customLinks || []).length === 0 && <p className="wp-muted m-0">No links yet. Add one below.</p>}
               {(col.customLinks || []).map((link, li) => (
-                <div key={link.id || li} className="flex gap-2 items-center">
-                  <input className={`${inputClass} flex-1`} value={link.label} onChange={e => updateCustomLink(li, { label: e.target.value })} placeholder="Label" />
-                  <input className={`${inputClass} flex-1`} value={link.url} onChange={e => updateCustomLink(li, { url: e.target.value })} placeholder="/url or https://..." />
-                  <button type="button" onClick={() => removeCustomLink(li)} className="p-1 text-[#d63638] hover:bg-red-50 rounded-[3px]"><X className="w-4 h-4" /></button>
+                <div key={link.id || li} className="flex flex-wrap gap-2 items-center">
+                  <label htmlFor={`footer-col-${idx}-link-${li}-label`} className="sr-only">Link {li + 1} label</label>
+                  <input id={`footer-col-${idx}-link-${li}-label`} className="wp-input flex-[1_1_160px] min-w-0" value={link.label} onChange={e => updateCustomLink(li, { label: e.target.value })} placeholder="Label" />
+                  <label htmlFor={`footer-col-${idx}-link-${li}-url`} className="sr-only">Link {li + 1} URL</label>
+                  <input id={`footer-col-${idx}-link-${li}-url`} className="wp-input flex-[1_1_160px] min-w-0" value={link.url} onChange={e => updateCustomLink(li, { url: e.target.value })} placeholder="/url or https://..." />
+                  <button type="button" onClick={() => removeCustomLink(li)} className={dangerIconBtn} aria-label={`Remove link ${li + 1}`}><X className="w-4 h-4" aria-hidden="true" /></button>
                 </div>
               ))}
-              <button type="button" onClick={addCustomLink} className="text-[#2271b1] text-[12px] font-medium hover:underline flex items-center gap-1 mt-1">
-                <Plus className="w-3 h-3" /> Add Link
+              <button type="button" onClick={addCustomLink} className={linkBtn}>
+                <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Add link
               </button>
             </div>
           )}
@@ -630,6 +662,11 @@ function ColumnEditor({ col, idx, total, dbCategories, dbBlogs, dbPages, onChang
       )}
     </div>
   );
+}
+
+/* One "bottom link" settings row (Privacy / Terms) — markup only */
+function BottomLinkFields({ idBase, children }) {
+  return <div className="space-y-2" style={ctrlWrap} id={idBase}>{children}</div>;
 }
 
 function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
@@ -662,33 +699,24 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
   };
 
   return (
-    <div className="space-y-6">
+    <>
 
       {/* Footer Logo */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">Footer Logo</h3>
-        <table className="w-full"><tbody>
-          <ImagePicker label="Logo" description="Displayed at the top of the footer." value={fc.logoUrl} onChange={v => setFc({ logoUrl: v })} />
-        </tbody></table>
-      </div>
+      <Postbox title="Footer logo">
+        <ImagePicker label="Logo" description="Displayed at the top of the footer." value={fc.logoUrl} onChange={v => setFc({ logoUrl: v })} />
+      </Postbox>
 
       {/* Dynamic Columns */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <div className="flex items-center justify-between px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7]">
-          <div>
-            <h3 className="text-[13px] font-bold text-[#1d2327]">Footer Columns</h3>
-            <p className="text-[11px] text-[#646970] mt-0.5">Add, remove and reorder columns. Each can show a newsletter, collections, blog posts, pages or custom links.</p>
-          </div>
-          <button type="button" onClick={addColumn}
-            className="flex items-center gap-1.5 bg-[#2271b1] text-white px-3 py-[6px] text-[12px] font-semibold rounded-[3px] hover:bg-[#135e96] transition-colors">
-            <Plus className="w-3.5 h-3.5" /> Add Column
-          </button>
-        </div>
-        <div className="p-4 space-y-4">
+      <Postbox
+        title="Footer columns"
+        aside={<button type="button" onClick={addColumn} className="wp-btn"><Plus className="w-3.5 h-3.5" aria-hidden="true" /> Add column</button>}
+      >
+        <p className="wp-desc mt-0 mb-3">Add, remove and reorder columns. Each can show a newsletter, collections, blog posts, pages or custom links.</p>
+        <div className="space-y-3">
           {columns.length === 0 && (
-            <div className="text-center py-8 border border-dashed border-[#c3c4c7] rounded-[3px]">
-              <p className="text-[13px] text-[#646970] mb-3">No columns yet. Click <strong>Add Column</strong> to start building your footer.</p>
-              <p className="text-[11px] text-[#646970]">Tip: The footer will fall back to the default 4-column layout until you add at least one column here.</p>
+            <div className="text-center py-8 px-3 border border-dashed border-[#c3c4c7]">
+              <p className="wp-muted mt-0 mb-2">No columns yet. Click <strong>Add column</strong> to start building your footer.</p>
+              <p className="wp-muted wp-small m-0">Tip: The footer will fall back to the default 4-column layout until you add at least one column here.</p>
             </div>
           )}
           {columns.map((col, idx) => (
@@ -706,178 +734,183 @@ function FooterTab({ config, onChange, dbCategories, dbBlogs, dbPages }) {
             />
           ))}
         </div>
-      </div>
+      </Postbox>
 
       {/* Privacy, Terms & Sitemap Links */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">Footer Bottom Links (Privacy, Terms, Sitemap)</h3>
-        <p className="px-4 pt-3 text-[12px] text-[#646970]">
+      <Postbox title="Footer bottom links (Privacy, Terms, Sitemap)">
+        <p className="wp-desc mt-0 mb-2">
           Configure labels, links, and visibility for the links displayed at the bottom of the footer next to the copyright notice.
         </p>
-        <table className="w-full mt-2">
-          <tbody>
-            {/* Privacy Policy Link */}
-            <tr className="border-b border-[#f0f0f1]">
-              <th className="text-left px-4 py-3 align-top w-52">
-                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Privacy Policy</label>
-                <p className="text-[12px] text-[#646970]">Label, target page/URL & visibility</p>
-              </th>
-              <td className="px-4 py-3 space-y-2">
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={fc.showPrivacyLink !== false}
-                      onChange={e => setFc({ showPrivacyLink: e.target.checked })}
-                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
-                    />
-                    <span>Show in Footer</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={fc.privacyLabel ?? "Privacy"}
-                    onChange={e => setFc({ privacyLabel: e.target.value })}
-                    placeholder="Link Label (e.g. Privacy Policy)"
-                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
-                  <div>
-                    <label className="text-[11px] text-[#646970] block mb-0.5">Select CMS Page:</label>
-                    <select
-                      value={fc.privacyPageSlug || ""}
-                      onChange={e => setFc({ privacyPageSlug: e.target.value })}
-                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
-                    >
-                      <option value="">— None selected —</option>
-                      {(dbPages || []).map(p => (
-                        <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-[#646970] block mb-0.5">Or Custom URL (optional):</label>
-                    <input
-                      type="text"
-                      value={fc.privacyUrl || ""}
-                      onChange={e => setFc({ privacyUrl: e.target.value })}
-                      placeholder="/privacy or https://..."
-                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
-                    />
-                  </div>
-                </div>
-              </td>
-            </tr>
 
-            {/* Terms of Service Link */}
-            <tr className="border-b border-[#f0f0f1]">
-              <th className="text-left px-4 py-3 align-top w-52">
-                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Terms of Service</label>
-                <p className="text-[12px] text-[#646970]">Label, target page/URL & visibility</p>
-              </th>
-              <td className="px-4 py-3 space-y-2">
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={fc.showTermsLink !== false}
-                      onChange={e => setFc({ showTermsLink: e.target.checked })}
-                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
-                    />
-                    <span>Show in Footer</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={fc.termsLabel ?? "Terms"}
-                    onChange={e => setFc({ termsLabel: e.target.value })}
-                    placeholder="Link Label (e.g. Terms of Service)"
-                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
-                  <div>
-                    <label className="text-[11px] text-[#646970] block mb-0.5">Select CMS Page:</label>
-                    <select
-                      value={fc.termsPageSlug || ""}
-                      onChange={e => setFc({ termsPageSlug: e.target.value })}
-                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
-                    >
-                      <option value="">— None selected —</option>
-                      {(dbPages || []).map(p => (
-                        <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-[#646970] block mb-0.5">Or Custom URL (optional):</label>
-                    <input
-                      type="text"
-                      value={fc.termsUrl || ""}
-                      onChange={e => setFc({ termsUrl: e.target.value })}
-                      placeholder="/terms or https://..."
-                      className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[5px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
-                    />
-                  </div>
-                </div>
-              </td>
-            </tr>
-
-            {/* Sitemap Link */}
-            <tr className="border-b border-[#f0f0f1]">
-              <th className="text-left px-4 py-3 align-top w-52">
-                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Sitemap Link</label>
-                <p className="text-[12px] text-[#646970]">Label, URL & visibility</p>
-              </th>
-              <td className="px-4 py-3 space-y-2">
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-[12px] font-medium text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={fc.showSitemapLink !== false}
-                      onChange={e => setFc({ showSitemapLink: e.target.checked })}
-                      className="w-4 h-4 accent-[#2271b1] cursor-pointer"
-                    />
-                    <span>Show in Footer</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={fc.sitemapLabel ?? "Sitemap"}
-                    onChange={e => setFc({ sitemapLabel: e.target.value })}
-                    placeholder="Link Label (e.g. Sitemap)"
-                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
-                  />
-                  <input
-                    type="text"
-                    value={fc.sitemapUrl ?? "/sitemap"}
-                    onChange={e => setFc({ sitemapUrl: e.target.value })}
-                    placeholder="URL (e.g. /sitemap)"
-                    className="max-w-[200px] border border-[#8c8f94] rounded-[3px] px-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white font-medium"
-                  />
-                </div>
-              </td>
-            </tr>
-
-            {/* Copyright & Brand Text */}
-            <tr>
-              <th className="text-left px-4 py-3 align-top w-52">
-                <label className="block text-[13px] font-semibold text-[#1d2327] mb-[2px]">Copyright & Brand Text</label>
-                <p className="text-[12px] text-[#646970]">Copyright notice in footer</p>
-              </th>
-              <td className="px-4 py-3 space-y-2">
+        {/* Privacy Policy Link */}
+        <div className="wp-frow items-start">
+          <span className="wp-flabel pt-1">Privacy Policy</span>
+          <BottomLinkFields idBase="footer-privacy">
+            <label className="wp-check" htmlFor="footer-privacy-show">
+              <input
+                id="footer-privacy-show"
+                type="checkbox"
+                checked={fc.showPrivacyLink !== false}
+                onChange={e => setFc({ showPrivacyLink: e.target.checked })}
+              />
+              Show in footer
+            </label>
+            <div>
+              <label className="wp-label" htmlFor="footer-privacy-label">Link label</label>
+              <input
+                id="footer-privacy-label"
+                type="text"
+                value={fc.privacyLabel ?? "Privacy"}
+                onChange={e => setFc({ privacyLabel: e.target.value })}
+                placeholder="Link Label (e.g. Privacy Policy)"
+                className="wp-input wp-full max-w-[320px]"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
+              <div className="min-w-0">
+                <label className="wp-label" htmlFor="footer-privacy-page">CMS page</label>
+                <select
+                  id="footer-privacy-page"
+                  value={fc.privacyPageSlug || ""}
+                  onChange={e => setFc({ privacyPageSlug: e.target.value })}
+                  className="wp-select wp-full"
+                >
+                  <option value="">— None selected —</option>
+                  {(dbPages || []).map(p => (
+                    <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="min-w-0">
+                <label className="wp-label" htmlFor="footer-privacy-url">Or custom URL (optional)</label>
                 <input
+                  id="footer-privacy-url"
                   type="text"
-                  value={config.brand?.copyrightText ?? "PAiRO — ALL RIGHTS RESERVED © 2026."}
-                  onChange={e => onChange({ ...config, brand: { ...(config.brand || {}), copyrightText: e.target.value } })}
-                  placeholder="e.g. PAiRO — ALL RIGHTS RESERVED © 2026."
-                  className="w-full max-w-xl border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white"
+                  value={fc.privacyUrl || ""}
+                  onChange={e => setFc({ privacyUrl: e.target.value })}
+                  placeholder="/privacy or https://..."
+                  className="wp-input wp-full"
                 />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              </div>
+            </div>
+          </BottomLinkFields>
+          <p className="wp-hint">Label, target page/URL and visibility.</p>
+        </div>
 
-    </div>
+        {/* Terms of Service Link */}
+        <div className="wp-frow items-start">
+          <span className="wp-flabel pt-1">Terms of Service</span>
+          <BottomLinkFields idBase="footer-terms">
+            <label className="wp-check" htmlFor="footer-terms-show">
+              <input
+                id="footer-terms-show"
+                type="checkbox"
+                checked={fc.showTermsLink !== false}
+                onChange={e => setFc({ showTermsLink: e.target.checked })}
+              />
+              Show in footer
+            </label>
+            <div>
+              <label className="wp-label" htmlFor="footer-terms-label">Link label</label>
+              <input
+                id="footer-terms-label"
+                type="text"
+                value={fc.termsLabel ?? "Terms"}
+                onChange={e => setFc({ termsLabel: e.target.value })}
+                placeholder="Link Label (e.g. Terms of Service)"
+                className="wp-input wp-full max-w-[320px]"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
+              <div className="min-w-0">
+                <label className="wp-label" htmlFor="footer-terms-page">CMS page</label>
+                <select
+                  id="footer-terms-page"
+                  value={fc.termsPageSlug || ""}
+                  onChange={e => setFc({ termsPageSlug: e.target.value })}
+                  className="wp-select wp-full"
+                >
+                  <option value="">— None selected —</option>
+                  {(dbPages || []).map(p => (
+                    <option key={p._id || p.slug} value={p.slug}>{p.title} ({p.slug})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="min-w-0">
+                <label className="wp-label" htmlFor="footer-terms-url">Or custom URL (optional)</label>
+                <input
+                  id="footer-terms-url"
+                  type="text"
+                  value={fc.termsUrl || ""}
+                  onChange={e => setFc({ termsUrl: e.target.value })}
+                  placeholder="/terms or https://..."
+                  className="wp-input wp-full"
+                />
+              </div>
+            </div>
+          </BottomLinkFields>
+          <p className="wp-hint">Label, target page/URL and visibility.</p>
+        </div>
+
+        {/* Sitemap Link */}
+        <div className="wp-frow items-start">
+          <span className="wp-flabel pt-1">Sitemap Link</span>
+          <BottomLinkFields idBase="footer-sitemap">
+            <label className="wp-check" htmlFor="footer-sitemap-show">
+              <input
+                id="footer-sitemap-show"
+                type="checkbox"
+                checked={fc.showSitemapLink !== false}
+                onChange={e => setFc({ showSitemapLink: e.target.checked })}
+              />
+              Show in footer
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
+              <div className="min-w-0">
+                <label className="wp-label" htmlFor="footer-sitemap-label">Link label</label>
+                <input
+                  id="footer-sitemap-label"
+                  type="text"
+                  value={fc.sitemapLabel ?? "Sitemap"}
+                  onChange={e => setFc({ sitemapLabel: e.target.value })}
+                  placeholder="Link Label (e.g. Sitemap)"
+                  className="wp-input wp-full"
+                />
+              </div>
+              <div className="min-w-0">
+                <label className="wp-label" htmlFor="footer-sitemap-url">URL</label>
+                <input
+                  id="footer-sitemap-url"
+                  type="text"
+                  value={fc.sitemapUrl ?? "/sitemap"}
+                  onChange={e => setFc({ sitemapUrl: e.target.value })}
+                  placeholder="URL (e.g. /sitemap)"
+                  className="wp-input wp-full"
+                />
+              </div>
+            </div>
+          </BottomLinkFields>
+          <p className="wp-hint">Label, URL and visibility.</p>
+        </div>
+
+        {/* Copyright & Brand Text */}
+        <div className="wp-frow">
+          <label className="wp-flabel" htmlFor="footer-copyright">Copyright &amp; Brand Text</label>
+          <div style={ctrlWrap}>
+            <input
+              id="footer-copyright"
+              type="text"
+              value={config.brand?.copyrightText ?? "PAiRO — ALL RIGHTS RESERVED © 2026."}
+              onChange={e => onChange({ ...config, brand: { ...(config.brand || {}), copyrightText: e.target.value } })}
+              placeholder="e.g. PAiRO — ALL RIGHTS RESERVED © 2026."
+              className="wp-input wp-full max-w-xl"
+            />
+          </div>
+          <p className="wp-hint">Copyright notice in footer.</p>
+        </div>
+      </Postbox>
+
+    </>
   );
 }
 
@@ -897,33 +930,26 @@ function SocialLinksTab({ config, onChange }) {
   };
 
   return (
-    <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-      <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">Social Media Profiles</h3>
-      <p className="px-4 pt-3 text-[12px] text-[#646970]">Enter your social media URLs. Enable them to show in the footer.</p>
-      <table className="w-full mt-2"><tbody>
-        {SOCIALS.map(({ key, label, Icon }) => {
-          const link = get(key);
-          return (
-            <tr key={key} className="border-b border-[#f0f0f1]">
-              <th className="text-left px-4 py-3 w-44">
-                <div className="flex items-center gap-2 text-[13px] font-semibold text-[#1d2327]">
-                  <Icon className="w-4 h-4 text-[#646970]" /> {label}
-                </div>
-              </th>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <input className={`${inputClass} flex-1`} value={link.url} onChange={e => set(key, { url: e.target.value })} placeholder={`https://${key}.com/yourprofile`} />
-                  <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap text-[12px]">
-                    <input type="checkbox" checked={link.enabled || false} onChange={() => set(key, { enabled: !link.enabled })} />
-                    <span className={link.enabled ? 'text-green-700 font-bold' : 'text-[#646970]'}>{link.enabled ? 'Active' : 'Inactive'}</span>
-                  </label>
-                </div>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody></table>
-    </div>
+    <Postbox title="Social media profiles">
+      <p className="wp-desc mt-0 mb-2">Enter your social media URLs. Enable them to show in the footer.</p>
+      {SOCIALS.map(({ key, label, Icon }) => {
+        const link = get(key);
+        return (
+          <div key={key} className="wp-frow">
+            <label className="wp-flabel inline-flex items-center gap-2" htmlFor={`social-${key}-url`}>
+              <Icon className="w-4 h-4 text-[#646970] shrink-0" aria-hidden="true" /> {label}
+            </label>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1" style={ctrlWrap}>
+              <input id={`social-${key}-url`} className="wp-input flex-[1_1_220px] min-w-0 max-w-[420px]" value={link.url} onChange={e => set(key, { url: e.target.value })} placeholder={`https://${key}.com/yourprofile`} />
+              <label className="wp-check whitespace-nowrap" htmlFor={`social-${key}-enabled`}>
+                <input id={`social-${key}-enabled`} type="checkbox" checked={link.enabled || false} onChange={() => set(key, { enabled: !link.enabled })} />
+                <span className={link.enabled ? 'text-[#2f6f1a] font-semibold' : 'wp-muted'}>{link.enabled ? 'Active' : 'Inactive'}</span>
+              </label>
+            </div>
+          </div>
+        );
+      })}
+    </Postbox>
   );
 }
 
@@ -1041,184 +1067,185 @@ function RedirectsTab() {
   const totalPages = Math.ceil(totalRedirects / 10) || 1;
 
   return (
-    <div className="space-y-8">
+    <>
       {/* Add / Edit Form */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <h3 className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] text-[13px] font-bold text-[#1d2327]">
-          {redirectForm._id ? "Edit Redirect Rule" : "Add New Redirect Rule"}
-        </h3>
-        <form onSubmit={handleSaveRedirect} className="p-4 space-y-4">
+      <form onSubmit={handleSaveRedirect} className="wp-postbox" aria-labelledby="redirect-form-title">
+        <div className="wp-postbox-head">
+          <h2 id="redirect-form-title">
+            {redirectForm._id ? "Edit redirect rule" : "Add new redirect rule"}
+          </h2>
+        </div>
+        <div className="wp-inside">
           {redirectError && (
-            <div className="bg-[#fcf0f1] border-l-4 border-[#d63638] text-[#d63638] p-3 text-[13px] rounded-[3px]">
-              {redirectError}
-            </div>
+            <Notice type="error">{redirectError}</Notice>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="block text-[12px] font-semibold text-[#1d2327]">Source Path (e.g. /old-url)</label>
-              <input
-                type="text"
-                required
-                placeholder="/old-page"
-                value={redirectForm.sourceUrl}
-                onChange={e => setRedirectForm({ ...redirectForm, sourceUrl: e.target.value })}
-                className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[12px] font-semibold text-[#1d2327]">Target Destination (e.g. /new-url)</label>
-              <input
-                type="text"
-                required
-                placeholder="/new-page"
-                value={redirectForm.targetUrl}
-                onChange={e => setRedirectForm({ ...redirectForm, targetUrl: e.target.value })}
-                className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="block text-[12px] font-semibold text-[#1d2327]">Redirect Type</label>
-              <select
-                value={redirectForm.statusCode}
-                onChange={e => setRedirectForm({ ...redirectForm, statusCode: parseInt(e.target.value, 10) })}
-                className="w-full border border-[#8c8f94] rounded-[3px] px-3 py-[6px] text-[13px] outline-none focus:border-[#2271b1] bg-white h-[31px]"
-              >
-                <option value={301}>301 Permanent Redirect</option>
-                <option value={302}>302 Temporary Redirect</option>
-              </select>
-            </div>
+          <div className="wp-frow">
+            <label className="wp-flabel" htmlFor="redirect-source">Source path</label>
+            <input
+              id="redirect-source"
+              type="text"
+              required
+              placeholder="/old-page"
+              value={redirectForm.sourceUrl}
+              onChange={e => setRedirectForm({ ...redirectForm, sourceUrl: e.target.value })}
+              className="wp-input"
+            />
+            <p className="wp-hint">The old URL path to redirect from, e.g. <code>/old-url</code>.</p>
           </div>
-
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={submittingRedirect}
-              className="bg-[#2271b1] text-white px-4 py-[6px] text-[12px] font-semibold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60"
+          <div className="wp-frow">
+            <label className="wp-flabel" htmlFor="redirect-target">Target destination</label>
+            <input
+              id="redirect-target"
+              type="text"
+              required
+              placeholder="/new-page"
+              value={redirectForm.targetUrl}
+              onChange={e => setRedirectForm({ ...redirectForm, targetUrl: e.target.value })}
+              className="wp-input"
+            />
+            <p className="wp-hint">Where visitors are sent, e.g. <code>/new-url</code>.</p>
+          </div>
+          <div className="wp-frow">
+            <label className="wp-flabel" htmlFor="redirect-type">Redirect type</label>
+            <select
+              id="redirect-type"
+              value={redirectForm.statusCode}
+              onChange={e => setRedirectForm({ ...redirectForm, statusCode: parseInt(e.target.value, 10) })}
+              className="wp-select"
             >
-              {submittingRedirect ? "Saving..." : redirectForm._id ? "Update Redirect" : "Add Redirect"}
-            </button>
-            {redirectForm._id && (
-              <button
-                type="button"
-                onClick={() => setRedirectForm({ _id: "", sourceUrl: "", targetUrl: "", statusCode: 301 })}
-                className="border border-[#c3c4c7] text-[#1d2327] px-4 py-[6px] text-[12px] font-semibold rounded-[3px] hover:bg-[#f6f7f7]"
-              >
-                Cancel Edit
-              </button>
-            )}
+              <option value={301}>301 Permanent Redirect</option>
+              <option value={302}>302 Temporary Redirect</option>
+            </select>
           </div>
-        </form>
-      </div>
+        </div>
+
+        <div className="wp-box-foot">
+          <button
+            type="submit"
+            disabled={submittingRedirect}
+            className="wp-btn wp-btn-primary"
+          >
+            {submittingRedirect ? "Saving..." : redirectForm._id ? "Update redirect" : "Add redirect"}
+          </button>
+          {redirectForm._id && (
+            <button
+              type="button"
+              onClick={() => setRedirectForm({ _id: "", sourceUrl: "", targetUrl: "", statusCode: 301 })}
+              className="wp-btn"
+            >
+              Cancel edit
+            </button>
+          )}
+        </div>
+      </form>
 
       {/* Redirects List Table */}
-      <div className="bg-white border border-[#c3c4c7] rounded-[3px]">
-        <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h3 className="text-[13px] font-bold text-[#1d2327] m-0">Active Redirect Rules ({totalRedirects})</h3>
-
-          {/* Search bar */}
-          <div className="relative max-w-xs w-full">
-            <input
-              type="text"
-              placeholder="Search redirects..."
-              value={redirectSearch}
-              onChange={e => { setRedirectSearch(e.target.value); setRedirectsPage(1); }}
-              className="w-full border border-[#8c8f94] rounded-[3px] pl-8 pr-3 py-[4px] text-[12px] outline-none focus:border-[#2271b1] bg-white"
-            />
-            <Search className="w-3.5 h-3.5 text-[#646970] absolute left-2.5 top-1/2 -translate-y-1/2" />
-          </div>
+      <h2 className="text-[16px] font-semibold text-[#1d2327] mt-6 mb-0">
+        Redirect rules <span className="wp-muted font-normal">({totalRedirects})</span>
+      </h2>
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <div className="wp-search" role="search">
+          <label htmlFor="redirect-search" className="sr-only">Search redirects</label>
+          <input
+            id="redirect-search"
+            type="search"
+            placeholder="Search redirects..."
+            value={redirectSearch}
+            onChange={e => { setRedirectSearch(e.target.value); setRedirectsPage(1); }}
+            className="wp-input"
+          />
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="wp-list-table w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[12px] font-semibold text-[#1d2327]">
-                <th className="px-4 py-3">Source URL Path</th>
-                <th className="px-4 py-3">Target Destination</th>
-                <th className="px-4 py-3 w-32">Status Code</th>
-                <th className="px-4 py-3 w-28 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-[13px] divide-y divide-[#f0f0f1]">
-              {loadingRedirects ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-[#646970] italic">
-                    Loading redirects...
-                  </td>
-                </tr>
-              ) : redirects.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-[#646970] italic">
-                    No redirect rules found.
-                  </td>
-                </tr>
-              ) : (
-                redirects.map((item) => (
-                  <tr key={item._id} className="hover:bg-[#f6f7f7]">
-                    <td className="px-4 py-3 font-mono text-[12px] text-[#1d2327] break-all">
-                      {item.sourceUrl}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-[12px] text-[#2271b1] break-all">
-                      {item.targetUrl}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${item.statusCode === 301 ? "bg-green-50 text-green-700 border border-green-200" : "bg-blue-50 text-blue-700 border border-blue-200"
-                        }`}>
-                        {item.statusCode}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEditRedirect(item)}
-                          className="text-[#2271b1] hover:underline text-[12px]"
-                        >
-                          Edit
-                        </button>
-                        <span className="text-[#c3c4c7]">|</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRedirect(item._id)}
-                          className="text-[#d63638] hover:underline text-[12px]"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination footer */}
-        {totalPages > 1 && (
-          <div className="px-4 py-3 bg-[#f6f7f7] border-t border-[#c3c4c7] flex items-center justify-between text-[12px] text-[#646970]">
-            <span>Showing page {redirectsPage} of {totalPages}</span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={redirectsPage === 1}
-                onClick={() => setRedirectsPage(prev => Math.max(1, prev - 1))}
-                className="px-2 py-1 border border-[#c3c4c7] rounded-[3px] bg-white disabled:opacity-50 hover:bg-[#f6f7f7]"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={redirectsPage === totalPages}
-                onClick={() => setRedirectsPage(prev => Math.min(totalPages, prev + 1))}
-                className="px-2 py-1 border border-[#c3c4c7] rounded-[3px] bg-white disabled:opacity-50 hover:bg-[#f6f7f7]"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </div>
-    </div>
+
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>
+            <tr>
+              <th scope="col">Source URL path</th>
+              <th scope="col" className="wp-hide-sm">Target destination</th>
+              <th scope="col" className="wp-hide-sm" style={{ width: 110 }}>Status code</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loadingRedirects ? (
+              <tr>
+                <td colSpan={3} className="wp-muted text-center" style={{ padding: "32px 10px" }}>
+                  Loading redirects...
+                </td>
+              </tr>
+            ) : redirects.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="wp-muted text-center" style={{ padding: "32px 10px" }}>
+                  No redirect rules found.
+                </td>
+              </tr>
+            ) : (
+              redirects.map((item) => (
+                <tr key={item._id}>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => handleEditRedirect(item)}
+                      className="wp-row-title font-mono break-all text-left bg-transparent border-0 p-0 cursor-pointer"
+                      aria-label={`Edit redirect ${item.sourceUrl}`}
+                    >
+                      {item.sourceUrl}
+                    </button>
+                    <div className="wp-mobile-meta">
+                      <span className="font-mono break-all">→ {item.targetUrl}</span> · {item.statusCode}
+                    </div>
+                    <div className="wp-row-actions">
+                      <span>
+                        <button type="button" onClick={() => handleEditRedirect(item)} aria-label={`Edit redirect ${item.sourceUrl}`}>Edit</button>
+                      </span>
+                      <span>
+                        <button type="button" onClick={() => handleDeleteRedirect(item._id)} className="is-danger" aria-label={`Delete redirect ${item.sourceUrl}`}>Delete</button>
+                      </span>
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm font-mono break-all">
+                    {item.targetUrl}
+                  </td>
+                  <td className="wp-hide-sm">
+                    <span className={`wp-pill wp-pill-sm ${item.statusCode === 301 ? "wp-st-published" : "wp-st-shipped"}`}>
+                      {item.statusCode}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination footer */}
+      {totalPages > 1 && (
+        <div className="wp-toolbar">
+          <span className="wp-spacer" />
+          <div className="wp-pages">
+            <span>Page {redirectsPage} of {totalPages}</span>
+            <button
+              type="button"
+              disabled={redirectsPage === 1}
+              onClick={() => setRedirectsPage(prev => Math.max(1, prev - 1))}
+              className="wp-btn"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              disabled={redirectsPage === totalPages}
+              onClick={() => setRedirectsPage(prev => Math.min(totalPages, prev + 1))}
+              className="wp-btn"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1226,12 +1253,12 @@ function RedirectsTab() {
    MAIN PAGE
    ═══════════════════════════════════════════════════════════════ */
 const TABS = [
-  { key: 'general', label: 'General', Icon: Globe },
-  { key: 'header', label: 'Header', Icon: Layout },
-  { key: 'footer', label: 'Footer', Icon: AlignLeft },
-  { key: 'social', label: 'Social Links', Icon: Share2 },
-  { key: 'popup', label: 'Popup', Icon: Sparkles },
-  { key: 'redirects', label: 'Redirects', Icon: RefreshCw },
+  { key: 'general', label: 'General' },
+  { key: 'header', label: 'Header' },
+  { key: 'footer', label: 'Footer' },
+  { key: 'social', label: 'Social Links' },
+  { key: 'popup', label: 'Popup' },
+  { key: 'redirects', label: 'Redirects' },
 ];
 
 export default function SiteSettingsPage() {
@@ -1291,18 +1318,39 @@ export default function SiteSettingsPage() {
     finally { setSaving(false); }
   };
 
-  if (loading) return <div className="p-10 text-center text-[13px] text-[#646970] bg-[#f0f0f1] min-h-screen flex items-center justify-center"><p>Loading Settings...</p></div>;
-  if (!config) return <div className="p-10 text-center text-[13px] text-[#d63638] bg-[#f0f0f1] min-h-screen">Failed to load settings.</div>;
+  if (loading) return (
+    <Page>
+      <PageHeader title="General settings" />
+      <div className="wp-postbox wp-inside space-y-3" aria-busy="true">
+        <span className="sr-only">Loading settings...</span>
+        <Skeleton height={30} width="60%" />
+        <Skeleton height={30} width="75%" />
+        <Skeleton height={30} width="50%" />
+      </div>
+    </Page>
+  );
+  if (!config) return (
+    <Page>
+      <PageHeader title="General settings" />
+      <Notice type="error">Failed to load settings.</Notice>
+    </Page>
+  );
 
   return (
     <RequirePermission permission="settings.view">
-    <AdminPageLayout title="Site Settings" breadcrumbs={[{ label: "Settings" }, { label: "Site Settings" }]}>
-      {/* WP-style sub-navigation tabs */}
-      <nav className="flex gap-0 border-b border-[#c3c4c7] mb-6 -mt-2 overflow-x-auto max-w-full scrollbar-none">
+    <Page>
+      <PageHeader title="General settings" />
+
+      {/* WordPress settings tabs */}
+      <nav className="wp-tabs" role="tablist" aria-label="Settings sections">
         {TABS.map(({ key, label }) => (
           <button
             key={key}
+            id={`site-tab-${key}`}
             type="button"
+            role="tab"
+            aria-selected={tab === key}
+            aria-controls="site-tabpanel"
             onClick={() => {
               setTab(key);
               if (typeof window !== "undefined") {
@@ -1311,10 +1359,7 @@ export default function SiteSettingsPage() {
                 window.history.replaceState({}, "", url);
               }
             }}
-            className={`px-4 py-2 text-[13px] font-semibold border-b-[3px] transition-colors whitespace-nowrap shrink-0 ${tab === key
-                ? 'border-[#2271b1] text-[#1d2327]'
-                : 'border-transparent text-[#646970] hover:text-[#135e96]'
-              }`}
+            className="wp-tab max-[782px]:min-h-10"
           >
             {label}
           </button>
@@ -1322,7 +1367,7 @@ export default function SiteSettingsPage() {
       </nav>
 
       {/* Tab content */}
-      <div className="pb-20">
+      <div id="site-tabpanel" role="tabpanel" aria-labelledby={`site-tab-${tab}`} className="min-w-0">
         {tab === 'general' && <GeneralTab config={config} onChange={setConfig} />}
         {tab === 'header' && <HeaderTab config={config} onChange={setConfig} dbPages={dbPages} dbCategories={dbCategories} dbProducts={dbProducts} />}
         {tab === 'footer' && <FooterTab config={config} onChange={setConfig} dbCategories={dbCategories} dbBlogs={dbBlogs} dbPages={dbPages} />}
@@ -1331,22 +1376,21 @@ export default function SiteSettingsPage() {
         {tab === 'redirects' && <RedirectsTab />}
       </div>
 
-      {/* WordPress-style sticky publish bar */}
+      {/* WordPress-style submit row */}
       {tab !== 'redirects' && (
-        <div className="fixed bottom-0 left-0 md:left-[160px] right-0 z-40 bg-white border-t border-[#c3c4c7] px-3 sm:px-6 py-2.5 sm:py-3 flex flex-col xs:flex-row xs:items-center justify-between gap-2 shadow-lg">
-          <p className="text-[11px] sm:text-[12px] text-[#646970]">Changes apply immediately after saving.</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-2">
           <button
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="bg-[#2271b1] text-white px-4 sm:px-5 py-1.5 sm:py-[6px] text-[13px] font-semibold rounded-[3px] hover:bg-[#135e96] disabled:opacity-60 flex items-center justify-center gap-2 w-full xs:w-auto"
+            className="wp-btn wp-btn-primary"
           >
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? 'Saving...' : 'Save changes'}
           </button>
+          <p className="wp-muted m-0">Changes apply immediately after saving.</p>
         </div>
       )}
-    </AdminPageLayout>
+    </Page>
     </RequirePermission>
   );
 }
