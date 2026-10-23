@@ -1,93 +1,241 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, X } from "lucide-react";
-import { Page, PageHeader } from "@/components/admin/ui";
+import { ChevronLeft, ChevronRight, Eye, EyeOff, X } from "lucide-react";
+import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
 import { useRBAC } from "@/hooks/useRBAC";
+import { usePopup } from "@/context/PopupContext";
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
 
+const PAGE_SIZE = 20;
+
+async function readError(res, fallback) {
+  try {
+    const data = await res.json();
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const EMPTY_PASSWORD = { open: false, id: null, name: "", password: "", showPass: false, loading: false };
+
 export default function StaffManagement() {
-  const router = useRouter();
-  const { session } = useRBAC();
+  return (
+    <RequirePermission permission="staff.view">
+      <StaffList />
+    </RequirePermission>
+  );
+}
+
+function StaffList() {
+  const { session, can } = useRBAC();
+  const { showConfirm } = usePopup();
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleView, setRoleView] = useState("all");
-  const [deleteTarget, setDeleteTarget] = useState({ open: false, id: null, name: "", loading: false });
-  const [passwordTarget, setPasswordTarget] = useState({ open: false, id: null, name: "", password: "", showPass: false, loading: false });
+  const [view, setView] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkAction, setBulkAction] = useState("Bulk actions");
+  const [passwordTarget, setPasswordTarget] = useState(EMPTY_PASSWORD);
 
-  const fetchStaff = async () => {
+  const fetchStaff = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/staff");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setStaff(data);
-        } else if (Array.isArray(data?.staff)) {
-          setStaff(data.staff);
-        } else {
-          setStaff([]);
-        }
-      } else {
-        setStaff([]);
-      }
+      const res = await fetch("/api/admin/staff?withTrashed=1");
+      if (!res.ok) throw new Error(await readError(res, "Failed to load users."));
+      const data = await res.json();
+      setStaff(Array.isArray(data) ? data : Array.isArray(data?.staff) ? data.staff : []);
+      setLoadError("");
     } catch (err) {
-      console.error(err);
-      setStaff([]);
+      setLoadError(err.message || "Failed to load users.");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    let active = true;
-    Promise.resolve().then(() => {
-      if (active) fetchStaff();
-    });
-    return () => {
-      active = false;
-    };
   }, []);
 
-  const toggleStatus = async (id, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'Suspended' : 'Active';
-    try {
-      const res = await fetch(`/api/admin/staff/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
-        setStaff(prev => (Array.isArray(prev) ? prev : []).map(s => s._id === id ? { ...s, status: newStatus } : s));
-      }
-    } catch (err) {
-      console.error(err);
-    }
+  useEffect(() => {
+    Promise.resolve().then(() => fetchStaff());
+  }, [fetchStaff]);
+
+  // Live search after a short pause; the Search button / Enter applies immediately.
+  useEffect(() => {
+    const term = searchInput.trim();
+    if (term === searchTerm) return;
+    const t = setTimeout(() => {
+      setPage(1);
+      setSearchTerm(term);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, searchTerm]);
+
+  const runSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    setSearchTerm(searchInput.trim());
   };
 
-  const confirmDeleteStaff = async () => {
-    if (!deleteTarget.id) return;
-    setDeleteTarget(prev => ({ ...prev, loading: true }));
-    try {
-      const res = await fetch(`/api/admin/staff/${deleteTarget.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setStaff(prev => (Array.isArray(prev) ? prev : []).filter(s => s._id !== deleteTarget.id));
-        toast.success(`Staff member "${deleteTarget.name}" deleted successfully.`);
-        setDeleteTarget({ open: false, id: null, name: "", loading: false });
-      } else {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Failed to delete staff member.");
-        setDeleteTarget(prev => ({ ...prev, loading: false }));
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Error deleting staff member.");
-      setDeleteTarget(prev => ({ ...prev, loading: false }));
-    }
+  const currentUserId = session?.user?.id || session?.user?._id;
+  const currentIsSuperAdmin = (session?.user?.role?.slug || session?.user?.roleId?.slug) === "super-admin";
+  const canEdit = can("staff.edit");
+  const canDelete = can("staff.delete");
+  const canCreate = can("staff.create");
+
+  const list = Array.isArray(staff) ? staff : [];
+  const live = list.filter((s) => !s.isDeleted);
+  const trashed = list.filter((s) => s.isDeleted);
+  const isTrash = view === "trash";
+  const counts = {
+    all: live.length,
+    active: live.filter((s) => (s.status || "Active") === "Active").length,
+    suspended: live.filter((s) => s.status && s.status !== "Active").length,
+    trash: trashed.length,
   };
+
+  const roleKey = (s) => s?.roleId?.slug || s?.roleId?.name || "";
+  const roleOptions = Array.from(
+    new Map(list.filter((s) => s?.roleId?.name).map((s) => [roleKey(s), s.roleId.name])).entries()
+  );
+
+  const search = searchTerm.toLowerCase();
+  const filtered = (isTrash ? trashed : live).filter((s) => {
+    if (view === "active" && (s.status || "Active") !== "Active") return false;
+    if (view === "suspended" && (!s.status || s.status === "Active")) return false;
+    if (roleFilter && roleKey(s) !== roleFilter) return false;
+    if (!search) return true;
+    return String(s.name || "").toLowerCase().includes(search) || String(s.email || "").toLowerCase().includes(search);
+  });
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const rows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const changeView = (next) => {
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    setPage(1);
+    setView(next);
+  };
+
+  // What the signed-in user may do with this row (the server re-checks everything).
+  const rowRules = (s) => {
+    const isSuperAdmin = s?.roleId?.slug === "super-admin";
+    const isSelf = Boolean(currentUserId) && String(s?._id) === String(currentUserId);
+    return {
+      isSuperAdmin,
+      isSelf,
+      canToggle: canEdit && !isSuperAdmin && !isSelf,
+      canTrash: canDelete && !isSelf && (!isSuperAdmin || currentIsSuperAdmin),
+      canResetPassword: canEdit && (!isSuperAdmin || currentIsSuperAdmin),
+    };
+  };
+
+  const nameOf = (s) => s?.name || s?.email || "this user";
+
+  // --- requests (throw on failure) ---
+  const trashStaff = async (id) => {
+    const res = await fetch(`/api/admin/staff/${id}?mode=trash`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to move user to the Trash."));
+  };
+  const restoreStaff = async (id) => {
+    const res = await fetch(`/api/admin/staff/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isDeleted: false }),
+    });
+    if (!res.ok) throw new Error(await readError(res, "Failed to restore user."));
+  };
+  const deleteStaffPermanently = async (id) => {
+    const res = await fetch(`/api/admin/staff/${id}?mode=permanent`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to delete user."));
+  };
+
+  const runRow = async (fn, success) => {
+    try {
+      await fn();
+      toast.success(success);
+    } catch (err) {
+      toast.error(err.message);
+    }
+    fetchStaff();
+  };
+
+  const toggleStatus = async (s) => {
+    const newStatus = s.status === "Active" ? "Suspended" : "Active";
+    if (newStatus === "Suspended") {
+      const ok = await showConfirm(`${nameOf(s)} will be signed out and won't be able to sign in until reactivated.`, "Suspend user?", { confirmText: "Suspend", danger: true });
+      if (!ok) return;
+    }
+    runRow(async () => {
+      const res = await fetch(`/api/admin/staff/${s._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Failed to update status."));
+    }, newStatus === "Active" ? `${nameOf(s)} activated.` : `${nameOf(s)} suspended.`);
+  };
+
+  const handleTrash = async (s) => {
+    const ok = await showConfirm(
+      `${nameOf(s)} will be moved to the Trash. They are signed out right away and can't sign in until restored.`,
+      "Move to Trash?",
+      { confirmText: "Move to Trash", danger: true }
+    );
+    if (ok) runRow(() => trashStaff(s._id), `${nameOf(s)} moved to the Trash.`);
+  };
+
+  const handleRestore = (s) => runRow(() => restoreStaff(s._id), `${nameOf(s)} restored.`);
+
+  const handleDeletePermanently = async (s) => {
+    const ok = await showConfirm(`${nameOf(s)} will be deleted permanently. This cannot be undone.`, "Delete permanently?", { confirmText: "Delete Permanently", danger: true });
+    if (ok) runRow(() => deleteStaffPermanently(s._id), "User deleted permanently.");
+  };
+
+  const BULK = {
+    "Move to Trash": { verb: "moved to the Trash", run: trashStaff },
+    Restore: { verb: "restored", run: restoreStaff },
+    "Delete Permanently": { verb: "deleted permanently", run: deleteStaffPermanently },
+  };
+
+  const handleBulk = async () => {
+    const def = BULK[bulkAction];
+    if (!def || selectedIds.length === 0) return;
+    const n = selectedIds.length;
+    const label = `${n} user${n === 1 ? "" : "s"}`;
+    const ok = bulkAction === "Restore"
+      ? await showConfirm(`Restore ${label}?`)
+      : bulkAction === "Delete Permanently"
+        ? await showConfirm(`${label} will be deleted permanently. This cannot be undone.`, "Delete permanently?", { confirmText: "Delete Permanently", danger: true })
+        : await showConfirm(`${label} will be moved to the Trash and signed out.`, "Move to Trash?", { confirmText: "Move to Trash", danger: true });
+    if (!ok) return;
+
+    let done = 0;
+    const failures = [];
+    for (const id of selectedIds) {
+      const s = list.find((x) => x._id === id);
+      try {
+        await def.run(id);
+        done++;
+      } catch (err) {
+        failures.push(`${nameOf(s)}: ${err.message}`);
+      }
+    }
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    fetchStaff();
+    if (done) toast.success(`${done} user${done === 1 ? "" : "s"} ${def.verb}.`);
+    if (failures.length) toast.error(`${failures.length} failed — ${failures.slice(0, 5).join("; ")}${failures.length > 5 ? "; …" : ""}`, { duration: 8000 });
+  };
+
+  const selectable = rows.filter((s) => isTrash || rowRules(s).canTrash);
+  const allSelected = selectable.length > 0 && selectable.every((s) => selectedIds.includes(s._id));
+  const toggleAll = () => setSelectedIds(allSelected ? [] : selectable.map((s) => s._id));
+  const toggleOne = (id) => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const submitResetPassword = async (e) => {
     e?.preventDefault();
@@ -95,111 +243,110 @@ export default function StaffManagement() {
       toast.error("Password must be at least 6 characters long.");
       return;
     }
-
-    setPasswordTarget(prev => ({ ...prev, loading: true }));
+    setPasswordTarget((prev) => ({ ...prev, loading: true }));
     try {
       const res = await fetch(`/api/admin/staff/${passwordTarget.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passwordTarget.password })
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordTarget.password }),
       });
-      if (res.ok) {
-        toast.success(`Password for "${passwordTarget.name}" updated successfully!`);
-        setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false });
-      } else {
-        const data = await res.json();
-        toast.error(data.error || "Failed to reset password");
-        setPasswordTarget(prev => ({ ...prev, loading: false }));
-      }
+      if (!res.ok) throw new Error(await readError(res, "Failed to reset password"));
+      toast.success(`Password for "${passwordTarget.name}" updated.`);
+      setPasswordTarget(EMPTY_PASSWORD);
     } catch (err) {
-      console.error(err);
-      toast.error("Error resetting password");
-      setPasswordTarget(prev => ({ ...prev, loading: false }));
+      toast.error(err.message);
+      setPasswordTarget((prev) => ({ ...prev, loading: false }));
     }
   };
 
-  const staffList = Array.isArray(staff) ? staff : [];
-  const currentUserId = session?.user?.id || session?.user?._id;
-  const currentIsSuperAdmin = (session?.user?.role?.slug || session?.user?.roleId?.slug) === 'super-admin';
-
-  const filteredStaff = staffList.filter(s => {
-    if (!s) return false;
-    const nameStr = s.name ? String(s.name).toLowerCase() : "";
-    const emailStr = s.email ? String(s.email).toLowerCase() : "";
-    const search = searchTerm.toLowerCase();
-    return nameStr.includes(search) || emailStr.includes(search);
-  });
-
-  const formatDate = (dateVal) => {
-    if (!dateVal) return "Never";
-    try {
-      const d = new Date(dateVal);
-      return isNaN(d.getTime()) ? "Never" : d.toLocaleDateString();
-    } catch {
-      return "Never";
-    }
-  };
-
-  const roleOptions = Array.from(
-    new Map(
-      staffList
-        .filter(s => s?.roleId && typeof s.roleId === "object" && s.roleId.name)
-        .map(s => [s.roleId.slug || s.roleId.name, s.roleId.name])
-    ).entries()
+  const viewLink = (key, label, count) => (
+    view === key ? (
+      <span className="is-current" aria-current="page">{label} <span className="wp-count">({count})</span></span>
+    ) : (
+      <button type="button" onClick={() => changeView(key)}>{label} <span className="wp-count">({count})</span></button>
+    )
   );
-  const visibleStaff = roleView === "all"
-    ? filteredStaff
-    : filteredStaff.filter(s => (s?.roleId?.slug || s?.roleId?.name) === roleView);
 
   const headerRow = (
     <tr>
+      {canDelete && (
+        <th className="wp-check-col">
+          <input type="checkbox" aria-label="Select all users" checked={allSelected} disabled={selectable.length === 0} onChange={toggleAll} />
+        </th>
+      )}
       <th scope="col">Username</th>
       <th scope="col" className="wp-hide-sm">Email</th>
       <th scope="col">Role</th>
       <th scope="col">Status</th>
-      <th scope="col" className="wp-hide-sm">Last login</th>
+      <th scope="col" className="wp-hide-sm">{isTrash ? "Trashed" : "Last login"}</th>
     </tr>
   );
+  const colCount = canDelete ? 6 : 5;
+  const itemsLabel = `${filtered.length} item${filtered.length === 1 ? "" : "s"}`;
 
   return (
-    <RequirePermission permission="staff.view">
     <Page>
       <PageHeader
         title="Users"
-        actions={<Link href="/admin/settings/team/new" className="wp-btn">Add new user</Link>}
+        actions={canCreate ? <Link href="/admin/settings/team/new" className="wp-btn">Add new user</Link> : null}
+        aside={
+          <form className="wp-search" role="search" onSubmit={runSearch}>
+            <label htmlFor="team-search" className="sr-only">Search users</label>
+            <input
+              id="team-search"
+              type="search"
+              className="wp-input"
+              placeholder="Search by name or email"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            <button type="submit" className="wp-btn">Search Users</button>
+          </form>
+        }
       />
 
-      <div className="wp-subsub" role="tablist" aria-label="Filter users by role">
-        <button type="button" role="tab" aria-selected={roleView === "all"} className={roleView === "all" ? "is-current" : undefined} onClick={() => setRoleView("all")}>
-          All <span className="wp-count">({staffList.length})</span>
-        </button>
-        {roleOptions.map(([key, label]) => (
-          <span key={key} style={{ display: "contents" }}>
-            <span className="wp-sep" aria-hidden="true">|</span>
-            <button type="button" role="tab" aria-selected={roleView === key} className={roleView === key ? "is-current" : undefined} onClick={() => setRoleView(key)}>
-              {label} <span className="wp-count">({staffList.filter(s => (s?.roleId?.slug || s?.roleId?.name) === key).length})</span>
-            </button>
-          </span>
-        ))}
+      {loadError && <Notice type="error" onDismiss={() => setLoadError("")}>{loadError}</Notice>}
+
+      <div className="wp-subsub">
+        {viewLink("all", "All", counts.all)}
         <span className="wp-sep" aria-hidden="true">|</span>
-        <span className="wp-muted">Active <span className="wp-count">({staffList.filter(s => s?.status === 'Active').length})</span></span>
+        {viewLink("active", "Active", counts.active)}
         <span className="wp-sep" aria-hidden="true">|</span>
-        <span className="wp-muted">Suspended <span className="wp-count">({staffList.filter(s => s?.status && s.status !== 'Active').length})</span></span>
+        {viewLink("suspended", "Suspended", counts.suspended)}
+        <span className="wp-sep" aria-hidden="true">|</span>
+        {viewLink("trash", "Trash", counts.trash)}
       </div>
 
       <div className="wp-toolbar">
+        {canDelete && (
+          <>
+            <label htmlFor="team-bulk" className="sr-only">Select bulk action</label>
+            <select id="team-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+              <option>Bulk actions</option>
+              {isTrash ? (
+                <>
+                  <option>Restore</option>
+                  <option>Delete Permanently</option>
+                </>
+              ) : (
+                <option>Move to Trash</option>
+              )}
+            </select>
+            <button type="button" className="wp-btn" onClick={handleBulk}>Apply</button>
+          </>
+        )}
+        <label htmlFor="team-role-filter" className="sr-only">Filter by role</label>
+        <select
+          id="team-role-filter"
+          className="wp-select"
+          value={roleFilter}
+          onChange={(e) => { setRoleFilter(e.target.value); setPage(1); setSelectedIds([]); }}
+        >
+          <option value="">All roles</option>
+          {roleOptions.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
         <span className="wp-spacer" />
-        <div className="wp-search" role="search">
-          <label htmlFor="team-search" className="sr-only">Search users</label>
-          <input
-            id="team-search"
-            type="search"
-            className="wp-input"
-            placeholder="Search by name or email"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        <span className="wp-pages">{itemsLabel}</span>
       </div>
 
       <div className="wp-table-box">
@@ -207,72 +354,84 @@ export default function StaffManagement() {
           <thead>{headerRow}</thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="wp-muted">Loading users…</td></tr>
-            ) : visibleStaff.length === 0 ? (
-              <tr><td colSpan={5} className="wp-muted">No users found.</td></tr>
-            ) : (
-              visibleStaff.map((s, index) => {
-                const isSuperAdmin = s?.roleId?.slug === 'super-admin';
-                const isSelf = currentUserId && s?._id === currentUserId;
-                const roleName = s?.roleId?.name || (typeof s?.roleId === 'string' ? 'Assigned' : 'No Role');
-                const isActive = (s?.status || "Active") === 'Active';
-
-                return (
-                  <tr key={s?._id || index}>
-                    <td>
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className="wp-avatar" aria-hidden="true">{(s?.name || "U").charAt(0).toUpperCase()}</div>
-                        <div className="min-w-0">
-                          <Link href={`/admin/settings/team/${s._id}`} className="wp-row-title" style={{ wordBreak: "break-word" }}>
+              [0, 1, 2].map((i) => <tr key={i}><td colSpan={colCount}><Skeleton height={18} /></td></tr>)
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={colCount} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>{isTrash ? "No users found in Trash." : "No users found."}</td></tr>
+            ) : rows.map((s) => {
+              const rules = rowRules(s);
+              const roleName = s?.roleId?.name || "No role";
+              const status = s?.status || "Active";
+              const isActive = status === "Active";
+              return (
+                <tr key={s._id} className={selectedIds.includes(s._id) ? "is-selected" : undefined}>
+                  {canDelete && (
+                    <td className="wp-check-col">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${nameOf(s)}`}
+                        checked={selectedIds.includes(s._id)}
+                        disabled={!isTrash && !rules.canTrash}
+                        onChange={() => toggleOne(s._id)}
+                      />
+                    </td>
+                  )}
+                  <td>
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="wp-avatar" aria-hidden="true">{(s?.name || "U").charAt(0).toUpperCase()}</div>
+                      <div className="min-w-0">
+                        {isTrash ? (
+                          <span className="wp-row-title" style={{ color: "inherit", overflowWrap: "anywhere" }}>{s?.name || "Unnamed"}</span>
+                        ) : (
+                          <Link href={`/admin/settings/team/${s._id}`} className="wp-row-title" style={{ overflowWrap: "anywhere" }}>
                             {s?.name || "Unnamed"}
                           </Link>
-                          {isSelf && <span className="wp-muted"> — You</span>}
-                          <div className="wp-mobile-meta" style={{ wordBreak: "break-all" }}>{s?.email || "No email"}</div>
-                          <div className="wp-row-actions">
-                            <button type="button" onClick={() => router.push(`/admin/settings/team/${s._id}`)}>Edit</button>
-                            {!isSuperAdmin && !isSelf && (
-                              <button type="button" onClick={() => toggleStatus(s._id, s.status)}>
-                                {s?.status === 'Active' ? 'Suspend' : 'Activate'}
-                              </button>
-                            )}
-                            {(!isSuperAdmin || currentIsSuperAdmin) && (
-                              <button
-                                type="button"
-                                onClick={() => setPasswordTarget({ open: true, id: s._id, name: s.name, password: "", showPass: false, loading: false })}
-                              >
-                                Reset password
-                              </button>
-                            )}
-                            {!isSuperAdmin && !isSelf && (
-                              <button
-                                type="button"
-                                className="is-danger"
-                                onClick={() => setDeleteTarget({ open: true, id: s._id, name: s.name, loading: false })}
-                              >
-                                Delete
-                              </button>
-                            )}
-                            {isSuperAdmin && <span className="is-muted">System protected</span>}
-                          </div>
+                        )}
+                        {rules.isSelf && <span className="wp-muted"> — You</span>}
+                        <div className="wp-mobile-meta" style={{ overflowWrap: "anywhere" }}>{s?.email || "No email"}</div>
+                        <div className="wp-row-actions">
+                          {isTrash ? (
+                            <>
+                              <button type="button" onClick={() => handleRestore(s)}>Restore</button>
+                              <button type="button" className="is-danger" onClick={() => handleDeletePermanently(s)}>Delete Permanently</button>
+                            </>
+                          ) : (
+                            <>
+                              <Link href={`/admin/settings/team/${s._id}`}>{canEdit ? "Edit" : "View"}</Link>
+                              {rules.canToggle && (
+                                <button type="button" onClick={() => toggleStatus(s)}>{isActive ? "Suspend" : "Activate"}</button>
+                              )}
+                              {rules.canResetPassword && (
+                                <button type="button" onClick={() => setPasswordTarget({ ...EMPTY_PASSWORD, open: true, id: s._id, name: s.name })}>
+                                  Reset password
+                                </button>
+                              )}
+                              {rules.canTrash && (
+                                <button type="button" className="is-danger" onClick={() => handleTrash(s)}>Trash</button>
+                              )}
+                              {rules.isSuperAdmin && !rules.canTrash && !rules.isSelf && <span className="is-muted">Protected</span>}
+                            </>
+                          )}
                         </div>
                       </div>
-                    </td>
-                    <td className="wp-hide-sm" style={{ wordBreak: "break-all" }}>
-                      {s?.email ? <a href={`mailto:${s.email}`} className="wp-link">{s.email}</a> : <span className="wp-muted">No email</span>}
-                    </td>
-                    <td>{roleName}</td>
-                    <td>
-                      <span className={`wp-pill wp-pill-sm ${isActive ? 'wp-st-published' : 'wp-st-cancelled'}`}>
-                        {s?.status || "Active"}
-                      </span>
-                    </td>
-                    <td className="wp-hide-sm wp-muted" suppressHydrationWarning>
-                      {formatDate(s?.security?.lastLogin)}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm" style={{ overflowWrap: "anywhere" }}>
+                    {s?.email ? <a href={`mailto:${s.email}`} className="wp-link">{s.email}</a> : <span className="wp-muted">No email</span>}
+                  </td>
+                  <td>{roleName}</td>
+                  <td>
+                    <span className={`wp-pill wp-pill-sm ${isTrash ? "wp-st-draft" : isActive ? "wp-st-published" : "wp-st-cancelled"}`}>
+                      {isTrash ? "Trashed" : status}
+                    </span>
+                  </td>
+                  <td className="wp-hide-sm wp-muted" suppressHydrationWarning>
+                    {isTrash
+                      ? (s.deletedAt ? formatDate(s.deletedAt) : "—")
+                      : (s?.security?.lastLogin ? formatDate(s.security.lastLogin) : "Never")}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>{headerRow}</tfoot>
         </table>
@@ -280,73 +439,28 @@ export default function StaffManagement() {
 
       <div className="wp-toolbar">
         <span className="wp-spacer" />
-        <span className="wp-muted">{visibleStaff.length} item{visibleStaff.length === 1 ? "" : "s"}</span>
+        <span className="wp-pages">
+          {itemsLabel}
+          {pages > 1 && (
+            <>
+              <button type="button" className="wp-pager" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => { setSelectedIds([]); setPage(currentPage - 1); }}><ChevronLeft className="w-4 h-4" aria-hidden="true" /></button>
+              <span>{currentPage} of {pages}</span>
+              <button type="button" className="wp-pager" aria-label="Next page" disabled={currentPage >= pages} onClick={() => { setSelectedIds([]); setPage(currentPage + 1); }}><ChevronRight className="w-4 h-4" aria-hidden="true" /></button>
+            </>
+          )}
+        </span>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {deleteTarget.open && (
-        <div
-          className="wp-modal-backdrop"
-          onClick={(e) => { if (e.target === e.currentTarget && !deleteTarget.loading) setDeleteTarget({ open: false, id: null, name: "", loading: false }); }}
-        >
-          <div className="wp-modal" style={{ maxWidth: 460 }} role="dialog" aria-modal="true" aria-labelledby="delete-staff-title">
-            <div className="wp-modal-head">
-              <h2 id="delete-staff-title">Delete user</h2>
-              <button
-                type="button"
-                className="wp-notice-dismiss"
-                aria-label="Close"
-                disabled={deleteTarget.loading}
-                onClick={() => setDeleteTarget({ open: false, id: null, name: "", loading: false })}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="wp-modal-body">
-              <p style={{ margin: 0 }}>
-                Are you sure you want to delete <span className="wp-strong">{deleteTarget.name}</span>? This action cannot be undone and will revoke their access immediately.
-              </p>
-            </div>
-            <div className="wp-modal-foot">
-              <button
-                type="button"
-                className="wp-btn"
-                disabled={deleteTarget.loading}
-                onClick={() => setDeleteTarget({ open: false, id: null, name: "", loading: false })}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="wp-btn wp-btn-primary"
-                style={{ background: "#b32d2e", borderColor: "#b32d2e", color: "#fff" }}
-                disabled={deleteTarget.loading}
-                onClick={confirmDeleteStaff}
-              >
-                {deleteTarget.loading ? "Deleting…" : "Delete user"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reset Password Modal */}
       {passwordTarget.open && (
         <div
           className="wp-modal-backdrop"
-          onClick={(e) => { if (e.target === e.currentTarget && !passwordTarget.loading) setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false }); }}
+          onClick={(e) => { if (e.target === e.currentTarget && !passwordTarget.loading) setPasswordTarget(EMPTY_PASSWORD); }}
         >
           <div className="wp-modal" style={{ maxWidth: 460 }} role="dialog" aria-modal="true" aria-labelledby="reset-pass-title">
             <form onSubmit={submitResetPassword}>
               <div className="wp-modal-head">
-                <h2 id="reset-pass-title" style={{ minWidth: 0, wordBreak: "break-word" }}>Set new password — {passwordTarget.name}</h2>
-                <button
-                  type="button"
-                  className="wp-notice-dismiss"
-                  aria-label="Close"
-                  disabled={passwordTarget.loading}
-                  onClick={() => setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })}
-                >
+                <h2 id="reset-pass-title" style={{ minWidth: 0, overflowWrap: "anywhere" }}>Set new password — {passwordTarget.name}</h2>
+                <button type="button" className="wp-notice-dismiss" aria-label="Close" disabled={passwordTarget.loading} onClick={() => setPasswordTarget(EMPTY_PASSWORD)}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -359,9 +473,10 @@ export default function StaffManagement() {
                     autoFocus
                     required
                     minLength={6}
+                    autoComplete="new-password"
                     placeholder="Enter new password"
                     value={passwordTarget.password}
-                    onChange={(e) => setPasswordTarget(prev => ({ ...prev, password: e.target.value }))}
+                    onChange={(e) => setPasswordTarget((prev) => ({ ...prev, password: e.target.value }))}
                     className="wp-input"
                     style={{ flex: 1, minWidth: 0 }}
                   />
@@ -369,7 +484,7 @@ export default function StaffManagement() {
                     type="button"
                     className="wp-btn"
                     aria-label={passwordTarget.showPass ? "Hide password" : "Show password"}
-                    onClick={() => setPasswordTarget(prev => ({ ...prev, showPass: !prev.showPass }))}
+                    onClick={() => setPasswordTarget((prev) => ({ ...prev, showPass: !prev.showPass }))}
                   >
                     {passwordTarget.showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     {passwordTarget.showPass ? "Hide" : "Show"}
@@ -378,14 +493,7 @@ export default function StaffManagement() {
                 <p className="wp-desc">Minimum 6 characters.</p>
               </div>
               <div className="wp-modal-foot">
-                <button
-                  type="button"
-                  className="wp-btn"
-                  disabled={passwordTarget.loading}
-                  onClick={() => setPasswordTarget({ open: false, id: null, name: "", password: "", showPass: false, loading: false })}
-                >
-                  Cancel
-                </button>
+                <button type="button" className="wp-btn" disabled={passwordTarget.loading} onClick={() => setPasswordTarget(EMPTY_PASSWORD)}>Cancel</button>
                 <button type="submit" className="wp-btn wp-btn-primary" disabled={passwordTarget.loading}>
                   {passwordTarget.loading ? "Saving…" : "Update password"}
                 </button>
@@ -395,6 +503,5 @@ export default function StaffManagement() {
         </div>
       )}
     </Page>
-    </RequirePermission>
   );
 }

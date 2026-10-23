@@ -1,189 +1,363 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, Lock } from "lucide-react";
-import { Page, PageHeader, Postbox } from "@/components/admin/ui";
-import { ALL_PERMISSIONS, ACTIONS } from "@/lib/rbac";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { Lock } from "lucide-react";
+import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import { useRBAC } from "@/hooks/useRBAC";
 import RequirePermission from "@/components/admin/RequirePermission";
+import PermissionMatrix, { countPermissions, TOTAL_PERMISSIONS } from "./PermissionMatrix";
+
+async function readError(res, fallback) {
+  try {
+    const data = await res.json();
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// Why the role can't be trashed/deleted, or "" when it can (the server re-checks).
+function removalBlock(role) {
+  if (role.isSystem) return "System role";
+  const total = (role.staffCount || 0) + (role.trashedStaffCount || 0);
+  if (total > 0) return `In use by ${total} user${total === 1 ? "" : "s"}`;
+  return "";
+}
 
 export default function RoleManagement() {
-  const router = useRouter();
-  const { showConfirm } = usePopup();
-  const [roles, setRoles] = useState([]);
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [expandedModules, setExpandedModules] = useState({});
+  return (
+    <RequirePermission permission={["staff.view", "staff.manage_roles"]}>
+      <RoleManagementScreen />
+    </RequirePermission>
+  );
+}
 
-  const fetchRoles = async () => {
+function RoleManagementScreen() {
+  const { showConfirm } = usePopup();
+  const { can } = useRBAC();
+  const canManage = can("staff.manage_roles");
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [view, setView] = useState("all");
+  const [selectedId, setSelectedId] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkAction, setBulkAction] = useState("Bulk actions");
+
+  const fetchRoles = useCallback(async (selectId) => {
     try {
-      const res = await fetch("/api/admin/roles");
-      if (res.ok) {
-        const data = await res.json();
-        const rolesList = Array.isArray(data) ? data : [];
-        setRoles(rolesList);
-        if (rolesList.length > 0 && !selectedRole) setSelectedRole(rolesList[0]);
-      } else {
-        setRoles([]);
-      }
+      const res = await fetch("/api/admin/roles?withTrashed=1");
+      if (!res.ok) throw new Error(await readError(res, "Failed to load roles."));
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : [];
+      setRoles(list);
+      setLoadError("");
+      setSelectedId((prev) => {
+        const wanted = selectId || prev;
+        const live = list.filter((r) => !r.isDeleted);
+        return live.some((r) => r._id === wanted) ? wanted : live[0]?._id || null;
+      });
     } catch (err) {
-      console.error(err);
-      setRoles([]);
+      setLoadError(err.message || "Failed to load roles.");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    Promise.resolve().then(() => {
-      fetchRoles();
-    });
   }, []);
 
-  const togglePermission = (module, action) => {
-    if (selectedRole?.slug === 'super-admin') return; // Super admin permissions are handled by bypass logic
+  useEffect(() => {
+    Promise.resolve().then(() => fetchRoles());
+  }, [fetchRoles]);
 
-    const currentPerms = { ...selectedRole.permissions };
-    const modulePerms = [...(currentPerms[module] || [])];
+  // Editing copy of the selected role (name, description, permissions).
+  const selectedRole = roles.find((r) => r._id === selectedId) || null;
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      setDraft(selectedRole ? {
+        _id: selectedRole._id,
+        name: selectedRole.name || "",
+        description: selectedRole.description || "",
+        permissions: { ...(selectedRole.permissions || {}) },
+      } : null);
+    });
+  }, [selectedRole]);
 
-    if (modulePerms.includes(action)) {
-      currentPerms[module] = modulePerms.filter(a => a !== action);
-    } else {
-      currentPerms[module] = [...modulePerms, action];
+  const liveRoles = roles.filter((r) => !r.isDeleted);
+  const trashedRoles = roles.filter((r) => r.isDeleted);
+  const isTrash = view === "trash";
+  const visible = isTrash ? trashedRoles : view === "custom" ? liveRoles.filter((r) => !r.isSystem) : liveRoles;
+
+  const changeView = (next) => {
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    setView(next);
+  };
+
+  // --- requests (throw on failure) ---
+  const trashRole = async (id) => {
+    const res = await fetch(`/api/admin/roles/${id}?mode=trash`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to move role to the Trash."));
+  };
+  const restoreRole = async (id) => {
+    const res = await fetch(`/api/admin/roles/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isDeleted: false }),
+    });
+    if (!res.ok) throw new Error(await readError(res, "Failed to restore role."));
+  };
+  const deleteRolePermanently = async (id) => {
+    const res = await fetch(`/api/admin/roles/${id}?mode=permanent`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await readError(res, "Failed to delete role."));
+  };
+
+  const run = async (fn, success) => {
+    try {
+      await fn();
+      toast.success(success);
+    } catch (err) {
+      toast.error(err.message);
     }
+    fetchRoles();
+  };
 
-    setSelectedRole({ ...selectedRole, permissions: currentPerms });
+  const handleTrash = async (role) => {
+    const block = removalBlock(role);
+    if (block) return toast.error(`${role.name}: ${block}. ${role.isSystem ? "System roles can't be removed." : "Assign those users another role first."}`);
+    const ok = await showConfirm(`The "${role.name}" role will be moved to the Trash. You can restore it later.`, "Move to Trash?", { confirmText: "Move to Trash", danger: true });
+    if (ok) run(() => trashRole(role._id), `"${role.name}" moved to the Trash.`);
+  };
+
+  const handleRestore = (role) => run(() => restoreRole(role._id), `"${role.name}" restored.`);
+
+  const handleDeletePermanently = async (role) => {
+    const ok = await showConfirm(`The "${role.name}" role will be deleted permanently. This cannot be undone.`, "Delete permanently?", { confirmText: "Delete Permanently", danger: true });
+    if (ok) run(() => deleteRolePermanently(role._id), "Role deleted permanently.");
+  };
+
+  const handleDuplicate = async (role) => {
+    try {
+      const res = await fetch(`/api/admin/roles/${role._id}/duplicate`, { method: "POST" });
+      if (!res.ok) throw new Error(await readError(res, "Failed to duplicate role."));
+      const copy = await res.json();
+      toast.success(`Created "${copy.name}". Adjust its permissions below.`);
+      setView("all");
+      await fetchRoles(copy._id);
+      document.getElementById("role-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   const handleSave = async () => {
+    if (!draft) return;
+    if (!draft.name.trim()) return toast.error("Role name is required.");
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/roles/${selectedRole._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selectedRole)
+      const res = await fetch(`/api/admin/roles/${draft._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: draft.name, description: draft.description, permissions: draft.permissions }),
       });
-      if (res.ok) {
-        setRoles(roles.map(r => r._id === selectedRole._id ? selectedRole : r));
-        toast.success("Permissions saved successfully!");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error || "Failed to save permissions");
-      }
+      if (!res.ok) throw new Error(await readError(res, "Failed to save role."));
+      toast.success("Role saved.");
+      fetchRoles(draft._id);
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to save permissions");
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCreateRole = () => {
-    router.push("/admin/settings/roles/new");
+  const BULK = {
+    "Move to Trash": { verb: "moved to the Trash", run: trashRole },
+    Restore: { verb: "restored", run: restoreRole },
+    "Delete Permanently": { verb: "deleted permanently", run: deleteRolePermanently },
   };
 
-  const deleteRole = async (role) => {
-    if (role.isSystem) return toast.error("System roles cannot be deleted.");
-    const confirmed = await showConfirm(
-      `Are you sure you want to delete the "${role.name}" role?`,
-      "Delete Role"
-    );
-    if (!confirmed) return;
-
-    try {
-      const res = await fetch(`/api/admin/roles/${role._id}`, { method: 'DELETE' });
-      if (res.ok) {
-        const remaining = roles.filter(r => r._id !== role._id);
-        setRoles(remaining);
-        if (selectedRole?._id === role._id) setSelectedRole(remaining[0] || null);
-        toast.success("Role deleted successfully.");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error || "Failed to delete role");
+  const handleBulk = async () => {
+    const def = BULK[bulkAction];
+    if (!def || selectedIds.length === 0) return;
+    const n = selectedIds.length;
+    const label = `${n} role${n === 1 ? "" : "s"}`;
+    const ok = bulkAction === "Restore"
+      ? await showConfirm(`Restore ${label}?`)
+      : await showConfirm(
+        bulkAction === "Delete Permanently" ? `${label} will be deleted permanently. This cannot be undone.` : `${label} will be moved to the Trash.`,
+        bulkAction === "Delete Permanently" ? "Delete permanently?" : "Move to Trash?",
+        { confirmText: bulkAction, danger: true }
+      );
+    if (!ok) return;
+    let done = 0;
+    const failures = [];
+    for (const id of selectedIds) {
+      const role = roles.find((r) => r._id === id);
+      try {
+        await def.run(id);
+        done++;
+      } catch (err) {
+        failures.push(`${role?.name || id}: ${err.message}`);
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to delete role");
     }
+    setSelectedIds([]);
+    setBulkAction("Bulk actions");
+    fetchRoles();
+    if (done) toast.success(`${done} role${done === 1 ? "" : "s"} ${def.verb}.`);
+    if (failures.length) toast.error(`${failures.length} failed — ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? "; …" : ""}`, { duration: 8000 });
   };
 
-  const toggleModule = (module) => {
-    // Modules default to expanded (undefined === expanded), so the first click collapses.
-    setExpandedModules(prev => ({ ...prev, [module]: prev[module] === false }));
-  };
+  const selectable = visible.filter((r) => isTrash || !removalBlock(r));
+  const allSelected = selectable.length > 0 && selectable.every((r) => selectedIds.includes(r._id));
+  const toggleAll = () => setSelectedIds(allSelected ? [] : selectable.map((r) => r._id));
+  const toggleOne = (id) => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  const isModuleExpanded = (module) => expandedModules[module] !== false;
-
-  const prettify = (key) => String(key).replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase());
-
-  if (loading) return (
-    <Page>
-      <PageHeader title="Roles" />
-      <p className="wp-muted" role="status">Loading roles…</p>
-    </Page>
+  const viewLink = (key, label, count) => (
+    view === key ? (
+      <span className="is-current" aria-current="page">{label} <span className="wp-count">({count})</span></span>
+    ) : (
+      <button type="button" onClick={() => changeView(key)}>{label} <span className="wp-count">({count})</span></button>
+    )
   );
 
   const headerRow = (
     <tr>
+      {canManage && (
+        <th className="wp-check-col">
+          <input type="checkbox" aria-label="Select all roles" checked={allSelected} disabled={selectable.length === 0} onChange={toggleAll} />
+        </th>
+      )}
       <th scope="col">Role</th>
       <th scope="col" className="wp-hide-sm">Description</th>
       <th scope="col">Type</th>
-      <th scope="col" className="wp-hide-sm">Permissions</th>
+      <th scope="col" className="wp-num" style={{ textAlign: "right" }}>Users</th>
+      <th scope="col" className="wp-num wp-hide-sm" style={{ textAlign: "right" }}>Permissions</th>
     </tr>
   );
+  const colCount = canManage ? 6 : 5;
+
+  const isSuperAdminDraft = selectedRole?.slug === "super-admin";
 
   return (
-    <RequirePermission permission={["staff.view", "staff.manage_roles"]}>
     <Page>
       <PageHeader
         title="Roles"
-        actions={<button type="button" onClick={handleCreateRole} className="wp-btn">Add new role</button>}
+        actions={canManage ? <Link href="/admin/settings/roles/new" className="wp-btn">Add new role</Link> : null}
       />
+
+      {loadError && <Notice type="error" onDismiss={() => setLoadError("")}>{loadError}</Notice>}
+
+      <div className="wp-subsub">
+        {viewLink("all", "All", liveRoles.length)}
+        <span className="wp-sep" aria-hidden="true">|</span>
+        {viewLink("custom", "Custom", liveRoles.filter((r) => !r.isSystem).length)}
+        <span className="wp-sep" aria-hidden="true">|</span>
+        {viewLink("trash", "Trash", trashedRoles.length)}
+      </div>
+
+      {canManage && (
+        <div className="wp-toolbar">
+          <label htmlFor="roles-bulk" className="sr-only">Select bulk action</label>
+          <select id="roles-bulk" className="wp-select" value={bulkAction} onChange={(e) => setBulkAction(e.target.value)}>
+            <option>Bulk actions</option>
+            {isTrash ? (
+              <>
+                <option>Restore</option>
+                <option>Delete Permanently</option>
+              </>
+            ) : (
+              <option>Move to Trash</option>
+            )}
+          </select>
+          <button type="button" className="wp-btn" onClick={handleBulk}>Apply</button>
+          <span className="wp-spacer" />
+          <span className="wp-pages">{visible.length} item{visible.length === 1 ? "" : "s"}</span>
+        </div>
+      )}
 
       <div className="wp-table-box" style={{ marginBottom: 20 }}>
         <table className="wp-list-table">
           <thead>{headerRow}</thead>
           <tbody>
-            {roles.length === 0 ? (
-              <tr><td colSpan={4} className="wp-muted">No roles found.</td></tr>
-            ) : roles.map((role) => {
-              const isSelected = selectedRole?._id === role._id;
-              const permCount = role.slug === 'super-admin'
-                ? "All"
-                : Object.values(role.permissions || {}).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0);
+            {loading ? (
+              [0, 1, 2].map((i) => (
+                <tr key={i}><td colSpan={colCount}><Skeleton height={18} /></td></tr>
+              ))
+            ) : visible.length === 0 ? (
+              <tr><td colSpan={colCount} className="wp-muted" style={{ padding: 20, textAlign: "center" }}>{isTrash ? "No roles found in Trash." : "No roles found."}</td></tr>
+            ) : visible.map((role) => {
+              const isSelected = !isTrash && selectedId === role._id;
+              const block = removalBlock(role);
+              const permCount = role.slug === "super-admin" ? "All" : `${countPermissions(role.permissions)}/${TOTAL_PERMISSIONS}`;
+              const users = role.staffCount || 0;
               return (
-                <tr key={role._id} className={isSelected ? "is-selected" : undefined}>
+                <tr key={role._id} className={isSelected || selectedIds.includes(role._id) ? "is-selected" : undefined}>
+                  {canManage && (
+                    <td className="wp-check-col">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${role.name}`}
+                        checked={selectedIds.includes(role._id)}
+                        disabled={!isTrash && Boolean(block)}
+                        title={!isTrash && block ? block : undefined}
+                        onChange={() => toggleOne(role._id)}
+                      />
+                    </td>
+                  )}
                   <td>
-                    <button
-                      type="button"
-                      className="wp-row-title"
-                      style={{ background: "none", border: 0, padding: 0, cursor: "pointer", textAlign: "left", wordBreak: "break-word" }}
-                      aria-pressed={isSelected}
-                      onClick={() => setSelectedRole(role)}
-                    >
-                      {role.name}
-                    </button>
+                    {isTrash ? (
+                      <span className="wp-row-title" style={{ color: "inherit", overflowWrap: "anywhere" }}>{role.name}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="wp-row-title"
+                        style={{ background: "none", border: 0, padding: 0, cursor: "pointer", textAlign: "left", overflowWrap: "anywhere" }}
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedId(role._id)}
+                      >
+                        {role.name}
+                      </button>
+                    )}
                     {isSelected && <span className="wp-muted"> — Editing</span>}
                     {role.description && <div className="wp-mobile-meta">{role.description}</div>}
                     <div className="wp-row-actions">
-                      <button type="button" onClick={() => setSelectedRole(role)}>Edit permissions</button>
-                      {!role.isSystem && (
-                        <button type="button" className="is-danger" onClick={() => deleteRole(role)}>Delete</button>
+                      {isTrash ? (
+                        <>
+                          <button type="button" onClick={() => handleRestore(role)}>Restore</button>
+                          <button type="button" className="is-danger" onClick={() => handleDeletePermanently(role)}>Delete Permanently</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" onClick={() => {
+                            setSelectedId(role._id);
+                            document.getElementById("role-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}>
+                            {canManage ? "Edit" : "View permissions"}
+                          </button>
+                          {canManage && <button type="button" onClick={() => handleDuplicate(role)}>Duplicate</button>}
+                          {canManage && (block
+                            ? <span className="is-muted">{block}</span>
+                            : <button type="button" className="is-danger" onClick={() => handleTrash(role)}>Trash</button>)}
+                        </>
                       )}
                     </div>
                   </td>
                   <td className="wp-hide-sm">{role.description || <span className="wp-muted">—</span>}</td>
                   <td>
                     {role.isSystem ? (
-                      <span className="inline-flex items-center gap-1 wp-muted"><Lock className="w-3 h-3" aria-hidden="true" /> System</span>
+                      <span className="inline-flex items-center gap-1 wp-muted" style={{ whiteSpace: "nowrap" }}><Lock className="w-3 h-3" aria-hidden="true" /> System</span>
                     ) : (
                       "Custom"
                     )}
                   </td>
-                  <td className="wp-hide-sm">{permCount}</td>
+                  <td className="wp-num">
+                    {users}
+                    {role.trashedStaffCount ? <div className="wp-muted wp-small">+{role.trashedStaffCount} in Trash</div> : null}
+                  </td>
+                  <td className="wp-num wp-hide-sm">{permCount}</td>
                 </tr>
               );
             })}
@@ -192,102 +366,79 @@ export default function RoleManagement() {
         </table>
       </div>
 
-      {selectedRole ? (
+      {!isTrash && draft && selectedRole && (
         <Postbox
           id="role-editor"
-          title={`Permissions — ${selectedRole.name}`}
-          aside={selectedRole.isSystem ? "System role" : undefined}
-          footer={
+          title={`${canManage ? "Edit role" : "Permissions"} — ${selectedRole.name}`}
+          aside={selectedRole.isSystem ? "System role" : `${selectedRole.staffCount || 0} user${selectedRole.staffCount === 1 ? "" : "s"}`}
+          footer={canManage ? (
             <>
-              {!selectedRole.isSystem && (
+              {removalBlock(selectedRole) ? (
+                <span className="wp-muted wp-small">{removalBlock(selectedRole)} — can&apos;t be trashed</span>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => deleteRole(selectedRole)}
+                  onClick={() => handleTrash(selectedRole)}
                   className="wp-link"
-                  style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "#b32d2e", minHeight: 30 }}
+                  style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--wp-danger)", minHeight: 30 }}
                 >
-                  Delete role
+                  Move to Trash
                 </button>
               )}
               <span className="wp-spacer" />
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving || selectedRole.slug === 'super-admin'}
-                className="wp-btn wp-btn-primary"
-              >
+              <button type="button" className="wp-btn" onClick={() => handleDuplicate(selectedRole)}>Duplicate</button>
+              <button type="button" onClick={handleSave} disabled={saving} className="wp-btn wp-btn-primary">
                 {saving ? "Saving…" : "Save changes"}
               </button>
             </>
-          }
+          ) : undefined}
         >
-          {selectedRole.description && <p className="wp-muted" style={{ margin: "0 0 12px" }}>{selectedRole.description}</p>}
+          <div className="grid gap-x-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+            <div className="wp-field">
+              <label htmlFor="role-edit-name" className="wp-label">Role name</label>
+              <input
+                id="role-edit-name"
+                type="text"
+                className="wp-input wp-full"
+                value={draft.name}
+                disabled={!canManage || selectedRole.isSystem}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+              {selectedRole.isSystem && <p className="wp-desc">System role names can&apos;t be changed.</p>}
+            </div>
+            <div className="wp-field">
+              <label htmlFor="role-edit-desc" className="wp-label">Description</label>
+              <input
+                id="role-edit-desc"
+                type="text"
+                className="wp-input wp-full"
+                value={draft.description}
+                disabled={!canManage}
+                onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              />
+            </div>
+          </div>
 
-          {selectedRole.slug === 'super-admin' ? (
+          <h3 className="wp-label" style={{ margin: "4px 0 8px" }}>Permissions</h3>
+          {isSuperAdminDraft ? (
             <div className="wp-notice wp-notice-info" style={{ margin: 0 }}>
               <p>
                 <span className="wp-strong">Full access enabled.</span> The Super Admin role bypasses all permission checks and has full access to every module by default. Individual permissions cannot be toggled for this role.
               </p>
             </div>
           ) : (
-            <div style={{ border: "1px solid #dcdcde" }}>
-              {Object.entries(ALL_PERMISSIONS).map(([module, actions], i) => {
-                const granted = selectedRole?.permissions?.[module]?.length || 0;
-                return (
-                  <fieldset
-                    key={module}
-                    className="flex flex-wrap items-start gap-x-4 gap-y-1"
-                    style={{
-                      margin: 0,
-                      padding: "8px 12px",
-                      border: 0,
-                      borderTop: i === 0 ? 0 : "1px solid #dcdcde",
-                      background: i % 2 ? "#f6f7f7" : "#fff",
-                      minWidth: 0,
-                    }}
-                  >
-                    <legend className="sr-only">{prettify(module)} permissions</legend>
-                    <div className="flex items-center gap-2" style={{ width: 190, flex: "none", minHeight: 26, maxWidth: "100%" }}>
-                      <span className="wp-strong">{prettify(module)}</span>
-                      <span className="wp-muted wp-small">{granted}/{actions.length}</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleModule(module)}
-                        aria-expanded={isModuleExpanded(module)}
-                        aria-label={`Toggle ${prettify(module)} permissions`}
-                        className="wp-muted"
-                        style={{ background: "none", border: 0, padding: 2, cursor: "pointer", display: "inline-flex" }}
-                      >
-                        {isModuleExpanded(module) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    {isModuleExpanded(module) && (
-                      <div className="flex flex-wrap gap-x-5 gap-y-0" style={{ flex: "1 1 260px", minWidth: 0 }}>
-                        {actions.map((action) => {
-                          const isChecked = Boolean(selectedRole?.permissions?.[module]?.includes(action));
-                          return (
-                            <label key={action} className="wp-check">
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => togglePermission(module, action)}
-                              />
-                              <span>{prettify(action)}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </fieldset>
-                );
-              })}
-            </div>
+            <PermissionMatrix
+              permissions={draft.permissions}
+              disabled={!canManage}
+              idPrefix={`role-${draft._id}`}
+              onChange={(permissions) => setDraft({ ...draft, permissions })}
+            />
           )}
         </Postbox>
-      ) : (
+      )}
+      {!isTrash && !loading && !selectedRole && liveRoles.length > 0 && (
         <p className="wp-empty">Select a role to manage permissions.</p>
       )}
     </Page>
-    </RequirePermission>
   );
 }

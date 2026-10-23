@@ -1,51 +1,141 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import { ArrowLeft, Package, Calendar, Mail, MapPin, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Page, PageHeader, Postbox, Notice, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice, StatusPill, Skeleton, formatMoney, formatDate } from "@/components/admin/ui";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { useRBAC } from "@/hooks/useRBAC";
+import { usePopup } from "@/context/PopupContext";
+import { toast } from "react-hot-toast";
+
+async function readError(res, fallback) {
+  try {
+    const data = await res.json();
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function CustomerDetail({ params }) {
   const { id } = use(params);
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { can } = useRBAC();
+  const { showConfirm } = usePopup();
+  const canEdit = can("customers.edit");
+  const canDelete = can("customers.delete");
+  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
-  useEffect(() => {
-    const fetchCustomer = async () => {
-      // Non-ObjectId ids (e.g. a stray /admin/customers/foo) can't exist: show "not found".
-      if (!/^[a-f0-9]{24}$/i.test(String(id || ""))) {
-        setCustomer(null);
-        setLoading(false);
+  const fetchCustomer = useCallback(async () => {
+    // Non-ObjectId ids (e.g. a stray /admin/customers/foo) can't exist: show "not found".
+    if (!/^[a-f0-9]{24}$/i.test(String(id || ""))) {
+      setCustomer(null);
+      setLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/customers/${id}`);
+      if (res.status === 403) {
+        router.push("/admin?error=NoPermission");
         return;
       }
-      try {
-        const res = await fetch(`/api/admin/customers/${id}`);
-        if (res.status === 403) {
-          router.push("/admin?error=NoPermission");
-          return;
-        }
-        if (res.status === 401) {
-          router.push("/admin-login");
-          return;
-        }
-        const data = await res.json();
-        if (res.ok) setCustomer(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+      if (res.status === 401) {
+        router.push("/admin-login");
+        return;
       }
-    };
-    fetchCustomer();
+      const data = await res.json();
+      if (res.ok) {
+        setCustomer(data);
+        setForm({ name: data.name || "", email: data.email || "", phone: data.phone || "" });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+      }
   }, [id, router]);
+
+  useEffect(() => {
+    Promise.resolve().then(() => fetchCustomer());
+  }, [fetchCustomer]);
+
+  // Row action "Edit" links here with #edit-customer: bring the form into view once loaded.
+  useEffect(() => {
+    if (loading || !customer || typeof window === "undefined" || window.location.hash !== "#edit-customer") return;
+    const el = document.getElementById("edit-customer-name");
+    el?.scrollIntoView({ block: "center" });
+    el?.focus({ preventScroll: true });
+  }, [loading, customer]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setFormError("");
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/customers/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Failed to update customer."));
+      toast.success("Customer updated.");
+      fetchCustomer();
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTrash = async () => {
+    const ok = await showConfirm(
+      `${customer.name || customer.email} will be moved to the Trash and won't be able to sign in. Their orders are kept.`,
+      "Move to Trash?",
+      { confirmText: "Move to Trash", danger: true }
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/admin/customers?id=${id}&mode=trash`, { method: "DELETE" });
+    if (!res.ok) return toast.error(await readError(res, "Failed to move customer to trash."));
+    toast.success("Customer moved to the Trash.");
+    fetchCustomer();
+  };
+
+  const handleRestore = async () => {
+    const res = await fetch("/api/admin/customers", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, isDeleted: false }),
+    });
+    if (!res.ok) return toast.error(await readError(res, "Failed to restore customer."));
+    toast.success("Customer restored.");
+    fetchCustomer();
+  };
+
+  const handleDeletePermanently = async () => {
+    const ok = await showConfirm(
+      `${customer.name || customer.email} will be deleted permanently. This cannot be undone. Their orders are kept.`,
+      "Delete permanently?",
+      { confirmText: "Delete Permanently", danger: true }
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/admin/customers?id=${id}&mode=permanent`, { method: "DELETE" });
+    if (!res.ok) return toast.error(await readError(res, "Failed to delete customer."));
+    toast.success("Customer deleted permanently.");
+    router.push("/admin/customers");
+  };
 
   if (loading) return (
     <Page>
-      <PageHeader title="Loading Customer..." />
-      <p className="wp-muted" role="status">Loading details...</p>
+      <PageHeader title="Customer" />
+      <div className="wp-postbox"><div className="wp-inside"><Skeleton height={56} /></div></div>
+      <Skeleton height={80} style={{ marginBottom: 20 }} />
+      <Skeleton height={160} />
     </Page>
   );
   if (!customer) return (
@@ -75,6 +165,12 @@ export default function CustomerDetail({ params }) {
           </Link>
         }
       />
+
+      {customer.isDeleted && (
+        <Notice type="warning">
+          This customer is in the Trash and can&apos;t sign in.{canDelete ? " Restore them to make changes." : ""}
+        </Notice>
+      )}
 
       {/* Profile header */}
       <section className="wp-postbox" aria-label="Customer profile">
@@ -211,6 +307,61 @@ export default function CustomerDetail({ params }) {
 
         {/* Side column */}
         <div className="wp-col-side">
+          {canEdit && !customer.isDeleted && (
+            <form onSubmit={handleSave}>
+              <Postbox
+                id="edit-customer"
+                title="Edit customer"
+                footer={
+                  <>
+                    {canDelete && (
+                      <button type="button" onClick={handleTrash} className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--wp-danger)", minHeight: 30 }}>
+                        Move to Trash
+                      </button>
+                    )}
+                    <span className="wp-spacer" />
+                    <button type="submit" disabled={saving} className="wp-btn wp-btn-primary">{saving ? "Saving…" : "Save"}</button>
+                  </>
+                }
+              >
+                {formError && <Notice type="error" onDismiss={() => setFormError("")}>{formError}</Notice>}
+                <div className="wp-field">
+                  <label htmlFor="edit-customer-name" className="wp-label">Name</label>
+                  <input id="edit-customer-name" type="text" required className="wp-input wp-full" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                </div>
+                <div className="wp-field">
+                  <label htmlFor="edit-customer-email" className="wp-label">Email</label>
+                  <input id="edit-customer-email" type="email" required className="wp-input wp-full" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="wp-field" style={{ marginBottom: 0 }}>
+                  <label htmlFor="edit-customer-phone" className="wp-label">Phone</label>
+                  <input id="edit-customer-phone" type="tel" className="wp-input wp-full" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                </div>
+              </Postbox>
+            </form>
+          )}
+          {!canEdit && canDelete && !customer.isDeleted && (
+            <Postbox id="customer-actions" title="Actions">
+              <button type="button" className="wp-btn" onClick={handleTrash}>Move to Trash</button>
+            </Postbox>
+          )}
+          {customer.isDeleted && canDelete && (
+            <Postbox
+              id="customer-trash"
+              title="Trash"
+              footer={
+                <>
+                  <button type="button" onClick={handleDeletePermanently} className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "var(--wp-danger)", minHeight: 30 }}>
+                    Delete Permanently
+                  </button>
+                  <span className="wp-spacer" />
+                  <button type="button" onClick={handleRestore} className="wp-btn wp-btn-primary">Restore</button>
+                </>
+              }
+            >
+              <p className="wp-muted" style={{ margin: 0 }}>Moved to the Trash {customer.deletedAt ? formatDate(customer.deletedAt) : ""}.</p>
+            </Postbox>
+          )}
           <Postbox id="account-details" title="Account">
             <div className="wp-kv">
               <span className="wp-kv-k wp-muted">Email</span>
@@ -219,6 +370,10 @@ export default function CustomerDetail({ params }) {
             <div className="wp-kv">
               <span className="wp-kv-k wp-muted">Role</span>
               <span className="wp-kv-v" style={{ textTransform: "capitalize" }}>{customer.role || "customer"}</span>
+            </div>
+            <div className="wp-kv">
+              <span className="wp-kv-k wp-muted">Phone</span>
+              <span className="wp-kv-v">{customer.phone || "—"}</span>
             </div>
             <div className="wp-kv">
               <span className="wp-kv-k wp-muted">Email verified</span>

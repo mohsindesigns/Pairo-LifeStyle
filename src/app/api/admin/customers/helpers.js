@@ -66,3 +66,30 @@ export function totalPages(total, limit = CUSTOMERS_PAGE_SIZE) {
 export function parseCustomerDeleteMode(value) {
   return value === "permanent" ? "permanent" : "trash";
 }
+
+// Validates and normalizes the admin "Edit customer" payload (name, email, phone).
+// Only fields present in the body are returned in `value`.
+export function validateCustomerUpdate(body = {}) {
+  const errors = [];
+  const value = {};
+  const str = (v) => (typeof v === "string" ? v.trim() : "");
+
+  if (body.name !== undefined) {
+    const name = str(body.name);
+    if (!name) errors.push("Name is required.");
+    else if (name.length > 120) errors.push("Name is too long.");
+    else value.name = name;
+  }
+  if (body.email !== undefined) {
+    const email = str(body.email).toLowerCase();
+    if (!email) errors.push("Email is required.");
+    else if (!EMAIL_PATTERN.test(email)) errors.push("Please provide a valid email address.");
+    else value.email = email;
+  }
+  if (body.phone !== undefined) {
+    const phone = str(body.phone);
+    if (phone && !/^[0-9+()\-.\s]{4,30}$/.test(phone)) errors.push("Please provide a valid phone number.");
+    else value.phone = phone || null;
+  }
+  return { errors, value };
+}

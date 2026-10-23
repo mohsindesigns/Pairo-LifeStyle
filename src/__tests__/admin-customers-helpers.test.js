@@ -92,3 +92,16 @@ describe("validateNewCustomer", () => {
     expect(validateNewCustomer({ password: "12345678" }).errors).toContain("Email is required.");
   });
 });
+
+describe("validateCustomerUpdate", () => {
+  it("only returns fields that were sent, normalized", async () => {
+    const { validateCustomerUpdate } = await import("@/app/api/admin/customers/helpers");
+    expect(validateCustomerUpdate({ name: "  Ann ", email: " ANN@X.COM " })).toEqual({ errors: [], value: { name: "Ann", email: "ann@x.com" } });
+    expect(validateCustomerUpdate({ phone: "" }).value).toEqual({ phone: null });
+  });
+  it("rejects bad values", async () => {
+    const { validateCustomerUpdate } = await import("@/app/api/admin/customers/helpers");
+    const { errors } = validateCustomerUpdate({ name: " ", email: "bad", phone: "abc" });
+    expect(errors).toHaveLength(3);
+  });
+});

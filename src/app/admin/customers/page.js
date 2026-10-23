@@ -225,8 +225,8 @@ export default function AdminCustomers() {
       </th>
       <th>Customer</th>
       <th className="wp-hide-sm">Location</th>
-      <th className="wp-num">Orders</th>
-      <th className="wp-num wp-hide-sm">Total spent</th>
+      <th className="wp-num" style={{ textAlign: "right" }}>Orders</th>
+      <th className="wp-num wp-hide-sm" style={{ textAlign: "right" }}>Total spent</th>
       <th className="wp-hide-sm">Last order</th>
       <th className="wp-hide-sm">Registered</th>
     </tr>
@@ -336,7 +336,7 @@ export default function AdminCustomers() {
                               </>
                             ) : (
                               <>
-                                <Link href={`/admin/customers/${c._id}`}>Edit</Link>
+                                <Link href={`/admin/customers/${c._id}#edit-customer`}>Edit</Link>
                                 <button type="button" className="is-danger" onClick={() => handleDelete(c)}>Trash</button>
                                 <Link href={`/admin/customers/${c._id}`}>View</Link>
                               </>
