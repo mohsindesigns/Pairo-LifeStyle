@@ -70,6 +70,7 @@ import { Page, PageHeader, Postbox, Notice } from "./ui";
 import { getSwatchBackground } from "@/lib/swatchRenderer";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange } from "@/components/admin/slugChange";
 import { validatePrices, priceWarning, buildVariantSku } from "@/lib/admin-products-utils";
 
 // Tiny inline image button — opens MediaPickerModal without the full MediaPicker drop-zone UI
@@ -125,6 +126,8 @@ export default function ProductForm({ productId = null }) {
    // Per-attribute draft text for the "Add value…" inputs (keyed by attribute index)
    const [attrValueDrafts, setAttrValueDrafts] = useState({});
    const focusAppliedRef = useRef(false);
+   // Slug the product was loaded / last saved with: changing it asks "Change URL?" first
+   const savedSlugRef = useRef(null);
 
    const [formData, setFormData] = useState({
       name: "",
@@ -206,6 +209,7 @@ export default function ProductForm({ productId = null }) {
                   const prodData = await prodRes.json().catch(() => null);
                   if (prodData && typeof prodData === "object" && prodData._id) {
                      setSlugManuallyEdited(!!prodData.slugManuallyEdited);
+                     savedSlugRef.current = prodData.slug || null;
                      setFormData({
                         ...prodData,
                         productType: prodData.productType || "simple",
@@ -332,9 +336,16 @@ export default function ProductForm({ productId = null }) {
             }
          }
       }
-      setSaving(true);
       // Auto-generate slug from name if still empty
       const finalSlug = formData.slug ? formData.slug : toSlug(formData.name);
+      // Existing product whose permalink changed: confirm first; cancel saves nothing
+      if (productId && !(await confirmSlugChange(showConfirm, {
+         savedSlug: savedSlugRef.current,
+         nextSlug: finalSlug,
+         normalize: (slug) => toSlug(String(slug ?? "")),
+         toPath: (slug) => getProductUrl({ slug }),
+      }))) return;
+      setSaving(true);
       
        // Synchronize parent prices and stock to combinations for variable products only if not explicitly set
        let updatedCombinations = formData.variantCombinations || [];
@@ -395,6 +406,7 @@ export default function ProductForm({ productId = null }) {
           if (res.ok) {
              const savedProduct = await res.json();
              if (asDraft) setFormData(prev => ({ ...prev, status: "Draft" }));
+             savedSlugRef.current = savedProduct?.slug || toSlug(finalSlug) || savedSlugRef.current;
              // The server keeps slugs unique (adds -1, -2… on a clash): show the slug actually saved
              if (savedProduct?.slug && savedProduct.slug !== finalSlug) {
                 setFormData(prev => ({ ...prev, slug: savedProduct.slug }));

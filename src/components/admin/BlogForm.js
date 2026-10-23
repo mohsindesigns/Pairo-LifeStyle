@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange } from "@/components/admin/slugChange";
 import Link from "next/link";
 import { Globe, Calendar, Edit } from "lucide-react";
 import dynamic from 'next/dynamic';
@@ -15,6 +16,8 @@ import { toast } from "react-hot-toast";
 export default function BlogForm({ blogId }) {
    const router = useRouter();
    const { showConfirm } = usePopup();
+   // Slug the post was loaded / last saved with: changing it asks "Change URL?" first
+   const savedSlugRef = useRef(null);
    const [loading, setLoading] = useState(blogId ? true : false);
    const [saving, setSaving] = useState(false);
    const [busy, setBusy] = useState(false);
@@ -94,6 +97,7 @@ export default function BlogForm({ blogId }) {
                if (blogRes?.ok) {
                   const data = await blogRes.json().catch(() => null);
                   if (data && typeof data === "object" && data._id) {
+                     savedSlugRef.current = data.slug || null;
                      setFormData(prev => ({
                          ...prev,
                          showFeaturedProduct: data.showFeaturedProduct !== false,
@@ -214,6 +218,17 @@ export default function BlogForm({ blogId }) {
    // overrides: fields forced for this save only (e.g. "Save Draft" forces status Draft)
    const handleSubmit = async (e, overrides = null) => {
       e?.preventDefault?.();
+      // Existing post whose URL changed: confirm first; cancel saves nothing.
+      // An empty slug is regenerated from the title by the server, so compare against that.
+      if (blogId) {
+         const nextSlug = String(formData.slug || "").trim()
+            || String(formData.title || "").toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+         if (!(await confirmSlugChange(showConfirm, {
+            savedSlug: savedSlugRef.current,
+            nextSlug,
+            toPath: (slug) => `/blog/${slug}`,
+         }))) return;
+      }
       setSaving(true);
       try {
          const method = blogId ? "PUT" : "POST";
@@ -227,6 +242,11 @@ export default function BlogForm({ blogId }) {
          });
          if (res.ok) {
             const savedBlog = await res.json();
+            if (blogId && savedBlog?.slug) {
+               savedSlugRef.current = savedBlog.slug;
+               // Show the slug the server actually stored (it adds -1, -2… on a clash)
+               setFormData(prev => (prev.slug === savedBlog.slug ? prev : { ...prev, slug: savedBlog.slug }));
+            }
             if (overrides) setFormData(prev => ({ ...prev, ...overrides }));
             toast.success(overrides?.status === "Draft"
                ? "Draft saved."

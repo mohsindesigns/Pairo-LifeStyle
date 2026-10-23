@@ -8,7 +8,8 @@ import { Page, PageHeader, Notice, Skeleton, formatDate, formatMoney } from "@/c
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
-import { paginate, parseRequiredPrice } from "@/lib/admin-products-utils";
+import { paginate, parseRequiredPrice, slugify } from "@/lib/admin-products-utils";
+import { confirmSlugChange } from "@/components/admin/slugChange";
 
 export default function AdminProducts() {
   const { showConfirm } = usePopup();
@@ -25,6 +26,8 @@ export default function AdminProducts() {
   const [quickEditId, setQuickEditId] = useState(null);
   const [quickEditData, setQuickEditData] = useState(null);
   const [quickEditSaving, setQuickEditSaving] = useState(false);
+  // Slug the product had when Quick Edit opened: changing it asks "Change URL?" first
+  const quickEditSlugRef = useRef(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
   const [counts, setCounts] = useState({ all: 0, published: 0, draft: 0, trash: 0 });
@@ -232,6 +235,7 @@ export default function AdminProducts() {
 
   const openQuickEdit = (p) => {
     setQuickEditId(p._id);
+    quickEditSlugRef.current = p.slug || null;
     setQuickEditData({
       name: p.name,
       slug: p.slug,
@@ -247,6 +251,14 @@ export default function AdminProducts() {
       toast.error(parsed.error);
       return;
     }
+    // Compare against what the server would store (an empty slug falls back to the name)
+    const nextSlug = slugify(quickEditData.slug) || slugify(quickEditData.name);
+    if (!(await confirmSlugChange(showConfirm, {
+      savedSlug: quickEditSlugRef.current,
+      nextSlug,
+      normalize: slugify,
+      toPath: (slug) => getProductUrl({ slug }),
+    }))) return;
     setQuickEditSaving(true);
     try {
       const res = await fetch("/api/admin/products", {

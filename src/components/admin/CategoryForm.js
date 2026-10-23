@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
 import MediaPicker from "@/components/admin/MediaPicker";
@@ -12,6 +12,7 @@ import { Pencil, ExternalLink } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getCategoryUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange } from "@/components/admin/slugChange";
 
 export default function CategoryForm({ categoryId = null, type = "product" }) {
   const router = useRouter();
@@ -27,6 +28,8 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
 
   const [activeTab, setActiveTab] = useState("content");
   const [slugLocked, setSlugLocked] = useState(true);
+  // Slug the category was loaded / last saved with: changing it asks "Change URL?" first
+  const savedSlugRef = useRef(null);
   const [editorMode, setEditorMode] = useState("visual");
 
   const [formData, setFormData] = useState({
@@ -56,6 +59,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       if (directRes?.ok) {
         const directCat = await directRes.json().catch(() => null);
         if (directCat && directCat._id) {
+          savedSlugRef.current = directCat.slug || null;
           setFormData(prev => ({
             ...prev,
             ...directCat,
@@ -76,6 +80,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
         if (Array.isArray(data)) {
           const cat = data.find(c => String(c?._id) === String(categoryId));
           if (cat) {
+            savedSlugRef.current = cat.slug || null;
             setFormData(prev => ({
               ...prev,
               ...cat,
@@ -157,6 +162,12 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       setSaveError("This category could not be loaded, so it cannot be saved.");
       return;
     }
+    // Existing category whose URL changed: confirm first; cancel saves nothing
+    if (formData._id && !(await confirmSlugChange(showConfirm, {
+      savedSlug: savedSlugRef.current,
+      nextSlug: formData.slug,
+      toPath: (slug) => `/${type === 'product' ? 'collections' : 'blog'}/${slug}`,
+    }))) return;
     setSaving(true);
     setSaveError("");
     try {
@@ -173,6 +184,7 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
       
       if (res.ok) {
         const savedCat = await res.json();
+        if (formData._id) savedSlugRef.current = savedCat?.slug || formData.slug || savedSlugRef.current;
         toast.success(forceStatus === "Draft" ? "Draft saved." : (categoryId ? "Category updated." : "Category created."));
         if (!categoryId && savedCat._id) {
           router.push(type === 'product' ? `/admin/products/categories/${savedCat._id}` : `/admin/blogs/categories/${savedCat._id}`);

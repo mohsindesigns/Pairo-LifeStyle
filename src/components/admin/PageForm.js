@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange, normalizePageSlug } from "./slugChange";
 import {
    ChevronDown,
    ChevronUp,
@@ -241,6 +242,8 @@ export default function PageForm({ pageId }) {
    });
    const [page, setPage] = useState(null);
    const pageRef = useRef(null);
+   // Slug the page was loaded / last saved with: changing it asks "Change URL?" first
+   const savedSlugRef = useRef(null);
    useEffect(() => {
       pageRef.current = page;
    }, [page]);
@@ -335,6 +338,7 @@ export default function PageForm({ pageId }) {
                });
             }
 
+            savedSlugRef.current = pageData?._id ? (pageData.slug || null) : null;
             setPage(pageData);
             setDynamicOptions({
                categories: catsList.filter(c => c && c.status === 'Published').map(c => ({ label: c.name, value: c._id })),
@@ -366,6 +370,14 @@ export default function PageForm({ pageId }) {
          toast.error("Please enter a permalink slug before saving.");
          return;
       }
+      // Existing (non-system: their slug is locked) page whose URL changed: confirm first; cancel saves nothing
+      const isExisting = pageId !== "new" && !!currentPage._id;
+      if (isExisting && !currentPage.isSystem && !(await confirmSlugChange(showConfirm, {
+         savedSlug: savedSlugRef.current,
+         nextSlug: currentPage.slug,
+         normalize: normalizePageSlug,
+         toPath: (slug) => `/${slug}`,
+      }))) return;
       setSaving(true);
       setSaveError("");
       try {
@@ -384,6 +396,7 @@ export default function PageForm({ pageId }) {
          });
          if (res.ok) {
             const savedData = await res.json();
+            if (savedData?._id) savedSlugRef.current = savedData.slug || savedSlugRef.current;
             setPage(prev => ({ ...savedData, sections: Array.isArray(savedData.sections) ? savedData.sections : (prev?.sections || []) }));
             toast.success(overrides.status === "Draft" ? "Draft saved" : isNew ? (savedData.status === "Published" ? "Page published" : "Page created") : "Page updated");
             if (isNew && savedData._id) {

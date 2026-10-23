@@ -19,6 +19,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import * as LucideIcons from "lucide-react";
 import { usePopup } from "@/context/PopupContext";
+import { confirmSlugChange, normalizePageSlug } from "@/components/admin/slugChange";
 import dynamic from "next/dynamic";
 
 const QuillEditor = dynamic(() => import("@/components/admin/QuillEditor"), { ssr: false });
@@ -243,6 +244,9 @@ export default function PageBuilder({ initialPage }) {
   
   // PRODUCTION TRACKING: Avoid redundant autosaves
   const lastSavedRef = useRef(JSON.stringify(hydratedInitial));
+  // Slug the page was loaded / last saved with. Autosave always sends this one, so a URL
+  // change only goes live through a manual save after the "Change URL?" confirm.
+  const savedSlugRef = useRef(hydratedInitial?.slug ?? null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -265,11 +269,20 @@ export default function PageBuilder({ initialPage }) {
 
   // Manual saves toast "Page saved"; autosaves only update the quiet "Synced" indicator. Errors are always toasted.
   const savePage = useCallback(async (data = page, { manual = false } = {}) => {
-    const currentDataStr = JSON.stringify(data);
+    // Autosave never applies a slug edit: it keeps the saved slug in the payload
+    const payload = manual || savedSlugRef.current == null ? data : { ...data, slug: savedSlugRef.current };
+    const currentDataStr = JSON.stringify(payload);
     if (currentDataStr === lastSavedRef.current) { // SKIP: Already saved this state
       if (manual) toast.success("No changes to save", { id: 'save-toast' });
       return;
     }
+    // Manual save of a changed URL (system page slugs are locked): confirm first; cancel saves nothing
+    if (manual && !data.isSystem && !(await confirmSlugChange(showConfirm, {
+      savedSlug: savedSlugRef.current,
+      nextSlug: data.slug,
+      normalize: normalizePageSlug,
+      toPath: (slug) => `/${slug}`,
+    }))) return;
 
     setIsSaving(true);
     try {
@@ -282,7 +295,9 @@ export default function PageBuilder({ initialPage }) {
         const savedData = await res.json();
         const savedAt = new Date();
         const nextPage = { ...savedData, updatedAt: savedData?.updatedAt || savedAt.toISOString() };
-        setPage(nextPage);
+        if (nextPage.slug) savedSlugRef.current = nextPage.slug;
+        // An autosave keeps the admin's unsaved slug edit in the form (it wasn't sent)
+        setPage(manual ? nextPage : (prev) => ({ ...nextPage, slug: prev?.slug ?? nextPage.slug }));
         lastSavedRef.current = JSON.stringify(nextPage);
         setLastSaved(savedAt);
         if (manual) toast.success("Page saved", { id: 'save-toast' });
@@ -295,7 +310,7 @@ export default function PageBuilder({ initialPage }) {
     } finally { 
         setIsSaving(false); 
     }
-  }, [page]);
+  }, [page, showConfirm]);
 
   // Optimized Debounced Auto-save
   useEffect(() => {
