@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import PopupTab from "@/components/admin/settings/PopupTab";
+import { migrateLegalLinks, normalizePublishedProducts } from "@/components/admin/settings/siteSettingsUtils";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
@@ -108,7 +109,7 @@ const SOCIALS = [
 /* ═══════════════════════════════════════════════════════════════
    TAB: General
    ═══════════════════════════════════════════════════════════════ */
-function GeneralTab({ config, onChange }) {
+function GeneralTab({ config, onChange, onGoToTab }) {
   const b = config.brand || {};
   const set = (k, v) => onChange({ ...config, brand: { ...b, [k]: v } });
   const pm = config.commerce?.paymentMethods || {};
@@ -129,8 +130,15 @@ function GeneralTab({ config, onChange }) {
       </Postbox>
 
       <Postbox title="Links and contact">
-        <TextRow label="Privacy Policy URL" value={b.privacyUrl} onChange={v => set('privacyUrl', v)} placeholder="/privacy" />
-        <TextRow label="Terms of Service URL" value={b.termsUrl} onChange={v => set('termsUrl', v)} placeholder="/terms" />
+        <div className="wp-frow">
+          <span className="wp-flabel">Privacy &amp; Terms links</span>
+          <div style={ctrlWrap}>
+            <p className="wp-muted m-0">
+              The Privacy Policy and Terms of Service links are edited on the{" "}
+              <button type="button" onClick={() => onGoToTab?.('footer')} className={linkBtn}>Footer tab</button>.
+            </p>
+          </div>
+        </div>
         <TextRow label="WhatsApp Number" value={b.whatsappNumber} onChange={v => set('whatsappNumber', v)} placeholder="+1234567890" description="Atelier WhatsApp contact number with country code." />
         <TextRow label="WhatsApp Chat URL" value={b.whatsappUrl} onChange={v => set('whatsappUrl', v)} placeholder="https://wa.me/..." description="Direct WhatsApp chat link." />
       </Postbox>
@@ -191,8 +199,17 @@ function GeneralTab({ config, onChange }) {
 function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
   const hc = config.headerConfig || {};
   const setHc = (u) => onChange({ ...config, headerConfig: { ...hc, ...u } });
-  const navItems = (hc.navItems || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+  const navItems = [...(hc.navItems || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
   const topOffers = hc.topOffers || [];
+  // topOffers is saved as [String]; stable React keys are kept client-side only,
+  // aligned by index with topOffers (never sent to the API).
+  const [offerIdState, setOfferIds] = useState(() => topOffers.map(() => generateId()));
+  let offerIds = offerIdState;
+  if (offerIds.length !== topOffers.length) {
+    // Re-align if topOffers changed length outside add/remove (e.g. after save/reload).
+    offerIds = topOffers.map((_, i) => offerIdState[i] || generateId());
+    setOfferIds(offerIds);
+  }
 
   // --- Nav item CRUD ---
   const addNavItem = () => setHc({ navItems: [...navItems, { id: generateId(), label: '', type: 'custom_url', value: '', openInNewTab: false, enabled: true, subItems: [], order: navItems.length }] });
@@ -234,9 +251,15 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
   };
 
   // --- Top offers CRUD ---
-  const addOffer = () => setHc({ topOffers: [...topOffers, ''] });
+  const addOffer = () => {
+    setOfferIds([...offerIds, generateId()]);
+    setHc({ topOffers: [...topOffers, ''] });
+  };
   const updateOffer = (idx, v) => setHc({ topOffers: topOffers.map((o, i) => i === idx ? v : o) });
-  const removeOffer = (idx) => setHc({ topOffers: topOffers.filter((_, i) => i !== idx) });
+  const removeOffer = (idx) => {
+    setOfferIds(offerIds.filter((_, i) => i !== idx));
+    setHc({ topOffers: topOffers.filter((_, i) => i !== idx) });
+  };
 
   return (
     <>
@@ -253,7 +276,7 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
         <div className="space-y-2">
           {topOffers.length === 0 && <p className="wp-muted m-0">No announcement messages. Click &quot;Add message&quot; to create one.</p>}
           {topOffers.map((msg, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div key={offerIds[i]} className="flex items-center gap-2">
               <label htmlFor={`offer-${i}`} className="sr-only">Announcement message {i + 1}</label>
               <input id={`offer-${i}`} className="wp-input flex-1 min-w-0" value={msg} onChange={e => updateOffer(i, e.target.value)} placeholder="e.g. FREE EXPRESS SHIPPING ON ALL ORDERS" />
               <button type="button" onClick={() => removeOffer(i)} className={dangerIconBtn} aria-label={`Remove announcement message ${i + 1}`}><X className="w-4 h-4" aria-hidden="true" /></button>
@@ -325,7 +348,7 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                     ) : item.type === 'product' ? (
                       <select id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
                         <option value="">— Select Product —</option>
-                        {dbProducts.map(p => <option key={p._id} value={p._id}>{p.title}</option>)}
+                        {dbProducts.map(p => <option key={p._id} value={p._id}>{p.name || p.title}</option>)}
                       </select>
                     ) : item.type === 'product_category' ? (
                       <select id={`nav-${idx}-value`} className="wp-select wp-full" value={item.value} onChange={e => updateNav(idx, { value: e.target.value })}>
@@ -479,7 +502,7 @@ function HeaderTab({ config, onChange, dbPages, dbCategories, dbProducts }) {
                               const updated = selected ? selectedIds.filter(s => s !== prod._id) : [...selectedIds, prod._id];
                               updateNav(idx, { dropdownProductIds: updated });
                             }} />
-                            <span className="truncate">{prod.title}</span>
+                            <span className="truncate">{prod.name || prod.title}</span>
                           </label>
                         );
                       })}
@@ -963,6 +986,11 @@ function RedirectsTab() {
   const [redirectsPage, setRedirectsPage] = useState(1);
   const [loadingRedirects, setLoadingRedirects] = useState(false);
   const [redirectSearch, setRedirectSearch] = useState("");
+  const [redirectsLoadError, setRedirectsLoadError] = useState("");
+  // Monotonic request id: only the newest list request may update state.
+  const redirectsRequestRef = useRef(0);
+  // Search value used by the last scheduled load (to debounce typing only).
+  const lastRedirectSearchRef = useRef(redirectSearch);
 
   const [redirectForm, setRedirectForm] = useState({
     _id: "",
@@ -974,7 +1002,10 @@ function RedirectsTab() {
   const [redirectError, setRedirectError] = useState("");
 
   const fetchRedirects = async () => {
+    const requestId = ++redirectsRequestRef.current;
+    const isLatest = () => requestId === redirectsRequestRef.current;
     setLoadingRedirects(true);
+    setRedirectsLoadError("");
     try {
       const params = new URLSearchParams();
       if (redirectSearch) params.set("search", redirectSearch);
@@ -982,20 +1013,31 @@ function RedirectsTab() {
       params.set("limit", "10");
 
       const res = await fetch(`/api/admin/redirects?${params.toString()}`);
+      if (!isLatest()) return;
       if (res.ok) {
         const data = await res.json();
+        if (!isLatest()) return;
         setRedirects(data.items || []);
         setTotalRedirects(data.total || 0);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (!isLatest()) return;
+        setRedirectsLoadError(data.error || "Failed to load redirects.");
       }
     } catch (err) {
-      toast.error("Failed to load redirects");
+      if (isLatest()) setRedirectsLoadError("Failed to load redirects.");
     } finally {
-      setLoadingRedirects(false);
+      if (isLatest()) setLoadingRedirects(false);
     }
   };
 
   useEffect(() => {
-    fetchRedirects();
+    // Debounce typing in the search box; page changes load immediately.
+    const searchChanged = lastRedirectSearchRef.current !== redirectSearch;
+    lastRedirectSearchRef.current = redirectSearch;
+    const timer = setTimeout(fetchRedirects, searchChanged ? 300 : 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [redirectsPage, redirectSearch]);
 
   const handleSaveRedirect = async (e) => {
@@ -1169,7 +1211,16 @@ function RedirectsTab() {
             </tr>
           </thead>
           <tbody>
-            {loadingRedirects ? (
+            {redirectsLoadError && !loadingRedirects ? (
+              <tr>
+                <td colSpan={3} style={{ padding: "16px 10px" }}>
+                  <Notice type="error">
+                    {redirectsLoadError}{" "}
+                    <button type="button" onClick={fetchRedirects} className="wp-btn">Retry</button>
+                  </Notice>
+                </td>
+              </tr>
+            ) : loadingRedirects ? (
               <tr>
                 <td colSpan={3} className="wp-muted text-center" style={{ padding: "32px 10px" }}>
                   Loading redirects...
@@ -1288,13 +1339,13 @@ export default function SiteSettingsPage() {
           fetch('/api/admin/pages'),
           fetch('/api/admin/categories'),
           fetch('/api/admin/blogs'),
-          fetch('/api/admin/products'),
+          fetch('/api/admin/products?status=Published'),
         ]);
-        if (sRes.ok) setConfig(await sRes.json());
+        if (sRes.ok) setConfig(migrateLegalLinks(await sRes.json()));
         if (pRes.ok) { const d = await pRes.json(); setDbPages(Array.isArray(d) ? d.filter(p => p.status === 'Published') : []); }
         if (cRes.ok) { const d = await cRes.json(); setDbCategories(Array.isArray(d) ? d.filter(c => c.type === 'product') : []); }
         if (bRes.ok) { const d = await bRes.json(); setDbBlogs(Array.isArray(d) ? d.filter(b => b.status === 'Published') : []); }
-        if (prRes.ok) { const d = await prRes.json(); setDbProducts(Array.isArray(d) ? d.filter(p => p.status === 'Published') : (d?.products || [])); }
+        if (prRes.ok) { const d = await prRes.json(); setDbProducts(normalizePublishedProducts(d)); }
       } catch { toast.error("Failed to load settings."); }
       finally { setLoading(false); }
     })();
@@ -1307,7 +1358,7 @@ export default function SiteSettingsPage() {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config),
       });
       if (res.ok) {
-        setConfig(await res.json());
+        setConfig(migrateLegalLinks(await res.json()));
         toast.success("Settings saved successfully.");
         router.refresh();
       } else {
@@ -1319,6 +1370,7 @@ export default function SiteSettingsPage() {
   };
 
   if (loading) return (
+    <RequirePermission permission="settings.view">
     <Page>
       <PageHeader title="General settings" />
       <div className="wp-postbox wp-inside space-y-3" aria-busy="true">
@@ -1328,13 +1380,25 @@ export default function SiteSettingsPage() {
         <Skeleton height={30} width="50%" />
       </div>
     </Page>
+    </RequirePermission>
   );
   if (!config) return (
+    <RequirePermission permission="settings.view">
     <Page>
       <PageHeader title="General settings" />
       <Notice type="error">Failed to load settings.</Notice>
     </Page>
+    </RequirePermission>
   );
+
+  const selectTab = (key) => {
+    setTab(key);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location);
+      url.searchParams.set("tab", key);
+      window.history.replaceState({}, "", url);
+    }
+  };
 
   return (
     <RequirePermission permission="settings.view">
@@ -1351,14 +1415,7 @@ export default function SiteSettingsPage() {
             role="tab"
             aria-selected={tab === key}
             aria-controls="site-tabpanel"
-            onClick={() => {
-              setTab(key);
-              if (typeof window !== "undefined") {
-                const url = new URL(window.location);
-                url.searchParams.set("tab", key);
-                window.history.replaceState({}, "", url);
-              }
-            }}
+            onClick={() => selectTab(key)}
             className="wp-tab max-[782px]:min-h-10"
           >
             {label}
@@ -1368,7 +1425,7 @@ export default function SiteSettingsPage() {
 
       {/* Tab content */}
       <div id="site-tabpanel" role="tabpanel" aria-labelledby={`site-tab-${tab}`} className="min-w-0">
-        {tab === 'general' && <GeneralTab config={config} onChange={setConfig} />}
+        {tab === 'general' && <GeneralTab config={config} onChange={setConfig} onGoToTab={selectTab} />}
         {tab === 'header' && <HeaderTab config={config} onChange={setConfig} dbPages={dbPages} dbCategories={dbCategories} dbProducts={dbProducts} />}
         {tab === 'footer' && <FooterTab config={config} onChange={setConfig} dbCategories={dbCategories} dbBlogs={dbBlogs} dbPages={dbPages} />}
         {tab === 'social' && <SocialLinksTab config={config} onChange={setConfig} />}

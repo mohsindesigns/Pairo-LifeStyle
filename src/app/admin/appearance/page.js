@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Palette,
   Plus,
@@ -14,11 +14,25 @@ import {
 import { toast } from "react-hot-toast";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { Page, PageHeader, Postbox, Skeleton } from "@/components/admin/ui";
+import { usePopup } from "@/context/PopupContext";
+
+// Read a JSON error message from a failed response, falling back to `fallback`.
+async function errorMessage(res, fallback) {
+  try {
+    const data = await res.json();
+    return data?.error || data?.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function AppearanceManagement() {
   const [themes, setThemes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingTheme, setEditingTheme] = useState(null);
+  // JSON snapshot of the config when the customizer was opened (dirty check).
+  const originalConfigRef = useRef(null);
+  const { showConfirm, showPrompt } = usePopup();
 
   const SUPPORTED_FONTS = [
     "Inter",
@@ -67,13 +81,15 @@ export default function AppearanceManagement() {
       if (res.ok) {
         toast.success("Theme activated successfully");
         fetchThemes();
+      } else {
+        toast.error(await errorMessage(res, "Activation failed"));
       }
     } catch (err) {
       toast.error("Activation failed");
     }
   };
 
-  const duplicateTheme = async (theme) => {
+  const duplicateTheme = async (theme, newName) => {
     try {
       const { _id, isActive, isSystem, createdAt, updatedAt, ...configOnly } = theme;
       const res = await fetch("/api/admin/themes", {
@@ -81,20 +97,97 @@ export default function AppearanceManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           ...configOnly, 
-          name: `${theme.name} (Copy)`, 
+          name: newName || `${theme.name} (Copy)`, 
           slug: `${theme.slug}-copy-${Date.now()}`,
           isActive: false,
           isSystem: false
         })
       });
       if (res.ok) {
-        toast.success("Theme duplicated");
+        toast.success(newName ? "Theme created" : "Theme duplicated");
         fetchThemes();
+      } else {
+        toast.error(await errorMessage(res, "Duplication failed"));
       }
     } catch (err) {
       toast.error("Duplication failed");
     }
   };
+
+  // "Add New Theme": a new theme is a named copy of the active (or default) theme.
+  const addNewTheme = async () => {
+    const base = themes.find(t => t.isActive) || themes.find(t => t.isSystem) || themes[0];
+    if (!base) {
+      toast.error("No theme available to start from");
+      return;
+    }
+    const name = await showPrompt(
+      `The new theme starts as a copy of "${base.name}".`,
+      `${base.name} (Copy)`,
+      "Add new theme",
+      { inputLabel: "Theme name", confirmText: "Create theme" }
+    );
+    if (name === null || name === undefined) return;
+    const trimmed = String(name).trim();
+    if (!trimmed) {
+      toast.error("Theme name is required");
+      return;
+    }
+    duplicateTheme(base, trimmed);
+  };
+
+  const deleteTheme = async (theme) => {
+    if (theme.isSystem || theme.isActive) return;
+    const ok = await showConfirm(
+      `Delete the theme "${theme.name}"? This cannot be undone.`,
+      "Delete theme",
+      { confirmText: "Delete", danger: true }
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/admin/themes/${theme._id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Theme deleted");
+        fetchThemes();
+      } else {
+        toast.error(await errorMessage(res, "Delete failed"));
+      }
+    } catch (err) {
+      toast.error("Delete failed");
+    }
+  };
+
+  const openCustomizer = (theme) => {
+    originalConfigRef.current = JSON.stringify(theme.config);
+    setEditingTheme(theme);
+  };
+
+  const closeCustomizer = useCallback(async () => {
+    if (!editingTheme) return;
+    const dirty = JSON.stringify(editingTheme.config) !== originalConfigRef.current;
+    if (dirty) {
+      const ok = await showConfirm(
+        "You have unsaved colour or font changes. Close the customizer and discard them?",
+        "Discard changes?",
+        { confirmText: "Discard changes", danger: true }
+      );
+      if (!ok) return;
+    }
+    setEditingTheme(null);
+  }, [editingTheme, showConfirm]);
+
+  // Escape closes the customizer (same path as the X button).
+  useEffect(() => {
+    if (!editingTheme) return;
+    const onKey = (e) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // Leave Escape alone while a popup (e.g. the discard confirm) is open.
+      if (document.getElementById("global-popup-title")) return;
+      closeCustomizer();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editingTheme, closeCustomizer]);
 
   const saveThemeChanges = async () => {
     if (editingTheme.isSystem) {
@@ -113,7 +206,7 @@ export default function AppearanceManagement() {
         fetchThemes();
         setEditingTheme(null);
       } else {
-        toast.error("Update failed");
+        toast.error(await errorMessage(res, "Update failed"));
       }
     } catch (err) {
       toast.error("Failed to save changes");
@@ -200,7 +293,7 @@ export default function AppearanceManagement() {
                      )}
                      <button
                       type="button"
-                      onClick={() => setEditingTheme(theme)}
+                      onClick={() => openCustomizer(theme)}
                       className="wp-btn wp-btn-primary"
                       aria-label={`Customize ${theme.name}`}
                      >
@@ -219,7 +312,7 @@ export default function AppearanceManagement() {
                       <Copy className="w-4 h-4" aria-hidden="true" />
                     </button>
                     {!theme.isSystem && !theme.isActive && (
-                      <button type="button" className="inline-flex items-center justify-center w-[30px] h-[30px] max-[782px]:w-10 max-[782px]:h-10 rounded-[3px] text-[#b32d2e] hover:bg-[#fcf0f1]" title="Delete" aria-label={`Delete ${theme.name}`}>
+                      <button type="button" onClick={() => deleteTheme(theme)} className="inline-flex items-center justify-center w-[30px] h-[30px] max-[782px]:w-10 max-[782px]:h-10 rounded-[3px] text-[#b32d2e] hover:bg-[#fcf0f1]" title="Delete" aria-label={`Delete ${theme.name}`}>
                         <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                     )}
@@ -229,10 +322,14 @@ export default function AppearanceManagement() {
             ))}
 
             {/* Add New Placeholder */}
-            <div className="border-2 border-dashed border-[#c3c4c7] aspect-[16/10] flex flex-col items-center justify-center text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] transition-colors cursor-pointer p-3">
+            <button
+              type="button"
+              onClick={addNewTheme}
+              className="border-2 border-dashed border-[#c3c4c7] aspect-[16/10] flex flex-col items-center justify-center text-[#646970] hover:border-[#2271b1] hover:text-[#2271b1] focus-visible:border-[#2271b1] focus-visible:text-[#2271b1] transition-colors cursor-pointer p-3 bg-transparent w-full"
+            >
                <Plus className="w-8 h-8 mb-2" aria-hidden="true" />
                <span className="text-[14px] font-semibold">Add New Theme</span>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -244,11 +341,15 @@ export default function AppearanceManagement() {
                <strong> Note:</strong> Changes made here only affect the public website, not the admin dashboard.
              </p>
              <ul className="m-0 p-0 list-none space-y-1">
-                <li className="wp-link flex items-center gap-2 min-h-[30px] cursor-pointer hover:underline">
-                  <Eye className="w-3.5 h-3.5" aria-hidden="true" /> Preview your site
+                <li>
+                  <a href="/" target="_blank" rel="noopener noreferrer" className="wp-link flex items-center gap-2 min-h-[30px] hover:underline">
+                    <Eye className="w-3.5 h-3.5" aria-hidden="true" /> Preview your site
+                  </a>
                 </li>
-                <li className="wp-link flex items-center gap-2 min-h-[30px] cursor-pointer hover:underline">
-                   <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> Visit site
+                <li>
+                  <a href="/" target="_blank" rel="noopener noreferrer" className="wp-link flex items-center gap-2 min-h-[30px] hover:underline">
+                    <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> Visit site
+                  </a>
                 </li>
              </ul>
           </Postbox>
@@ -277,7 +378,7 @@ export default function AppearanceManagement() {
 
                     {/* Customizer header: close + publish */}
                     <div className="flex items-center gap-2 px-2 py-2 bg-white border-b border-[#dcdcde] shrink-0">
-                       <button type="button" onClick={() => setEditingTheme(null)} className="inline-flex items-center justify-center w-10 h-10 rounded-[3px] text-[#646970] hover:text-[#1d2327] hover:bg-[#f0f0f1] shrink-0" title="Close" aria-label="Close customizer">
+                       <button type="button" onClick={closeCustomizer} className="inline-flex items-center justify-center w-10 h-10 rounded-[3px] text-[#646970] hover:text-[#1d2327] hover:bg-[#f0f0f1] shrink-0" title="Close" aria-label="Close customizer">
                           <X className="w-5 h-5" aria-hidden="true" />
                        </button>
                        <span className="flex-1" />
@@ -390,7 +491,7 @@ export default function AppearanceManagement() {
                           <div className="p-12 max-w-2xl mx-auto space-y-16">
                              {/* Hero Section */}
                              <div className="space-y-6 text-center">
-                                <span style={{ color: editingTheme.config.colors.primary, fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', tracking: 'widest', fontFamily: editingTheme.config.typography.bodyFont }}>New Collection</span>
+                                <span style={{ color: editingTheme.config.colors.primary, fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: editingTheme.config.typography.bodyFont }}>New Collection</span>
                                 <h1 style={{ color: editingTheme.config.colors.foreground, fontFamily: editingTheme.config.typography.headingFont, fontSize: '48px', lineHeight: '1.1', fontWeight: '800', letterSpacing: '-1px' }}>
                                   Experience Pure Luxury
                                 </h1>

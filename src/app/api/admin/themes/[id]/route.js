@@ -54,6 +54,7 @@ export async function DELETE(req, { params }) {
   await dbConnect();
   try {
     const theme = await Theme.findById(id);
+    if (!theme) return NextResponse.json({ error: "Theme not found" }, { status: 404 });
     if (theme.isSystem) return NextResponse.json({ error: "Cannot delete system themes" }, { status: 403 });
     if (theme.isActive) return NextResponse.json({ error: "Cannot delete active theme" }, { status: 403 });
 
