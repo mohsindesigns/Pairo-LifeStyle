@@ -166,66 +166,65 @@ export default function AdminNotices() {
   if (visibleNotices.length === 0) return null;
 
   return (
-    <div className="space-y-3 mb-6 pr-4">
-      <div className="flex justify-end">
+    <div className="mb-4">
+      <div className="flex justify-end mb-2">
         <button
           type="button"
           onClick={markAllAsRead}
-          className="text-[12px] text-[#2271b1] hover:text-[#135e96] font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+          className="wp-link inline-flex items-center gap-1 min-h-10 sm:min-h-0 bg-transparent border-0 p-0 text-[13px] cursor-pointer"
         >
-          <CheckCheck className="w-3.5 h-3.5" />
+          <CheckCheck className="w-4 h-4" aria-hidden="true" />
           Mark all as read
         </button>
       </div>
       {visibleNotices.map((notice) => {
-        let borderClass = "border-l-[#72aee6]"; // info / blue
-        if (notice.type === "warning") borderClass = "border-l-[#dba617]"; // warning / orange
-        if (notice.type === "error") borderClass = "border-l-[#d63638]"; // error / red
+        let typeClass = "wp-notice-info"; // info / blue
+        if (notice.type === "warning") typeClass = "wp-notice-warning"; // warning / yellow
+        if (notice.type === "error") typeClass = "wp-notice-error"; // error / red
 
         const isUpdating = updatingId === notice.id;
 
         return (
           <div
             key={notice.id}
-            className={`bg-white border border-[#c3c4c7] border-l-4 ${borderClass} shadow-sm px-4 py-3 text-[13px] relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left`}
+            className={`wp-notice ${typeClass} flex-wrap sm:flex-nowrap`}
+            role={notice.type === "error" ? "alert" : "status"}
           >
-            <div>
-              <span className="font-bold text-[#1d2327] mr-1.5">{notice.label}:</span>
-              <span className="text-[#2c3338]">{notice.text}</span>
-            </div>
-
-            <div className="flex items-center gap-3 self-end sm:self-auto pr-6">
-              {notice.actions.map((act, i) => {
-                if (act.href) {
-                  return (
-                    <Link
-                      key={i}
-                      href={act.href}
-                      className="text-[#2271b1] hover:text-[#135e96] underline font-semibold transition-colors"
-                    >
-                      {act.label}
-                    </Link>
-                  );
-                }
-                return (
-                  <button
-                    key={i}
-                    disabled={isUpdating}
-                    onClick={act.action}
-                    className="text-[#2271b1] hover:text-[#135e96] underline font-semibold disabled:opacity-50 transition-colors cursor-pointer"
-                  >
-                    {isUpdating ? "Processing..." : act.label}
-                  </button>
-                );
-              })}
-            </div>
+            <p className="min-w-0 basis-[calc(100%-40px)] sm:basis-auto">
+              <strong className="text-[#1d2327]">{notice.label}:</strong> {notice.text}
+              {notice.actions.length > 0 && (
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                  {notice.actions.map((act, i) => {
+                    if (act.href) {
+                      return (
+                        <Link key={i} href={act.href} className="wp-link">
+                          {act.label}
+                        </Link>
+                      );
+                    }
+                    return (
+                      <button
+                        key={i}
+                        disabled={isUpdating}
+                        onClick={act.action}
+                        className="wp-btn"
+                      >
+                        {isUpdating ? "Processing..." : act.label}
+                      </button>
+                    );
+                  })}
+                </span>
+              )}
+            </p>
 
             <button
+              type="button"
               onClick={() => dismissNotice(notice.id)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-[#8c8f94] hover:text-[#d63638] rounded-full transition-colors cursor-pointer"
+              className="wp-notice-dismiss self-start min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 items-center justify-center"
+              aria-label="Dismiss this notice"
               title="Dismiss this notice"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         );
