@@ -5,6 +5,7 @@ import Product from "@/models/Product";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 import { trackMediaUsage, removeMediaUsage, findMediaByUrl } from "@/lib/mediaUsage";
+import { copySlugCandidate, restoreStatus } from "@/lib/admin-products-utils";
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
@@ -18,6 +19,17 @@ export async function GET(req) {
 
   await dbConnect();
   try {
+    // Status counts for the admin list's All / Published / Drafts / Trash links
+    if (searchParams.get("counts") === "true") {
+      const [all, published, draft, trash] = await Promise.all([
+        Product.countDocuments({ isDeleted: false }),
+        Product.countDocuments({ isDeleted: false, status: "Published" }),
+        Product.countDocuments({ isDeleted: false, status: "Draft" }),
+        Product.countDocuments({ isDeleted: true }),
+      ]);
+      return NextResponse.json({ all, published, draft, trash });
+    }
+
     if (id) {
       const product = await Product.findById(id).lean();
       return NextResponse.json(product);
@@ -28,7 +40,7 @@ export async function GET(req) {
     if (status) query.status = status;
     
     const products = await Product.find(query)
-      .select('name slug price status sku stock manageStock image images categories createdAt isDeleted')
+      .select('name slug price compareAtPrice status sku stock manageStock lowStockThreshold productType image images categories primaryCategory createdAt isDeleted')
       .sort({ createdAt: -1 })
       .lean();
     return NextResponse.json(products);
@@ -45,6 +57,30 @@ export async function POST(req) {
   await dbConnect();
   try {
     const data = await req.json();
+
+    // Duplicate: copy the full stored product server-side (the list only holds a partial
+    // projection) and give it a guaranteed-unique "<slug>-copy[-N]" slug.
+    if (data.duplicateOf) {
+      const source = await Product.findById(data.duplicateOf).lean();
+      if (!source) return NextResponse.json({ error: "Product to duplicate not found" }, { status: 404 });
+      const { _id, __v, createdAt, updatedAt, statusBeforeTrash, rating, reviewCount, ratingBreakdown, id: legacyId, ...rest } = source;
+      let attempt = 1;
+      let copySlug = copySlugCandidate(source.slug, attempt);
+      // Checked against ALL products (trashed included) — the slug index is unique.
+      while (await Product.exists({ slug: copySlug })) {
+        attempt++;
+        copySlug = copySlugCandidate(source.slug, attempt);
+      }
+      const copy = await Product.create({
+        ...rest,
+        name: `${source.name} (Copy)`,
+        slug: copySlug,
+        slugManuallyEdited: false,
+        status: "Draft",
+        isDeleted: false,
+      });
+      return NextResponse.json(copy, { status: 201 });
+    }
 
     const productData = { ...data };
 
@@ -137,8 +173,20 @@ export async function PUT(req) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    // Restoring from trash: put the product back to the status it had before it was
+    // trashed (recorded by the trash routes), ignoring any status the caller sent; Draft if unknown.
+    const isRestore = oldProduct.isDeleted && data.isDeleted === false;
+    if (isRestore) {
+      const raw = await Product.findById(id).select("statusBeforeTrash").lean();
+      data.status = restoreStatus(raw?.statusBeforeTrash);
+    }
+
     // Use $set so nested objects (seo, narrative, etc.) are properly merged
     const product = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: false });
+    if (isRestore) {
+      // Clear the trash marker (not a schema field, hence strict:false on this one $unset only)
+      await Product.updateOne({ _id: id }, { $unset: { statusBeforeTrash: 1 } }, { strict: false });
+    }
     console.log("[Products PUT] Saved seo:", product?.seo);
 
     // Sync SizeChart assignment if changed
@@ -222,8 +270,16 @@ export async function DELETE(req) {
 
   await dbConnect();
   try {
-    // Soft delete
-    const product = await Product.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+    const existing = await Product.findById(id).select("status isDeleted").lean();
+    if (!existing) return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    if (existing.isDeleted) return NextResponse.json({ message: "Product already in trash" });
+    // Soft delete, remembering the status so a restore can put it back.
+    // statusBeforeTrash is not in the Product schema, hence strict:false.
+    const product = await Product.findByIdAndUpdate(
+      id,
+      { $set: { isDeleted: true, statusBeforeTrash: existing.status || "Draft" } },
+      { new: true, strict: false }
+    );
     return NextResponse.json(product);
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

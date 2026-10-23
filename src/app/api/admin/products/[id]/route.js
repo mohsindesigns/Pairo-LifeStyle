@@ -133,10 +133,13 @@ export async function DELETE(req, { params }) {
       await Product.findByIdAndDelete(id);
       return NextResponse.json({ message: "Product permanently deleted" });
     } else {
-      product.isDeleted = true;
-      product.status = 'Draft';
-      await product.save();
-      return NextResponse.json({ message: "Product moved to trash", product });
+      // Remember the pre-trash status so a restore can put it back (not a schema field → strict:false).
+      const trashed = await Product.findByIdAndUpdate(
+        id,
+        { $set: { isDeleted: true, status: 'Draft', statusBeforeTrash: product.status || 'Draft' } },
+        { new: true, strict: false }
+      );
+      return NextResponse.json({ message: "Product moved to trash", product: trashed });
     }
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

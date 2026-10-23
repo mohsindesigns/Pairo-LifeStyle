@@ -1,16 +1,16 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { Image as ImageIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Image as ImageIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
 import { Page, PageHeader, formatDate } from "@/components/admin/ui";
 import { getProductUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { paginate, parseRequiredPrice } from "@/lib/admin-products-utils";
 
 export default function AdminProducts() {
-  const router = useRouter();
   const { showConfirm } = usePopup();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,9 +22,34 @@ export default function AdminProducts() {
   const [view, setView] = useState("all"); 
   const [quickEditId, setQuickEditId] = useState(null);
   const [quickEditData, setQuickEditData] = useState(null);
+  const [quickEditSaving, setQuickEditSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("Bulk actions");
-  const [counts, setCounts] = useState({ all: 0, published: 0, trash: 0 });
+  const [counts, setCounts] = useState({ all: 0, published: 0, draft: 0, trash: 0 });
+  const [page, setPage] = useState(1);
+
+  // Any change to what is listed (filters, search, view) goes back to page 1 and drops the selection
+  const resetPaging = () => {
+    setPage(1);
+    setSelectedIds([]);
+  };
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/products?counts=true");
+      if (res.ok) {
+        const data = await res.json();
+        setCounts({
+          all: data.all || 0,
+          published: data.published || 0,
+          draft: data.draft || 0,
+          trash: data.trash || 0,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -32,24 +57,23 @@ export default function AdminProducts() {
       let url = "/api/admin/products";
       if (view === "trash") url += "?isDeleted=true";
       else if (view === "published") url += "?status=Published";
+      else if (view === "draft") url += "?status=Draft";
       
       const res = await fetch(url);
       const data = await res.json();
       if (res.ok) {
-         const list = Array.isArray(data) ? data : [];
-         setProducts(list);
-         if (view === "all") {
-            const all = list.length;
-            const published = list.filter(p => p.status === "Published").length;
-            setCounts(prev => ({ ...prev, all, published }));
-         }
+         setProducts(Array.isArray(data) ? data : []);
+      } else {
+         toast.error(data?.error || "Failed to load products");
       }
     } catch (err) {
       console.error(err);
+      toast.error("Failed to load products");
     } finally {
       setLoading(false);
     }
-  }, [view]);
+    fetchCounts();
+  }, [view, fetchCounts]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -61,26 +85,36 @@ export default function AdminProducts() {
     }
   }, []);
 
+  const errorFrom = async (res, fallback) => {
+    const data = await res.json().catch(() => ({}));
+    return data?.error || fallback;
+  };
+
   const handleTrash = async (id) => {
     if (!(await showConfirm("Move this product to trash?", "Move to Trash"))) return;
     try {
       const res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchProducts();
+      else toast.error(await errorFrom(res, "Failed to move product to trash"));
     } catch (err) {
       console.error(err);
+      toast.error("Failed to move product to trash");
     }
   };
 
   const handleRestoreProduct = async (id) => {
     try {
+      // The API restores the status the product had before it was trashed (Draft if unknown)
       const res = await fetch("/api/admin/products", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, isDeleted: false, status: 'Draft' })
+        body: JSON.stringify({ id, isDeleted: false })
       });
       if (res.ok) fetchProducts();
+      else toast.error(await errorFrom(res, "Failed to restore product"));
     } catch (err) {
       console.error(err);
+      toast.error("Failed to restore product");
     }
   };
 
@@ -89,51 +123,87 @@ export default function AdminProducts() {
     try {
       const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
       if (res.ok) fetchProducts();
+      else toast.error(await errorFrom(res, "Failed to delete product"));
     } catch (err) {
       console.error(err);
+      toast.error("Failed to delete product");
     }
+  };
+
+  // Server copies the full product and picks a unique "<slug>-copy[-N]" slug
+  const duplicateProduct = async (id) => {
+    const res = await fetch("/api/admin/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ duplicateOf: id })
+    });
+    return res;
   };
 
   const handleDuplicate = async (product) => {
      try {
-        const { _id, createdAt, updatedAt, ...rest } = product;
-        const copy = {
-           ...rest,
-           name: `${product.name} (Copy)`,
-           slug: `${product.slug}-copy-${Math.floor(Math.random() * 1000)}`,
-           status: "Draft"
-        };
-        const res = await fetch("/api/admin/products", {
-           method: "POST",
-           headers: { "Content-Type": "application/json" },
-           body: JSON.stringify(copy)
-        });
-        if (res.ok) fetchProducts();
+        const res = await duplicateProduct(product._id);
+        if (res.ok) {
+           toast.success("Product duplicated as a draft");
+           fetchProducts();
+        } else {
+           toast.error(await errorFrom(res, "Failed to duplicate product"));
+        }
      } catch (err) {
         console.error("Duplicate failed:", err);
+        toast.error("Failed to duplicate product");
      }
   };
 
   const handleBulkAction = async () => {
      if (bulkAction === "Bulk actions" || selectedIds.length === 0) return;
-     if (await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`, "Bulk Action")) {
+     if (!(await showConfirm(`Apply "${bulkAction}" to ${selectedIds.length} items?`, "Bulk Action"))) return;
+     let ok = 0;
+     let failed = 0;
+     for (const id of selectedIds) {
         try {
-           for (const id of selectedIds) {
-              if (bulkAction === "Move to Trash") {
-                 await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
-              } else if (bulkAction === "Duplicate") {
-                 const p = products.find(prod => prod._id === id);
-                 if (p) await handleDuplicate(p);
-              } else if (bulkAction === "Delete Permanently") {
-                 await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
-              }
+           let res = null;
+           if (bulkAction === "Move to Trash") {
+              res = await fetch(`/api/admin/products?id=${id}`, { method: "DELETE" });
+           } else if (bulkAction === "Duplicate") {
+              res = await duplicateProduct(id);
+           } else if (bulkAction === "Delete Permanently") {
+              res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
            }
-           setSelectedIds([]);
-           fetchProducts();
+           if (res?.ok) ok++;
+           else failed++;
         } catch (err) {
            console.error("Bulk action failed:", err);
+           failed++;
         }
      }
+     setSelectedIds([]);
+     fetchProducts();
+     if (failed === 0) toast.success(`${bulkAction}: ${ok} item${ok === 1 ? "" : "s"} done`);
+     else toast.error(`${bulkAction}: ${ok} succeeded, ${failed} failed`);
+  };
+
+  const handleToggleStatus = async (p) => {
+    const oldStatus = p.status;
+    const newStatus = oldStatus === 'Published' ? 'Draft' : 'Published';
+    // Optimistic update, reverted if the save fails
+    setProducts(prev => prev.map(x => x._id === p._id ? { ...x, status: newStatus } : x));
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p._id, status: newStatus })
+      });
+      if (res.ok) {
+        fetchProducts();
+        return;
+      }
+      toast.error(await errorFrom(res, "Failed to update status"));
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update status");
+    }
+    setProducts(prev => prev.map(x => x._id === p._id ? { ...x, status: oldStatus } : x));
   };
 
   const openQuickEdit = (p) => {
@@ -141,19 +211,42 @@ export default function AdminProducts() {
     setQuickEditData({
       name: p.name,
       slug: p.slug,
-      price: p.price,
+      price: p.price ?? "",
       status: p.status,
       sku: p.sku
     });
   };
 
-  const toggleSelect = (id) => {
-     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const handleQuickEditSave = async () => {
+    const parsed = parseRequiredPrice(quickEditData.price);
+    if (parsed.error) {
+      toast.error(parsed.error);
+      return;
+    }
+    setQuickEditSaving(true);
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...quickEditData, price: parsed.value, id: quickEditId })
+      });
+      if (res.ok) {
+        toast.success("Product updated");
+        setQuickEditId(null);
+        fetchProducts();
+      } else {
+        toast.error(await errorFrom(res, "Failed to update product"));
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update product");
+    } finally {
+      setQuickEditSaving(false);
+    }
   };
 
-  const toggleSelectAll = () => {
-     if (selectedIds.length === filteredProducts.length) setSelectedIds([]);
-     else setSelectedIds(filteredProducts.map(p => p._id));
+  const toggleSelect = (id) => {
+     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
   useEffect(() => {
@@ -184,6 +277,27 @@ export default function AdminProducts() {
     return matchesSearch && matchesCategory && matchesStock && matchesType;
   });
 
+  const { items: pageProducts, page: currentPage, totalPages } = paginate(filteredProducts, page);
+  const visibleIds = pageProducts.map(p => p._id);
+  const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id));
+  const someSelected = visibleIds.some(id => selectedIds.includes(id));
+
+  const toggleSelectAll = () => {
+     if (allSelected) setSelectedIds(prev => prev.filter(id => !visibleIds.includes(id)));
+     else setSelectedIds(prev => [...new Set([...prev, ...visibleIds])]);
+  };
+
+  const goToPage = (n) => {
+    setPage(Math.min(Math.max(1, n), totalPages));
+    setSelectedIds([]);
+  };
+
+  const changeView = (v) => {
+    setView(v);
+    setBulkAction("Bulk actions");
+    resetPaging();
+  };
+
   const stockClass = (p) =>
     !p.manageStock
       ? "wp-stock-in"
@@ -202,14 +316,14 @@ export default function AdminProducts() {
           ? `Low stock (${p.stock})`
           : `In stock (${p.stock})`;
 
-  const allSelected = filteredProducts.length > 0 && selectedIds.length === filteredProducts.length;
-
   const pagination = (
     <div className="wp-pages">
-      <span>{filteredProducts.length} items</span>
-      <button type="button" className="wp-pager" aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></button>
-      <span>1 of 1</span>
-      <button type="button" className="wp-pager" aria-label="Next page"><ChevronRight className="w-4 h-4" /></button>
+      <span>{filteredProducts.length} {filteredProducts.length === 1 ? "item" : "items"}</span>
+      <button type="button" className="wp-pager" aria-label="First page" disabled={currentPage <= 1} onClick={() => goToPage(1)}><ChevronsLeft className="w-4 h-4" /></button>
+      <button type="button" className="wp-pager" aria-label="Previous page" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}><ChevronLeft className="w-4 h-4" /></button>
+      <span>{currentPage} of {totalPages}</span>
+      <button type="button" className="wp-pager" aria-label="Next page" disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)}><ChevronRight className="w-4 h-4" /></button>
+      <button type="button" className="wp-pager" aria-label="Last page" disabled={currentPage >= totalPages} onClick={() => goToPage(totalPages)}><ChevronsRight className="w-4 h-4" /></button>
     </div>
   );
 
@@ -220,6 +334,7 @@ export default function AdminProducts() {
           type="checkbox"
           aria-label="Select all products"
           checked={allSelected}
+          ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
           onChange={toggleSelectAll}
         />
       </th>
@@ -247,16 +362,20 @@ export default function AdminProducts() {
 
       {/* Status filter links */}
       <div className="wp-subsub" role="tablist" aria-label="Filter products by status">
-        <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-current" : undefined} onClick={() => setView("all")}>
+        <button type="button" role="tab" aria-selected={view === "all"} className={view === "all" ? "is-current" : undefined} onClick={() => changeView("all")}>
           All <span className="wp-count">({counts.all})</span>
         </button>
         <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={view === "published"} className={view === "published" ? "is-current" : undefined} onClick={() => setView("published")}>
+        <button type="button" role="tab" aria-selected={view === "published"} className={view === "published" ? "is-current" : undefined} onClick={() => changeView("published")}>
           Published <span className="wp-count">({counts.published})</span>
         </button>
         <span className="wp-sep" aria-hidden="true">|</span>
-        <button type="button" role="tab" aria-selected={view === "trash"} className={view === "trash" ? "is-current" : undefined} onClick={() => setView("trash")}>
-          Trash <span className="wp-count">({view === "trash" ? products.length : "-"})</span>
+        <button type="button" role="tab" aria-selected={view === "draft"} className={view === "draft" ? "is-current" : undefined} onClick={() => changeView("draft")}>
+          Drafts <span className="wp-count">({counts.draft})</span>
+        </button>
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <button type="button" role="tab" aria-selected={view === "trash"} className={view === "trash" ? "is-current" : undefined} onClick={() => changeView("trash")}>
+          Trash <span className="wp-count">({counts.trash})</span>
         </button>
       </div>
 
@@ -288,7 +407,7 @@ export default function AdminProducts() {
           id="products-filter-category"
           className="wp-select"
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
+          onChange={(e) => { setSelectedCategory(e.target.value); resetPaging(); }}
         >
           <option>All categories</option>
           {categories.map(cat => <option key={cat._id} value={cat.name}>{cat.name}</option>)}
@@ -299,7 +418,7 @@ export default function AdminProducts() {
           id="products-filter-stock"
           className="wp-select"
           value={selectedStock}
-          onChange={(e) => setSelectedStock(e.target.value)}
+          onChange={(e) => { setSelectedStock(e.target.value); resetPaging(); }}
         >
           <option>All stock</option>
           <option>In stock</option>
@@ -312,7 +431,7 @@ export default function AdminProducts() {
           id="products-filter-type"
           className="wp-select"
           value={selectedType}
-          onChange={(e) => setSelectedType(e.target.value)}
+          onChange={(e) => { setSelectedType(e.target.value); resetPaging(); }}
         >
           <option value="All types">All types</option>
           <option value="simple">Simple product</option>
@@ -320,26 +439,27 @@ export default function AdminProducts() {
           <option value="gifting">Gifting product</option>
         </select>
 
-        <button type="button" className="wp-btn">
-          Filter
-        </button>
-
         <span className="wp-spacer" />
 
-        <div className="wp-search" role="search">
+        {/* Results filter live as you type; Search / Enter submits the same term */}
+        <form
+          className="wp-search"
+          role="search"
+          onSubmit={(e) => { e.preventDefault(); resetPaging(); }}
+        >
           <label htmlFor="products-search" className="sr-only">Search products</label>
           <input
             id="products-search"
             type="search"
             placeholder="Search products..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); resetPaging(); }}
             className="wp-input"
           />
-          <button type="button" className="wp-btn">
+          <button type="submit" className="wp-btn">
             Search products
           </button>
-        </div>
+        </form>
       </div>
 
       <div className="wp-toolbar">
@@ -354,10 +474,10 @@ export default function AdminProducts() {
           <tbody>
             {loading ? (
               <tr><td colSpan={9} className="wp-muted">Loading products…</td></tr>
-            ) : filteredProducts.length === 0 ? (
+            ) : pageProducts.length === 0 ? (
               <tr><td colSpan={9} className="wp-muted">No products found.</td></tr>
             ) : (
-              filteredProducts.map((p) => (
+              pageProducts.map((p) => (
                 <tr key={p._id} className={selectedIds.includes(p._id) ? "is-selected" : undefined}>
                   <td className="wp-check-col">
                     <input
@@ -429,15 +549,7 @@ export default function AdminProducts() {
                   <td>
                     <button
                       type="button"
-                      onClick={async () => {
-                        const newStatus = p.status === 'Published' ? 'Draft' : 'Published';
-                        const res = await fetch("/api/admin/products", {
-                          method: "PUT",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ id: p._id, status: newStatus })
-                        });
-                        if (res.ok) fetchProducts();
-                      }}
+                      onClick={() => handleToggleStatus(p)}
                       title={p.status === 'Published' ? "Click to switch to Draft" : "Click to publish"}
                       aria-label={`Status: ${p.status}. Toggle status`}
                       className={`wp-pill ${p.status === 'Published' ? 'wp-st-published' : 'wp-st-draft'}`}
@@ -485,7 +597,7 @@ export default function AdminProducts() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                   <div className="wp-field">
                     <label htmlFor="qe-price" className="wp-label">Price ($)</label>
-                    <input id="qe-price" type="number" className="wp-input wp-full" value={quickEditData.price} onChange={e => setQuickEditData({...quickEditData, price: parseFloat(e.target.value)})} />
+                    <input id="qe-price" type="number" min="0" step="0.01" inputMode="decimal" required className="wp-input wp-full" value={quickEditData.price} onChange={e => setQuickEditData({...quickEditData, price: e.target.value})} />
                   </div>
                   <div className="wp-field">
                     <label htmlFor="qe-sku" className="wp-label">SKU</label>
@@ -505,20 +617,11 @@ export default function AdminProducts() {
               <button type="button" onClick={() => setQuickEditId(null)} className="wp-btn">Cancel</button>
               <button
                 type="button"
-                onClick={async () => {
-                  const res = await fetch("/api/admin/products", {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ...quickEditData, id: quickEditId })
-                  });
-                  if (res.ok) {
-                    setQuickEditId(null);
-                    fetchProducts();
-                  }
-                }}
+                onClick={handleQuickEditSave}
+                disabled={quickEditSaving}
                 className="wp-btn wp-btn-primary"
               >
-                Update
+                {quickEditSaving ? "Updating…" : "Update"}
               </button>
             </div>
           </div>

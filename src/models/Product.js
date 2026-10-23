@@ -8,6 +8,8 @@ const ProductSchema = new mongoose.Schema({
   shortDescription: { type: String },
   description: { type: String }, // Long Description (Rich Text)
   status: { type: String, enum: ['Draft', 'Published'], default: 'Draft' },
+  // Status before the product was trashed, so restoring puts it back (cleared on restore).
+  statusBeforeTrash: { type: String, enum: ['Draft', 'Published'] },
   isFeatured: { type: Boolean, default: false },
   category: { type: String }, // Main category string (Legacy)
   categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], // Multi-category support

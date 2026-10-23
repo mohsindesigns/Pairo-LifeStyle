@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from 'next/dynamic';
 import { toast } from "react-hot-toast";
@@ -68,6 +68,9 @@ import GallerySorter from "./GallerySorter";
 import Link from "next/link";
 import { Page, PageHeader, Postbox } from "./ui";
 import { getSwatchBackground } from "@/lib/swatchRenderer";
+import { getProductUrl } from "@/lib/routes";
+import { usePopup } from "@/context/PopupContext";
+import { validatePrices, priceWarning, buildVariantSku } from "@/lib/admin-products-utils";
 
 // Tiny inline image button — opens MediaPickerModal without the full MediaPicker drop-zone UI
 function InlinePick({ value, onChange, label = "+ Image", doneLabel = "✓ Change", title = "Pick image" }) {
@@ -105,6 +108,7 @@ function toSlug(str) {
 
 export default function ProductForm({ productId = null }) {
    const router = useRouter();
+   const { showConfirm } = usePopup();
    const [loading, setLoading] = useState(productId ? true : false);
    const [saving, setSaving] = useState(false);
    const [activeTab, setActiveTab] = useState("general");
@@ -118,18 +122,9 @@ export default function ProductForm({ productId = null }) {
    const [categories, setCategories] = useState([]);
    const [sizeCharts, setSizeCharts] = useState([]);
 
-   const getPreviewCategorySlug = () => {
-      const catsList = Array.isArray(categories) ? categories : [];
-      if (formData.primaryCategory) {
-         const match = catsList.find(c => c?._id === formData.primaryCategory);
-         if (match && match.slug) return match.slug;
-      }
-      if (formData.categories && Array.isArray(formData.categories) && formData.categories.length > 0) {
-         const match = catsList.find(c => c?._id === formData.categories[0]);
-         if (match && match.slug) return match.slug;
-      }
-      return "shop";
-   };
+   // Per-attribute draft text for the "Add value…" inputs (keyed by attribute index)
+   const [attrValueDrafts, setAttrValueDrafts] = useState({});
+   const focusAppliedRef = useRef(false);
 
    const [formData, setFormData] = useState({
       name: "",
@@ -271,12 +266,24 @@ export default function ProductForm({ productId = null }) {
       fetchData();
     }, [productId]);
 
+    // Apply ?focus= / ?tab= once, after the product data has loaded
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-           const params = new URLSearchParams(window.location.search);
-           const focus = params.get("focus");
-           const tab = params.get("tab");
-           
+        if (loading || focusAppliedRef.current || typeof window === 'undefined') return;
+        focusAppliedRef.current = true;
+        const params = new URLSearchParams(window.location.search);
+        const focus = params.get("focus");
+        const tab = params.get("tab");
+        const productType = formData.productType;
+        const focusEl = (...ids) => setTimeout(() => {
+           const el = ids.map(id => document.getElementById(id)).find(Boolean);
+           if (el) {
+              el.focus();
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+           }
+        }, 300);
+
+        // Deferred so state isn't set synchronously inside the effect body
+        Promise.resolve().then(() => {
            if (focus === "seo" || tab === "seo") {
               setActiveFormTab("seo");
            } else if (focus === "content" || tab === "content") {
@@ -285,24 +292,14 @@ export default function ProductForm({ productId = null }) {
 
            if (focus === "pricing" || focus === "price" || tab === "general") {
               setActiveTab("general");
-              setTimeout(() => {
-                 const el = document.getElementById("sale-price-input");
-                 if (el) {
-                    el.focus();
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
-                 }
-              }, 300);
+              focusEl("sale-price-input");
            } else if (focus === "stock" || focus === "inventory" || tab === "inventory") {
               setActiveTab("inventory");
-              setTimeout(() => {
-                 const el = document.getElementById("stock-input");
-                 if (el) {
-                    el.focus();
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
-                 }
-              }, 300);
+              // The quantity field only renders while stock tracking is on; else focus the toggle
+              focusEl("stock-input", "manage-stock-input");
            } else if (focus === "variants" || tab === "variants") {
-              setActiveTab("variants");
+              // The Variants tab only exists for variable products
+              setActiveTab(productType === "variable" ? "variants" : productType === "gifting" ? "gifting" : "general");
            } else if (focus === "sizeguide" || focus === "size" || tab === "sizeguide") {
               setActiveTab("sizeguide");
            } else if (focus === "faqs" || tab === "faqs") {
@@ -310,11 +307,31 @@ export default function ProductForm({ productId = null }) {
            } else if (focus === "stats" || tab === "stats") {
               setActiveTab("stats");
            }
-        }
-     }, [loading]);
+        });
+     }, [loading, formData.productType]);
 
-   const handleSubmit = async (e) => {
+   // options.asDraft: "Save Draft" always saves with status Draft
+   const handleSubmit = async (e, options = {}) => {
       if (e) e.preventDefault();
+      const asDraft = options.asDraft === true;
+      const priceError = validatePrices(formData.compareAtPrice, formData.price);
+      if (priceError) {
+         toast.error(priceError);
+         setActiveTab("general");
+         return;
+      }
+      const warning = priceWarning(formData.compareAtPrice, formData.price);
+      if (warning) toast(warning);
+      if (formData.productType === "variable") {
+         for (const comb of formData.variantCombinations || []) {
+            const combError = validatePrices(comb.compareAtPrice, comb.price);
+            if (combError) {
+               toast.error(`${comb.title || "Variant"}: ${combError}`);
+               setActiveTab("variants");
+               return;
+            }
+         }
+      }
       setSaving(true);
       // Auto-generate slug from name if still empty
       const finalSlug = formData.slug ? formData.slug : toSlug(formData.name);
@@ -358,6 +375,7 @@ export default function ProductForm({ productId = null }) {
       };
       const normalizedData = {
          ...formData,
+         ...(asDraft ? { status: "Draft" } : {}),
          corporateGifting,
          slug: finalSlug,
          slugManuallyEdited,
@@ -376,7 +394,8 @@ export default function ProductForm({ productId = null }) {
          });
           if (res.ok) {
              const savedProduct = await res.json();
-             toast.success(productId ? "Product updated successfully!" : "Product created successfully!");
+             if (asDraft) setFormData(prev => ({ ...prev, status: "Draft" }));
+             toast.success(asDraft ? "Draft saved." : productId ? "Product updated successfully!" : "Product created successfully!");
              if (!productId && savedProduct._id) {
                 router.push(`/admin/products/${savedProduct._id}`);
              }
@@ -393,31 +412,52 @@ export default function ProductForm({ productId = null }) {
       }
    };
 
+   const handleTrash = async () => {
+      if (!productId) return;
+      if (!(await showConfirm("Move this product to trash?", "Move to Trash", { confirmText: "Move to Trash", danger: true }))) return;
+      try {
+         const res = await fetch(`/api/admin/products?id=${productId}`, { method: "DELETE" });
+         if (res.ok) {
+            toast.success("Product moved to trash.");
+            router.push("/admin/products");
+         } else {
+            const errData = await res.json().catch(() => ({}));
+            toast.error(errData.error || "Failed to move product to trash");
+         }
+      } catch (err) {
+         console.error(err);
+         toast.error("Failed to move product to trash");
+      }
+   };
+
    const addAttribute = () => {
-      setFormData({
-         ...formData,
-         attributes: [...(formData.attributes || []), { name: "", type: "custom", values: [] }]
-      });
+      setFormData(prev => ({
+         ...prev,
+         attributes: [...(prev.attributes || []), { name: "", type: "custom", values: [] }]
+      }));
    };
 
    const addAttributeValue = (aIdx, label) => {
       if (!label) return;
-      const newAttrs = [...(formData.attributes || [])];
-      const type = newAttrs[aIdx].type;
-      newAttrs[aIdx].values.push({
-         label,
-         value: label,
-         hex: type === "color" ? "#000000" : "",
-         colorMode: "single",
-         hex2: "",
-         hex3: "",
-         hex4: "",
-         texture: "",
-         image: "",
-         swatchType: "color", // "color" | "image"
-         variantImage: ""
-      });
-      setFormData({ ...formData, attributes: newAttrs });
+      setFormData(prev => ({
+         ...prev,
+         attributes: (prev.attributes || []).map((attr, i) => i !== aIdx ? attr : {
+            ...attr,
+            values: [...(attr.values || []), {
+               label,
+               value: label,
+               hex: attr.type === "color" ? "#000000" : "",
+               colorMode: "single",
+               hex2: "",
+               hex3: "",
+               hex4: "",
+               texture: "",
+               image: "",
+               swatchType: "color", // "color" | "image"
+               variantImage: ""
+            }]
+         })
+      }));
    };
 
    const generateCombinations = () => {
@@ -437,16 +477,17 @@ export default function ProductForm({ productId = null }) {
       };
 
       const combos = combine(attrs);
-      const newCombos = combos.map(c => ({
-         title: c.map(v => v.label).join(" / "),
-         price: formData.price,
-         compareAtPrice: formData.compareAtPrice,
-         stock: formData.stock,
-         sku: `${formData.sku}-${c.map(v => v.label).join("-")}`.toUpperCase(),
-         image: c.find(v => v.variantImage)?.variantImage || ""
+      setFormData(prev => ({
+         ...prev,
+         variantCombinations: combos.map(c => ({
+            title: c.map(v => v.label).join(" / "),
+            price: prev.price,
+            compareAtPrice: prev.compareAtPrice,
+            stock: prev.stock,
+            sku: buildVariantSku(prev.sku, c.map(v => v.label)),
+            image: c.find(v => v.variantImage)?.variantImage || ""
+         }))
       }));
-
-      setFormData({ ...formData, variantCombinations: newCombos });
    };
 
    const addTemplate = (type) => {
@@ -474,10 +515,10 @@ export default function ProductForm({ productId = null }) {
          }
       };
       if (templates[type]) {
-         setFormData({
-            ...formData,
-            attributes: [...(formData.attributes || []), templates[type]]
-         });
+         setFormData(prev => ({
+            ...prev,
+            attributes: [...(prev.attributes || []), templates[type]]
+         }));
       }
    };
 
@@ -532,6 +573,9 @@ export default function ProductForm({ productId = null }) {
    const subBoxStyle = { border: "1px solid #dcdcde", background: "#fff", marginBottom: 16 };
    const subHeadStyle = { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "8px 12px", borderBottom: "1px solid #dcdcde", background: "#f6f7f7" };
    const iconBtnStyle = { ...linkBtnStyle, color: "#646970", display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32 };
+   // Canonical storefront URL is /product/<slug> (category-nested URLs redirect there);
+   // an unsaved slug falls back to the saved product's id route.
+   const previewUrl = productId ? getProductUrl({ slug: formData.slug, _id: productId }) : null;
 
    return (
       <Page>
@@ -679,7 +723,7 @@ export default function ProductForm({ productId = null }) {
                      <div className="wp-postbox" role="group" aria-label="Product description" style={{ overflow: "hidden" }}>
                         <TiptapEditor
                            content={formData.description}
-                           onChange={(html) => setFormData({ ...formData, description: html })}
+                           onChange={(html) => setFormData(prev => ({ ...prev, description: html }))}
                         />
                      </div>
 
@@ -695,7 +739,7 @@ export default function ProductForm({ productId = null }) {
                               value={formData.productType}
                               onChange={(e) => {
                                  const val = e.target.value;
-                                 setFormData({ ...formData, productType: val });
+                                 setFormData(prev => ({ ...prev, productType: val }));
                                  if (val === "variable") setActiveTab("variants");
                                  if (val === "gifting") setActiveTab("gifting");
                               }}
@@ -738,15 +782,15 @@ export default function ProductForm({ productId = null }) {
                                  <div>
                                     <div className="wp-frow">
                                        <label htmlFor="regular-price-input" className="wp-flabel">Regular price ($)</label>
-                                       <input id="regular-price-input" className="wp-input" placeholder="0.00" value={formData.compareAtPrice} onChange={(e) => setFormData({ ...formData, compareAtPrice: e.target.value })} />
+                                       <input id="regular-price-input" type="number" min="0" step="0.01" inputMode="decimal" className="wp-input" placeholder="0.00" value={formData.compareAtPrice ?? ""} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, compareAtPrice: v })); }} />
                                     </div>
                                     <div className="wp-frow">
                                        <label htmlFor="sale-price-input" className="wp-flabel">Sale price ($)</label>
-                                       <input id="sale-price-input" className="wp-input" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} />
+                                       <input id="sale-price-input" type="number" min="0" step="0.01" inputMode="decimal" className="wp-input" placeholder="0.00" value={formData.price ?? ""} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, price: v })); }} />
                                     </div>
                                     <div className="wp-frow">
                                        <label htmlFor="shipping-type-select" className="wp-flabel">Shipping type</label>
-                                       <select id="shipping-type-select" className="wp-select" value={formData.shippingType} onChange={(e) => setFormData({ ...formData, shippingType: e.target.value })}>
+                                       <select id="shipping-type-select" className="wp-select" value={formData.shippingType} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, shippingType: v })); }}>
                                           <option value="Express">Express Shipping</option>
                                           <option value="Standard">Standard Shipping</option>
                                           <option value="Free">Free Shipping</option>
@@ -760,7 +804,7 @@ export default function ProductForm({ productId = null }) {
                                           className="wp-input"
                                           placeholder="e.g. Black, Navy Blue, Crimson"
                                           value={formData.color || ""}
-                                          onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                                          onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, color: v })); }}
                                        />
                                     </div>
                                     <div className="wp-frow">
@@ -769,7 +813,7 @@ export default function ProductForm({ productId = null }) {
                                           id="product-gender-select"
                                           className="wp-select"
                                           value={formData.gender || "unisex"}
-                                          onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                          onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, gender: v })); }}
                                        >
                                           <option value="unisex">Unisex</option>
                                           <option value="male">Male</option>
@@ -782,7 +826,7 @@ export default function ProductForm({ productId = null }) {
                                           id="product-age-select"
                                           className="wp-select"
                                           value={formData.ageGroup || "adult"}
-                                          onChange={(e) => setFormData({ ...formData, ageGroup: e.target.value })}
+                                          onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, ageGroup: v })); }}
                                        >
                                           <option value="adult">Adult</option>
                                           <option value="kids">Kids</option>
@@ -798,19 +842,19 @@ export default function ProductForm({ productId = null }) {
                                  <div>
                                     <div className="wp-frow">
                                        <label htmlFor="product-sku-input" className="wp-flabel">SKU</label>
-                                       <input id="product-sku-input" className="wp-input uppercase" placeholder="e.g. PR-001" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} />
+                                       <input id="product-sku-input" className="wp-input uppercase" placeholder="e.g. PR-001" value={formData.sku} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, sku: v })); }} />
                                     </div>
                                     <div className="wp-frow">
                                        <span className="wp-flabel">Track stock</span>
                                        <label className="wp-check" htmlFor="manage-stock-input">
-                                          <input id="manage-stock-input" type="checkbox" checked={formData.manageStock} onChange={(e) => setFormData({ ...formData, manageStock: e.target.checked })} />
+                                          <input id="manage-stock-input" type="checkbox" checked={formData.manageStock} onChange={(e) => { const v = e.target.checked; setFormData(prev => ({ ...prev, manageStock: v })); }} />
                                           <span>Enable inventory tracking for this product</span>
                                        </label>
                                     </div>
                                     {formData.manageStock && (
                                        <div className="wp-frow">
                                           <label htmlFor="stock-input" className="wp-flabel">Stock quantity</label>
-                                          <input id="stock-input" type="number" className="wp-input" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} />
+                                          <input id="stock-input" type="number" className="wp-input" value={formData.stock} onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, stock: v })); }} />
                                        </div>
                                     )}
                                  </div>
@@ -828,9 +872,10 @@ export default function ProductForm({ productId = null }) {
                                     </div>
 
                                     {(formData.attributes || []).map((attr, aIdx) => {
-                                       const updateAttr = (key, v) => { const n=[...formData.attributes]; n[aIdx][key]=v; setFormData({...formData,attributes:n}); };
-                                       const updateVal = (vIdx, key, v) => { const n=[...formData.attributes]; n[aIdx].values[vIdx][key]=v; setFormData({...formData,attributes:n}); };
-                                       const removeVal = (vIdx) => { const n=[...formData.attributes]; n[aIdx].values=n[aIdx].values.filter((_,i)=>i!==vIdx); setFormData({...formData,attributes:n}); };
+                                       const mapAttr = (fn) => setFormData(prev => ({ ...prev, attributes: (prev.attributes || []).map((a, i) => i === aIdx ? fn(a) : a) }));
+                                       const updateAttr = (key, v) => mapAttr(a => ({ ...a, [key]: v }));
+                                       const updateVal = (vIdx, key, v) => mapAttr(a => ({ ...a, values: (a.values || []).map((val, i) => i === vIdx ? { ...val, [key]: v } : val) }));
+                                       const removeVal = (vIdx) => mapAttr(a => ({ ...a, values: (a.values || []).filter((_, i) => i !== vIdx) }));
 
                                        return (
                                           <div key={aIdx} style={subBoxStyle}>
@@ -843,7 +888,7 @@ export default function ProductForm({ productId = null }) {
                                                    <option value="size">Size</option>
                                                    <option value="custom">Custom</option>
                                                 </select>
-                                                <button type="button" aria-label={`Remove attribute ${attr.name || ""}`.trim()} title="Remove attribute" onClick={()=>setFormData({...formData,attributes:formData.attributes.filter((_,i)=>i!==aIdx)})} className="hover:text-red-700" style={{ ...iconBtnStyle, marginLeft: "auto" }}><X className="w-4 h-4" aria-hidden="true" /></button>
+                                                <button type="button" aria-label={`Remove attribute ${attr.name || ""}`.trim()} title="Remove attribute" onClick={()=>{ setFormData(prev=>({...prev,attributes:(prev.attributes||[]).filter((_,i)=>i!==aIdx)})); setAttrValueDrafts({}); }} className="hover:text-red-700" style={{ ...iconBtnStyle, marginLeft: "auto" }}><X className="w-4 h-4" aria-hidden="true" /></button>
                                              </div>
                                              <div>
                                                 {(attr.values||[]).map((val,vIdx)=>{
@@ -998,7 +1043,7 @@ export default function ProductForm({ productId = null }) {
                                              </div>
                                              <div style={{ padding: "8px 12px" }}>
                                                 <label htmlFor={`attr-${aIdx}-add`} className="sr-only">Add value to {attr.name || "attribute"}</label>
-                                                <input id={`attr-${aIdx}-add`} className="wp-input wp-full" placeholder="Add value... (press Enter)" onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); addAttributeValue(aIdx,e.target.value); e.target.value=""; } }} />
+                                                <input id={`attr-${aIdx}-add`} className="wp-input wp-full" placeholder="Add value... (press Enter)" value={attrValueDrafts[aIdx] || ""} onChange={e=>{ const v=e.target.value; setAttrValueDrafts(prev=>({...prev,[aIdx]:v})); }} onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); addAttributeValue(aIdx,(attrValueDrafts[aIdx]||"").trim()); setAttrValueDrafts(prev=>({...prev,[aIdx]:""})); } }} />
                                              </div>
                                           </div>
                                        );
@@ -1021,39 +1066,41 @@ export default function ProductForm({ productId = null }) {
                                                 <tbody>
                                                    {formData.variantCombinations.map((comb, cIdx) => (
                                                       <tr key={cIdx}>
-                                                         <td><InlinePick value={comb.image} onChange={url=>{ const n=[...formData.variantCombinations]; n[cIdx].image=url; setFormData({...formData,variantCombinations:n}); }} /></td>
+                                                         <td><InlinePick value={comb.image} onChange={url=>setFormData(prev=>({...prev,variantCombinations:(prev.variantCombinations||[]).map((c,i)=>i===cIdx?{...c,image:url}:c)}))} /></td>
                                                          <td className="wp-strong">{comb.title}</td>
                                                          <td>
                                                             <input
                                                                type="number"
+                                                               min="0"
                                                                step="0.01"
+                                                               inputMode="decimal"
                                                                aria-label={`Regular price for ${comb.title}`}
                                                                className="wp-input wp-full"
                                                                placeholder="e.g. 0.00"
                                                                value={comb.compareAtPrice !== undefined && comb.compareAtPrice !== null ? comb.compareAtPrice : ""}
                                                                onChange={(e) => {
-                                                                  const n = [...formData.variantCombinations];
-                                                                  n[cIdx].compareAtPrice = e.target.value === "" ? "" : Number(e.target.value);
-                                                                  setFormData({ ...formData, variantCombinations: n });
+                                                                  const v = e.target.value === "" ? "" : Number(e.target.value);
+                                                                  setFormData(prev => ({ ...prev, variantCombinations: (prev.variantCombinations || []).map((c, i) => i === cIdx ? { ...c, compareAtPrice: v } : c) }));
                                                                }}
                                                             />
                                                          </td>
                                                          <td>
                                                             <input
                                                                type="number"
+                                                               min="0"
                                                                step="0.01"
+                                                               inputMode="decimal"
                                                                aria-label={`Sale price for ${comb.title}`}
                                                                className="wp-input wp-full"
                                                                placeholder="e.g. 0.00"
                                                                value={comb.price !== undefined && comb.price !== null ? comb.price : ""}
                                                                onChange={(e) => {
-                                                                  const n = [...formData.variantCombinations];
-                                                                  n[cIdx].price = e.target.value === "" ? "" : Number(e.target.value);
-                                                                  setFormData({ ...formData, variantCombinations: n });
+                                                                  const v = e.target.value === "" ? "" : Number(e.target.value);
+                                                                  setFormData(prev => ({ ...prev, variantCombinations: (prev.variantCombinations || []).map((c, i) => i === cIdx ? { ...c, price: v } : c) }));
                                                                }}
                                                             />
                                                          </td>
-                                                         <td><button type="button" aria-label={`Remove variant ${comb.title}`} title="Remove variant" className="hover:text-red-700" style={iconBtnStyle} onClick={()=>setFormData({...formData,variantCombinations:formData.variantCombinations.filter((_,i)=>i!==cIdx)})}><X className="w-4 h-4" aria-hidden="true" /></button></td>
+                                                         <td><button type="button" aria-label={`Remove variant ${comb.title}`} title="Remove variant" className="hover:text-red-700" style={iconBtnStyle} onClick={()=>setFormData(prev => ({...prev,variantCombinations:prev.variantCombinations.filter((_,i)=>i!==cIdx)}))}><X className="w-4 h-4" aria-hidden="true" /></button></td>
                                                       </tr>
                                                    ))}
                                                 </tbody>
@@ -1073,13 +1120,13 @@ export default function ProductForm({ productId = null }) {
                                        </div>
                                        <button
                                           type="button"
-                                          onClick={() => setFormData({
-                                             ...formData,
+                                          onClick={() => setFormData(prev => ({
+                                             ...prev,
                                              corporateGifting: {
-                                                ...(formData.corporateGifting || {}),
-                                                items: [...(formData.corporateGifting?.items || []), { name: "", description: "", image: "", priceDelta: "", active: true, _localKey: Date.now() + Math.random() }],
+                                                ...(prev.corporateGifting || {}),
+                                                items: [...(prev.corporateGifting?.items || []), { name: "", description: "", image: "", priceDelta: "", active: true, _localKey: Date.now() + Math.random() }],
                                              },
-                                          })}
+                                          }))}
                                           className="wp-btn"
                                        >
                                           <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Add Item
@@ -1095,7 +1142,7 @@ export default function ProductForm({ productId = null }) {
                                           className="wp-input"
                                           style={{ maxWidth: 120 }}
                                           value={formData.corporateGifting?.minSelections ?? 3}
-                                          onChange={(e) => setFormData({ ...formData, corporateGifting: { ...(formData.corporateGifting || {}), minSelections: e.target.value } })}
+                                          onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, corporateGifting: { ...(prev.corporateGifting || {}), minSelections: v } })); }}
                                        />
                                     </div>
 
@@ -1107,13 +1154,13 @@ export default function ProductForm({ productId = null }) {
                                              <div className="wp-notice wp-notice-warning"><p>Only {(formData.corporateGifting?.items || []).length} item(s) but the minimum is {Number(formData.corporateGifting?.minSelections) || 3} — customers won&apos;t be able to order until there are enough items.</p></div>
                                           )}
                                           {(formData.corporateGifting?.items || []).map((item, idx) => {
-                                             const updateItem = (patch) => setFormData({
-                                                ...formData,
+                                             const updateItem = (patch) => setFormData(prev => ({
+                                                ...prev,
                                                 corporateGifting: {
-                                                   ...(formData.corporateGifting || {}),
-                                                   items: (formData.corporateGifting?.items || []).map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+                                                   ...(prev.corporateGifting || {}),
+                                                   items: (prev.corporateGifting?.items || []).map((it, i) => (i === idx ? { ...it, ...patch } : it)),
                                                 },
-                                             });
+                                             }));
                                              return (
                                                 <div key={item._id || item._localKey || idx} className="flex flex-col sm:flex-row gap-3" style={{ ...subBoxStyle, padding: 12, marginBottom: 10 }}>
                                                    <div className="shrink-0 flex sm:flex-col items-center gap-2">
@@ -1164,13 +1211,13 @@ export default function ProductForm({ productId = null }) {
                                                       </label>
                                                       <button
                                                          type="button"
-                                                         onClick={() => setFormData({
-                                                            ...formData,
+                                                         onClick={() => setFormData(prev => ({
+                                                            ...prev,
                                                             corporateGifting: {
-                                                               ...(formData.corporateGifting || {}),
-                                                               items: (formData.corporateGifting?.items || []).filter((_, i) => i !== idx),
+                                                               ...(prev.corporateGifting || {}),
+                                                               items: (prev.corporateGifting?.items || []).filter((_, i) => i !== idx),
                                                             },
-                                                         })}
+                                                         }))}
                                                          className="hover:text-red-700"
                                                          style={iconBtnStyle}
                                                          aria-label="Remove item"
@@ -1190,19 +1237,19 @@ export default function ProductForm({ productId = null }) {
                               {activeTab === "stats" && (
                                  <div>
                                     <div style={{ margin: "6px 0 12px" }}>
-                                       <button type="button" onClick={() => setFormData({ ...formData, stats: [...(formData.stats || []), { label: "", value: "", icon: "Shield" }] })} className="wp-btn">+ Add Stat</button>
+                                       <button type="button" onClick={() => setFormData(prev => ({ ...prev, stats: [...(prev.stats || []), { label: "", value: "", icon: "Shield" }] }))} className="wp-btn">+ Add Stat</button>
                                     </div>
                                     {(formData.stats || []).map((stat, sIdx) => (
                                        <div key={sIdx} className="flex flex-wrap items-end gap-2" style={{ ...subBoxStyle, padding: 10, marginBottom: 10 }}>
                                           <div className="flex-1 min-w-[120px]">
                                              <label htmlFor={`stat-${sIdx}-label`} className="wp-label wp-small">Label</label>
-                                             <input id={`stat-${sIdx}-label`} className="wp-input wp-full" placeholder="Label" value={stat.label} onChange={e=>{ const n=[...formData.stats]; n[sIdx].label=e.target.value; setFormData({...formData,stats:n}); }} />
+                                             <input id={`stat-${sIdx}-label`} className="wp-input wp-full" placeholder="Label" value={stat.label} onChange={e=>{ const v=e.target.value; setFormData(prev=>({...prev,stats:(prev.stats||[]).map((x,i)=>i===sIdx?{...x,label:v}:x)})); }} />
                                           </div>
                                           <div className="flex-1 min-w-[120px]">
                                              <label htmlFor={`stat-${sIdx}-value`} className="wp-label wp-small">Value</label>
-                                             <input id={`stat-${sIdx}-value`} className="wp-input wp-full" placeholder="Value" value={stat.value} onChange={e=>{ const n=[...formData.stats]; n[sIdx].value=e.target.value; setFormData({...formData,stats:n}); }} />
+                                             <input id={`stat-${sIdx}-value`} className="wp-input wp-full" placeholder="Value" value={stat.value} onChange={e=>{ const v=e.target.value; setFormData(prev=>({...prev,stats:(prev.stats||[]).map((x,i)=>i===sIdx?{...x,value:v}:x)})); }} />
                                           </div>
-                                          <button type="button" aria-label="Remove stat" title="Remove stat" className="hover:text-red-700" style={iconBtnStyle} onClick={()=>setFormData({...formData,stats:formData.stats.filter((_,i)=>i!==sIdx)})}><X className="w-4 h-4" aria-hidden="true" /></button>
+                                          <button type="button" aria-label="Remove stat" title="Remove stat" className="hover:text-red-700" style={iconBtnStyle} onClick={()=>setFormData(prev => ({...prev,stats:prev.stats.filter((_,i)=>i!==sIdx)}))}><X className="w-4 h-4" aria-hidden="true" /></button>
                                        </div>
                                     ))}
                                  </div>
@@ -1211,19 +1258,19 @@ export default function ProductForm({ productId = null }) {
                               {activeTab === "faqs" && (
                                  <div>
                                     <div style={{ margin: "6px 0 12px" }}>
-                                       <button type="button" onClick={() => setFormData({ ...formData, faqs: [...(formData.faqs || []), { question: "", answer: "" }] })} className="wp-btn">+ Add FAQ</button>
+                                       <button type="button" onClick={() => setFormData(prev => ({ ...prev, faqs: [...(prev.faqs || []), { question: "", answer: "" }] }))} className="wp-btn">+ Add FAQ</button>
                                     </div>
                                     {(formData.faqs || []).map((faq, fIdx) => (
                                        <div key={fIdx} style={{ ...subBoxStyle, padding: 12, marginBottom: 10 }}>
                                           <div className="wp-field">
                                              <label htmlFor={`faq-${fIdx}-q`} className="wp-label">Question</label>
-                                             <input id={`faq-${fIdx}-q`} className="wp-input wp-full" placeholder="Question" value={faq.question} onChange={e=>{ const n=[...formData.faqs]; n[fIdx].question=e.target.value; setFormData({...formData,faqs:n}); }} />
+                                             <input id={`faq-${fIdx}-q`} className="wp-input wp-full" placeholder="Question" value={faq.question} onChange={e=>{ const v=e.target.value; setFormData(prev=>({...prev,faqs:(prev.faqs||[]).map((x,i)=>i===fIdx?{...x,question:v}:x)})); }} />
                                           </div>
                                           <div className="wp-field">
                                              <label htmlFor={`faq-${fIdx}-a`} className="wp-label">Answer</label>
-                                             <textarea id={`faq-${fIdx}-a`} className="wp-textarea" placeholder="Answer" rows={2} value={faq.answer} onChange={e=>{ const n=[...formData.faqs]; n[fIdx].answer=e.target.value; setFormData({...formData,faqs:n}); }} />
+                                             <textarea id={`faq-${fIdx}-a`} className="wp-textarea" placeholder="Answer" rows={2} value={faq.answer} onChange={e=>{ const v=e.target.value; setFormData(prev=>({...prev,faqs:(prev.faqs||[]).map((x,i)=>i===fIdx?{...x,answer:v}:x)})); }} />
                                           </div>
-                                          <button type="button" onClick={()=>setFormData({...formData,faqs:formData.faqs.filter((_,i)=>i!==fIdx)})} style={dangerLinkStyle}>Remove</button>
+                                          <button type="button" onClick={()=>setFormData(prev => ({...prev,faqs:prev.faqs.filter((_,i)=>i!==fIdx)}))} style={dangerLinkStyle}>Remove</button>
                                        </div>
                                     ))}
                                  </div>
@@ -1243,14 +1290,14 @@ export default function ProductForm({ productId = null }) {
                                                value={formData.sizeChartSource || "category_default"}
                                                onChange={(e) => {
                                                   const val = e.target.value;
-                                                  setFormData({
-                                                     ...formData,
+                                                  setFormData(prev => ({
+                                                     ...prev,
                                                      sizeChartSource: val,
                                                      sizeGuide: {
-                                                        ...(formData.sizeGuide || {}),
+                                                        ...(prev.sizeGuide || {}),
                                                         enabled: val === "product_custom"
                                                      }
-                                                  });
+                                                  }));
                                                }}
                                             >
                                                <option value="category_default">Use Category Default</option>
@@ -1278,7 +1325,7 @@ export default function ProductForm({ productId = null }) {
                                                   id="size-chart-select"
                                                   className="wp-select wp-full"
                                                   value={formData.sizeChart || ""}
-                                                  onChange={(e) => setFormData({ ...formData, sizeChart: e.target.value })}
+                                                  onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, sizeChart: v })); }}
                                                >
                                                   <option value="">-- Choose Size Chart --</option>
                                                   {sizeCharts.map((sc) => (
@@ -1308,13 +1355,13 @@ export default function ProductForm({ productId = null }) {
                                                      className="wp-input wp-full"
                                                      placeholder="e.g. Jacket Size, Waist Size, Dress Size"
                                                      value={formData.sizeGuide?.sizeName || ""}
-                                                     onChange={(e) => setFormData({
-                                                        ...formData,
+                                                     onChange={(e) => { const v = e.target.value; setFormData(prev => ({
+                                                        ...prev,
                                                         sizeGuide: {
-                                                           ...(formData.sizeGuide || {}),
-                                                           sizeName: e.target.value
+                                                           ...(prev.sizeGuide || {}),
+                                                           sizeName: v
                                                         }
-                                                     })}
+                                                     })); }}
                                                   />
                                                   <p className="wp-desc">Label shown as the first column header in the size table (e.g. &quot;Jacket Size&quot;).</p>
                                                </div>
@@ -1325,13 +1372,13 @@ export default function ProductForm({ productId = null }) {
                                                      className="wp-input wp-full"
                                                      placeholder="e.g. https://www.youtube.com/watch?v=ipyhV51zUWk"
                                                      value={formData.sizeGuide?.videoUrl || ""}
-                                                     onChange={(e) => setFormData({
-                                                        ...formData,
+                                                     onChange={(e) => { const v = e.target.value; setFormData(prev => ({
+                                                        ...prev,
                                                         sizeGuide: {
-                                                           ...(formData.sizeGuide || {}),
-                                                           videoUrl: e.target.value
+                                                           ...(prev.sizeGuide || {}),
+                                                           videoUrl: v
                                                         }
-                                                     })}
+                                                     })); }}
                                                   />
                                                   <p className="wp-desc">URL to instructions video (YouTube embed/watch link).</p>
                                                </div>
@@ -1350,7 +1397,7 @@ export default function ProductForm({ productId = null }) {
                                                   ? formData.sizeGuide.columnsCm
                                                   : DEFAULT_COLS_CM;
                                                const updateColsCm = (cols) =>
-                                                  setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), columnsCm: cols } });
+                                                  setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), columnsCm: cols } }));
                                                const addColCm = () => {
                                                   const key = `col_${Date.now()}`;
                                                   updateColsCm([...colsCm, { key, label: "New Column" }]);
@@ -1371,11 +1418,9 @@ export default function ProductForm({ productId = null }) {
                                                            </button>
                                                            <button type="button"
                                                               onClick={() => {
-                                                                 const cm = [...(formData.sizeGuide?.sizesCm || [])];
                                                                  const emptyRow = {};
                                                                  colsCm.forEach(c => { emptyRow[c.key] = ""; });
-                                                                 cm.push(emptyRow);
-                                                                 setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesCm: cm } });
+                                                                 setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesCm: [...(prev.sizeGuide?.sizesCm || []), emptyRow] } }));
                                                               }}
                                                               className="wp-btn wp-btn-primary">
                                                               + Add Row
@@ -1421,17 +1466,15 @@ export default function ProductForm({ productId = null }) {
                                                                              className="wp-input wp-full"
                                                                              value={row[col.key] || ""}
                                                                              onChange={(e) => {
-                                                                                const cm = [...(formData.sizeGuide?.sizesCm || [])];
-                                                                                cm[rIdx] = { ...cm[rIdx], [col.key]: e.target.value };
-                                                                                setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesCm: cm } });
+                                                                                const v = e.target.value;
+                                                                                setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesCm: (prev.sizeGuide?.sizesCm || []).map((r, i) => i === rIdx ? { ...r, [col.key]: v } : r) } }));
                                                                              }}
                                                                           />
                                                                        </td>
                                                                     ))}
                                                                     <td style={{ padding: 6, textAlign: "center" }}>
                                                                        <button type="button" aria-label={`Remove row ${rIdx + 1}`} title="Remove row" className="hover:text-red-700" style={iconBtnStyle} onClick={() => {
-                                                                          const cm = (formData.sizeGuide?.sizesCm || []).filter((_, i) => i !== rIdx);
-                                                                          setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesCm: cm } });
+                                                                          setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesCm: (prev.sizeGuide?.sizesCm || []).filter((_, i) => i !== rIdx) } }));
                                                                        }}><X className="w-4 h-4" aria-hidden="true" /></button>
                                                                     </td>
                                                                  </tr>
@@ -1456,7 +1499,7 @@ export default function ProductForm({ productId = null }) {
                                                   ? formData.sizeGuide.columnsIn
                                                   : DEFAULT_COLS_IN;
                                                const updateColsIn = (cols) =>
-                                                  setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), columnsIn: cols } });
+                                                  setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), columnsIn: cols } }));
                                                const addColIn = () => {
                                                   const key = `col_${Date.now()}`;
                                                   updateColsIn([...colsIn, { key, label: "New Column" }]);
@@ -1477,11 +1520,9 @@ export default function ProductForm({ productId = null }) {
                                                            </button>
                                                            <button type="button"
                                                               onClick={() => {
-                                                                 const inches = [...(formData.sizeGuide?.sizesIn || [])];
                                                                  const emptyRow = {};
                                                                  colsIn.forEach(c => { emptyRow[c.key] = ""; });
-                                                                 inches.push(emptyRow);
-                                                                 setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesIn: inches } });
+                                                                 setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesIn: [...(prev.sizeGuide?.sizesIn || []), emptyRow] } }));
                                                               }}
                                                               className="wp-btn wp-btn-primary">
                                                               + Add Row
@@ -1527,17 +1568,15 @@ export default function ProductForm({ productId = null }) {
                                                                              className="wp-input wp-full"
                                                                              value={row[col.key] || ""}
                                                                              onChange={(e) => {
-                                                                                const inches = [...(formData.sizeGuide?.sizesIn || [])];
-                                                                                inches[rIdx] = { ...inches[rIdx], [col.key]: e.target.value };
-                                                                                setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesIn: inches } });
+                                                                                const v = e.target.value;
+                                                                                setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesIn: (prev.sizeGuide?.sizesIn || []).map((r, i) => i === rIdx ? { ...r, [col.key]: v } : r) } }));
                                                                              }}
                                                                           />
                                                                        </td>
                                                                     ))}
                                                                     <td style={{ padding: 6, textAlign: "center" }}>
                                                                        <button type="button" aria-label={`Remove row ${rIdx + 1}`} title="Remove row" className="hover:text-red-700" style={iconBtnStyle} onClick={() => {
-                                                                          const inches = (formData.sizeGuide?.sizesIn || []).filter((_, i) => i !== rIdx);
-                                                                          setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), sizesIn: inches } });
+                                                                          setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), sizesIn: (prev.sizeGuide?.sizesIn || []).filter((_, i) => i !== rIdx) } }));
                                                                        }}><X className="w-4 h-4" aria-hidden="true" /></button>
                                                                     </td>
                                                                  </tr>
@@ -1555,9 +1594,7 @@ export default function ProductForm({ productId = null }) {
                                                   <h4 className="wp-strong" style={{ fontSize: 14, margin: 0, flex: 1 }}>How to measure instructions</h4>
                                                   <button type="button"
                                                      onClick={() => {
-                                                        const inst = [...(formData.sizeGuide?.instructions || [])];
-                                                        inst.push({ title: "", desc: "" });
-                                                        setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), instructions: inst } });
+                                                        setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), instructions: [...(prev.sizeGuide?.instructions || []), { title: "", desc: "" }] } }));
                                                      }}
                                                      className="wp-btn wp-btn-primary">
                                                      + Add Instruction
@@ -1566,9 +1603,7 @@ export default function ProductForm({ productId = null }) {
                                                <div style={{ padding: 12 }}>
                                                   {(formData.sizeGuide?.instructions || []).map((row, rIdx) => {
                                                      const updateRow = (key, val) => {
-                                                        const inst = [...(formData.sizeGuide?.instructions || [])];
-                                                        inst[rIdx][key] = val;
-                                                        setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), instructions: inst } });
+                                                        setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), instructions: (prev.sizeGuide?.instructions || []).map((r, i) => i === rIdx ? { ...r, [key]: val } : r) } }));
                                                      };
                                                      return (
                                                         <div key={rIdx} className="flex gap-3 items-start" style={{ padding: "10px 0", borderBottom: "1px solid #f0f0f1" }}>
@@ -1595,8 +1630,7 @@ export default function ProductForm({ productId = null }) {
                                                            <button
                                                               type="button"
                                                               onClick={() => {
-                                                                 const inst = (formData.sizeGuide?.instructions || []).filter((_, idx) => idx !== rIdx);
-                                                                 setFormData({ ...formData, sizeGuide: { ...(formData.sizeGuide || {}), instructions: inst } });
+                                                                 setFormData(prev => ({ ...prev, sizeGuide: { ...(prev.sizeGuide || {}), instructions: (prev.sizeGuide?.instructions || []).filter((_, idx) => idx !== rIdx) } }));
                                                               }}
                                                               aria-label={`Remove instruction ${rIdx + 1}`}
                                                               title="Remove instruction"
@@ -1626,7 +1660,7 @@ export default function ProductForm({ productId = null }) {
                      parentTitle={formData.name}
                      parentDescription={formData.shortDescription || formData.description}
                      parentSlug={formData.slug}
-                     parentImage={formData.image || (formData.images && formData.images[0])}
+                     parentImage={formData.images?.[0] || ""}
                      parentType="product"
                   />
                )}
@@ -1637,7 +1671,7 @@ export default function ProductForm({ productId = null }) {
                   <Postbox title="Product short description" id="pf-short-desc">
                      <TiptapEditor
                         content={formData.shortDescription}
-                        onChange={(html) => setFormData({ ...formData, shortDescription: html })}
+                        onChange={(html) => setFormData(prev => ({ ...prev, shortDescription: html }))}
                      />
                      <p className="wp-desc">Supports bold, italic, lists, and links. Displays as a rich excerpt on the product page.</p>
                   </Postbox>
@@ -1649,8 +1683,8 @@ export default function ProductForm({ productId = null }) {
                <section className="wp-postbox" aria-labelledby="pf-publish-title">
                   <div className="wp-postbox-head"><h2 id="pf-publish-title">Publish</h2></div>
                   <div className="flex flex-wrap justify-between items-center gap-2" style={{ padding: "10px 12px 2px" }}>
-                     <button type="button" onClick={handleSubmit} className="wp-btn">Save Draft</button>
-                     <button type="button" onClick={() => formData.slug && window.open(`/product/${formData.slug}`, '_blank')} className="wp-btn" title={formData.slug ? `Preview /product/${formData.slug}` : 'Save first to preview'}>Preview</button>
+                     <button type="button" disabled={saving} onClick={(e) => handleSubmit(e, { asDraft: true })} className="wp-btn">Save Draft</button>
+                     <button type="button" onClick={() => previewUrl && window.open(previewUrl, '_blank')} className="wp-btn" title={previewUrl ? `Preview ${previewUrl}` : 'Save first to preview'}>Preview</button>
                   </div>
                   <div className="wp-misc">
                      <div className="wp-misc-row">
@@ -1661,7 +1695,7 @@ export default function ProductForm({ productId = null }) {
                            className="wp-select"
                            style={{ marginLeft: "auto" }}
                            value={formData.status}
-                           onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                           onChange={(e) => { const v = e.target.value; setFormData(prev => ({ ...prev, status: v })); }}
                         >
                            <option value="Draft">Draft</option>
                            <option value="Published">Published</option>
@@ -1676,14 +1710,14 @@ export default function ProductForm({ productId = null }) {
                               type="checkbox"
                               id="isFeatured"
                               checked={formData.isFeatured}
-                              onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
+                              onChange={(e) => { const v = e.target.checked; setFormData(prev => ({ ...prev, isFeatured: v })); }}
                            />
                            <span>Featured product</span>
                         </label>
                      </div>
                   </div>
                   <div className="wp-box-foot">
-                     <button type="button" style={dangerLinkStyle}>Move to Trash</button>
+                     {productId && <button type="button" onClick={handleTrash} style={dangerLinkStyle}>Move to Trash</button>}
                      <span className="wp-spacer" />
                      <button type="submit" disabled={saving} className="wp-btn wp-btn-primary" style={{ minHeight: 36 }}>
                         {saving ? "Saving..." : (productId ? "Update" : "Publish")}
@@ -1706,8 +1740,8 @@ export default function ProductForm({ productId = null }) {
                                  type="checkbox"
                                  checked={(formData.categories || []).includes(cat._id)}
                                  onChange={e => {
-                                    const n = e.target.checked ? [...(formData.categories || []), cat._id] : (formData.categories || []).filter(id => id !== cat._id);
-                                    setFormData({ ...formData, categories: n });
+                                    const checked = e.target.checked;
+                                    setFormData(prev => ({ ...prev, categories: checked ? [...(prev.categories || []), cat._id] : (prev.categories || []).filter(id => id !== cat._id) }));
                                  }}
                               />
                               <span>{cat.name}</span>
@@ -1718,11 +1752,11 @@ export default function ProductForm({ productId = null }) {
                </Postbox>
 
                <Postbox title="Product image" id="pf-image">
-                  <MediaPicker value={formData.images[0]} onChange={url => setFormData({ ...formData, images: [url, ...(formData.images?.slice(1) || [])] })} />
+                  <MediaPicker value={formData.images[0]} onChange={url => setFormData(prev => ({ ...prev, images: [url, ...(prev.images?.slice(1) || [])] }))} />
                </Postbox>
 
                <Postbox title="Product gallery" id="pf-gallery">
-                  <MediaPicker multiple value={formData.images.slice(1)} onChange={urls => setFormData({ ...formData, images: [formData.images[0] || "", ...urls] })} />
+                  <MediaPicker multiple value={formData.images.slice(1)} onChange={urls => setFormData(prev => ({ ...prev, images: [prev.images[0] || "", ...urls] }))} />
                </Postbox>
             </div>
          </form>
