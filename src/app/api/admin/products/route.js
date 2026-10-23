@@ -6,6 +6,7 @@ import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
 import { trackMediaUsage, removeMediaUsage, findMediaByUrl } from "@/lib/mediaUsage";
 import { copySlugCandidate, restoreStatus, slugify, uniqueSlug } from "@/lib/admin-products-utils";
+import { planProductRedirects, applyProductRedirects } from "@/lib/product-redirects";
 
 export async function GET(req) {
   const session = await getServerSession(authOptions);
@@ -211,8 +212,12 @@ export async function PUT(req) {
         : await uniqueSlug(wanted, (candidate) => Product.exists({ slug: candidate, _id: { $ne: id } }));
     }
 
+    // Old URLs 301 to the new one when the slug or primary category changes (editor, Quick Edit)
+    const redirects = await planProductRedirects(id, data);
+
     // Use $set so nested objects (seo, narrative, etc.) are properly merged
     const product = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: false });
+    await applyProductRedirects(redirects);
     if (isRestore) {
       // Clear the trash marker (not a schema field, hence strict:false on this one $unset only)
       await Product.updateOne({ _id: id }, { $unset: { statusBeforeTrash: 1 } }, { strict: false });

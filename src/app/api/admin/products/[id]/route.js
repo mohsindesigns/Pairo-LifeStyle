@@ -4,7 +4,7 @@ import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
-import { registerRedirect } from "@/lib/redirect-resolver";
+import { planProductRedirects, applyProductRedirects } from "@/lib/product-redirects";
 import { slugify, uniqueSlug } from "@/lib/admin-products-utils";
 
 // GET single product with relations
@@ -58,31 +58,11 @@ export async function PUT(req, { params }) {
       : await uniqueSlug(slugify(slug) || "product", (candidate) => Product.exists({ slug: candidate, _id: { $ne: id } }));
     data.slug = finalSlug;
 
-    // Register redirect if slug or primary category changed
-    const { getProductPrimaryCategorySlug } = await import("@/lib/routes");
-    const oldCatSlugRaw = getProductPrimaryCategorySlug(oldProduct);
-    const oldCatSlug = oldCatSlugRaw === 'uncategorized' ? 'shop' : oldCatSlugRaw;
-
-    const tempNewProduct = {
-      ...oldProduct.toObject(),
-      ...data
-    };
-    const newCatSlugRaw = getProductPrimaryCategorySlug(tempNewProduct);
-    const newCatSlug = newCatSlugRaw === 'uncategorized' ? 'shop' : newCatSlugRaw;
-
-    const slugChanged = oldProduct.slug !== finalSlug;
-    const categoryChanged = oldCatSlug !== newCatSlug;
-
-    if (slugChanged || categoryChanged) {
-      const oldPath = `/${oldCatSlug}/${oldProduct.slug}`;
-      const newPath = `/product/${finalSlug}`;
-      await registerRedirect(oldPath, newPath);
-      await registerRedirect(`/product/${oldProduct.slug}`, newPath);
-      await registerRedirect(`/product-category/${oldCatSlug}/${oldProduct.slug}`, newPath);
-      await registerRedirect(`/collections/${oldCatSlug}/${oldProduct.slug}`, newPath);
-    }
+    // Old URLs 301 to the new one when the slug or primary category changes
+    const redirects = await planProductRedirects(id, data);
 
     const product = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
+    await applyProductRedirects(redirects);
     return NextResponse.json(product);
   } catch (error) {
     console.error("PUT Error:", error);
