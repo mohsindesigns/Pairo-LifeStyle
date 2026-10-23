@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { Search, X, FolderTree, Check } from "lucide-react";
+import React, { useState, useMemo, useId } from "react";
+import { X, FolderTree } from "lucide-react";
 
 export default function CategorySelector({
   selectedIds = [],
@@ -11,6 +11,9 @@ export default function CategorySelector({
 }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const uid = useId();
+  const headingId = `${uid}-cats`;
+  const searchId = `${uid}-cat-search`;
 
   const normalizedSelected = useMemo(() => {
     if (!Array.isArray(selectedIds)) return [];
@@ -52,48 +55,47 @@ export default function CategorySelector({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <label className="text-[13px] font-bold text-[#1d2327]">
-          Applicable Categories (Optional)
-        </label>
+    <div role="group" aria-labelledby={headingId} className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2" style={{ marginBottom: 6 }}>
+        <span id={headingId} className="wp-strong">
+          Product categories
+        </span>
         <button
           type="button"
           onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="text-[12px] font-semibold text-[#2271b1] hover:text-[#135e96] hover:underline flex items-center gap-1 cursor-pointer"
+          aria-expanded={dropdownOpen}
+          className="wp-btn"
         >
-          <FolderTree className="w-3.5 h-3.5" />
+          <FolderTree className="w-4 h-4" aria-hidden="true" />
           {dropdownOpen ? "Close Categories" : normalizedSelected.length === 0 ? "Choose Categories" : `Manage Categories (${normalizedSelected.length})`}
         </button>
       </div>
 
       {/* Selected Categories Chips */}
       {normalizedSelected.length === 0 ? (
-        <div
+        <button
+          type="button"
           onClick={() => setDropdownOpen(true)}
-          className="border border-dashed border-[#ccd0d4] rounded-[3px] p-2.5 text-center bg-[#fafafa] hover:bg-[#f6f7f7] cursor-pointer transition-colors"
+          className="wp-muted w-full text-left"
+          style={{ border: "1px dashed #c3c4c7", background: "#fff", padding: "10px 12px", minHeight: 40, cursor: "pointer" }}
         >
-          <p className="text-[12px] text-[#646970]">
-            No categories restricted. (Applies to all categories)
-          </p>
-        </div>
+          No categories restricted. (Applies to all categories)
+        </button>
       ) : (
-        <div className="flex flex-wrap gap-1.5 p-2 bg-[#fafafa] border border-[#ccd0d4] rounded-[3px]">
+        <div className="flex flex-wrap gap-1.5" style={{ border: "1px solid #dcdcde", background: "#fff", padding: 8 }}>
           {normalizedSelected.map((id) => {
             const cat = categoryMap.get(id);
             const name = cat?.name || `Category ID: ${id.slice(-6)}`;
             return (
-              <span
-                key={id}
-                className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-[#c3c4c7] rounded-[3px] text-[11px] font-medium text-[#1d2327]"
-              >
-                <span>{name}</span>
+              <span key={id} className="wp-chip" style={{ maxWidth: "100%" }}>
+                <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{name}</span>
                 <button
                   type="button"
                   onClick={() => removeSingle(id)}
-                  className="text-gray-400 hover:text-red-600"
+                  aria-label={`Remove ${name}`}
+                  className="max-[782px]:min-h-8 max-[782px]:min-w-8 items-center justify-center"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </span>
             );
@@ -103,62 +105,53 @@ export default function CategorySelector({
 
       {/* Dropdown Checklist Box */}
       {dropdownOpen && (
-        <div className="border border-[#c3c4c7] rounded-[3px] bg-white shadow-md p-3 space-y-2 mt-1">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search categories..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1 text-[12px] border border-[#ccd0d4] rounded-[3px] outline-none focus:border-[#2271b1]"
-            />
-          </div>
+        <div style={{ marginTop: 8, border: "1px solid #c3c4c7", background: "#f6f7f7", padding: 10 }}>
+          <label htmlFor={searchId} className="sr-only">Search categories</label>
+          <input
+            id={searchId}
+            type="text"
+            placeholder="Search categories..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="wp-input wp-full"
+            style={{ marginBottom: 8 }}
+          />
 
-          <div className="max-h-48 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-[3px]">
+          <div className="wp-checklist">
             {loading ? (
-              <div className="p-3 text-center text-xs text-gray-400 italic">
+              <p className="wp-muted" style={{ margin: "6px 0" }}>
                 Loading categories...
-              </div>
+              </p>
             ) : filteredCategories.length === 0 ? (
-              <div className="p-3 text-center text-xs text-gray-500">
+              <p className="wp-muted" style={{ margin: "6px 0" }}>
                 No categories found.
-              </div>
+              </p>
             ) : (
               filteredCategories.map((c) => {
                 const sId = String(c._id);
                 const isChecked = normalizedSelected.includes(sId);
                 return (
-                  <label
-                    key={sId}
-                    className={`flex items-center justify-between px-3 py-1.5 hover:bg-[#f6f7f7] cursor-pointer text-[12px] ${
-                      isChecked ? "bg-[#f0f6fa] font-semibold text-[#1d2327]" : "text-[#2c3338]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleCategory(sId)}
-                        className="rounded-sm border-gray-300 text-[#2271b1]"
-                      />
-                      <span>{c.name}</span>
-                    </div>
-                    {isChecked && <Check className="w-3.5 h-3.5 text-[#2271b1]" />}
+                  <label key={sId} className="wp-check max-[782px]:min-h-10">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleCategory(sId)}
+                    />
+                    <span className={isChecked ? "wp-strong" : undefined}>{c.name}</span>
                   </label>
                 );
               })
             )}
           </div>
 
-          <div className="flex items-center justify-between pt-1 text-[11px]">
-            <span className="text-gray-500">
+          <div className="flex items-center justify-between gap-2" style={{ marginTop: 8 }}>
+            <span className="wp-muted">
               {normalizedSelected.length} selected
             </span>
             <button
               type="button"
               onClick={() => setDropdownOpen(false)}
-              className="text-[#2271b1] font-bold hover:underline"
+              className="wp-btn"
             >
               Done
             </button>

@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, Suspense } from "react";
-import { ChevronDown, Search, Edit2, X, QrCode, Copy, Check, Eye, Package, FolderTree, CreditCard, AlertTriangle } from "lucide-react";
+import { X, Copy, Check, CreditCard, AlertTriangle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams, useRouter } from "next/navigation";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 import ProductSelector from "@/components/admin/discounts/ProductSelector";
 import CategorySelector from "@/components/admin/discounts/CategorySelector";
 import CouponViewModal from "@/components/admin/discounts/CouponViewModal";
+import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
 
 // Prefers the real specificCustomerEmails field; falls back to deriving from populated
 // specificCustomers (ObjectId refs with .email) for any coupon saved before that field
@@ -63,22 +63,32 @@ function ShareCouponModal({ discount, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 overflow-y-auto bg-black/50" onClick={onClose}>
-      <div className="bg-white rounded-[4px] border border-[#c3c4c7] shadow-xl w-full max-w-sm max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6 space-y-4" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[14px] font-bold text-[#1d2327] min-w-0 break-words">Share Coupon &quot;{discount.code}&quot;</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 shrink-0 cursor-pointer"><X className="w-4 h-4" /></button>
+    <div className="wp-modal-backdrop" style={{ zIndex: 9999 }} onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-coupon-title"
+        className="wp-modal"
+        style={{ maxWidth: 420 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="wp-modal-head" style={{ gap: 8 }}>
+          <h2 id="share-coupon-title" style={{ minWidth: 0, overflowWrap: "anywhere" }}>Share coupon &ldquo;{discount.code}&rdquo;</h2>
+          <button type="button" onClick={onClose} className="wp-notice-dismiss shrink-0 min-h-10 min-w-10 items-center justify-center" aria-label="Close"><X className="w-5 h-5" aria-hidden="true" /></button>
         </div>
-        <p className="text-[12px] text-[#646970]">Scanning this QR code (or opening the link) automatically applies the coupon and takes the shopper to the store.</p>
-        <div className="flex justify-center bg-white p-4 border border-[#ccd0d4] rounded">
-          <QRCodeSVG value={link} size={180} />
-        </div>
-        <div className="flex items-center gap-2">
-          <input readOnly value={link} className="flex-1 min-w-0 text-xs border border-[#ccd0d4] rounded-[3px] px-2.5 py-1.5 bg-[#f6f7f7] font-mono" onFocus={e => e.target.select()} />
-          <button onClick={handleCopy} className="shrink-0 bg-[#2271b1] hover:bg-[#135e96] text-white text-xs font-semibold px-3 py-1.5 rounded-[3px] flex items-center gap-1.5 cursor-pointer">
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? "Copied" : "Copy"}
-          </button>
+        <div className="wp-modal-body">
+          <p className="wp-muted" style={{ margin: "0 0 12px" }}>Scanning this QR code (or opening the link) automatically applies the coupon and takes the shopper to the store.</p>
+          <div className="flex justify-center" style={{ padding: 16, border: "1px solid #dcdcde", background: "#fff", marginBottom: 12 }}>
+            <QRCodeSVG value={link} size={180} />
+          </div>
+          <label htmlFor="share-coupon-link" className="wp-label">Share link</label>
+          <div className="flex items-center gap-1.5">
+            <input id="share-coupon-link" readOnly value={link} className="wp-input flex-1 min-w-0" style={{ background: "#f6f7f7" }} onFocus={e => e.target.select()} />
+            <button type="button" onClick={handleCopy} className="wp-btn wp-btn-primary shrink-0">
+              {copied ? <Check className="w-4 h-4" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -579,738 +589,781 @@ function CouponsContent() {
   };
 
   const getCouponStatus = (d) => {
-    if (d.isDeleted) return { label: "Trashed", color: "text-red-500 font-bold" };
-    if (!d.isActive) return { label: "Inactive", color: "text-gray-400 font-medium" };
-    if (d.startDate && new Date(d.startDate) > new Date()) return { label: "Scheduled", color: "text-blue-600 font-semibold" };
-    if (d.endDate && new Date(d.endDate) < new Date()) return { label: "Expired", color: "text-amber-600 font-semibold" };
-    return { label: "Active", color: "text-green-600 font-bold" };
+    if (d.isDeleted) return { label: "Trashed", color: "wp-st-cancelled" };
+    if (!d.isActive) return { label: "Inactive", color: "wp-st-draft" };
+    if (d.startDate && new Date(d.startDate) > new Date()) return { label: "Scheduled", color: "wp-st-shipped" };
+    if (d.endDate && new Date(d.endDate) < new Date()) return { label: "Expired", color: "wp-st-confirmed" };
+    return { label: "Active", color: "wp-st-published" };
   };
 
-  const inputClass = "w-full border border-[#ccd0d4] bg-white text-xs px-2.5 py-1.5 outline-none focus:border-[#2271b1] focus:ring-0 rounded-[3px] font-medium";
-  const btnClass = "bg-[#f6f7f7] border border-[#ccd0d4] hover:bg-[#f0f0f1] text-[#2c3338] text-xs font-semibold px-3 py-1.5 rounded-[3px] cursor-pointer inline-block transition-colors outline-none select-none";
-  const primaryBtnClass = "bg-[#2271b1] border border-[#135e96] hover:bg-[#135e96] text-white text-xs font-semibold px-4 py-1.5 rounded-[3px] cursor-pointer inline-block transition-colors outline-none select-none";
+  // Layout-only: which "Coupon data" tab is visible. Every panel stays mounted.
+  const [couponTab, setCouponTab] = useState("general");
+  // If the browser blocks submit because a required/invalid field sits on a hidden tab,
+  // bring that tab into view so the field can be seen and fixed.
+  const revealInvalidField = (e) => {
+    const panel = e.target?.closest?.("[data-coupon-panel]");
+    if (panel && panel.dataset.couponPanel !== couponTab) setCouponTab(panel.dataset.couponPanel);
+  };
+
+  const COUPON_TABS = [
+    { key: "general", label: "General" },
+    { key: "restriction", label: "Usage restriction" },
+    { key: "limits", label: "Usage limits" },
+  ];
 
   // ── Full Add/Edit Coupon Form Screen ──
   if (showForm) {
     const isEdit = Boolean(editingDiscountId);
     return (
-      <AdminPageLayout 
-        title={isEdit ? `Edit Coupon: ${formData.code || ""}` : "Add New Coupon"} 
-        breadcrumbs={[
-          { label: "WooCommerce", href: "/admin/orders" },
-          { label: "Coupons", href: "/admin/discounts" },
-          { label: isEdit ? "Edit Coupon" : "Add New" }
-        ]}
-      >
+      <Page>
+        <PageHeader title={isEdit ? "Edit coupon" : "Add new coupon"} />
+
         {/* WordPress Notices */}
         {errorNotice && (
-          <div className="bg-white border-l-4 border-l-[#d63638] p-2.5 mb-4 text-[13px] font-medium flex items-center justify-between select-none">
-            <span className="text-[#d63638] min-w-0 break-words">{errorNotice}</span>
-            <button onClick={() => setErrorNotice("")} className="text-gray-400 hover:text-gray-600 ml-2 shrink-0"><X className="w-4 h-4" /></button>
-          </div>
+          <Notice type="error" onDismiss={() => setErrorNotice("")}>
+            <span style={{ overflowWrap: "anywhere" }}>{errorNotice}</span>
+          </Notice>
         )}
 
-        <div className="w-full max-w-3xl bg-white border border-[#c3c4c7] p-4 sm:p-6 space-y-6 shadow-xs">
-          <div className="flex items-center justify-between border-b border-[#ccd0d4] pb-3">
-            <div>
-              <h2 className="text-[16px] font-bold text-[#1d2327]">
-                {isEdit ? `Edit Coupon Details` : `Create Coupon`}
-              </h2>
-              <p className="text-[12px] text-[#646970]">
-                {isEdit ? "Update discounts, rules, and product restrictions." : "Configure code, discount values, and customer restrictions."}
-              </p>
-            </div>
-            {isEdit && (
-              <span className="text-xs font-mono font-bold px-2.5 py-1 bg-gray-100 border border-gray-300 rounded text-gray-700">
-                {formData.code}
-              </span>
-            )}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* General Coupon Settings */}
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[13px] font-bold text-[#1d2327]">Coupon Code <span className="text-red-500">*</span></label>
-                <input 
+        <form onSubmit={handleSubmit} onInvalidCapture={revealInvalidField}>
+          <div className="wp-cols">
+            <div className="wp-col-main">
+              <div style={{ marginBottom: 20 }}>
+                <label htmlFor="coupon-code" className="sr-only">Coupon code (required)</label>
+                <input
+                  id="coupon-code"
                   required
-                  placeholder="SUMMER50"
-                  className={`${inputClass} font-bold tracking-wider uppercase text-[14px]`}
+                  placeholder="Coupon code"
+                  className="wp-title-input"
                   value={formData.code}
                   onChange={(e) => setFormData({...formData, code: e.target.value})}
                 />
-                <p className="text-[11px] text-[#646970] italic">The code customers enter at checkout.</p>
+                <p className="wp-desc">The code customers enter at checkout. Example: SUMMER50</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Discount Type</label>
-                  <select
-                    className={`${inputClass} py-1.5 font-semibold text-[#2c3338]`}
-                    value={formData.type}
-                    onChange={(e) => setFormData({...formData, type: e.target.value})}
+              <section className="wp-postbox" aria-labelledby="coupon-data-title">
+                <div className="wp-postbox-head">
+                  <h2 id="coupon-data-title">Coupon data</h2>
+                </div>
+                <div className="wp-vtabs">
+                  <div className="wp-vtabs-list" role="tablist" aria-label="Coupon data" aria-orientation="vertical">
+                    {COUPON_TABS.map(t => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        role="tab"
+                        id={`coupon-tab-${t.key}`}
+                        aria-controls={`coupon-panel-${t.key}`}
+                        aria-selected={couponTab === t.key}
+                        className="wp-vtab"
+                        onClick={() => setCouponTab(t.key)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* General */}
+                  <div
+                    id="coupon-panel-general"
+                    role="tabpanel"
+                    aria-labelledby="coupon-tab-general"
+                    data-coupon-panel="general"
+                    className={`wp-vtabs-panel ${couponTab === "general" ? "" : "hidden"}`}
                   >
-                    <option value="percentage">Percentage Discount</option>
-                    <option value="fixed">Fixed Cart Discount</option>
-                  </select>
-                </div>
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-type" className="wp-flabel">Discount type</label>
+                      <select
+                        id="coupon-type"
+                        className="wp-select"
+                        value={formData.type}
+                        onChange={(e) => setFormData({...formData, type: e.target.value})}
+                      >
+                        <option value="percentage">Percentage Discount</option>
+                        <option value="fixed">Fixed Cart Discount</option>
+                      </select>
+                    </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Coupon Amount <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input
-                      required
-                      type="number"
-                      min="0.01"
-                      step="any"
-                      placeholder={formData.type === "percentage" ? "e.g. 20" : "e.g. 50"}
-                      className={`${inputClass} pl-6 font-bold`}
-                      value={formData.value}
-                      onChange={(e) => setFormData({...formData, value: e.target.value})}
-                    />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">
-                      {formData.type === "percentage" ? "%" : "$"}
-                    </span>
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-amount" className="wp-flabel">
+                        Coupon amount ({formData.type === "percentage" ? "%" : "$"}) <span style={{ color: "#b32d2e" }} aria-hidden="true">*</span>
+                      </label>
+                      <input
+                        id="coupon-amount"
+                        required
+                        type="number"
+                        min="0.01"
+                        step="any"
+                        placeholder={formData.type === "percentage" ? "e.g. 20" : "e.g. 50"}
+                        className="wp-input"
+                        value={formData.value}
+                        onChange={(e) => setFormData({...formData, value: e.target.value})}
+                      />
+                      <span className="wp-hint">Value of the coupon.</span>
+                    </div>
+
+                    {formData.type === "percentage" && (
+                      <div className="wp-frow">
+                        <label htmlFor="coupon-max-cap" className="wp-flabel">Max discount cap ($)</label>
+                        <input
+                          id="coupon-max-cap"
+                          type="number"
+                          min="0.01"
+                          step="any"
+                          placeholder="No cap"
+                          className="wp-input"
+                          value={formData.maxDiscountAmount}
+                          onChange={(e) => setFormData({...formData, maxDiscountAmount: e.target.value})}
+                        />
+                        <span className="wp-hint">Caps percentage discounts (e.g. 20% off, up to $50 max).</span>
+                      </div>
+                    )}
+
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-start" className="wp-flabel">Start date</label>
+                      <input
+                        id="coupon-start"
+                        type="date"
+                        className="wp-input"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                      />
+                      <span className="wp-hint">Leave blank to activate immediately.</span>
+                    </div>
+
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-expiry" className="wp-flabel">Coupon expiry date</label>
+                      <input
+                        id="coupon-expiry"
+                        type="date"
+                        className="wp-input"
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                      />
+                      <span className="wp-hint">Leave blank for no expiration.</span>
+                    </div>
+                  </div>
+
+                  {/* Usage restriction */}
+                  <div
+                    id="coupon-panel-restriction"
+                    role="tabpanel"
+                    aria-labelledby="coupon-tab-restriction"
+                    data-coupon-panel="restriction"
+                    className={`wp-vtabs-panel ${couponTab === "restriction" ? "" : "hidden"}`}
+                  >
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-min-spend" className="wp-flabel">Minimum spend ($)</label>
+                      <input
+                        id="coupon-min-spend"
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="0.00"
+                        className="wp-input"
+                        value={formData.minPurchase}
+                        onChange={(e) => setFormData({...formData, minPurchase: e.target.value})}
+                      />
+                      <span className="wp-hint">Minimum cart total required before coupon applies.</span>
+                    </div>
+
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-min-qty" className="wp-flabel">Minimum quantity</label>
+                      <input
+                        id="coupon-min-qty"
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        className="wp-input"
+                        value={formData.minQuantity}
+                        onChange={(e) => setFormData({...formData, minQuantity: e.target.value})}
+                      />
+                      <span className="wp-hint">Minimum item quantity required in cart.</span>
+                    </div>
+
+                    <div className="wp-frow">
+                      <span className="wp-flabel">Exclude sale items</span>
+                      <label className="wp-check">
+                        <input
+                          type="checkbox"
+                          checked={formData.excludeSaleItems}
+                          onChange={(e) => setFormData({...formData, excludeSaleItems: e.target.checked})}
+                        />
+                        <span>Full-price items only</span>
+                      </label>
+                    </div>
+
+                    <div style={{ padding: "12px 0", borderBottom: "1px solid #f6f7f7" }}>
+                      <p className="wp-desc" style={{ margin: "0 0 10px" }}>
+                        Select specific products or categories this coupon applies to. If left empty, it will apply to all products storewide.
+                      </p>
+                      <div style={{ marginBottom: 14 }}>
+                        <ProductSelector
+                          selectedIds={formData.specificProducts}
+                          onChange={(ids) => setFormData({ ...formData, specificProducts: ids })}
+                          products={catalogProducts}
+                          loading={catalogLoading}
+                        />
+                      </div>
+                      <CategorySelector
+                        selectedIds={formData.specificCategories}
+                        onChange={(ids) => setFormData({ ...formData, specificCategories: ids })}
+                        categories={catalogCategories}
+                        loading={catalogLoading}
+                      />
+                    </div>
+
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-emails" className="wp-flabel">Allowed emails</label>
+                      <input
+                        id="coupon-emails"
+                        type="text"
+                        placeholder="e.g. jane@example.com, john@example.com"
+                        className="wp-input"
+                        value={formData.specificCustomerEmails}
+                        onChange={(e) => setFormData({...formData, specificCustomerEmails: e.target.value})}
+                      />
+                      <span className="wp-hint">Comma-separated. Restricts the coupon to these emails only — no account required. Each one gets an automatic email with the code once this coupon is active.</span>
+                    </div>
+
+                    <div className="wp-frow">
+                      <span className="wp-flabel">Customer eligibility</span>
+                      <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+                        <label className="wp-check">
+                          <input
+                            type="checkbox"
+                            checked={formData.firstOrderOnly}
+                            onChange={(e) => setFormData({...formData, firstOrderOnly: e.target.checked})}
+                          />
+                          <span>First order only (new customers only)</span>
+                        </label>
+                        <label className="wp-check">
+                          <input
+                            type="checkbox"
+                            checked={formData.userRegistrationRequired}
+                            onChange={(e) => setFormData({...formData, userRegistrationRequired: e.target.checked})}
+                          />
+                          <span>Require user login / account registration</span>
+                        </label>
+                        <label className="wp-check">
+                          <input
+                            type="checkbox"
+                            checked={formData.newsletterSubscribedOnly}
+                            onChange={(e) => setFormData({...formData, newsletterSubscribedOnly: e.target.checked})}
+                          />
+                          <span>Newsletter subscribers only</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Usage limits */}
+                  <div
+                    id="coupon-panel-limits"
+                    role="tabpanel"
+                    aria-labelledby="coupon-tab-limits"
+                    data-coupon-panel="limits"
+                    className={`wp-vtabs-panel ${couponTab === "limits" ? "" : "hidden"}`}
+                  >
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-usage-limit" className="wp-flabel">Usage limit per coupon</label>
+                      <input
+                        id="coupon-usage-limit"
+                        type="number"
+                        min="1"
+                        placeholder="Unlimited"
+                        disabled={formData.unlimitedUsage}
+                        className="wp-input"
+                        value={formData.usageLimit}
+                        onChange={(e) => setFormData({...formData, usageLimit: e.target.value})}
+                      />
+                      <label className="wp-check">
+                        <input
+                          type="checkbox"
+                          checked={formData.unlimitedUsage}
+                          onChange={(e) => setFormData({...formData, unlimitedUsage: e.target.checked, usageLimit: e.target.checked ? "" : formData.usageLimit})}
+                        />
+                        <span>Unlimited usage</span>
+                      </label>
+                      <span className="wp-hint">How many times this coupon can be used before it is void.</span>
+                    </div>
+
+                    <div className="wp-frow">
+                      <label htmlFor="coupon-usage-per-user" className="wp-flabel">Usage limit per user</label>
+                      <input
+                        id="coupon-usage-per-user"
+                        type="number"
+                        min="1"
+                        placeholder="Unlimited"
+                        disabled={formData.unlimitedPerCustomer}
+                        className="wp-input"
+                        value={formData.usagePerUserLimit}
+                        onChange={(e) => setFormData({...formData, usagePerUserLimit: e.target.value})}
+                      />
+                      <label className="wp-check">
+                        <input
+                          type="checkbox"
+                          checked={formData.unlimitedPerCustomer}
+                          onChange={(e) => setFormData({...formData, unlimitedPerCustomer: e.target.checked, usagePerUserLimit: e.target.checked ? "" : (formData.usagePerUserLimit || "1")})}
+                        />
+                        <span>Unlimited per customer</span>
+                      </label>
+                    </div>
+
+                    <div className="wp-frow">
+                      <span className="wp-flabel">Per device</span>
+                      <label className="wp-check">
+                        <input
+                          type="checkbox"
+                          checked={formData.oneRedemptionPerDevice}
+                          onChange={(e) => setFormData({...formData, oneRedemptionPerDevice: e.target.checked})}
+                        />
+                        <span>Limit to one redemption per device / IP</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </section>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Minimum Purchase Spend</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      placeholder="0.00"
-                      className={`${inputClass} pl-6 font-medium`}
-                      value={formData.minPurchase}
-                      onChange={(e) => setFormData({...formData, minPurchase: e.target.value})}
-                    />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+            <div className="wp-col-side">
+              <Postbox
+                id="coupon-publish"
+                title="Publish"
+                footer={
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleReset();
+                        router.push("/admin/discounts");
+                      }}
+                      className="wp-btn"
+                    >
+                      Cancel
+                    </button>
+                    <span className="wp-spacer" />
+                    <button type="submit" className="wp-btn wp-btn-primary">
+                      {isEdit ? "Update Coupon" : "Create Coupon"}
+                    </button>
+                  </>
+                }
+              >
+                {isEdit && (
+                  <div className="wp-kv">
+                    <span className="wp-kv-k">Coupon</span>
+                    <span className="wp-kv-v" style={{ overflowWrap: "anywhere" }}>{formData.code}</span>
                   </div>
-                  <p className="text-[11px] text-[#646970] italic">Minimum cart total required before coupon applies.</p>
+                )}
+                <div className="wp-kv">
+                  <span className="wp-kv-k">Status</span>
+                  <span className={`wp-pill wp-pill-sm ${formData.isActive ? "wp-st-published" : "wp-st-draft"}`}>
+                    {formData.isActive ? "Active" : "Inactive"}
+                  </span>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Total Usage Limit</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Unlimited"
-                    disabled={formData.unlimitedUsage}
-                    className={`${inputClass} font-medium disabled:bg-gray-100 disabled:text-gray-400`}
-                    value={formData.usageLimit}
-                    onChange={(e) => setFormData({...formData, usageLimit: e.target.value})}
-                  />
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[#2c3338] cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={formData.unlimitedUsage}
-                      onChange={(e) => setFormData({...formData, unlimitedUsage: e.target.checked, usageLimit: e.target.checked ? "" : formData.usageLimit})}
-                      className="rounded-sm border-gray-300"
-                    />
-                    <span>Unlimited Usage</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Start Date</label>
-                  <input
-                    type="date"
-                    className={`${inputClass} py-1.5 font-medium`}
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                  />
-                  <p className="text-[11px] text-[#646970] italic">Leave blank to activate immediately.</p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Expiry Date</label>
-                  <input
-                    type="date"
-                    className={`${inputClass} py-1.5 font-medium`}
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                  />
-                  <p className="text-[11px] text-[#646970] italic">Leave blank for no expiration.</p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[13px] font-bold text-[#1d2327]">Coupon Status</label>
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer select-none">
+                <label className="wp-check" style={{ marginTop: 8 }}>
                   <input
                     type="checkbox"
                     checked={formData.isActive}
                     onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
-                    className="rounded-sm border-gray-300"
                   />
                   <span>{formData.isActive ? "Active (Ready for use)" : "Inactive (Paused)"}</span>
                 </label>
-              </div>
+              </Postbox>
             </div>
-
-            {/* ── Product & Category Selectors (New Interactive System) ── */}
-            <div className="border-t border-[#ccd0d4] pt-5 space-y-4">
-              <div>
-                <h3 className="text-[14px] font-bold text-[#1d2327]">Product & Category Restrictions</h3>
-                <p className="text-[11px] text-[#646970] mt-0.5">
-                  Select specific products or categories this coupon applies to. If left empty, it will apply to all products storewide.
-                </p>
-              </div>
-
-              <ProductSelector
-                selectedIds={formData.specificProducts}
-                onChange={(ids) => setFormData({ ...formData, specificProducts: ids })}
-                products={catalogProducts}
-                loading={catalogLoading}
-              />
-
-              <CategorySelector
-                selectedIds={formData.specificCategories}
-                onChange={(ids) => setFormData({ ...formData, specificCategories: ids })}
-                categories={catalogCategories}
-                loading={catalogLoading}
-              />
-            </div>
-
-            {/* Advanced Restrictions / Conditions */}
-            <div className="border-t border-[#ccd0d4] pt-5 space-y-4">
-              <h3 className="text-[14px] font-bold text-[#1d2327]">Usage Rules & Customer Limits</h3>
-
-              <div className="space-y-2 select-none">
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.firstOrderOnly}
-                    onChange={(e) => setFormData({...formData, firstOrderOnly: e.target.checked})}
-                    className="rounded-sm border-gray-300"
-                  />
-                  <span>First Order Only (New Customers Only)</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.userRegistrationRequired}
-                    onChange={(e) => setFormData({...formData, userRegistrationRequired: e.target.checked})}
-                    className="rounded-sm border-gray-300"
-                  />
-                  <span>Require User Login / Account Registration</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.newsletterSubscribedOnly}
-                    onChange={(e) => setFormData({...formData, newsletterSubscribedOnly: e.target.checked})}
-                    className="rounded-sm border-gray-300"
-                  />
-                  <span>Newsletter Subscribers Only</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.excludeSaleItems}
-                    onChange={(e) => setFormData({...formData, excludeSaleItems: e.target.checked})}
-                    className="rounded-sm border-gray-300"
-                  />
-                  <span>Exclude Sale Items (Full-price items only)</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#2c3338] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.oneRedemptionPerDevice}
-                    onChange={(e) => setFormData({...formData, oneRedemptionPerDevice: e.target.checked})}
-                    className="rounded-sm border-gray-300"
-                  />
-                  <span>Limit to One Redemption Per Device / IP</span>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Usage Limit Per Customer</label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Unlimited"
-                    disabled={formData.unlimitedPerCustomer}
-                    className={`${inputClass} font-medium disabled:bg-gray-100 disabled:text-gray-400`}
-                    value={formData.usagePerUserLimit}
-                    onChange={(e) => setFormData({...formData, usagePerUserLimit: e.target.value})}
-                  />
-                  <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[#2c3338] cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={formData.unlimitedPerCustomer}
-                      onChange={(e) => setFormData({...formData, unlimitedPerCustomer: e.target.checked, usagePerUserLimit: e.target.checked ? "" : (formData.usagePerUserLimit || "1")})}
-                      className="rounded-sm border-gray-300"
-                    />
-                    <span>Unlimited Per Customer</span>
-                  </label>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Minimum Quantity In Cart</label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    className={`${inputClass} font-medium`}
-                    value={formData.minQuantity}
-                    onChange={(e) => setFormData({...formData, minQuantity: e.target.value})}
-                  />
-                  <p className="text-[11px] text-[#646970] italic">Minimum item quantity required in cart.</p>
-                </div>
-              </div>
-
-              {formData.type === "percentage" && (
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-[#1d2327]">Max Discount Cap</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="any"
-                      placeholder="No cap"
-                      className={`${inputClass} pl-6 font-medium`}
-                      value={formData.maxDiscountAmount}
-                      onChange={(e) => setFormData({...formData, maxDiscountAmount: e.target.value})}
-                    />
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[11px] font-medium">$</span>
-                  </div>
-                  <p className="text-[11px] text-[#646970] italic">Caps percentage discounts (e.g. 20% off, up to $50 max).</p>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label className="text-[13px] font-bold text-[#1d2327]">Specific Customer Emails (Comma-separated)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. jane@example.com, john@example.com"
-                  className={`${inputClass} font-mono`}
-                  value={formData.specificCustomerEmails}
-                  onChange={(e) => setFormData({...formData, specificCustomerEmails: e.target.value})}
-                />
-                <p className="text-[11px] text-[#646970] italic">Restricts the coupon to these emails only — no account required. Each one gets an automatic email with the code once this coupon is active.</p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-3 border-t border-[#ccd0d4] select-none">
-              <button
-                type="button"
-                onClick={() => {
-                  handleReset();
-                  router.push("/admin/discounts");
-                }}
-                className={btnClass}
-              >
-                Cancel
-              </button>
-              <button type="submit" className={primaryBtnClass}>
-                {isEdit ? "Update Coupon" : "Create Coupon"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </AdminPageLayout>
+          </div>
+        </form>
+      </Page>
     );
   }
 
+  const FILTERS = [
+    { key: "All", count: stats.allCount },
+    { key: "Active", count: stats.activeCount },
+    { key: "Expired", count: stats.expiredCount },
+    { key: "Trash", count: stats.trashCount },
+  ];
+
+  const headerRow = (
+    <tr>
+      <th scope="col" className="wp-check-col">
+        <input
+          type="checkbox"
+          aria-label="Select all coupons"
+          checked={discounts.length > 0 && selectedIds.length === discounts.length}
+          onChange={toggleSelectAll}
+        />
+      </th>
+      <th scope="col">Code</th>
+      <th scope="col" className="wp-hide-sm">Coupon type</th>
+      <th scope="col" className="wp-hide-sm">Coupon amount</th>
+      <th scope="col" className="wp-hide-sm">Product IDs / scope</th>
+      <th scope="col" className="wp-hide-sm">Minimum spend</th>
+      <th scope="col" className="wp-hide-sm">Usage / Limit</th>
+      <th scope="col" className="wp-hide-sm">Expiry date</th>
+      <th scope="col">Status</th>
+    </tr>
+  );
+
+  const linkBtnStyle = { background: "none", border: 0, padding: 0, cursor: "pointer", textAlign: "left" };
+
   // ── Coupons List View ──
   return (
-    <AdminPageLayout 
-      title="Coupons" 
-      addNewLink={() => {
-        setEditingDiscountId(null);
-        setFormData({ ...EMPTY_FORM });
-        setShowForm(true);
-        router.push("/admin/discounts?action=new");
-      }}
-      addNewLabel="Add New"
-      breadcrumbs={[{ label: "WooCommerce", href: "/admin/orders" }, { label: "Coupons" }]}
-    >
+    <Page>
+      <PageHeader
+        title="Coupons"
+        actions={
+          <button
+            type="button"
+            className="wp-btn"
+            onClick={() => {
+              setEditingDiscountId(null);
+              setFormData({ ...EMPTY_FORM });
+              setShowForm(true);
+              router.push("/admin/discounts?action=new");
+            }}
+          >
+            Add coupon
+          </button>
+        }
+      />
+
       {/* WordPress Notices */}
       {successNotice && (
-        <div className="bg-white border-l-4 border-l-[#00a0d2] p-2.5 mb-4 text-[13px] font-medium flex items-center justify-between select-none">
-          <span className="text-[#1d2327] min-w-0 break-words">{successNotice}</span>
-          <button onClick={() => setSuccessNotice("")} className="text-gray-400 hover:text-gray-650 ml-2 shrink-0 cursor-pointer"><X className="w-4 h-4" /></button>
-        </div>
+        <Notice type="success" onDismiss={() => setSuccessNotice("")}>
+          <span style={{ overflowWrap: "anywhere" }}>{successNotice}</span>
+        </Notice>
       )}
       {errorNotice && (
-        <div className="bg-white border-l-4 border-l-[#d63638] p-2.5 mb-4 text-[13px] font-medium flex items-center justify-between select-none">
-          <span className="text-[#d63638] min-w-0 break-words">{errorNotice}</span>
-          <button onClick={() => setErrorNotice("")} className="text-gray-400 hover:text-gray-655 ml-2 shrink-0 cursor-pointer"><X className="w-4 h-4" /></button>
-        </div>
+        <Notice type="error" onDismiss={() => setErrorNotice("")}>
+          <span style={{ overflowWrap: "anywhere" }}>{errorNotice}</span>
+        </Notice>
       )}
 
-      {/* Subsubsub Navigation & Search */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#c3c4c7] pb-2 mb-4 w-full">
-        <ul className="flex flex-wrap items-center gap-1 text-[13px] text-[#2c3338] font-medium select-none">
-          <li>
-            <button 
-              onClick={() => { setStatusFilter("All"); setSelectedIds([]); }} 
-              className={`hover:text-[#2271b1] transition-colors cursor-pointer ${statusFilter === "All" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
+      {/* Status filter links */}
+      <div className="wp-subsub" role="tablist" aria-label="Filter coupons by status">
+        {FILTERS.map((f, i) => (
+          <React.Fragment key={f.key}>
+            {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === f.key}
+              className={`max-[782px]:min-h-10 ${statusFilter === f.key ? "is-current" : ""}`}
+              onClick={() => { setStatusFilter(f.key); setSelectedIds([]); }}
             >
-              All <span className="text-gray-400 text-xs font-normal">({stats.allCount || 0})</span>
+              {f.key} <span className="wp-count">({f.count || 0})</span>
             </button>
-            <span className="text-gray-400 mx-1.5">|</span>
-          </li>
-          <li>
-            <button 
-              onClick={() => { setStatusFilter("Active"); setSelectedIds([]); }} 
-              className={`hover:text-[#2271b1] transition-colors cursor-pointer ${statusFilter === "Active" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-            >
-              Active <span className="text-gray-400 text-xs font-normal">({stats.activeCount || 0})</span>
-            </button>
-            <span className="text-gray-400 mx-1.5">|</span>
-          </li>
-          <li>
-            <button 
-              onClick={() => { setStatusFilter("Expired"); setSelectedIds([]); }} 
-              className={`hover:text-[#2271b1] transition-colors cursor-pointer ${statusFilter === "Expired" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-            >
-              Expired <span className="text-gray-400 text-xs font-normal">({stats.expiredCount || 0})</span>
-            </button>
-            <span className="text-gray-400 mx-1.5">|</span>
-          </li>
-          <li>
-            <button 
-              onClick={() => { setStatusFilter("Trash"); setSelectedIds([]); }} 
-              className={`hover:text-[#2271b1] transition-colors cursor-pointer ${statusFilter === "Trash" ? "font-bold text-[#000]" : "text-[#2271b1]"}`}
-            >
-              Trash <span className="text-gray-400 text-xs font-normal">({stats.trashCount || 0})</span>
-            </button>
-          </li>
-        </ul>
+          </React.Fragment>
+        ))}
+      </div>
 
-        {/* Search Box */}
-        <form onSubmit={(e) => { e.preventDefault(); fetchDiscounts(); }} className="flex items-center gap-1.5">
+      {/* Toolbar: bulk actions + search */}
+      <div className="wp-toolbar">
+        <label htmlFor="coupons-bulk-action" className="sr-only">Select bulk action</label>
+        <select
+          id="coupons-bulk-action"
+          className="wp-select"
+          value={bulkAction}
+          onChange={(e) => setBulkAction(e.target.value)}
+        >
+          <option>Bulk actions</option>
+          {statusFilter === "Trash" ? (
+            <>
+              <option>Restore</option>
+              <option>Delete Permanently</option>
+            </>
+          ) : (
+            <>
+              <option>Move to Trash</option>
+              <option>Duplicate</option>
+            </>
+          )}
+        </select>
+        <button
+          type="button"
+          onClick={handleBulkAction}
+          disabled={selectedIds.length === 0 || bulkAction === "Bulk actions"}
+          className="wp-btn"
+        >
+          Apply
+        </button>
+
+        <span className="wp-spacer" />
+
+        <form role="search" onSubmit={(e) => { e.preventDefault(); fetchDiscounts(); }} className="wp-search">
+          <label htmlFor="coupons-search" className="sr-only">Search coupons</label>
           <input
+            id="coupons-search"
             type="search"
             placeholder="Search coupons..."
-            className="border border-[#8c8f94] bg-white text-xs px-2.5 py-1 outline-none focus:border-[#2271b1] rounded-[3px] w-48 font-medium"
+            className="wp-input"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <button type="submit" className={btnClass}>
-            Search
+          <button type="submit" className="wp-btn">
+            Search coupons
           </button>
         </form>
       </div>
 
-      {/* Bulk Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 select-none">
-        <div className="flex items-center gap-2">
-          <select 
-            className="border border-[#8c8f94] bg-white text-xs px-2.5 py-1 outline-none focus:border-[#2271b1] rounded-[3px] text-[#2c3338]"
-            value={bulkAction}
-            onChange={(e) => setBulkAction(e.target.value)}
-          >
-            <option>Bulk actions</option>
-            {statusFilter === "Trash" ? (
-              <>
-                <option>Restore</option>
-                <option>Delete Permanently</option>
-              </>
-            ) : (
-              <>
-                <option>Move to Trash</option>
-                <option>Duplicate</option>
-              </>
-            )}
-          </select>
-          <button 
-            type="button" 
-            onClick={handleBulkAction}
-            disabled={selectedIds.length === 0 || bulkAction === "Bulk actions"}
-            className={`${btnClass} disabled:opacity-50 disabled:cursor-not-allowed`}
-          >
-            Apply
-          </button>
-        </div>
-
-        <div className="text-xs text-[#646970]">
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <span className="wp-pages">
           {discounts.length} item{discounts.length === 1 ? "" : "s"}
-        </div>
+        </span>
       </div>
 
       {/* Coupon List Table */}
-      <div className="bg-white border border-[#c3c4c7] shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-[#ccd0d4] bg-[#f6f7f7] text-[#2c3338] font-bold select-none">
-                <th className="w-8 px-3 py-2.5 text-center">
-                  <input 
-                    type="checkbox" 
-                    checked={discounts.length > 0 && selectedIds.length === discounts.length}
-                    onChange={toggleSelectAll}
-                    className="rounded-sm border-gray-300"
-                  />
-                </th>
-                <th className="px-3 py-2.5">Code</th>
-                <th className="hidden md:table-cell px-3 py-2.5">Coupon Type</th>
-                <th className="px-3 py-2.5">Coupon Amount</th>
-                <th className="hidden sm:table-cell px-3 py-2.5">Products / Scope</th>
-                <th className="hidden md:table-cell px-3 py-2.5">Min Spend</th>
-                <th className="px-3 py-2.5">Usage / Limit</th>
-                <th className="hidden lg:table-cell px-3 py-2.5">Expiry Date</th>
-                <th className="px-3 py-2.5 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={9} className="p-16 text-center italic text-gray-400 font-medium">Loading coupons database...</td></tr>
-              ) : discounts.length === 0 ? (
-                <tr><td colSpan={9} className="p-16 text-center italic text-gray-400 font-medium">No coupons found.</td></tr>
-              ) : (
-                discounts.map((d) => {
-                  const isSelected = selectedIds.includes(d._id);
-                  const isQuickEditing = quickEditingId === d._id;
-                  const cStatus = getCouponStatus(d);
-                  const prodCount = Array.isArray(d.specificProducts) ? d.specificProducts.length : 0;
-                  const catCount = Array.isArray(d.specificCategories) ? d.specificCategories.length : 0;
-                  
-                  if (isQuickEditing) {
-                    return (
-                      <tr key={d._id} className="bg-[#f6f7f7] border-y-2 border-[#c3c4c7]">
-                        <td colSpan={9} className="p-3 sm:p-4 align-top">
-                          <div className="space-y-4">
-                            <h4 className="text-[12px] font-bold text-gray-800 uppercase tracking-wider border-b border-gray-200 pb-1.5 flex items-center gap-1.5 select-none">
-                              <Edit2 className="w-3.5 h-3.5 text-gray-500" /> Quick Edit Coupon: <span className="font-mono text-[#2271b1]">{d.code}</span>
-                            </h4>
-                            
-                            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Code</label>
-                                <input 
-                                  type="text" 
-                                  className={`${inputClass} uppercase font-bold p-1`}
-                                  value={quickEditData.code}
-                                  onChange={e => setQuickEditData({ ...quickEditData, code: e.target.value })}
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Type</label>
-                                <select 
-                                  className={`${inputClass} p-1`}
-                                  value={quickEditData.type}
-                                  onChange={e => setQuickEditData({ ...quickEditData, type: e.target.value })}
-                                >
-                                  <option value="percentage">Percentage</option>
-                                  <option value="fixed">Fixed Cart</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Amount</label>
-                                <input 
-                                  type="number" 
-                                  min="0.01" 
-                                  step="any"
-                                  className={`${inputClass} p-1 font-bold`}
-                                  value={quickEditData.value}
-                                  onChange={e => setQuickEditData({ ...quickEditData, value: e.target.value })}
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Min Spend ($)</label>
-                                <input 
-                                  type="number" 
-                                  min="0" 
-                                  step="any"
-                                  className={`${inputClass} p-1`}
-                                  value={quickEditData.minPurchase}
-                                  onChange={e => setQuickEditData({ ...quickEditData, minPurchase: e.target.value })}
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Total Limit</label>
-                                <input
-                                  type="number"
-                                  placeholder="Unlimited"
-                                  disabled={quickEditData.unlimitedUsage}
-                                  className={`${inputClass} p-1 disabled:bg-gray-100 disabled:text-gray-400`}
-                                  value={quickEditData.usageLimit}
-                                  onChange={e => setQuickEditData({ ...quickEditData, usageLimit: e.target.value })}
-                                />
-                                <label className="flex items-center gap-1 text-[10px] font-semibold text-[#2c3338] cursor-pointer select-none mt-1">
-                                  <input
-                                    type="checkbox"
-                                    checked={quickEditData.unlimitedUsage}
-                                    onChange={(e) => setQuickEditData({...quickEditData, unlimitedUsage: e.target.checked, usageLimit: e.target.checked ? "" : quickEditData.usageLimit})}
-                                    className="rounded-sm border-gray-300"
-                                  />
-                                  <span>Unlimited</span>
-                                </label>
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Status</label>
-                                <label className="flex items-center gap-1.5 text-xs font-semibold text-[#2c3338] cursor-pointer select-none h-[26px]">
-                                  <input
-                                    type="checkbox"
-                                    checked={quickEditData.isActive}
-                                    onChange={(e) => setQuickEditData({...quickEditData, isActive: e.target.checked})}
-                                    className="rounded-sm border-gray-300"
-                                  />
-                                  <span>{quickEditData.isActive ? "Active" : "Inactive"}</span>
-                                </label>
-                              </div>
-                            </div>
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={9} className="wp-muted">Loading coupons…</td></tr>
+            ) : discounts.length === 0 ? (
+              <tr><td colSpan={9} className="wp-muted">No coupons found.</td></tr>
+            ) : (
+              discounts.map((d) => {
+                const isSelected = selectedIds.includes(d._id);
+                const isQuickEditing = quickEditingId === d._id;
+                const cStatus = getCouponStatus(d);
+                const prodCount = Array.isArray(d.specificProducts) ? d.specificProducts.length : 0;
+                const catCount = Array.isArray(d.specificCategories) ? d.specificCategories.length : 0;
+                const amountLabel = d.type === 'percentage' ? `${d.value}%` : `$${Number(d.value || 0).toFixed(2)}`;
 
-                            {/* Dropdown Selectors inside Quick Edit */}
-                            <div className="border-t border-gray-200 pt-3">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <ProductSelector
-                                  selectedIds={quickEditData.specificProducts}
-                                  onChange={(ids) => setQuickEditData({ ...quickEditData, specificProducts: ids })}
-                                  products={catalogProducts}
-                                  loading={catalogLoading}
-                                />
-                                <CategorySelector
-                                  selectedIds={quickEditData.specificCategories}
-                                  onChange={(ids) => setQuickEditData({ ...quickEditData, specificCategories: ids })}
-                                  categories={catalogCategories}
-                                  loading={catalogLoading}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap justify-end gap-1.5 select-none pt-2 border-t border-gray-200">
-                              <button
-                                type="button"
-                                onClick={() => setQuickEditingId(null)}
-                                className={`${btnClass} py-1`}
-                              >
-                                Cancel
-                              </button>
-                              <button 
-                                type="button" 
-                                onClick={() => handleQuickEditSubmit(d._id)}
-                                className={`${primaryBtnClass} py-1`}
-                              >
-                                Update
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  }
-
+                if (isQuickEditing) {
                   return (
-                    <tr key={d._id} className={`hover:bg-[#f6f7f7]/50 group transition-colors ${isSelected ? "bg-[#f0f6fa]" : ""} ${d.isDeleted ? "opacity-60 bg-[#f9f9f9]" : ""}`}>
-                      <td className="px-3 py-3 text-center align-top">
-                        <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(d._id)} className="rounded-sm border-gray-300" />
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              onClick={() => setViewingDiscount(d)}
-                              className="text-[13px] font-bold text-[#2271b1] hover:text-[#135e96] hover:underline cursor-pointer tracking-wide uppercase font-mono"
-                              title="Click to view this coupon"
+                    <tr key={d._id} className="is-selected">
+                      <td colSpan={9} style={{ padding: 0 }}>
+                        <fieldset style={{ border: 0, margin: 0, padding: 14, minWidth: 0, borderLeft: "4px solid #2271b1" }}>
+                          <legend className="wp-strong" style={{ float: "left", width: "100%", margin: "0 0 10px", fontSize: 14, overflowWrap: "anywhere" }}>
+                            Quick Edit — <span style={{ color: "#2271b1" }}>{d.code}</span>
+                          </legend>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-x-3" style={{ clear: "both" }}>
+                            <div className="wp-field">
+                              <label htmlFor="qe-coupon-code" className="wp-label">Code</label>
+                              <input
+                                id="qe-coupon-code"
+                                type="text"
+                                className="wp-input wp-full"
+                                value={quickEditData.code}
+                                onChange={e => setQuickEditData({ ...quickEditData, code: e.target.value })}
+                              />
+                            </div>
+                            <div className="wp-field">
+                              <label htmlFor="qe-coupon-type" className="wp-label">Type</label>
+                              <select
+                                id="qe-coupon-type"
+                                className="wp-select wp-full"
+                                value={quickEditData.type}
+                                onChange={e => setQuickEditData({ ...quickEditData, type: e.target.value })}
+                              >
+                                <option value="percentage">Percentage</option>
+                                <option value="fixed">Fixed Cart</option>
+                              </select>
+                            </div>
+                            <div className="wp-field">
+                              <label htmlFor="qe-coupon-amount" className="wp-label">Amount</label>
+                              <input
+                                id="qe-coupon-amount"
+                                type="number"
+                                min="0.01"
+                                step="any"
+                                className="wp-input wp-full"
+                                value={quickEditData.value}
+                                onChange={e => setQuickEditData({ ...quickEditData, value: e.target.value })}
+                              />
+                            </div>
+                            <div className="wp-field">
+                              <label htmlFor="qe-coupon-min" className="wp-label">Min spend ($)</label>
+                              <input
+                                id="qe-coupon-min"
+                                type="number"
+                                min="0"
+                                step="any"
+                                className="wp-input wp-full"
+                                value={quickEditData.minPurchase}
+                                onChange={e => setQuickEditData({ ...quickEditData, minPurchase: e.target.value })}
+                              />
+                            </div>
+                            <div className="wp-field">
+                              <label htmlFor="qe-coupon-limit" className="wp-label">Total limit</label>
+                              <input
+                                id="qe-coupon-limit"
+                                type="number"
+                                placeholder="Unlimited"
+                                disabled={quickEditData.unlimitedUsage}
+                                className="wp-input wp-full"
+                                value={quickEditData.usageLimit}
+                                onChange={e => setQuickEditData({ ...quickEditData, usageLimit: e.target.value })}
+                              />
+                              <label className="wp-check">
+                                <input
+                                  type="checkbox"
+                                  checked={quickEditData.unlimitedUsage}
+                                  onChange={(e) => setQuickEditData({...quickEditData, unlimitedUsage: e.target.checked, usageLimit: e.target.checked ? "" : quickEditData.usageLimit})}
+                                />
+                                <span>Unlimited</span>
+                              </label>
+                            </div>
+                            <div className="wp-field">
+                              <span className="wp-label">Status</span>
+                              <label className="wp-check">
+                                <input
+                                  type="checkbox"
+                                  checked={quickEditData.isActive}
+                                  onChange={(e) => setQuickEditData({...quickEditData, isActive: e.target.checked})}
+                                />
+                                <span>{quickEditData.isActive ? "Active" : "Inactive"}</span>
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* Selectors inside Quick Edit */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" style={{ borderTop: "1px solid #dcdcde", paddingTop: 12 }}>
+                            <ProductSelector
+                              selectedIds={quickEditData.specificProducts}
+                              onChange={(ids) => setQuickEditData({ ...quickEditData, specificProducts: ids })}
+                              products={catalogProducts}
+                              loading={catalogLoading}
+                            />
+                            <CategorySelector
+                              selectedIds={quickEditData.specificCategories}
+                              onChange={(ids) => setQuickEditData({ ...quickEditData, specificCategories: ids })}
+                              categories={catalogCategories}
+                              loading={catalogLoading}
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-2" style={{ marginTop: 14 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleQuickEditSubmit(d._id)}
+                              className="wp-btn wp-btn-primary"
                             >
-                              {d.code}
-                            </span>
-                            {d.stripeSyncStatus === "synced" && (
-                              <span title="Synced to Stripe" className="text-emerald-600"><CreditCard className="w-3 h-3" /></span>
-                            )}
-                            {d.stripeSyncStatus === "error" && (
-                              <span title={`Stripe sync failed: ${d.stripeSyncError || "unknown error"}`} className="text-rose-600"><AlertTriangle className="w-3 h-3" /></span>
-                            )}
+                              Update
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQuickEditingId(null)}
+                              className="wp-btn"
+                            >
+                              Cancel
+                            </button>
                           </div>
-
-                          {/* Row Actions */}
-                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] text-[#2271b1] mt-1 font-semibold select-none">
-                            {d.isDeleted ? (
-                              <>
-                                <button onClick={() => handleRestore(d._id)} className="hover:text-[#135e96] cursor-pointer">Restore</button>
-                                <span className="text-gray-300 font-normal">|</span>
-                                <button onClick={() => handleDelete(d._id, true)} className="text-[#d63638] hover:text-[#bc0b0d] cursor-pointer">Delete Permanently</button>
-                              </>
-                            ) : (
-                              <>
-                                <button onClick={() => handleStartFullEdit(d)} className="hover:text-[#135e96] font-bold cursor-pointer">Edit</button>
-                                <span className="text-gray-300 font-normal">|</span>
-                                <button onClick={() => handleStartQuickEdit(d)} className="hover:text-[#135e96] cursor-pointer">Quick Edit</button>
-                                <span className="text-gray-300 font-normal">|</span>
-                                <button onClick={() => setViewingDiscount(d)} className="hover:text-[#135e96] flex items-center gap-0.5 cursor-pointer">
-                                  <Eye className="w-3 h-3" />View
-                                </button>
-                                <span className="text-gray-300 font-normal">|</span>
-                                <button onClick={() => setSharingDiscount(d)} className="hover:text-[#135e96] flex items-center gap-0.5 cursor-pointer">
-                                  <QrCode className="w-3 h-3" />Share
-                                </button>
-                                <span className="text-gray-300 font-normal">|</span>
-                                <button onClick={() => handleDuplicate(d)} className="hover:text-[#135e96] cursor-pointer">Duplicate</button>
-                                <span className="text-gray-300 font-normal">|</span>
-                                <button onClick={() => handleDelete(d._id)} className="text-[#d63638] hover:text-[#bc0b0d] cursor-pointer">Trash</button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="hidden md:table-cell px-3 py-3 align-top text-gray-600 font-medium">
-                        {d.type === 'percentage' ? 'Percentage' : 'Fixed Cart'}
-                      </td>
-                      <td className="px-3 py-3 align-top font-semibold text-[#2c3338]">
-                        {d.type === 'percentage' ? `${d.value}%` : `$${Number(d.value || 0).toFixed(2)}`}
-                      </td>
-
-                      {/* Scope / Products Badge */}
-                      <td className="hidden sm:table-cell px-3 py-3 align-top text-[11px]">
-                        {prodCount > 0 ? (
-                          <span 
-                            onClick={() => setViewingDiscount(d)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-[#2271b1] border border-blue-200 font-semibold cursor-pointer hover:bg-blue-100"
-                            title="Click to view eligible products"
-                          >
-                            <Package className="w-3 h-3" />
-                            {prodCount} Product{prodCount === 1 ? "" : "s"}
-                          </span>
-                        ) : catCount > 0 ? (
-                          <span 
-                            onClick={() => setViewingDiscount(d)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 font-semibold cursor-pointer hover:bg-purple-100"
-                          >
-                            <FolderTree className="w-3 h-3" />
-                            {catCount} Categor{catCount === 1 ? "y" : "ies"}
-                          </span>
-                        ) : (
-                          <span className="text-gray-500 font-medium">
-                            Storewide (All)
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="hidden md:table-cell px-3 py-3 align-top font-medium text-gray-500">
-                        ${Number(d.minPurchase || 0).toFixed(2)}
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        <span className="font-bold text-[#2c3338]">{d.usageCount || 0}</span>
-                        <span className="text-gray-400"> / {d.usageLimit || "∞"}</span>
-                      </td>
-                      <td className="hidden lg:table-cell px-3 py-3 align-top text-gray-500 font-medium">
-                        {formatDate(d.endDate)}
-                      </td>
-                      <td className={`px-3 py-3 align-top text-right text-[11px] uppercase tracking-wider ${cStatus.color}`}>
-                        {cStatus.label}
+                        </fieldset>
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                }
+
+                return (
+                  <tr key={d._id} className={isSelected ? "is-selected" : undefined}>
+                    <td className="wp-check-col">
+                      <input type="checkbox" aria-label={`Select coupon ${d.code}`} checked={isSelected} onChange={() => toggleSelect(d._id)} />
+                    </td>
+                    <td style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setViewingDiscount(d)}
+                          className="wp-row-title"
+                          style={linkBtnStyle}
+                          title="Click to view this coupon"
+                        >
+                          {d.code}
+                        </button>
+                        {d.stripeSyncStatus === "synced" && (
+                          <span title="Synced to Stripe" role="img" aria-label="Synced to Stripe" style={{ color: "#2f6f1a", display: "inline-flex" }}><CreditCard className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                        )}
+                        {d.stripeSyncStatus === "error" && (
+                          <span title={`Stripe sync failed: ${d.stripeSyncError || "unknown error"}`} role="img" aria-label="Stripe sync failed" style={{ color: "#b32d2e", display: "inline-flex" }}><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                        )}
+                      </div>
+
+                      <div className="wp-mobile-meta">
+                        {d.type === 'percentage' ? 'Percentage' : 'Fixed Cart'} · <span className="wp-strong">{amountLabel}</span>
+                        {" · "}Used {d.usageCount || 0} / {d.usageLimit || "∞"}
+                        {d.endDate ? <> · Expires {formatDate(d.endDate)}</> : null}
+                      </div>
+
+                      {/* Row Actions */}
+                      <div className="wp-row-actions">
+                        {d.isDeleted ? (
+                          <>
+                            <span><button type="button" onClick={() => handleRestore(d._id)} className="max-[782px]:min-h-10">Restore</button></span>
+                            <span><button type="button" onClick={() => handleDelete(d._id, true)} className="is-danger max-[782px]:min-h-10">Delete Permanently</button></span>
+                          </>
+                        ) : (
+                          <>
+                            <span><button type="button" onClick={() => handleStartFullEdit(d)} className="max-[782px]:min-h-10">Edit</button></span>
+                            <span><button type="button" onClick={() => handleStartQuickEdit(d)} className="max-[782px]:min-h-10">Quick Edit</button></span>
+                            <span><button type="button" onClick={() => setViewingDiscount(d)} className="max-[782px]:min-h-10">View</button></span>
+                            <span><button type="button" onClick={() => setSharingDiscount(d)} className="max-[782px]:min-h-10">Share</button></span>
+                            <span><button type="button" onClick={() => handleDuplicate(d)} className="max-[782px]:min-h-10">Duplicate</button></span>
+                            <span><button type="button" onClick={() => handleDelete(d._id)} className="is-danger max-[782px]:min-h-10">Trash</button></span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="wp-hide-sm">
+                      {d.type === 'percentage' ? 'Percentage discount' : 'Fixed cart discount'}
+                    </td>
+                    <td className="wp-hide-sm wp-strong">
+                      {amountLabel}
+                    </td>
+
+                    {/* Scope / Products */}
+                    <td className="wp-hide-sm">
+                      {prodCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewingDiscount(d)}
+                          className="wp-link"
+                          style={linkBtnStyle}
+                          title="Click to view eligible products"
+                        >
+                          {prodCount} Product{prodCount === 1 ? "" : "s"}
+                        </button>
+                      ) : catCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewingDiscount(d)}
+                          className="wp-link"
+                          style={linkBtnStyle}
+                        >
+                          {catCount} Categor{catCount === 1 ? "y" : "ies"}
+                        </button>
+                      ) : (
+                        <span className="wp-muted">
+                          Storewide (All)
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="wp-hide-sm">
+                      ${Number(d.minPurchase || 0).toFixed(2)}
+                    </td>
+                    <td className="wp-hide-sm">
+                      {d.usageCount || 0} / {d.usageLimit || "∞"}
+                    </td>
+                    <td className="wp-hide-sm">
+                      {formatDate(d.endDate)}
+                    </td>
+                    <td>
+                      <span className={`wp-pill wp-pill-sm ${cStatus.color}`}>
+                        {cStatus.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+          <tfoot>{headerRow}</tfoot>
+        </table>
       </div>
 
       {/* ── Modals ── */}
@@ -1330,19 +1383,19 @@ function CouponsContent() {
       )}
 
       {sharingDiscount && (
-        <ShareCouponModal 
-          discount={sharingDiscount} 
-          onClose={() => setSharingDiscount(null)} 
+        <ShareCouponModal
+          discount={sharingDiscount}
+          onClose={() => setSharingDiscount(null)}
         />
       )}
-    </AdminPageLayout>
+    </Page>
   );
 }
 
 export default function AdminDiscounts() {
   return (
     <RequirePermission permission="promotions.view">
-      <Suspense fallback={<div className="p-8 text-center italic text-gray-400">Loading layout...</div>}>
+      <Suspense fallback={<div className="wp-page wp-muted">Loading…</div>}>
         <CouponsContent />
       </Suspense>
     </RequirePermission>
