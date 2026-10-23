@@ -20,7 +20,7 @@ export async function GET(req) {
   const search = searchParams.get("search") || "";
   const paymentStatus = searchParams.get("paymentStatus") || "all";
 
-  const query = { "payment.method": { $in: CUSTOM_ORDER_PAYMENT_METHODS } };
+  const query = { "payment.method": { $in: CUSTOM_ORDER_PAYMENT_METHODS }, isDeleted: { $ne: true } };
   if (paymentStatus !== "all") query["payment.status"] = paymentStatus;
   if (search) {
     query.$or = [
@@ -51,7 +51,7 @@ export async function GET(req) {
     }
 
     const counts = await Order.aggregate([
-      { $match: { "payment.method": { $in: CUSTOM_ORDER_PAYMENT_METHODS } } },
+      { $match: { "payment.method": { $in: CUSTOM_ORDER_PAYMENT_METHODS }, isDeleted: { $ne: true } } },
       { $group: { _id: "$payment.status", count: { $sum: 1 } } },
     ]);
 

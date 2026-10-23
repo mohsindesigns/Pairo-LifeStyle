@@ -4,19 +4,20 @@ import { useEffect, useState, useCallback } from "react";
 import { X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
-import { Page, PageHeader, Notice } from "@/components/admin/ui";
+import { Page, PageHeader, Notice, StatusPill, formatMoney, formatDate } from "@/components/admin/ui";
 
 export default function AdminTrash() {
   const [activeTab, setActiveTab] = useState("products");
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [blogs, setBlogs] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Modal State
   const [confirmModal, setConfirmModal] = useState({
     open: false,
-    type: "", // "product", "category", "blog"
+    type: "", // "product", "category", "blog", "order"
     id: null,
     name: ""
   });
@@ -26,18 +27,22 @@ export default function AdminTrash() {
   const fetchTrash = useCallback(async () => {
     setLoading(true);
     try {
-      const [prodRes, catRes, blogRes] = await Promise.all([
+      const [prodRes, catRes, blogRes, orderRes] = await Promise.all([
         fetch("/api/admin/products?isDeleted=true"),
         fetch("/api/admin/categories?trash=true"),
-        fetch("/api/admin/blogs?isDeleted=true")
+        fetch("/api/admin/blogs?isDeleted=true"),
+        fetch("/api/admin/orders?trash=true&limit=100")
       ]);
       
-      const [prodData, catData, blogData] = await Promise.all([
+      const [prodData, catData, blogData, orderData] = await Promise.all([
         prodRes.json(),
         catRes.json(),
-        blogRes.json()
+        blogRes.json(),
+        // Staff without orders access get a 403 here; show an empty tab rather than failing the page.
+        orderRes.ok ? orderRes.json() : Promise.resolve({ orders: [] })
       ]);
       
+      setOrders(Array.isArray(orderData?.orders) ? orderData.orders : []);
       setProducts(Array.isArray(prodData) ? prodData : []);
       setCategories(Array.isArray(catData) ? catData : []);
       setBlogs(Array.isArray(blogData) ? blogData : []);
@@ -65,6 +70,9 @@ export default function AdminTrash() {
         payload = { id, isDeleted: false };
       } else if (type === "blog") {
         url = "/api/admin/blogs";
+        payload = { id, isDeleted: false };
+      } else if (type === "order") {
+        url = "/api/admin/orders";
         payload = { id, isDeleted: false };
       }
       
@@ -100,6 +108,8 @@ export default function AdminTrash() {
         url = `/api/admin/categories?id=${id}`;
       } else if (type === "blog") {
         url = `/api/admin/blogs?id=${id}`;
+      } else if (type === "order") {
+        url = `/api/admin/orders?id=${id}&permanent=true`;
       }
       
       const res = await fetch(url, {
@@ -134,14 +144,16 @@ export default function AdminTrash() {
   const activeItemsCount = 
     activeTab === "products" ? products.length :
     activeTab === "categories" ? categories.length :
+    activeTab === "orders" ? orders.length :
     blogs.length;
 
   const tabs = [
     { key: "products", label: "Products", count: products.length },
     { key: "categories", label: "Categories", count: categories.length },
     { key: "blogs", label: "Blogs", count: blogs.length },
+    { key: "orders", label: "Orders", count: orders.length },
   ];
-  const colCount = activeTab === "products" ? 3 : activeTab === "categories" ? 2 : 1;
+  const colCount = activeTab === "products" ? 3 : activeTab === "categories" ? 2 : activeTab === "orders" ? 4 : 1;
 
   return (
     <Page>
@@ -178,10 +190,13 @@ export default function AdminTrash() {
         <table className="wp-list-table">
           <thead>
             <tr>
-              <th scope="col">{activeTab === "products" ? "Name" : activeTab === "categories" ? "Name" : "Title"}</th>
+              <th scope="col">{activeTab === "orders" ? "Order" : activeTab === "blogs" ? "Title" : "Name"}</th>
               {activeTab === "products" && <th scope="col" className="wp-hide-sm">SKU</th>}
               {activeTab === "products" && <th scope="col" className="wp-hide-sm">Price</th>}
               {activeTab === "categories" && <th scope="col" className="wp-hide-sm">Type</th>}
+              {activeTab === "orders" && <th scope="col" className="wp-hide-sm">Status</th>}
+              {activeTab === "orders" && <th scope="col" className="wp-hide-sm">Trashed</th>}
+              {activeTab === "orders" && <th scope="col">Total</th>}
             </tr>
           </thead>
           <tbody>
@@ -252,6 +267,26 @@ export default function AdminTrash() {
                     </td>
                   </tr>
                 ))}
+
+                {activeTab === "orders" && orders.map(o => {
+                  const label = `#${o.orderNumber || String(o._id).slice(-6)}`;
+                  const customer = o.shippingAddress?.fullName || o.customer?.email || "";
+                  return (
+                    <tr key={o._id}>
+                      <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                        <span className="wp-row-title">{label}{customer ? ` ${customer}` : ""}</span>
+                        <div className="wp-mobile-meta">{o.status} · {formatDate(o.deletedAt || o.updatedAt)}</div>
+                        <div className="wp-row-actions">
+                          <span><button type="button" onClick={() => handleRestore("order", o._id)}>Restore</button></span>
+                          <span><button type="button" onClick={() => openConfirmModal("order", o._id, label)} className="is-danger">Delete permanently</button></span>
+                        </div>
+                      </td>
+                      <td className="wp-hide-sm"><StatusPill status={o.status} small /></td>
+                      <td className="wp-hide-sm wp-muted">{formatDate(o.deletedAt || o.updatedAt)}</td>
+                      <td className="wp-num">{formatMoney(o.financials?.total, o.financials?.currency || "USD")}</td>
+                    </tr>
+                  );
+                })}
               </>
             )}
           </tbody>

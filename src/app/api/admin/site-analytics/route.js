@@ -879,6 +879,7 @@ async function retention(f) {
         createdAt: { $lte: f.until },
         status: { $nin: ["Cancelled", "Refunded"] },
         "customer.userId": { $ne: null },
+        isDeleted: { $ne: true },
       },
     },
     { $sort: { createdAt: 1 } },
