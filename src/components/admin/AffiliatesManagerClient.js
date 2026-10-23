@@ -525,10 +525,10 @@ export default function AffiliatesManagerClient() {
               { label: "Conversion rate", value: `${overviewStats?.stats?.conversionRate ?? 0}%`, tab: "conversions" },
             ],
             [
-              { label: "Total revenue", value: `$${(overviewStats?.stats?.totalRevenue ?? 0).toFixed(2)}`, tab: "analytics" },
-              { label: "Commission paid", value: `$${(overviewStats?.stats?.totalCommissionPaid ?? 0).toFixed(2)}`, tab: "commissions" },
-              { label: "Pending commission", value: `$${(overviewStats?.stats?.pendingCommission ?? 0).toFixed(2)}`, tab: "commissions" },
-              { label: "Total paid out", value: `$${(overviewStats?.stats?.totalPaid ?? 0).toFixed(2)}`, tab: "payouts" },
+              { label: "Total revenue", value: formatMoney(overviewStats?.stats?.totalRevenue ?? 0), tab: "analytics" },
+              { label: "Commission paid", value: formatMoney(overviewStats?.stats?.totalCommissionPaid ?? 0), tab: "commissions" },
+              { label: "Pending commission", value: formatMoney(overviewStats?.stats?.pendingCommission ?? 0), tab: "commissions" },
+              { label: "Total paid out", value: formatMoney(overviewStats?.stats?.totalPaid ?? 0), tab: "payouts" },
             ],
           ].map((strip, i) => (
             <div key={i} className="wp-stats">
@@ -560,7 +560,7 @@ export default function AffiliatesManagerClient() {
                             </div>
                           </td>
                           <td className="font-mono">{a.referralCode}</td>
-                          <td className="wp-num wp-strong">${(a.lifetimeEarnings ?? 0).toFixed(2)}</td>
+                          <td className="wp-num wp-strong">{formatMoney(a.lifetimeEarnings ?? 0)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -591,7 +591,7 @@ export default function AffiliatesManagerClient() {
                             <div className="wp-mobile-meta">{o.affiliateReferralCode} · {new Date(o.createdAt).toLocaleDateString()}</div>
                           </td>
                           <td className="wp-hide-sm font-mono">{o.affiliateReferralCode}</td>
-                          <td className="wp-num wp-strong">${(o.financials?.total ?? 0).toFixed(2)}</td>
+                          <td className="wp-num wp-strong">{formatMoney(o.financials?.total ?? 0)}</td>
                           <td className="wp-num wp-muted wp-hide-sm">{new Date(o.createdAt).toLocaleDateString()}</td>
                         </tr>
                       ))}
@@ -716,11 +716,11 @@ export default function AffiliatesManagerClient() {
                       <td className="wp-hide-sm wp-muted">{new Date(o.createdAt).toLocaleDateString()}</td>
                       <td className="wp-hide-sm">{o.customer?.email || '—'}</td>
                       <td className="wp-hide-sm font-mono">{o.affiliateReferralCode}</td>
-                      <td className="wp-num wp-hide-sm">${(o.financials?.subtotal ?? 0).toFixed(2)}</td>
+                      <td className="wp-num wp-hide-sm">{formatMoney(o.financials?.subtotal ?? 0)}</td>
                       <td className="wp-num wp-hide-sm" style={{ color: "#2f6f1a" }}>
-                        {o.financials?.affiliateDiscountAmount > 0 ? `-$${o.financials.affiliateDiscountAmount.toFixed(2)}` : '—'}
+                        {o.financials?.affiliateDiscountAmount > 0 ? `-${formatMoney(o.financials.affiliateDiscountAmount)}` : '—'}
                       </td>
-                      <td className="wp-num wp-strong">${(o.financials?.total ?? 0).toFixed(2)}</td>
+                      <td className="wp-num wp-strong">{formatMoney(o.financials?.total ?? 0)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -858,7 +858,7 @@ export default function AffiliatesManagerClient() {
                       </td>
                       <td className="wp-hide-sm font-mono">{c.orderNumber || '—'}</td>
                       <td className="wp-hide-sm">{c.commissionType === 'Fixed' ? `$${c.commissionRate}` : `${c.commissionRate}%`}</td>
-                      <td className="wp-num wp-strong">${(c.commissionAmount ?? 0).toFixed(2)}</td>
+                      <td className="wp-num wp-strong">{formatMoney(c.commissionAmount ?? 0)}</td>
                       <td><AffPill status={c.status} /></td>
                       <td className="wp-hide-sm wp-muted">{new Date(c.createdAt).toLocaleDateString()}</td>
                     </tr>
@@ -878,7 +878,7 @@ export default function AffiliatesManagerClient() {
               { label: "Conversion rate", value: overviewStats?.stats?.conversionRate != null ? `${overviewStats.stats.conversionRate}%` : `${activityData.clicks?.length > 0 ? ((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1) : 0}%` },
               { label: "Total clicks", value: overviewStats?.stats?.totalClicks ?? activityData.clicks?.length ?? 0 },
               { label: "Total orders", value: overviewStats?.stats?.totalReferralOrders ?? activityData.referredOrders?.length ?? 0 },
-              { label: "Total revenue", value: `$${(overviewStats?.stats?.totalRevenue ?? 0).toFixed(2)}` },
+              { label: "Total revenue", value: formatMoney(overviewStats?.stats?.totalRevenue ?? 0) },
             ].map(({ label, value }) => (
               <div key={label} className="wp-stat">
                 <div className="wp-stat-label">{label}</div>
@@ -1251,7 +1251,7 @@ export default function AffiliatesManagerClient() {
                             </div>
                           )}
                         </td>
-                        <td className="wp-num wp-strong">${pay.amount?.toFixed(2)}</td>
+                        <td className="wp-num wp-strong">{formatMoney(pay.amount)}</td>
                         <td className="wp-hide-sm font-mono wp-muted">{pay.paymentMethod}</td>
                         <td className="wp-hide-sm wp-muted">{new Date(pay.createdAt).toLocaleDateString()}</td>
                         <td><AffPill status={pay.status} /></td>
@@ -2077,7 +2077,7 @@ export default function AffiliatesManagerClient() {
         <div className="wp-modal-backdrop">
           <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="aff-payout-title" style={{ maxWidth: 480 }}>
             <div className="wp-modal-head">
-              <h2 id="aff-payout-title">Process payout: ${selectedPayout.amount?.toFixed(2)}</h2>
+              <h2 id="aff-payout-title">Process payout: {formatMoney(selectedPayout.amount)}</h2>
               <CloseButton onClick={closePayout} />
             </div>
 
