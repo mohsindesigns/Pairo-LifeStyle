@@ -1,24 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { 
-  Mail, 
-  CheckCircle2, 
-  Trash2, 
-  Search, 
-  ChevronLeft, 
-  ChevronRight, 
-  Eye, 
-  MoreVertical,
+import { Fragment, useEffect, useState, useCallback } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
   Flag,
-  User,
-  Clock,
-  MessageSquare,
   Send,
   X,
-  History,
-  Tag,
-  AlertCircle
 } from "lucide-react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
@@ -216,382 +204,458 @@ export default function AdminContact() {
     else setSelectedIds([...selectedIds, id]);
   };
 
+  const STATUS_TABS = [
+    ["all", "All", counts.all],
+    ["New", "Pending", counts.New],
+    ["Read", "Read", counts.Read],
+    ["Replied", "Replied", counts.Replied],
+    ["Spam", "Spam", counts.Spam],
+  ];
+
+  const statusPillClass = (st) =>
+    st === 'New' ? 'wp-st-out' :
+    st === 'Replied' ? 'wp-st-delivered' :
+    st === 'Spam' ? 'wp-st-cancelled' :
+    'wp-st-draft';
+
+  const priorityColor = (pr) =>
+    pr === 'High' ? '#d63638' :
+    pr === 'Medium' ? '#dba617' :
+    '#72aee6';
+
+  const sourcePillClass = (src) =>
+    src === 'Email Subscriber' || src === 'Newsletter' ? 'wp-st-packed' :
+    src === 'Contact' || !src ? 'wp-st-shipped' :
+    'wp-st-draft';
+
+  const headerRow = (id) => (
+    <tr>
+      <td className="wp-check-col">
+        <input
+          id={id}
+          type="checkbox"
+          aria-label="Select all submissions"
+          checked={selectedIds.length === items.length && items.length > 0}
+          onChange={toggleSelectAll}
+        />
+      </td>
+      <th scope="col">Author</th>
+      <th scope="col">Submission</th>
+      <th scope="col" className="wp-hide-sm">Source</th>
+      <th scope="col" className="wp-hide-sm">Status / Priority</th>
+      <th scope="col" className="wp-hide-sm">Submitted on</th>
+    </tr>
+  );
+
+  const pager = (
+    <div className="wp-pages">
+      <span>{pagination.total} items</span>
+      <button
+        type="button"
+        className="wp-pager"
+        aria-label="Previous page"
+        disabled={pagination.page <= 1}
+        onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
+      >
+        <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+      </button>
+      <span>{pagination.page} of {pagination.pages}</span>
+      <button
+        type="button"
+        className="wp-pager"
+        aria-label="Next page"
+        disabled={pagination.page >= pagination.pages}
+        onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
+      >
+        <ChevronRight className="w-4 h-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+
   return (
     <RequirePermission permission="submissions.view">
     <AdminPageLayout
       title="Submissions"
       breadcrumbs={[{ label: "Submissions" }]}
     >
-      <div className="space-y-4">
-        {/* --- 1. Filter Links (EXACT UI PRESERVED) --- */}
-        <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
-          <li className={`${status === 'all' ? 'text-[#1d2327] font-bold' : 'cursor-pointer hover:text-[#135e96]'} transition-colors`} onClick={() => setStatus('all')}>
-            All <span className="text-[#646970] font-normal">({counts.all})</span>
-          </li>
-          <span className="text-[#c3c4c7]">|</span>
-          <li className={`${status === 'New' ? 'text-[#1d2327] font-bold' : 'cursor-pointer hover:text-[#135e96]'} transition-colors`} onClick={() => setStatus('New')}>
-            Pending <span className="text-[#646970] font-normal">({counts.New})</span>
-          </li>
-          <span className="text-[#c3c4c7]">|</span>
-          <li className={`${status === 'Read' ? 'text-[#1d2327] font-bold' : 'cursor-pointer hover:text-[#135e96]'} transition-colors`} onClick={() => setStatus('Read')}>
-            Read <span className="text-[#646970] font-normal">({counts.Read})</span>
-          </li>
-          <span className="text-[#c3c4c7]">|</span>
-          <li className={`${status === 'Replied' ? 'text-[#1d2327] font-bold' : 'cursor-pointer hover:text-[#135e96]'} transition-colors`} onClick={() => setStatus('Replied')}>
-            Replied <span className="text-[#646970] font-normal">({counts.Replied})</span>
-          </li>
-          <span className="text-[#c3c4c7]">|</span>
-          <li className={`${status === 'Spam' ? 'text-[#1d2327] font-bold' : 'cursor-pointer hover:text-[#135e96]'} transition-colors`} onClick={() => setStatus('Spam')}>
-            Spam <span className="text-[#646970] font-normal">({counts.Spam})</span>
-          </li>
-          <span className="text-[#c3c4c7]">|</span>
-          <li className="flex items-center gap-2">
-            <button 
-              onClick={() => setIsLive(!isLive)}
-              className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${isLive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
+      {/* --- 1. Filter Links --- */}
+      <div className="wp-subsub" role="tablist" aria-label="Filter submissions by status">
+        {STATUS_TABS.map(([val, label, count], i) => (
+          <Fragment key={val}>
+            {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={status === val}
+              className={status === val ? "is-current" : undefined}
+              onClick={() => setStatus(val)}
             >
-              <div className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-              LIVE {isLive ? 'ON' : 'OFF'}
+              {label} <span className="wp-count">({count})</span>
             </button>
-          </li>
-        </ul>
+          </Fragment>
+        ))}
+        <span className="wp-sep" aria-hidden="true">|</span>
+        <button
+          type="button"
+          onClick={() => setIsLive(!isLive)}
+          aria-pressed={isLive}
+          title="Refresh the list automatically every 60 seconds"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        >
+          <span
+            aria-hidden="true"
+            className={isLive ? "animate-pulse" : undefined}
+            style={{ width: 8, height: 8, borderRadius: "50%", background: isLive ? "#00a32a" : "#c3c4c7", display: "inline-block" }}
+          />
+          Live refresh: {isLive ? "On" : "Off"}
+        </button>
+      </div>
 
-        {/* --- 2. Action Bar (EXACT UI PRESERVED) --- */}
-        <div className="bg-white border border-[#ccd0d4] p-3 flex flex-col md:flex-row items-center justify-between gap-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <select 
-              value={bulkAction}
-              onChange={(e) => setBulkAction(e.target.value)}
-              className="border border-[#8c8f94] bg-white text-[13px] px-2 py-1 rounded-[3px] outline-none max-w-full"
-            >
-              <option>Bulk actions</option>
-              <option>Mark as read</option>
-              <option>Move to Trash</option>
-              <option>Mark as Spam</option>
-            </select>
-            <button 
-              onClick={handleBulkAction}
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]"
-            >
-              Apply
-            </button>
-            <button 
-              onClick={exportToCSV}
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] ml-2"
-            >
-              Export to CSV
-            </button>
-          </div>
+      {/* --- 2. Action Bar --- */}
+      <div className="wp-toolbar">
+        <label htmlFor="submissions-bulk-action" className="sr-only">Select bulk action</label>
+        <select
+          id="submissions-bulk-action"
+          value={bulkAction}
+          onChange={(e) => setBulkAction(e.target.value)}
+          className="wp-select"
+        >
+          <option>Bulk actions</option>
+          <option>Mark as read</option>
+          <option>Move to Trash</option>
+          <option>Mark as Spam</option>
+        </select>
+        <button type="button" onClick={handleBulkAction} className="wp-btn">
+          Apply
+        </button>
+        <button type="button" onClick={exportToCSV} className="wp-btn">
+          Export to CSV
+        </button>
 
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <input
-              type="text"
-              placeholder="Search submissions..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && setSearchQuery(searchTerm)}
-              className="border border-[#8c8f94] outline-none px-3 py-1 text-[13px] flex-1 md:w-48 bg-white focus:border-[#2271b1] rounded-[3px]"
-            />
-            <button 
-              onClick={() => setSearchQuery(searchTerm)}
-              className="border border-[#8c8f94] text-[#3c434a] px-3 py-1 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]"
-            >
-              Search
-            </button>
-          </div>
-        </div>
+        <span className="wp-spacer" />
 
-        {/* --- 3. WP List Table (EXACT UI PRESERVED) --- */}
-        <div className="bg-white border border-[#ccd0d4] shadow-sm overflow-x-auto max-w-full rounded-[2px]">
-          <table className="w-full text-left border-collapse min-w-[750px] text-[13px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-3 py-2 w-10 text-center">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedIds.length === items.length && items.length > 0} 
-                    onChange={toggleSelectAll} 
-                  />
-                </th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Author</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Submission</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Source</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Status / Priority</th>
-                <th className="px-3 py-2 font-bold text-[#1d2327]">Submitted on</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={6} className="p-10 text-center italic text-gray-400">Loading submissions...</td></tr>
-              ) : items.length === 0 ? (
-                <tr><td colSpan={6} className="p-10 text-center italic text-gray-400">No submissions found.</td></tr>
-              ) : (
-                items.filter(s => s !== null).map((s) => (
-                  <tr key={s._id} className={`hover:bg-[#f6f7f7] group ${s?.status === 'New' ? 'bg-blue-50/30' : ''}`}>
-                    <td className="px-3 py-4 text-center align-top pt-5">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedIds.includes(s._id)} 
-                        onChange={() => toggleSelectOne(s._id)}
-                      />
-                    </td>
-                    <td className="px-3 py-4 w-52 align-top">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 bg-[#f0f2f1] border border-gray-200 rounded-[2px] flex items-center justify-center text-[#8c8f94] shrink-0 font-bold text-[11px]">
-                          {s.name?.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex flex-col overflow-hidden">
-                          <span className={`text-[14px] ${s.status === 'New' ? 'font-black' : 'font-bold'} text-[#1d2327] truncate`}>{s.name}</span>
-                          <span className="text-[12px] text-[#2271b1] hover:underline cursor-pointer truncate">{s.email}</span>
-                          {s.phone && <span className="text-[11px] text-gray-400">{s.phone}</span>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 align-top">
-                      <div className="flex flex-col">
-                        <p className="text-[13px] leading-relaxed mb-2 text-[#3c434a] max-w-xl line-clamp-2">{s.message}</p>
-                        
-                        {/* Action Links (WP-Style Hover) */}
-                        <div className="flex flex-wrap items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-[11px] font-medium text-[#2271b1]">
-                          <button onClick={() => { setSelectedItem(s); setIsDetailOpen(true); }} className="hover:text-[#135e96]">View Detail</button>
-                          <span className="text-[#c3c4c7]">|</span>
-                          {s.status === 'New' ? (
-                            <button onClick={() => handleAction(s._id, 'SET_STATUS', { status: 'Read' })} className="hover:text-[#135e96]">Mark as Read</button>
-                          ) : (
-                            <button onClick={() => { setSelectedItem(s); setIsDetailOpen(true); setReplyMode(true); }} className="hover:text-[#135e96]">Reply</button>
-                          )}
-                          <span className="text-[#c3c4c7]">|</span>
-                          <button onClick={() => handleAction(s._id, 'trash')} className="text-[#d63638] hover:text-[#bc0b0d]">Trash</button>
-                          <span className="text-[#c3c4c7]">|</span>
-                          <button onClick={() => handleAction(s._id, 'SET_STATUS', { status: 'Spam' })} className="text-orange-600 hover:text-orange-700">Spam</button>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 align-top">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider w-fit ${
-                        s.sourceForm === 'Email Subscriber' ? 'bg-purple-100 text-purple-700' :
-                        s.sourceForm === 'Newsletter' ? 'bg-purple-100 text-purple-700' :
-                        s.sourceForm === 'Contact' ? 'bg-blue-100 text-blue-600' :
-                        'bg-gray-100 text-gray-600'
-                      }`}>
-                        {s.sourceForm || 'Contact'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-4 align-top">
-                      <div className="flex flex-col gap-1.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider w-fit ${
-                          s.status === 'New' ? 'bg-blue-100 text-blue-700' :
-                          s.status === 'Replied' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-600'
-                        }`}>
-                          {s.status}
-                        </span>
-                        <div className="flex items-center gap-1 text-[10px] text-gray-400">
-                          <Flag className={`w-3 h-3 ${
-                            s.priority === 'High' ? 'text-red-500' :
-                            s.priority === 'Medium' ? 'text-orange-400' :
-                            'text-blue-300'
-                          }`} />
-                          {s.priority} Priority
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 text-[12px] text-[#646970] align-top font-medium">
-                      {new Date(s.createdAt).toLocaleDateString()} at {new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* --- 4. Pagination (EXACT UI PRESERVED) --- */}
-        <div className="flex items-center justify-between text-[13px] text-[#646970]">
-          <div>{pagination.total} items</div>
-          <div className="flex items-center gap-1">
-            <button 
-              disabled={pagination.page <= 1}
-              onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
-              className="p-1 border border-[#ccd0d4] bg-white rounded disabled:opacity-50"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-3 font-bold text-[#2c3338]">{pagination.page} of {pagination.pages}</span>
-            <button 
-              disabled={pagination.page >= pagination.pages}
-              onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
-              className="p-1 border border-[#ccd0d4] bg-white rounded disabled:opacity-50"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="wp-search" role="search">
+          <label htmlFor="submissions-search" className="sr-only">Search submissions</label>
+          <input
+            id="submissions-search"
+            type="search"
+            placeholder="Search submissions..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && setSearchQuery(searchTerm)}
+            className="wp-input"
+          />
+          <button type="button" onClick={() => setSearchQuery(searchTerm)} className="wp-btn">
+            Search submissions
+          </button>
         </div>
       </div>
 
-      {/* --- 5. CRM Detail Side Panel (Enterprise CRM Feel) --- */}
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pager}
+      </div>
+
+      {/* --- 3. WP List Table --- */}
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow("submissions-select-all-top")}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="wp-muted">Loading submissions...</td></tr>
+            ) : items.length === 0 ? (
+              <tr><td colSpan={6} className="wp-muted">No submissions found.</td></tr>
+            ) : (
+              items.filter(s => s !== null).map((s) => (
+                <tr
+                  key={s._id}
+                  className={selectedIds.includes(s._id) ? "is-selected" : undefined}
+                  style={s?.status === 'New' && !selectedIds.includes(s._id) ? { boxShadow: "inset 3px 0 0 #2271b1" } : undefined}
+                >
+                  <td className="wp-check-col">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select submission from ${s.name}`}
+                      checked={selectedIds.includes(s._id)}
+                      onChange={() => toggleSelectOne(s._id)}
+                    />
+                  </td>
+                  <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <span className="wp-avatar wp-hide-sm" aria-hidden="true">
+                        {s.name?.charAt(0).toUpperCase()}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="wp-strong" style={{ fontWeight: s.status === 'New' ? 700 : 600 }}>{s.name}</div>
+                        <a href={`mailto:${s.email}`} className="wp-link wp-small" style={{ wordBreak: "break-all" }}>{s.email}</a>
+                        {s.phone && <div className="wp-muted wp-small">{s.phone}</div>}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                    {s.subject && (
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedItem(s); setIsDetailOpen(true); }}
+                        className="wp-row-title"
+                        style={{ background: "none", border: 0, padding: 0, cursor: "pointer", textAlign: "left", fontWeight: s.status === 'New' ? 700 : 600 }}
+                      >
+                        {s.subject}
+                      </button>
+                    )}
+                    <p className="line-clamp-2" style={{ margin: "2px 0 0", maxWidth: 640 }}>{s.message}</p>
+                    <div className="wp-mobile-meta">
+                      <span className={`wp-pill wp-pill-sm ${statusPillClass(s.status)}`}>{s.status}</span>
+                      {" · "}{s.priority} priority
+                      {" · "}{new Date(s.createdAt).toLocaleDateString()}
+                    </div>
+
+                    {/* Row actions */}
+                    <div className="wp-row-actions">
+                      <span><button type="button" onClick={() => { setSelectedItem(s); setIsDetailOpen(true); }}>View Detail</button></span>
+                      {s.status === 'New' ? (
+                        <span><button type="button" onClick={() => handleAction(s._id, 'SET_STATUS', { status: 'Read' })}>Mark as Read</button></span>
+                      ) : (
+                        <span><button type="button" onClick={() => { setSelectedItem(s); setIsDetailOpen(true); setReplyMode(true); }}>Reply</button></span>
+                      )}
+                      <span><button type="button" onClick={() => handleAction(s._id, 'trash')} className="is-danger">Trash</button></span>
+                      <span><button type="button" onClick={() => handleAction(s._id, 'SET_STATUS', { status: 'Spam' })} className="is-danger">Spam</button></span>
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm">
+                    <span className={`wp-pill wp-pill-sm ${sourcePillClass(s.sourceForm)}`}>
+                      {s.sourceForm || 'Contact'}
+                    </span>
+                  </td>
+                  <td className="wp-hide-sm">
+                    <span className={`wp-pill ${statusPillClass(s.status)}`}>
+                      {s.status}
+                    </span>
+                    <div className="wp-muted wp-small" style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                      <Flag className="w-3 h-3" aria-hidden="true" style={{ color: priorityColor(s.priority) }} />
+                      {s.priority} Priority
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm wp-muted">
+                    {new Date(s.createdAt).toLocaleDateString()} at {new Date(s.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot>{headerRow("submissions-select-all-bottom")}</tfoot>
+        </table>
+      </div>
+
+      {/* --- 4. Pagination --- */}
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        {pager}
+      </div>
+
+      {/* --- 5. Detail view --- */}
       {isDetailOpen && selectedItem && (
-        <div className="fixed inset-0 z-[100] flex justify-end bg-black/20 backdrop-blur-[2px]">
-          <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+        <div className="wp-modal-backdrop">
+          <div
+            className="wp-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="submission-detail-title"
+            style={{ maxWidth: 1000 }}
+          >
             {/* Header */}
-            <div className="p-3 sm:px-6 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-[#f6f7f7]">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white border border-gray-200 rounded flex items-center justify-center text-[#2271b1] font-bold text-base sm:text-lg shadow-sm shrink-0">
+            <div className="wp-modal-head" style={{ gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                <span className="wp-avatar" aria-hidden="true">
                   {selectedItem.name?.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-[14px] sm:text-[16px] font-bold text-[#1d2327] truncate">{selectedItem.name}</h2>
-                  <p className="text-[11px] sm:text-[12px] text-[#2271b1] truncate">{selectedItem.email}</p>
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <h2 id="submission-detail-title" style={{ wordBreak: "break-word" }}>{selectedItem.name}</h2>
+                  <a href={`mailto:${selectedItem.email}`} className="wp-link" style={{ wordBreak: "break-all" }}>{selectedItem.email}</a>
                 </div>
               </div>
-              <button onClick={() => setIsDetailOpen(false)} className="p-1.5 sm:p-2 hover:bg-gray-200 rounded-full transition-colors shrink-0">
-                <X className="w-5 h-5 text-gray-500" />
+              <button
+                type="button"
+                onClick={() => setIsDetailOpen(false)}
+                className="wp-btn"
+                aria-label="Close"
+                style={{ minWidth: 32, padding: "0 6px", flex: "none" }}
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
 
-            {/* Content Body */}
-            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6 sm:space-y-8">
-              {/* Status & Actions Bar */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <select 
-                  className="text-[12px] border border-gray-300 rounded px-3 py-1.5 outline-none focus:border-[#2271b1]"
-                  value={selectedItem.status}
-                  onChange={(e) => handleAction(selectedItem._id, 'SET_STATUS', { status: e.target.value })}
-                >
-                  <option value="New">New</option>
-                  <option value="Read">Read</option>
-                  <option value="Replied">Replied</option>
-                  <option value="Archived">Archived</option>
-                  <option value="Spam">Spam</option>
-                </select>
-
-                <select 
-                  className="text-[12px] border border-gray-300 rounded px-3 py-1.5 outline-none focus:border-[#2271b1]"
-                  value={selectedItem.priority}
-                  onChange={(e) => handleAction(selectedItem._id, 'SET_PRIORITY', { priority: e.target.value })}
-                >
-                  <option value="Low">Low Priority</option>
-                  <option value="Medium">Medium Priority</option>
-                  <option value="High">High Priority</option>
-                </select>
-
-                <button 
-                  onClick={() => { setReplyMode(!replyMode); setReplyData({ subject: `Re: ${selectedItem.subject || 'Your Inquiry'}`, message: "" }); }}
-                  className="bg-[#2271b1] text-white px-3 sm:px-4 py-1.5 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] flex items-center gap-2"
-                >
-                  <Send className="w-3.5 h-3.5" /> {replyMode ? "Cancel Reply" : "Reply to Customer"}
-                </button>
-              </div>
-
-              {/* Message Content */}
-              <div className="bg-[#fcfcfc] border border-gray-100 p-3 sm:p-6 rounded-lg shadow-sm">
-                <div className="flex items-center gap-2 text-[11px] text-gray-400 uppercase tracking-widest font-bold mb-4">
-                  <MessageSquare className="w-3.5 h-3.5" /> Submission Content
-                </div>
-                {selectedItem.subject && <h4 className="text-[14px] sm:text-[15px] font-bold text-gray-800 mb-2">{selectedItem.subject}</h4>}
-                <p className="text-[13px] sm:text-[14px] text-gray-600 leading-relaxed whitespace-pre-wrap break-words">{selectedItem.message}</p>
-                
-                <div className="mt-6 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-3 sm:gap-6 text-[11px] text-gray-400">
-                  <div className="flex items-center gap-1.5"><Clock className="w-3 h-3" /> Received: {new Date(selectedItem.createdAt).toLocaleString()}</div>
-                  {selectedItem.sourcePage && <div className="flex items-center gap-1.5"><Eye className="w-3 h-3" /> Page: {selectedItem.sourcePage}</div>}
-                </div>
-              </div>
-
-              {/* Reply Interface */}
-              {replyMode && (
-                <div className="bg-blue-50/50 border border-blue-100 p-3 sm:p-6 rounded-lg space-y-4 animate-in fade-in duration-300">
-                  <h4 className="text-[13px] font-bold text-blue-900 flex items-center gap-2">
-                    <Send className="w-4 h-4" /> Send Email Reply
-                  </h4>
-                  <div className="space-y-3">
-                    <input 
-                      type="text" 
-                      placeholder="Subject"
-                      className="w-full border border-blue-200 px-3 py-2 text-[13px] rounded outline-none focus:border-blue-500"
-                      value={replyData.subject}
-                      onChange={(e) => setReplyData({...replyData, subject: e.target.value})}
-                    />
-                    <textarea 
-                      rows={6}
-                      placeholder="Type your response here..."
-                      className="w-full border border-blue-200 px-3 py-2 text-[13px] rounded outline-none focus:border-blue-500 resize-none"
-                      value={replyData.message}
-                      onChange={(e) => setReplyData({...replyData, message: e.target.value})}
-                    />
-                    <div className="flex justify-end gap-3">
-                       <button onClick={() => setReplyMode(false)} className="text-[12px] font-bold text-gray-500 px-4 py-2 hover:bg-gray-100 rounded">Cancel</button>
-                       <button 
-                        onClick={sendReply}
-                        disabled={submitting}
-                        className="bg-blue-600 text-white px-6 py-2 rounded font-bold text-[12px] hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
-                       >
-                         {submitting ? "Sending..." : "Dispatch Reply"}
-                       </button>
+            <div className="wp-modal-body" style={{ background: "#f0f0f1" }}>
+              <div className="wp-cols">
+                {/* Main */}
+                <div className="wp-col-main">
+                  <section className="wp-postbox" aria-labelledby="submission-message-title">
+                    <div className="wp-postbox-head">
+                      <h2 id="submission-message-title">{selectedItem.subject || "Message"}</h2>
                     </div>
-                  </div>
-                </div>
-              )}
+                    <div className="wp-inside">
+                      <div className="wp-note-body is-customer" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                        {selectedItem.message}
+                      </div>
+                      <div className="wp-note-meta">
+                        <span>Received {new Date(selectedItem.createdAt).toLocaleString()}</span>
+                        {selectedItem.sourcePage && <span>· Page: {selectedItem.sourcePage}</span>}
+                      </div>
+                    </div>
+                    <div className="wp-box-foot">
+                      <span className="wp-spacer" />
+                      <button
+                        type="button"
+                        onClick={() => { setReplyMode(!replyMode); setReplyData({ subject: `Re: ${selectedItem.subject || 'Your Inquiry'}`, message: "" }); }}
+                        className={replyMode ? "wp-btn" : "wp-btn wp-btn-primary"}
+                      >
+                        <Send className="w-4 h-4" aria-hidden="true" /> {replyMode ? "Cancel Reply" : "Reply to Customer"}
+                      </button>
+                    </div>
+                  </section>
 
-              {/* Internal Notes & History (Timeline) */}
-              <div className="space-y-4">
-                <h4 className="text-[13px] font-bold text-gray-700 flex items-center gap-2">
-                  <History className="w-4 h-4" /> Activity & Internal Notes
-                </h4>
-                
-                {/* Note Input */}
-                <div className="flex gap-2">
-                  <input 
-                    type="text"
-                    placeholder="Add an internal note..."
-                    className="flex-1 border border-gray-200 px-3 py-2 text-[13px] rounded outline-none focus:border-[#2271b1]"
-                    value={internalNote}
-                    onChange={(e) => setInternalNote(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addNote()}
-                  />
-                  <button onClick={addNote} className="bg-gray-100 text-gray-600 px-4 py-2 rounded text-[12px] font-bold hover:bg-gray-200 transition-colors">Add</button>
-                </div>
-
-                {/* Timeline */}
-                <div className="space-y-4 pt-4">
-                  {(selectedItem.internalNotes || []).length === 0 && (
-                    <p className="text-[12px] text-gray-400 italic">No internal activity recorded yet.</p>
+                  {/* Reply Interface */}
+                  {replyMode && (
+                    <section className="wp-postbox" aria-labelledby="submission-reply-title">
+                      <div className="wp-postbox-head">
+                        <h2 id="submission-reply-title">Send email reply</h2>
+                      </div>
+                      <div className="wp-inside">
+                        <div className="wp-field">
+                          <label htmlFor="submission-reply-subject" className="wp-label">Subject</label>
+                          <input
+                            id="submission-reply-subject"
+                            type="text"
+                            placeholder="Subject"
+                            className="wp-input wp-full"
+                            value={replyData.subject}
+                            onChange={(e) => setReplyData({...replyData, subject: e.target.value})}
+                          />
+                        </div>
+                        <div className="wp-field" style={{ marginBottom: 0 }}>
+                          <label htmlFor="submission-reply-message" className="wp-label">Message</label>
+                          <textarea
+                            id="submission-reply-message"
+                            rows={6}
+                            placeholder="Type your response here..."
+                            className="wp-textarea wp-full"
+                            value={replyData.message}
+                            onChange={(e) => setReplyData({...replyData, message: e.target.value})}
+                          />
+                        </div>
+                      </div>
+                      <div className="wp-box-foot">
+                        <span className="wp-spacer" />
+                        <button type="button" onClick={() => setReplyMode(false)} className="wp-btn">Cancel</button>
+                        <button
+                          type="button"
+                          onClick={sendReply}
+                          disabled={submitting}
+                          className="wp-btn wp-btn-primary"
+                        >
+                          {submitting ? "Sending..." : "Dispatch Reply"}
+                        </button>
+                      </div>
+                    </section>
                   )}
-                  {selectedItem.internalNotes?.map((note, i) => (
-                    <div key={i} className="flex gap-3 relative">
-                      <div className="w-6 h-6 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0 z-10">
-                        <User className="w-3 h-3 text-gray-400" />
-                      </div>
-                      <div className="flex-1 bg-[#f9f9f9] border border-gray-100 p-3 rounded text-[12px] relative">
-                         <div className="flex justify-between items-center mb-1">
-                            <span className="font-bold text-gray-700">{note.author?.name || 'Staff'}</span>
-                            <span className="text-[10px] text-gray-400">{new Date(note.createdAt).toLocaleString()}</span>
-                         </div>
-                         <p className="text-gray-600 whitespace-pre-wrap">{note.content}</p>
+
+                  {/* Internal Notes & History */}
+                  <section className="wp-postbox" aria-labelledby="submission-notes-title">
+                    <div className="wp-postbox-head">
+                      <h2 id="submission-notes-title">Activity &amp; internal notes</h2>
+                    </div>
+                    <div className="wp-inside">
+                      {(selectedItem.internalNotes || []).length === 0 && (
+                        <p className="wp-muted" style={{ margin: "0 0 12px" }}>No internal activity recorded yet.</p>
+                      )}
+                      {selectedItem.internalNotes?.map((note, i) => (
+                        <div key={i} style={{ marginBottom: 12 }}>
+                          <div className="wp-note-body" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{note.content}</div>
+                          <div className="wp-note-meta">
+                            <span>by {note.author?.name || 'Staff'}</span>
+                            <span>· {new Date(note.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+
+                      <label htmlFor="submission-internal-note" className="wp-label">Add note</label>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input
+                          id="submission-internal-note"
+                          type="text"
+                          placeholder="Add an internal note..."
+                          className="wp-input"
+                          style={{ flex: 1, minWidth: 0 }}
+                          value={internalNote}
+                          onChange={(e) => setInternalNote(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && addNote()}
+                        />
+                        <button type="button" onClick={addNote} className="wp-btn">Add</button>
                       </div>
                     </div>
-                  ))}
+                  </section>
                 </div>
-              </div>
 
-              {/* Metadata Table */}
-              <div className="pt-8 border-t border-gray-100 grid grid-cols-2 gap-y-4 text-[12px]">
-                <div>
-                   <span className="text-gray-400 block mb-1">Source Page</span>
-                   <span className="font-medium text-gray-700">{selectedItem.sourcePage || 'N/A'}</span>
-                </div>
-                <div>
-                   <span className="text-gray-400 block mb-1">IP Address</span>
-                   <span className="font-medium text-gray-700">{selectedItem.ipAddress || '127.0.0.1'}</span>
-                </div>
-                <div>
-                   <span className="text-gray-400 block mb-1">Last Viewed</span>
-                   <span className="font-medium text-gray-700">{selectedItem.lastViewedAt ? new Date(selectedItem.lastViewedAt).toLocaleString() : 'Never'}</span>
-                </div>
-                <div>
-                   <span className="text-gray-400 block mb-1">System ID</span>
-                   <span className="font-mono text-[10px] text-gray-400">{selectedItem._id}</span>
+                {/* Side */}
+                <div className="wp-col-side">
+                  <section className="wp-postbox" aria-labelledby="submission-status-title">
+                    <div className="wp-postbox-head">
+                      <h2 id="submission-status-title">Submission</h2>
+                    </div>
+                    <div className="wp-inside">
+                      <div className="wp-field">
+                        <label htmlFor="submission-status" className="wp-label">Status</label>
+                        <select
+                          id="submission-status"
+                          className="wp-select wp-full"
+                          value={selectedItem.status}
+                          onChange={(e) => handleAction(selectedItem._id, 'SET_STATUS', { status: e.target.value })}
+                        >
+                          <option value="New">New</option>
+                          <option value="Read">Read</option>
+                          <option value="Replied">Replied</option>
+                          <option value="Archived">Archived</option>
+                          <option value="Spam">Spam</option>
+                        </select>
+                      </div>
+                      <div className="wp-field">
+                        <label htmlFor="submission-priority" className="wp-label">Priority</label>
+                        <select
+                          id="submission-priority"
+                          className="wp-select wp-full"
+                          value={selectedItem.priority}
+                          onChange={(e) => handleAction(selectedItem._id, 'SET_PRIORITY', { priority: e.target.value })}
+                        >
+                          <option value="Low">Low Priority</option>
+                          <option value="Medium">Medium Priority</option>
+                          <option value="High">High Priority</option>
+                        </select>
+                      </div>
+
+                      <div className="wp-kv">
+                        <span className="wp-kv-k wp-muted">Source page</span>
+                        <span className="wp-kv-v" style={{ textAlign: "right", wordBreak: "break-all", minWidth: 0 }}>{selectedItem.sourcePage || 'N/A'}</span>
+                      </div>
+                      <div className="wp-kv">
+                        <span className="wp-kv-k wp-muted">IP address</span>
+                        <span className="wp-kv-v font-mono" style={{ wordBreak: "break-all" }}>{selectedItem.ipAddress || '127.0.0.1'}</span>
+                      </div>
+                      <div className="wp-kv">
+                        <span className="wp-kv-k wp-muted">Last viewed</span>
+                        <span className="wp-kv-v" style={{ textAlign: "right" }}>{selectedItem.lastViewedAt ? new Date(selectedItem.lastViewedAt).toLocaleString() : 'Never'}</span>
+                      </div>
+                      <div className="wp-kv">
+                        <span className="wp-kv-k wp-muted">System ID</span>
+                        <span className="wp-kv-v font-mono wp-small" style={{ fontWeight: 400, wordBreak: "break-all", minWidth: 0 }}>{selectedItem._id}</span>
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </div>
+            </div>
+
+            <div className="wp-modal-foot">
+              <button type="button" onClick={() => setIsDetailOpen(false)} className="wp-btn">Close</button>
             </div>
           </div>
         </div>

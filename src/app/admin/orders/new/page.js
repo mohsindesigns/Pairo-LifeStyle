@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Plus, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, X, Search, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { can } from "@/lib/rbac";
 import CustomizationEditor, { defaultCustomization } from "./CustomizationEditor";
 
-const inputClass = "w-full bg-white border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] outline-none focus:border-[#2271b1] transition-all text-black";
-const labelClass = "block text-[11px] font-bold text-[#3c434a] uppercase tracking-wide mb-1";
+const inputClass = "wp-input wp-full";
+const selectClass = "wp-select wp-full";
+const labelClass = "wp-label";
 
 function resolveVariantTitle(product, selectedOptions) {
   if (!selectedOptions) return null;
@@ -90,31 +91,44 @@ function ProductPicker({ onAdd }) {
   };
 
   return (
-    <div className="border border-[#ccd0d4] bg-[#f6f7f7] rounded-[3px] p-3 space-y-3">
-      <div className="relative">
-        <Search className="w-3.5 h-3.5 text-[#646970] absolute left-2.5 top-1/2 -translate-y-1/2" />
+    <div>
+      <label htmlFor="new-order-product-search" className={labelClass}>Add product</label>
+      <div style={{ position: "relative" }}>
+        <Search className="w-4 h-4" aria-hidden="true" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: "#646970", pointerEvents: "none" }} />
         <input
-          type="text"
+          id="new-order-product-search"
+          type="search"
+          autoComplete="off"
           placeholder={loading ? "Loading products..." : "Search products by name..."}
           value={search}
           disabled={loading}
           onChange={(e) => setSearch(e.target.value)}
-          className={`${inputClass} pl-8`}
+          className={inputClass}
+          style={{ paddingLeft: 30 }}
         />
         {matches.length > 0 && (
-          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-[#ccd0d4] rounded-[3px] shadow-lg max-h-64 overflow-y-auto divide-y divide-[#f0f0f1]">
+          <div
+            role="listbox"
+            aria-label="Matching products"
+            style={{ position: "absolute", zIndex: 20, left: 0, right: 0, marginTop: 2, background: "#fff", border: "1px solid #c3c4c7", boxShadow: "0 3px 6px rgba(0,0,0,0.08)", maxHeight: 256, overflowY: "auto" }}
+          >
             {matches.map(p => (
               <button
                 key={p._id}
                 type="button"
+                role="option"
+                aria-selected={false}
                 onClick={() => pickProduct(p)}
-                className="w-full flex items-center gap-2.5 text-left px-3 py-2 hover:bg-[#f6f7f7] cursor-pointer"
+                className="hover:bg-[#f0f6fc]"
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, textAlign: "left", padding: "6px 10px", minHeight: 44, background: "transparent", border: 0, borderBottom: "1px solid #f0f0f1", cursor: "pointer" }}
               >
-                <img src={p.image || p.images?.[0] || "/placeholder.jpg"} alt="" className="w-8 h-8 object-cover rounded-[2px] border border-[#e0e0e0]" />
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-black truncate">{p.name}</p>
-                  <p className="text-[11px] text-[#646970]">${p.price?.toLocaleString()} · Stock: {p.manageStock ? p.stock : "Unmanaged"}</p>
-                </div>
+                <span className="wp-thumb" style={{ width: 32, height: 32 }}>
+                  <img src={p.image || p.images?.[0] || "/placeholder.jpg"} alt="" />
+                </span>
+                <span style={{ minWidth: 0 }}>
+                  <span className="wp-strong" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                  <span className="wp-muted wp-small">${p.price?.toLocaleString()} · Stock: {p.manageStock ? p.stock : "Unmanaged"}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -122,51 +136,52 @@ function ProductPicker({ onAdd }) {
       </div>
 
       {loadingDetail && (
-        <div className="flex items-center gap-2 text-[12px] text-[#646970]"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading product...</div>
+        <p className="wp-muted" style={{ margin: "8px 0 0", display: "flex", alignItems: "center", gap: 6 }}>
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Loading product...
+        </p>
       )}
 
       {pendingProduct && (
-        <div className="bg-white border border-[#ccd0d4] rounded-[3px] p-3 space-y-3">
-          <p className="text-[13px] font-bold text-black">{pendingProduct.name}</p>
-
-          {(pendingProduct.attributes || []).map(attr => (
-            <div key={attr.name}>
-              <label className={labelClass}>{attr.name} *</label>
-              <select
-                className={inputClass}
-                value={selectedOptions[attr.name] || ""}
-                onChange={(e) => setSelectedOptions(prev => ({ ...prev, [attr.name]: e.target.value }))}
-              >
-                <option value="" disabled>Select {attr.name}...</option>
-                {(attr.values || []).map(v => (
-                  <option key={v.value} value={v.value}>{v.label || v.value}</option>
-                ))}
-              </select>
+        <div style={{ marginTop: 10, border: "1px solid #c3c4c7", background: "#fff" }}>
+          <div style={{ padding: "8px 12px", borderBottom: "1px solid #dcdcde" }} className="wp-strong">{pendingProduct.name}</div>
+          <div style={{ padding: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "0 12px" }}>
+            {(pendingProduct.attributes || []).map(attr => (
+              <div key={attr.name} className="wp-field">
+                <label htmlFor={`new-order-attr-${attr.name}`} className={labelClass}>{attr.name} *</label>
+                <select
+                  id={`new-order-attr-${attr.name}`}
+                  className={selectClass}
+                  value={selectedOptions[attr.name] || ""}
+                  onChange={(e) => setSelectedOptions(prev => ({ ...prev, [attr.name]: e.target.value }))}
+                >
+                  <option value="" disabled>Select {attr.name}...</option>
+                  {(attr.values || []).map(v => (
+                    <option key={v.value} value={v.value}>{v.label || v.value}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+            <div className="wp-field">
+              <label htmlFor="new-order-pending-qty" className={labelClass}>Quantity</label>
+              <input id="new-order-pending-qty" type="number" min={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} className={inputClass} />
             </div>
-          ))}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>Quantity</label>
-              <input type="number" min={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Price (editable) *</label>
-              <input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className={inputClass} />
+            <div className="wp-field">
+              <label htmlFor="new-order-pending-price" className={labelClass}>Price (editable) *</label>
+              <input id="new-order-pending-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className={inputClass} />
             </div>
           </div>
-
-          <div className="flex gap-2">
+          <div className="wp-box-foot">
+            <button type="button" onClick={() => setPendingProduct(null)} className="wp-btn">
+              Cancel
+            </button>
+            <span className="wp-spacer" />
             <button
               type="button"
               onClick={handleAdd}
               disabled={requiredAttrsMissing}
-              className="flex items-center gap-1.5 bg-[#2271b1] text-white px-3 py-1.5 rounded-[3px] text-[12px] font-bold hover:bg-[#135e96] disabled:opacity-50 cursor-pointer"
+              className="wp-btn wp-btn-primary"
             >
-              <Plus className="w-3.5 h-3.5" /> Add Item
-            </button>
-            <button type="button" onClick={() => setPendingProduct(null)} className="text-[12px] font-semibold text-[#646970] hover:text-black cursor-pointer">
-              Cancel
+              <Plus className="w-4 h-4" aria-hidden="true" /> Add item
             </button>
           </div>
         </div>
@@ -281,216 +296,307 @@ export default function AdminNewOrderPage() {
   if (!can(session?.user, "orders.create")) {
     return (
       <AdminPageLayout title="Create Order" breadcrumbs={[{ label: "Orders", href: "/admin/orders" }, { label: "Create Order" }]}>
-        <div className="bg-white border border-[#ccd0d4] p-6 text-[13px] text-[#646970]">
-          You don&apos;t have permission to create orders.
+        <div className="wp-notice wp-notice-error" role="alert">
+          <p>You don&apos;t have permission to create orders.</p>
         </div>
       </AdminPageLayout>
     );
   }
 
   return (
-    <AdminPageLayout title="Create Order" breadcrumbs={[{ label: "Orders", href: "/admin/orders" }, { label: "Create Order" }]}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 space-y-4">
-          {/* Line Items */}
-          <div className="bg-white border border-[#ccd0d4] shadow-sm">
-            <div className="px-3 py-2.5 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-              <h2 className="text-[13px] font-bold text-[#1d2327]">Products</h2>
+    <AdminPageLayout title="Add new order" breadcrumbs={[{ label: "Orders", href: "/admin/orders" }, { label: "Create Order" }]}>
+      <div className="wp-cols">
+
+        {/* ===================== MAIN COLUMN ===================== */}
+        <div className="wp-col-main">
+
+          {/* Order data */}
+          <section className="wp-postbox" aria-labelledby="new-order-data-title">
+            <div style={{ padding: "16px 16px 0" }}>
+              <h2 id="new-order-data-title" style={{ margin: 0, fontSize: 20, fontWeight: 400, color: "#1d2327", lineHeight: 1.3 }}>
+                New order details
+              </h2>
+              <p className="wp-muted" style={{ margin: "4px 0 0" }}>Fields marked * are required.</p>
             </div>
-            <div className="p-3 space-y-3">
-              {lineItems.length > 0 && (
-                <div className="divide-y divide-[#f0f0f1] border border-[#f0f0f1] rounded-[3px]">
+
+            <div className="wp-order-cols" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+
+              {/* General */}
+              <div style={{ minWidth: 0 }}>
+                <h3>General</h3>
+                <fieldset className="wp-field" style={{ border: 0, padding: 0, margin: "0 0 12px" }}>
+                  <legend className={labelClass}>Customer</legend>
+                  <label className="wp-check">
+                    <input type="radio" name="new-order-customer-mode" checked={customerMode === "guest"} onChange={() => setCustomerMode("guest")} />
+                    Guest / New
+                  </label>
+                  <label className="wp-check">
+                    <input type="radio" name="new-order-customer-mode" checked={customerMode === "existing"} onChange={() => setCustomerMode("existing")} />
+                    Existing customer
+                  </label>
+                </fieldset>
+
+                {customerMode === "existing" ? (
+                  <div className="wp-field">
+                    <label htmlFor="new-order-customer" className={labelClass}>Select customer *</label>
+                    <select
+                      id="new-order-customer"
+                      className={selectClass}
+                      value={selectedCustomerId}
+                      onChange={(e) => setSelectedCustomerId(e.target.value)}
+                      disabled={loadingCustomers}
+                    >
+                      <option value="">{loadingCustomers ? "Loading customers..." : "Select a customer..."}</option>
+                      {customers.map(c => (
+                        <option key={c._id} value={c._id}>{c.name} — {c.email}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="wp-field">
+                    <label htmlFor="new-order-guest-email" className={labelClass}>Email *</label>
+                    <input id="new-order-guest-email" type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} className={inputClass} />
+                    <p className="wp-desc">The recipient&apos;s name and phone are taken from the shipping address.</p>
+                  </div>
+                )}
+
+                <div className="wp-field">
+                  <label htmlFor="new-order-payment-status" className={labelClass}>Payment status</label>
+                  <select id="new-order-payment-status" className={selectClass} value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
+                    <option value="Paid">Paid</option>
+                    <option value="Pending">Pending</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Shipping */}
+              <div style={{ minWidth: 0 }}>
+                <h3>Shipping</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "0 12px" }}>
+                  <div className="wp-field" style={{ gridColumn: "1 / -1" }}>
+                    <label htmlFor="new-order-ship-fullName" className={labelClass}>Full name *</label>
+                    <input id="new-order-ship-fullName" type="text" value={shippingAddress.fullName} onChange={(e) => setShippingAddress(prev => ({ ...prev, fullName: e.target.value }))} className={inputClass} />
+                  </div>
+                  <div className="wp-field" style={{ gridColumn: "1 / -1" }}>
+                    <label htmlFor="new-order-ship-street" className={labelClass}>Street *</label>
+                    <input id="new-order-ship-street" type="text" value={shippingAddress.street} onChange={(e) => setShippingAddress(prev => ({ ...prev, street: e.target.value }))} className={inputClass} />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="new-order-ship-city" className={labelClass}>City *</label>
+                    <input id="new-order-ship-city" type="text" value={shippingAddress.city} onChange={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))} className={inputClass} />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="new-order-ship-state" className={labelClass}>State</label>
+                    <input id="new-order-ship-state" type="text" value={shippingAddress.state} onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))} className={inputClass} />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="new-order-ship-zip" className={labelClass}>ZIP / Postal code</label>
+                    <input id="new-order-ship-zip" type="text" value={shippingAddress.zip} onChange={(e) => setShippingAddress(prev => ({ ...prev, zip: e.target.value }))} className={inputClass} />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="new-order-ship-country" className={labelClass}>Country *</label>
+                    <input id="new-order-ship-country" type="text" value={shippingAddress.country} onChange={(e) => setShippingAddress(prev => ({ ...prev, country: e.target.value }))} className={inputClass} />
+                  </div>
+                  <div className="wp-field">
+                    <label htmlFor="new-order-ship-phone" className={labelClass}>Phone</label>
+                    <input id="new-order-ship-phone" type="text" value={shippingAddress.phone} onChange={(e) => setShippingAddress(prev => ({ ...prev, phone: e.target.value }))} className={inputClass} />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          {/* Items */}
+          <section className="wp-postbox" aria-labelledby="new-order-items-title">
+            <div className="wp-postbox-head">
+              <h2 id="new-order-items-title">Items</h2>
+            </div>
+
+            <div style={{ overflowX: "auto" }}>
+              <table className="wp-list-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Item</th>
+                    <th scope="col" className="wp-num">Cost</th>
+                    <th scope="col" className="wp-num">Qty</th>
+                    <th scope="col" className="wp-num wp-hide-sm">Total</th>
+                    <th scope="col"><span className="sr-only">Remove</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineItems.length === 0 && (
+                    <tr><td colSpan={5} className="wp-muted">No items yet. Search for a product below to add it to the order.</td></tr>
+                  )}
                   {lineItems.map(item => (
-                    <div key={item.key} className="p-2.5 space-y-2.5">
-                      <div className="flex items-center gap-3">
-                        <img src={item.image || "/placeholder.jpg"} alt="" className="w-10 h-10 object-cover rounded-[2px] border border-[#e0e0e0] shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-semibold text-black truncate">{item.name}</p>
-                          {item.variantTitle && <p className="text-[11px] text-[#646970]">{item.variantTitle}</p>}
+                    <Fragment key={item.key}>
+                    <tr>
+                      <td style={{ minWidth: 180 }}>
+                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                          <span className="wp-thumb">
+                            <img src={item.image || "/placeholder.jpg"} alt="" />
+                          </span>
+                          <div style={{ minWidth: 0, flex: 1, wordBreak: "break-word" }}>
+                            <div className="wp-strong">{item.name}</div>
+                            {item.variantTitle && <div className="wp-muted wp-small">{item.variantTitle}</div>}
+
+                            <fieldset style={{ border: 0, padding: 0, margin: "6px 0 0", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0 12px" }}>
+                              <legend className="sr-only">Order type for {item.name}</legend>
+                              <span className="wp-muted wp-small" aria-hidden="true">Order type:</span>
+                              <label className="wp-check">
+                                <input
+                                  type="radio"
+                                  name={`order-type-${item.key}`}
+                                  checked={item.orderType !== "customized"}
+                                  onChange={() => updateItem(item.key, { orderType: "simple" })}
+                                />
+                                Simple
+                              </label>
+                              <label className="wp-check">
+                                <input
+                                  type="radio"
+                                  name={`order-type-${item.key}`}
+                                  checked={item.orderType === "customized"}
+                                  onChange={() => updateItem(item.key, { orderType: "customized", customization: item.customization || defaultCustomization() })}
+                                />
+                                Customized order
+                              </label>
+                            </fieldset>
+
+                          </div>
                         </div>
-                        <input
-                          type="number"
-                          min={1}
-                          value={item.quantity}
-                          onChange={(e) => updateItem(item.key, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
-                          className="w-16 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[12px] text-center"
-                        />
+                      </td>
+                      <td className="wp-num">
                         <input
                           type="number"
                           min={0}
                           step="0.01"
+                          aria-label={`Price for ${item.name}`}
                           value={item.price}
                           onChange={(e) => updateItem(item.key, { price: e.target.value })}
-                          className="w-24 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[12px] text-right"
+                          className="wp-input"
+                          style={{ width: 90, textAlign: "right" }}
                         />
-                        <button type="button" onClick={() => removeItem(item.key)} className="text-[#bc0b0d] hover:text-red-700 cursor-pointer shrink-0">
-                          <Trash2 className="w-4 h-4" />
+                      </td>
+                      <td className="wp-num">
+                        <input
+                          type="number"
+                          min={1}
+                          aria-label={`Quantity for ${item.name}`}
+                          value={item.quantity}
+                          onChange={(e) => updateItem(item.key, { quantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                          className="wp-input"
+                          style={{ width: 64, textAlign: "center" }}
+                        />
+                      </td>
+                      <td className="wp-num wp-hide-sm wp-strong" style={{ whiteSpace: "nowrap" }}>
+                        ${((Number(item.price) || 0) * (Number(item.quantity) || 0)).toLocaleString()}
+                      </td>
+                      <td style={{ width: 44 }}>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.key)}
+                          aria-label={`Remove ${item.name}`}
+                          title="Remove item"
+                          className="wp-btn"
+                          style={{ minWidth: 32, padding: "0 6px", color: "#d63638", borderColor: "#d63638" }}
+                        >
+                          <X className="w-4 h-4" aria-hidden="true" />
                         </button>
-                      </div>
-
-                      <div className="flex items-center gap-4 pl-[52px] text-[12px] font-semibold">
-                        <span className="text-[10px] font-bold uppercase text-[#646970]">Order Type:</span>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            checked={item.orderType !== "customized"}
-                            onChange={() => updateItem(item.key, { orderType: "simple" })}
-                            className="accent-[#2271b1]"
-                          />
-                          Simple
-                        </label>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="radio"
-                            checked={item.orderType === "customized"}
-                            onChange={() => updateItem(item.key, { orderType: "customized", customization: item.customization || defaultCustomization() })}
-                            className="accent-[#2271b1]"
-                          />
-                          Customized Order
-                        </label>
-                      </div>
-
-                      {item.orderType === "customized" && (
-                        <div className="pl-[52px]">
+                      </td>
+                    </tr>
+                    {item.orderType === "customized" && (
+                      <tr>
+                        <td colSpan={5} style={{ paddingTop: 0 }}>
                           <CustomizationEditor
                             value={item.customization}
                             onChange={(c) => updateItem(item.key, { customization: c })}
                           />
-                        </div>
-                      )}
-                    </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
-                </div>
-              )}
+                </tbody>
+              </table>
+            </div>
 
+            {/* Totals */}
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 16px", borderTop: "1px solid #dcdcde" }}>
+              <div style={{ width: "100%", maxWidth: 300 }}>
+                <div className="wp-kv">
+                  <span className="wp-kv-k wp-muted">Items subtotal</span>
+                  <span className="wp-kv-v">${subtotal.toLocaleString()}</span>
+                </div>
+                <div className="wp-kv">
+                  <label htmlFor="new-order-shipping-cost" className="wp-kv-k wp-muted">Shipping</label>
+                  <input
+                    id="new-order-shipping-cost"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={shippingCost}
+                    onChange={(e) => setShippingCost(e.target.value)}
+                    className="wp-input"
+                    style={{ width: 100, textAlign: "right" }}
+                  />
+                </div>
+                <div className="wp-kv" style={{ borderTop: "1px solid #dcdcde", marginTop: 4, paddingTop: 10 }}>
+                  <span className="wp-kv-k wp-strong">Order total</span>
+                  <span className="wp-kv-v" style={{ fontSize: 15 }}>${total.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="wp-box-foot" style={{ display: "block" }}>
               <ProductPicker onAdd={(item) => setLineItems(prev => [...prev, item])} />
             </div>
-          </div>
+          </section>
+        </div>
 
-          {/* Customer */}
-          <div className="bg-white border border-[#ccd0d4] shadow-sm">
-            <div className="px-3 py-2.5 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-              <h2 className="text-[13px] font-bold text-[#1d2327]">Customer</h2>
+        {/* ===================== SIDE COLUMN ===================== */}
+        <div className="wp-col-side">
+          <section className="wp-postbox" aria-labelledby="new-order-actions-title">
+            <div className="wp-postbox-head">
+              <h2 id="new-order-actions-title">Order actions</h2>
             </div>
-            <div className="p-3 space-y-3">
-              <div className="flex gap-4 text-[12px] font-semibold">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="radio" checked={customerMode === "guest"} onChange={() => setCustomerMode("guest")} className="accent-[#2271b1]" />
-                  Guest / New
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="radio" checked={customerMode === "existing"} onChange={() => setCustomerMode("existing")} className="accent-[#2271b1]" />
-                  Existing Customer
-                </label>
+            <div className="wp-inside">
+              <div className="wp-kv">
+                <span className="wp-kv-k wp-muted">Items</span>
+                <span className="wp-kv-v">{lineItems.length}</span>
+              </div>
+              <div className="wp-kv">
+                <span className="wp-kv-k wp-muted">Payment</span>
+                <span className={`wp-pill wp-pill-sm ${paymentStatus === "Paid" ? "wp-st-paid" : "wp-st-unpaid"}`}>{paymentStatus}</span>
+              </div>
+              <div className="wp-kv">
+                <span className="wp-kv-k wp-muted">Total</span>
+                <span className="wp-kv-v">${total.toLocaleString()}</span>
               </div>
 
-              {customerMode === "existing" ? (
-                <select
-                  className={inputClass}
-                  value={selectedCustomerId}
-                  onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  disabled={loadingCustomers}
-                >
-                  <option value="">{loadingCustomers ? "Loading customers..." : "Select a customer..."}</option>
-                  {customers.map(c => (
-                    <option key={c._id} value={c._id}>{c.name} — {c.email}</option>
-                  ))}
-                </select>
-              ) : (
-                <div>
-                  <label className={labelClass}>Email *</label>
-                  <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} className={inputClass} />
-                  <p className="text-[11px] text-[#646970] mt-1">The recipient's name and phone are taken from the shipping address below.</p>
+              <div className="wp-field" style={{ marginTop: 12, marginBottom: 0 }}>
+                <label htmlFor="new-order-note" className={labelClass}>Note (optional)</label>
+                <textarea id="new-order-note" rows={3} value={adminNote} onChange={(e) => setAdminNote(e.target.value)} className="wp-textarea wp-full" />
+              </div>
+
+              {error && (
+                <div className="wp-notice wp-notice-error" role="alert" style={{ margin: "12px 0 0" }}>
+                  <p>{error}</p>
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Shipping Address */}
-          <div className="bg-white border border-[#ccd0d4] shadow-sm">
-            <div className="px-3 py-2.5 border-b border-[#ccd0d4] bg-[#f6f7f7]">
-              <h2 className="text-[13px] font-bold text-[#1d2327]">Shipping Address</h2>
+            <div className="wp-box-foot">
+              <span className="wp-spacer" />
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting || !idempotencyKey}
+                className="wp-btn wp-btn-primary"
+              >
+                {submitting ? "Creating Order..." : "Create Order"}
+              </button>
             </div>
-            <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <label className={labelClass}>Full Name *</label>
-                <input type="text" value={shippingAddress.fullName} onChange={(e) => setShippingAddress(prev => ({ ...prev, fullName: e.target.value }))} className={inputClass} />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelClass}>Street *</label>
-                <input type="text" value={shippingAddress.street} onChange={(e) => setShippingAddress(prev => ({ ...prev, street: e.target.value }))} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>City *</label>
-                <input type="text" value={shippingAddress.city} onChange={(e) => setShippingAddress(prev => ({ ...prev, city: e.target.value }))} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>State</label>
-                <input type="text" value={shippingAddress.state} onChange={(e) => setShippingAddress(prev => ({ ...prev, state: e.target.value }))} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>ZIP / Postal Code</label>
-                <input type="text" value={shippingAddress.zip} onChange={(e) => setShippingAddress(prev => ({ ...prev, zip: e.target.value }))} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Country *</label>
-                <input type="text" value={shippingAddress.country} onChange={(e) => setShippingAddress(prev => ({ ...prev, country: e.target.value }))} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Phone</label>
-                <input type="text" value={shippingAddress.phone} onChange={(e) => setShippingAddress(prev => ({ ...prev, phone: e.target.value }))} className={inputClass} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right column: summary + submit */}
-        <div className="space-y-4">
-          <div className="bg-white border border-[#ccd0d4] shadow-sm p-3 space-y-3">
-            <h2 className="text-[13px] font-bold text-[#1d2327]">Order Summary</h2>
-
-            <div className="space-y-1 text-[13px]">
-              <div className="flex justify-between"><span className="text-[#646970]">Subtotal</span><span className="font-semibold">${subtotal.toLocaleString()}</span></div>
-              <div className="flex justify-between items-center">
-                <span className="text-[#646970]">Shipping</span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={shippingCost}
-                  onChange={(e) => setShippingCost(e.target.value)}
-                  className="w-24 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[12px] text-right"
-                />
-              </div>
-              <div className="flex justify-between pt-2 border-t border-[#f0f0f1] font-bold text-black">
-                <span>Total</span><span>${total.toLocaleString()}</span>
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>Payment Status</label>
-              <select className={inputClass} value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)}>
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending</option>
-              </select>
-            </div>
-
-            <div>
-              <label className={labelClass}>Note (optional)</label>
-              <textarea rows={2} value={adminNote} onChange={(e) => setAdminNote(e.target.value)} className={`${inputClass} resize-none`} />
-            </div>
-
-            {error && <p className="text-[12px] text-red-600 font-semibold">{error}</p>}
-
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={submitting || !idempotencyKey}
-              className="w-full bg-[#2271b1] text-white py-2.5 rounded-[3px] text-[13px] font-bold hover:bg-[#135e96] disabled:opacity-50 cursor-pointer"
-            >
-              {submitting ? "Creating Order..." : "Create Order"}
-            </button>
-          </div>
+          </section>
         </div>
       </div>
     </AdminPageLayout>

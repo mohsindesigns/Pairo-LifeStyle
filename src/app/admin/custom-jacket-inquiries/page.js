@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import AdminPageLayout from "@/components/admin/AdminPageLayout";
 import { toast } from "react-hot-toast";
-import { Eye, Trash2, Search, ChevronLeft, ChevronRight, X, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ExternalLink, ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
 
 const STATUS_COLORS = {
-  New: "bg-blue-100 text-blue-700 border-blue-200",
-  Contacted: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  "In Progress": "bg-purple-100 text-purple-700 border-purple-200",
-  Converted: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  Completed: "bg-green-100 text-green-700 border-green-200",
-  Cancelled: "bg-red-100 text-red-700 border-red-200"
+  New: "wp-st-out",
+  Contacted: "wp-st-confirmed",
+  "In Progress": "wp-st-packed",
+  Converted: "wp-st-shipped",
+  Completed: "wp-st-delivered",
+  Cancelled: "wp-st-cancelled"
 };
 
 const ALL_STATUSES = ["New", "Contacted", "In Progress", "Converted", "Completed", "Cancelled"];
@@ -75,120 +75,119 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
     }
   };
 
+  const kvRows = (rows) => rows.map(([label, val]) => val ? (
+    <div key={label} className="wp-kv" style={{ alignItems: "flex-start" }}>
+      <span className="wp-kv-k wp-muted">{label}</span>
+      <span className="wp-kv-v" style={{ textAlign: "right", wordBreak: "break-word", minWidth: 0 }}>{val}</span>
+    </div>
+  ) : null);
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto" onClick={onClose}>
+    <div className="wp-modal-backdrop" onClick={onClose}>
       <div
-        className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] overflow-y-auto"
+        className="wp-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="inquiry-detail-title"
+        style={{ maxWidth: 760 }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-3 sm:p-6 border-b border-gray-100 gap-2">
-          <div className="min-w-0">
-            <h2 className="font-bold text-base sm:text-lg text-[#1d2327] truncate">
+        <div className="wp-modal-head" style={{ gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <h2 id="inquiry-detail-title" style={{ wordBreak: "break-word" }}>
               {inquiry.firstName} {inquiry.lastName}
             </h2>
-            <p className="text-[12px] sm:text-[13px] text-[#646970] truncate">{inquiry.email}</p>
+            <p className="wp-muted" style={{ margin: "2px 0 0", wordBreak: "break-all" }}>{inquiry.email}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center shrink-0">
-            <X className="w-4 h-4" />
+          <button type="button" onClick={onClose} className="wp-btn" aria-label="Close" style={{ minWidth: 32, padding: "0 6px", flex: "none" }}>
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="p-3 sm:p-6 space-y-4 sm:space-y-5">
-          {/* Personal Info */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4 text-[13px]">
-            {[
-              ["Phone", inquiry.phone],
-              ["Country", inquiry.country],
-              ["City", inquiry.city],
-              ["Submitted", new Date(inquiry.createdAt).toLocaleString()]
-            ].map(([label, val]) => val ? (
-              <div key={label}>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-                <p className="text-[#1d2327] font-medium mt-0.5 break-words">{val}</p>
-              </div>
-            ) : null)}
-          </div>
+        <div className="wp-modal-body">
+          <div className="wp-order-cols" style={{ padding: 0, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 16 }}>
+            {/* Personal Info */}
+            <div style={{ minWidth: 0 }}>
+              <h3>Contact</h3>
+              {kvRows([
+                ["Phone", inquiry.phone],
+                ["Country", inquiry.country],
+                ["City", inquiry.city],
+                ["Submitted", new Date(inquiry.createdAt).toLocaleString()]
+              ])}
+            </div>
 
-          <hr className="border-gray-100" />
-
-          {/* Jacket Specs */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4 text-[13px]">
-            {[
-              ["Jacket Type", inquiry.jacketType],
-              ["Gender", inquiry.gender],
-              ["Leather", inquiry.preferredLeather],
-              ["Color", inquiry.preferredColor],
-              ["Size", inquiry.size],
-              ["Budget", inquiry.budget],
-              ["Deadline", inquiry.deadline]
-            ].map(([label, val]) => val ? (
-              <div key={label}>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970]">{label}</p>
-                <p className="text-[#1d2327] font-medium mt-0.5 break-words">{val}</p>
-              </div>
-            ) : null)}
+            {/* Jacket Specs */}
+            <div style={{ minWidth: 0 }}>
+              <h3>Jacket</h3>
+              {kvRows([
+                ["Jacket Type", inquiry.jacketType],
+                ["Gender", inquiry.gender],
+                ["Leather", inquiry.preferredLeather],
+                ["Color", inquiry.preferredColor],
+                ["Size", inquiry.size],
+                ["Budget", inquiry.budget],
+                ["Deadline", inquiry.deadline]
+              ])}
+            </div>
           </div>
 
           {/* Notes */}
           {inquiry.additionalNotes && (
-            <>
-              <hr className="border-gray-100" />
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Additional Notes</p>
-                <p className="text-[13px] text-[#1d2327] leading-relaxed bg-gray-50 p-3 rounded-lg">
-                  {inquiry.additionalNotes}
-                </p>
+            <div className="wp-field">
+              <div className="wp-label">Additional notes</div>
+              <div className="wp-note-body is-customer" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {inquiry.additionalNotes}
               </div>
-            </>
+            </div>
           )}
 
           {/* Reference Images */}
           {inquiry.referenceImages?.length > 0 && (
-            <>
-              <hr className="border-gray-100" />
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-3">
-                  Reference Images ({inquiry.referenceImages.length})
-                </p>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {inquiry.referenceImages.map((url, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-lg overflow-hidden border border-gray-100 group">
-                      <img src={url} alt={`Reference ${i + 1}`} className="w-full h-full object-cover group-hover:opacity-80 transition-opacity" />
-                    </a>
-                  ))}
-                </div>
+            <div className="wp-field">
+              <div className="wp-label">
+                Reference images ({inquiry.referenceImages.length})
               </div>
-            </>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 8 }}>
+                {inquiry.referenceImages.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", aspectRatio: "1 / 1", overflow: "hidden", border: "1px solid #dcdcde" }}>
+                    <img src={url} alt={`Reference ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </a>
+                ))}
+              </div>
+            </div>
           )}
 
-          <hr className="border-gray-100" />
-
           {/* Convert to Order */}
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[#646970] mb-2">Custom Order</p>
+          <div className="wp-field" style={{ borderTop: "1px solid #f0f0f1", paddingTop: 12 }}>
+            <div className="wp-label">Custom order</div>
             {inquiry.orderId ? (
               <Link
                 href={`/admin/orders/${inquiry.orderId}`}
-                className="inline-flex items-center gap-1.5 text-[#2271b1] hover:text-[#135e96] text-[13px] font-medium bg-blue-50 border border-blue-100 rounded-lg px-3 py-2"
+                className="wp-btn"
               >
-                View Order <ExternalLink className="w-3.5 h-3.5" />
+                View order <ExternalLink className="w-4 h-4" aria-hidden="true" />
               </Link>
             ) : (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                <label htmlFor="inquiry-quote-amount" className="sr-only">Quoted price (USD)</label>
                 <input
+                  id="inquiry-quote-amount"
                   type="number"
                   min="0.01"
                   step="0.01"
                   placeholder="Quoted price (USD)"
                   value={quoteAmount}
                   onChange={e => setQuoteAmount(e.target.value)}
-                  className="border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] w-48 outline-none focus:border-[#2271b1]"
+                  className="wp-input"
+                  style={{ width: 200, maxWidth: "100%" }}
                 />
                 <button
+                  type="button"
                   onClick={handleConvert}
                   disabled={converting}
-                  className="bg-[#1a1a1a] text-white px-4 py-2 rounded-[3px] text-[12px] font-bold uppercase tracking-wide hover:bg-black disabled:opacity-60"
+                  className="wp-btn"
                 >
                   {converting ? "Creating..." : "Convert to Order"}
                 </button>
@@ -196,38 +195,36 @@ function DetailModal({ inquiry, onClose, onStatusChange, onConverted }) {
             )}
           </div>
 
-          <hr className="border-gray-100" />
-
           {/* Status + Notes */}
-          <div className="space-y-4">
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-2">Status</label>
-              <select
-                value={status}
-                onChange={e => setStatus(e.target.value)}
-                className="border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] w-full outline-none focus:border-[#2271b1]"
-              >
-                {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-[#646970] block mb-2">Admin Notes</label>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                rows={3}
-                placeholder="Internal notes (not visible to customer)..."
-                className="border border-[#8c8f94] rounded-[3px] px-3 py-2 text-[13px] w-full outline-none focus:border-[#2271b1] resize-none"
-              />
-            </div>
+          <div className="wp-field" style={{ borderTop: "1px solid #f0f0f1", paddingTop: 12 }}>
+            <label htmlFor="inquiry-status" className="wp-label">Status</label>
+            <select
+              id="inquiry-status"
+              value={status}
+              onChange={e => setStatus(e.target.value)}
+              className="wp-select wp-full"
+            >
+              {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="wp-field" style={{ marginBottom: 0 }}>
+            <label htmlFor="inquiry-admin-notes" className="wp-label">Admin notes</label>
+            <textarea
+              id="inquiry-admin-notes"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Internal notes (not visible to customer)..."
+              className="wp-textarea wp-full"
+            />
           </div>
         </div>
 
-        <div className="p-3 sm:p-6 border-t border-gray-100 flex flex-col-reverse xs:flex-row xs:justify-end gap-2 sm:gap-3">
-          <button onClick={onClose} className="border border-[#8c8f94] text-[#3c434a] px-4 py-1.5 rounded-[3px] text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1] w-full xs:w-auto">
+        <div className="wp-modal-foot">
+          <button type="button" onClick={onClose} className="wp-btn">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving} className="bg-[#2271b1] text-white px-4 py-1.5 rounded-[3px] text-[13px] font-medium hover:bg-[#135e96] disabled:opacity-60 w-full xs:w-auto">
+          <button type="button" onClick={handleSave} disabled={saving} className="wp-btn wp-btn-primary">
             {saving ? "Saving..." : "Save Changes"}
           </button>
         </div>
@@ -293,130 +290,144 @@ export default function CustomJacketInquiriesPage() {
     }
   };
 
+  const headerRow = (
+    <tr>
+      <th scope="col">Name</th>
+      <th scope="col" className="wp-hide-sm">Email</th>
+      <th scope="col" className="wp-hide-sm">Jacket type</th>
+      <th scope="col">Status</th>
+      <th scope="col" className="wp-hide-sm">Date</th>
+    </tr>
+  );
+
+  const pager = (
+    <div className="wp-pages">
+      <button
+        type="button"
+        className="wp-pager"
+        aria-label="Previous page"
+        onClick={() => setPage(p => Math.max(1, p - 1))}
+        disabled={page === 1}
+      >
+        <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+      </button>
+      <span>Page {page} of {pagination.pages}</span>
+      <button
+        type="button"
+        className="wp-pager"
+        aria-label="Next page"
+        onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
+        disabled={page === pagination.pages}
+      >
+        <ChevronRight className="w-4 h-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+
   return (
     <RequirePermission permission="submissions.view">
     <AdminPageLayout title="Custom Jacket Inquiries">
-      <div className="space-y-4">
-        {/* Status Tabs */}
-        <ul className="flex flex-wrap items-center gap-2 text-[13px] text-[#2271b1]">
-          {[["all", "All"], ...ALL_STATUSES.map(s => [s, s])].map(([val, label]) => (
-            <li key={val} className="flex items-center gap-1">
-              <button
-                onClick={() => { setStatusFilter(val); setPage(1); }}
-                className={`hover:text-[#135e96] ${statusFilter === val ? "text-[#1d2327] font-semibold" : ""}`}
-              >
-                {label} <span className="text-[#646970] font-normal">({counts[val] || 0})</span>
-              </button>
-              {val !== "Cancelled" && <span className="text-[#c3c4c7]">|</span>}
-            </li>
-          ))}
-        </ul>
+      {/* Status Tabs */}
+      <div className="wp-subsub" role="tablist" aria-label="Filter inquiries by status">
+        {[["all", "All"], ...ALL_STATUSES.map(s => [s, s])].map(([val, label], i) => (
+          <Fragment key={val}>
+            {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === val}
+              onClick={() => { setStatusFilter(val); setPage(1); }}
+              className={statusFilter === val ? "is-current" : undefined}
+            >
+              {label} <span className="wp-count">({counts[val] || 0})</span>
+            </button>
+          </Fragment>
+        ))}
+      </div>
 
-        {/* Search */}
-        <div className="bg-white border border-[#ccd0d4] p-2 sm:p-3 flex items-center gap-2 shadow-sm">
+      {/* Search */}
+      <div className="wp-toolbar">
+        <span className="wp-spacer" />
+        <div className="wp-search" role="search">
+          <label htmlFor="jacket-inquiries-search" className="sr-only">Search inquiries</label>
           <input
-            type="text"
+            id="jacket-inquiries-search"
+            type="search"
             placeholder="Search by name, email, jacket type..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="border border-[#8c8f94] outline-none px-2.5 xs:px-3 py-1 text-[12px] xs:text-[13px] w-full max-w-sm bg-white focus:border-[#2271b1] rounded-[3px]"
+            className="wp-input"
+            style={{ minWidth: 0, width: 280, maxWidth: "100%" }}
           />
-          <button className="border border-[#8c8f94] text-[#3c434a] px-2.5 xs:px-3 py-1 rounded-[3px] text-[12px] xs:text-[13px] font-medium bg-[#f6f7f7] hover:bg-[#f0f0f1]">
-            <Search className="w-3.5 h-3.5" />
+          <button type="button" className="wp-btn">
+            Search inquiries
           </button>
         </div>
-
-        {/* Table */}
-        <div className="bg-white border border-[#ccd0d4] overflow-x-auto max-w-full shadow-sm">
-          <table className="w-full text-left border-collapse text-[13px] min-w-[500px] md:min-w-[800px]">
-            <thead>
-              <tr className="bg-[#f6f7f7] border-b border-[#ccd0d4]">
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Name</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Email</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Jacket Type</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Status</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Date</th>
-                <th className="px-4 py-2 font-bold text-[#1d2327]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f0f0f1]">
-              {loading ? (
-                <tr><td colSpan={6} className="p-8 text-center italic text-gray-400">Loading inquiries...</td></tr>
-              ) : inquiries.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center italic text-gray-400">No inquiries found.</td></tr>
-              ) : (
-                inquiries.map(inq => (
-                  <tr key={inq._id} className="hover:bg-[#f6f7f7] group transition-colors">
-                    <td className="px-4 py-3 font-medium text-[#1d2327]">
-                      {inq.firstName} {inq.lastName}
-                      {inq.referenceImages?.length > 0 && (
-                        <span className="ml-2 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
-                          {inq.referenceImages.length} img
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-[#646970] break-all">{inq.email}</td>
-                    <td className="px-4 py-3 text-[#646970]">{inq.jacketType || "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${STATUS_COLORS[inq.status] || "bg-gray-100 text-gray-600"}`}>
-                        {inq.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[#646970]">
-                      {new Date(inq.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => setSelectedInquiry(inq)}
-                          className="flex items-center gap-1 text-[#2271b1] hover:text-[#135e96] text-[12px] font-medium"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> View
-                        </button>
-                        <button
-                          onClick={() => handleDelete(inq._id)}
-                          className="flex items-center gap-1 text-[#d63638] hover:text-[#bc0b0d] text-[12px] font-medium"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Delete
-                        </button>
-                        {inq.orderId && (
-                          <Link
-                            href={`/admin/orders/${inq.orderId}`}
-                            className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-[12px] font-medium"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" /> Order
-                          </Link>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {pagination.pages > 1 && (
-          <div className="flex items-center gap-2 text-[13px]">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="border border-[#ccd0d4] px-2 py-1 rounded-[3px] disabled:opacity-40 hover:bg-[#f6f7f7]"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-[#646970]">Page {page} of {pagination.pages}</span>
-            <button
-              onClick={() => setPage(p => Math.min(pagination.pages, p + 1))}
-              disabled={page === pagination.pages}
-              className="border border-[#ccd0d4] px-2 py-1 rounded-[3px] disabled:opacity-40 hover:bg-[#f6f7f7]"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </div>
+
+      {pagination.pages > 1 && <div className="wp-toolbar"><span className="wp-spacer" />{pager}</div>}
+
+      {/* Table */}
+      <div className="wp-table-box">
+        <table className="wp-list-table">
+          <thead>{headerRow}</thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={5} className="wp-muted">Loading inquiries...</td></tr>
+            ) : inquiries.length === 0 ? (
+              <tr><td colSpan={5} className="wp-muted">No inquiries found.</td></tr>
+            ) : (
+              inquiries.map(inq => (
+                <tr key={inq._id}>
+                  <td style={{ minWidth: 0, wordBreak: "break-word" }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedInquiry(inq)}
+                      className="wp-row-title"
+                      style={{ background: "none", border: 0, padding: 0, cursor: "pointer", textAlign: "left" }}
+                    >
+                      {inq.firstName} {inq.lastName}
+                    </button>
+                    {inq.referenceImages?.length > 0 && (
+                      <span className="wp-muted wp-small" style={{ marginLeft: 6, display: "inline-flex", alignItems: "center", gap: 3, verticalAlign: "middle" }}>
+                        <ImageIcon className="w-3 h-3" aria-hidden="true" /> {inq.referenceImages.length} img
+                      </span>
+                    )}
+                    <div className="wp-mobile-meta">
+                      <span style={{ wordBreak: "break-all" }}>{inq.email}</span>
+                      <br />
+                      {inq.jacketType || "—"} · {new Date(inq.createdAt).toLocaleDateString()}
+                    </div>
+                    <div className="wp-row-actions">
+                      <span><button type="button" onClick={() => setSelectedInquiry(inq)}>View</button></span>
+                      {inq.orderId && (
+                        <span><Link href={`/admin/orders/${inq.orderId}`}>Order</Link></span>
+                      )}
+                      <span><button type="button" onClick={() => handleDelete(inq._id)} className="is-danger">Delete</button></span>
+                    </div>
+                  </td>
+                  <td className="wp-hide-sm" style={{ wordBreak: "break-all" }}>
+                    <a href={`mailto:${inq.email}`} className="wp-link">{inq.email}</a>
+                  </td>
+                  <td className="wp-hide-sm">{inq.jacketType || "—"}</td>
+                  <td>
+                    <span className={`wp-pill ${STATUS_COLORS[inq.status] || "wp-st-draft"}`}>
+                      {inq.status}
+                    </span>
+                  </td>
+                  <td className="wp-hide-sm wp-muted">
+                    {new Date(inq.createdAt).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+          <tfoot>{headerRow}</tfoot>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && <div className="wp-toolbar"><span className="wp-spacer" />{pager}</div>}
 
       {/* Detail Modal */}
       {selectedInquiry && (

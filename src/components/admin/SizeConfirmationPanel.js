@@ -5,9 +5,9 @@ import { toast } from "react-hot-toast";
 import { Ruler, Send, MessageSquareReply, CheckCircle2, RefreshCw } from "lucide-react";
 
 const STATUS_STYLES = {
-  "Awaiting Reply": "bg-[#f0f0f1] text-[#50575e]",
-  Replied: "bg-[#fcf0c3] text-[#7a5d00]",
-  Confirmed: "bg-[#d5f0dc] text-[#007017]",
+  "Awaiting Reply": "wp-st-draft",
+  Replied: "wp-st-confirmed",
+  Confirmed: "wp-st-delivered",
 };
 
 /**
@@ -93,97 +93,105 @@ export default function SizeConfirmationPanel({ orderId, customerEmail }) {
   };
 
   return (
-    <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-[2px]">
-      <div className="px-4 py-3 border-b border-[#ccd0d4] bg-[#f6f7f7] flex items-center gap-2">
-        <Ruler className="w-3.5 h-3.5 text-[#2271b1]" />
-        <h3 className="text-[13px] font-bold text-[#1d2327] flex-1">Size Confirmation</h3>
-        <button
-          type="button"
-          onClick={checkReplies}
-          disabled={checking}
-          title="Check the inbox for new replies"
-          className="text-[#2271b1] hover:text-[#135e96] disabled:opacity-50 cursor-pointer"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${checking ? "animate-spin" : ""}`} />
-        </button>
+    <section className="wp-postbox" aria-labelledby={`size-confirmation-${orderId}-title`}>
+      <div className="wp-postbox-head">
+        <h2 id={`size-confirmation-${orderId}-title`} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Ruler className="w-4 h-4" aria-hidden="true" /> Size confirmation
+        </h2>
+        <span className="wp-postbox-aside">
+          <button
+            type="button"
+            onClick={checkReplies}
+            disabled={checking}
+            title="Check the inbox for new replies"
+            aria-label="Check the inbox for new replies"
+            className="wp-btn"
+            style={{ minWidth: 32, padding: "0 6px" }}
+          >
+            <RefreshCw className={`w-4 h-4 ${checking ? "animate-spin" : ""}`} aria-hidden="true" />
+          </button>
+        </span>
       </div>
 
-      <div className="p-4 space-y-3">
-        <div>
-          <label className="block text-[11px] font-semibold text-[#3c434a] mb-1">Extra size chart image URL (optional — the products&apos; own size charts are included automatically)</label>
+      <div className="wp-inside">
+        <div className="wp-field">
+          <label htmlFor={`size-chart-url-${orderId}`} className="wp-label">Extra size chart image URL</label>
           <input
+            id={`size-chart-url-${orderId}`}
             type="url"
             value={chartUrl}
             onChange={(e) => setChartUrl(e.target.value)}
             placeholder="https://… (shown in the email)"
-            className="w-full border border-[#8c8f94] rounded-[3px] px-2 py-1.5 text-[12px] outline-none focus:border-[#2271b1]"
+            className="wp-input wp-full"
           />
+          <p className="wp-desc">Optional — the products&apos; own size charts are included automatically.</p>
         </div>
 
-        <button
-          type="button"
-          onClick={send}
-          disabled={sending || !customerEmail}
-          className="w-full flex items-center justify-center gap-1.5 bg-[#1a1a1a] text-white py-2 rounded-[3px] font-bold text-xs uppercase hover:bg-black transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          <Send className="w-3.5 h-3.5" />
-          {sending ? "Sending..." : items.length ? "Send Again" : "Send Size Confirmation"}
-        </button>
-        <p className="text-[11px] text-[#646970] text-center">
-          Emails {customerEmail || "the customer"} and tracks their reply here.
-        </p>
-
         {!inboxConfigured && (
-          <p className="text-[11px] text-[#7a5d00] bg-[#fcf0c3] rounded-[3px] px-2 py-1.5">
-            Replies can&apos;t be picked up yet — add <code>IMAP_HOST</code> (and mailbox login) to the server environment.
-          </p>
+          <div className="wp-notice wp-notice-warning" role="status" style={{ margin: "0 0 12px" }}>
+            <p>Replies can&apos;t be picked up yet — add <code>IMAP_HOST</code> (and mailbox login) to the server environment.</p>
+          </div>
         )}
 
         {loading ? (
-          <p className="text-[11px] text-[#646970] text-center">Loading…</p>
+          <p className="wp-muted" style={{ margin: 0 }}>Loading…</p>
         ) : (
           items.map((c) => (
-            <div key={c._id} className="border border-[#dcdcde] rounded-[3px]">
-              <div className="px-3 py-2 bg-[#f6f7f7] flex items-center justify-between gap-2">
-                <span className="text-[11px] text-[#50575e]">
-                  {c.auto ? "Sent automatically" : "Sent"} {new Date(c.sentAt).toLocaleString()}
-                  {c.chartLabels?.length > 0 && <span className="block text-[10px] text-[#8c8f94]">Chart: {c.chartLabels.join(", ")}</span>}
-                </span>
-                <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-[2px] ${STATUS_STYLES[c.status] || ""}`}>
-                  {c.status}
-                </span>
+            <div key={c._id} style={{ borderTop: "1px solid #f0f0f1", paddingTop: 10, marginTop: 10 }}>
+              <div className="wp-kv">
+                <span className="wp-kv-k wp-muted">Status</span>
+                <span className={`wp-pill wp-pill-sm ${STATUS_STYLES[c.status] || ""}`}>{c.status}</span>
               </div>
+              <div className="wp-kv">
+                <span className="wp-kv-k wp-muted">{c.auto ? "Sent automatically" : "Sent"}</span>
+                <span className="wp-kv-v" style={{ fontWeight: 400, textAlign: "right" }}>{new Date(c.sentAt).toLocaleString()}</span>
+              </div>
+              {c.chartLabels?.length > 0 && (
+                <div className="wp-kv">
+                  <span className="wp-kv-k wp-muted">Chart</span>
+                  <span className="wp-kv-v" style={{ fontWeight: 400, textAlign: "right", wordBreak: "break-word" }}>{c.chartLabels.join(", ")}</span>
+                </div>
+              )}
 
               {c.replies?.map((r) => (
-                <div key={r._id} className={`px-3 py-2 border-t border-[#f0f0f1] ${r.read ? "" : "bg-[#f0f6fc]"}`}>
-                  <div className="flex items-center gap-1.5 text-[11px] text-[#50575e] mb-1">
-                    <MessageSquareReply className="w-3 h-3" />
-                    <span className="font-semibold">{r.fromName || r.fromEmail}</span>
-                    <span>· {new Date(r.receivedAt).toLocaleString()}</span>
+                <div key={r._id} style={{ marginTop: 10 }}>
+                  <div
+                    className="wp-note-body is-customer"
+                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", outline: r.read ? undefined : "2px solid #2271b1" }}
+                  >
+                    {r.text}
                   </div>
-                  <p className="text-[12px] text-[#1d2327] whitespace-pre-wrap break-words">{r.text}</p>
+                  <div className="wp-note-meta">
+                    <MessageSquareReply className="w-3 h-3" aria-hidden="true" />
+                    <span>{r.fromName || r.fromEmail}</span>
+                    <span>· {new Date(r.receivedAt).toLocaleString()}</span>
+                    {!r.read && <span className="wp-strong">· New</span>}
+                  </div>
                 </div>
               ))}
 
               {c.status === "Confirmed" ? (
-                <div className="px-3 py-2 border-t border-[#f0f0f1] flex items-center gap-1.5 text-[12px] text-[#007017] font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Confirmed size: {c.confirmedSize}
-                </div>
+                <p style={{ margin: "10px 0 0", display: "flex", alignItems: "center", gap: 6, color: "#00a32a" }} className="wp-strong">
+                  <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> Confirmed size: {c.confirmedSize}
+                </p>
               ) : (
                 c.replies?.length > 0 && (
-                  <div className="px-3 py-2 border-t border-[#f0f0f1] space-y-2">
-                    <div className="flex gap-2">
+                  <div style={{ marginTop: 10 }}>
+                    <label htmlFor={`confirmed-size-${c._id}`} className="wp-label">Confirmed size</label>
+                    <div style={{ display: "flex", gap: 6 }}>
                       <input
+                        id={`confirmed-size-${c._id}`}
                         type="text"
                         value={sizeInputs[c._id] || ""}
                         onChange={(e) => setSizeInputs((s) => ({ ...s, [c._id]: e.target.value }))}
-                        placeholder="Confirmed size (e.g. Medium)"
-                        className="flex-1 min-w-0 border border-[#8c8f94] rounded-[3px] px-2 py-1 text-[12px] outline-none focus:border-[#2271b1]"
+                        placeholder="e.g. Medium"
+                        className="wp-input"
+                        style={{ flex: 1, minWidth: 0 }}
                       />
                       <button
                         type="button"
                         onClick={() => patch(c._id, { action: "confirm", size: sizeInputs[c._id] }, "Size confirmed")}
-                        className="bg-[#2271b1] hover:bg-[#135e96] text-white text-[11px] font-bold px-2.5 rounded-[3px] cursor-pointer"
+                        className="wp-btn wp-btn-primary"
                       >
                         Confirm
                       </button>
@@ -192,7 +200,8 @@ export default function SizeConfirmationPanel({ orderId, customerEmail }) {
                       <button
                         type="button"
                         onClick={() => patch(c._id, { action: "markRead" })}
-                        className="text-[11px] text-[#2271b1] hover:underline cursor-pointer"
+                        className="wp-link"
+                        style={{ background: "none", border: 0, padding: 0, marginTop: 8, minHeight: 32, cursor: "pointer" }}
                       >
                         Mark replies as read
                       </button>
@@ -204,6 +213,22 @@ export default function SizeConfirmationPanel({ orderId, customerEmail }) {
           ))
         )}
       </div>
-    </div>
+
+      <div className="wp-box-foot" style={{ flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+        <button
+          type="button"
+          onClick={send}
+          disabled={sending || !customerEmail}
+          className="wp-btn wp-btn-primary"
+          style={{ justifyContent: "center" }}
+        >
+          <Send className="w-4 h-4" aria-hidden="true" />
+          {sending ? "Sending..." : items.length ? "Send Again" : "Send Size Confirmation"}
+        </button>
+        <p className="wp-muted wp-small" style={{ margin: 0, textAlign: "center", wordBreak: "break-word" }}>
+          Emails {customerEmail || "the customer"} and tracks their reply here.
+        </p>
+      </div>
+    </section>
   );
 }
