@@ -6,9 +6,26 @@ import { toast } from "react-hot-toast";
 import { Page, PageHeader, Notice, Skeleton, formatDate } from "@/components/admin/ui";
 import { usePopup } from "@/context/PopupContext";
 import { useRBAC } from "@/hooks/useRBAC";
-import { allowed, visibleModules, filterItems, paginate, summarize } from "./trashModules";
+import { allowed, visibleModules, groupModules, filterItems, paginate, summarize, responseResult } from "./trashModules";
 
 const PER_PAGE = 20;
+
+const countLabel = (e) => (!e || e.status === "loading" ? "…" : e.status === "error" ? "!" : e.docs.length);
+
+// Page-local layout for the grouped section tabs (admin-ui.css has no show-on-phone helper).
+const TAB_CSS = `
+.trash-tabs-sm { display: none; }
+.trash-tabs-lg { margin: 6px 0 10px; border-top: 1px solid #f0f0f1; }
+.trash-group { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; border-bottom: 1px solid #f0f0f1; }
+.trash-group-label { flex: 0 0 72px; font-size: 12px; font-weight: 600; color: #646970; text-transform: uppercase; letter-spacing: .02em; }
+.trash-group .wp-subsub { margin: 0; flex: 1; min-width: 0; }
+.trash-group .wp-subsub button.trash-empty { color: #8c8f94; }
+@media (max-width: 782px) {
+  .trash-tabs-lg { display: none; }
+  .trash-tabs-sm { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 10px; }
+  .trash-tabs-sm .wp-select { width: 100%; }
+}
+`;
 const BULK_CONCURRENCY = 4;
 
 async function getJson(url) {
@@ -25,9 +42,8 @@ async function send({ url, method, body }) {
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (res.ok) return { ok: true };
     const data = await res.json().catch(() => null);
-    return { ok: false, error: data?.error || `HTTP ${res.status}` };
+    return responseResult(res.ok, res.status, data);
   } catch {
     return { ok: false, error: "Network error" };
   }
@@ -54,6 +70,11 @@ export default function AdminTrash() {
   // Re-evaluated only when the signed-in role changes.
   const roleKey = JSON.stringify(session?.user?.role || null);
   const modules = useMemo(() => visibleModules(can), [roleKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const groups = useMemo(() => groupModules(modules), [modules]);
+  const actor = useMemo(
+    () => ({ userId: session?.user?.id || null, roleSlug: session?.user?.role?.slug || null }),
+    [session?.user?.id, session?.user?.role?.slug],
+  );
 
   const [active, setActive] = useState("");
   const [data, setData] = useState({}); // key -> { status: "loading"|"ok"|"error", docs, error }
@@ -126,7 +147,7 @@ export default function AdminTrash() {
 
   const mayRestore = current ? allowed(can, current.permissions.restore) : false;
   const mayDelete = current ? allowed(can, current.permissions.delete) : false;
-  const blockReason = (it) => (current?.canDestroy ? current.canDestroy(it.doc) : null);
+  const blockReason = (it) => (current?.canDestroy ? current.canDestroy(it.doc, actor) || null : null);
 
   const sliceIds = slice.map((it) => it.id);
   const allOnPage = sliceIds.length > 0 && sliceIds.every((id) => selected.includes(id));
@@ -170,9 +191,11 @@ export default function AdminTrash() {
     const results = await runAll(runnable, (it) => send(kind === "delete" ? mod.destroy(it.doc) : mod.restore(it.doc)));
     setBusy(false);
     const ok = results.filter((r) => r.ok).length;
+    // Items the server refuses (or that are blocked up front) are skipped, never fatal:
+    // the rest of the run carries on and the toast reports both numbers.
     const failed = results.length - ok + skipped;
     const firstError = results.find((r) => !r.ok)?.error || (skipped ? blockReason(targets.find((it) => blockReason(it))) : "");
-    const msg = summarize(kind === "delete" ? "deleted permanently" : "restored", ok, failed);
+    const msg = kind === "delete" ? summarize("deleted", ok, failed, "skipped") : summarize("restored", ok, failed);
     if (failed) toast.error(`${msg}${firstError ? ` — ${firstError}` : ""}`);
     else toast.success(msg);
     setSelected([]);
@@ -197,8 +220,10 @@ export default function AdminTrash() {
 
   const emptyTrash = async () => {
     if (items.length === 0) return;
+    const blocked = items.filter((it) => blockReason(it)).length;
     const ok = await showConfirm(
-      `Permanently delete all ${items.length} ${current.noun}${items.length === 1 ? "" : "s"} in the Trash? This cannot be undone.`,
+      `Permanently delete all ${items.length} ${current.noun}${items.length === 1 ? "" : "s"} in the Trash? This cannot be undone.`
+        + `${blocked ? ` ${blocked} that can't be deleted will be skipped and stay in the Trash.` : " Any the server refuses are skipped and stay in the Trash."}`,
       `Empty ${current.label} trash`,
       { confirmText: "Empty trash", danger: true },
     );
@@ -253,20 +278,49 @@ export default function AdminTrash() {
         Items moved to the Trash from every section, in one place. Restore them, or delete them permanently.
       </p>
 
-      <div className="wp-subsub" role="tablist" aria-label="Trash by section">
-        {modules.map((m, i) => {
-          const e = data[m.key];
-          const count = !e || e.status === "loading" ? "…" : e.status === "error" ? "!" : e.docs.length;
-          const isCur = m.key === current.key;
-          return (
-            <span key={m.key} style={{ display: "inline-flex", alignItems: "center" }}>
-              {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
-              <button type="button" role="tab" aria-selected={isCur} className={isCur ? "is-current" : undefined} onClick={() => selectTab(m.key)}>
-                {m.label} <span className="wp-count">({count})</span>
-              </button>
-            </span>
-          );
-        })}
+      <style>{TAB_CSS}</style>
+
+      {/* Phones: one select, grouped. */}
+      <div className="trash-tabs-sm">
+        <label htmlFor="trash-section" className="wp-muted wp-small">Section</label>
+        <select id="trash-section" className="wp-select" value={current.key} onChange={(e) => selectTab(e.target.value)}>
+          {groups.map((g) => (
+            <optgroup key={g.key} label={g.label}>
+              {g.modules.map((m) => (
+                <option key={m.key} value={m.key}>{m.label} ({countLabel(data[m.key])})</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+
+      {/* Desktop: WP status links, one wrapping row per group. */}
+      <div className="trash-tabs-lg" role="tablist" aria-label="Trash by section">
+        {groups.map((g) => (
+          <div key={g.key} className="trash-group">
+            <span className="trash-group-label">{g.label}</span>
+            <div className="wp-subsub">
+              {g.modules.map((m, i) => {
+                const isCur = m.key === current.key;
+                const n = countLabel(data[m.key]);
+                return (
+                  <span key={m.key} style={{ display: "inline-flex", alignItems: "center" }}>
+                    {i > 0 && <span className="wp-sep" aria-hidden="true">|</span>}
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={isCur}
+                      className={[isCur ? "is-current" : "", n === 0 && !isCur ? "trash-empty" : ""].filter(Boolean).join(" ") || undefined}
+                      onClick={() => selectTab(m.key)}
+                    >
+                      {m.label} <span className="wp-count">({n})</span>
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {entry?.status === "error" && (
@@ -386,7 +440,8 @@ export default function AdminTrash() {
       <div style={{ marginTop: 16 }}>
         <Notice type="warning">
           <strong>Deleting permanently</strong> removes the item and cleans up its references. This cannot be undone.
-          {" "}Items are also listed in their own section&apos;s Trash view, e.g. <Link href="/admin/products" className="wp-link">Products</Link>.
+          {" "}{current.label} in the Trash are also listed in the Trash view of{" "}
+          <Link href={current.href || "/admin/products"} className="wp-link">{current.href ? `the ${current.label} screen` : "their own screen"}</Link>.
         </Notice>
       </div>
     </Page>
