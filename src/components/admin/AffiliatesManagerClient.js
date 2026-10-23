@@ -1,16 +1,28 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
-import { Page, PageHeader, Postbox, Notice, Skeleton } from "@/components/admin/ui";
+import { Page, PageHeader, Postbox, Notice, Skeleton, formatMoney } from "@/components/admin/ui";
 import { Eye, X, ExternalLink, FileText } from "lucide-react";
+
+const AFFILIATE_TABS = ["overview", "requests", "list", "links", "orders", "conversions", "commissions", "payouts", "analytics", "settings"];
 
 export default function AffiliatesManagerClient({ userSession }) {
   const { showConfirm } = usePopup();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState("requests");
+  const router = useRouter();
+  const pathname = usePathname();
+  // The active tab lives in ?view= (same URLs the sidebar links to); no view = overview.
+  const viewParam = searchParams.get("view");
+  const activeTab = AFFILIATE_TABS.includes(viewParam) ? viewParam : "overview";
+  const setActiveTab = (tab) => {
+    if (tab === activeTab) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", tab);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const [loading, setLoading] = useState(true);
 
   // States
@@ -100,8 +112,8 @@ export default function AffiliatesManagerClient({ userSession }) {
   const [autoPromos, setAutoPromos] = useState([]);
   const [disablingPromos, setDisablingPromos] = useState(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async ({ initial = false } = {}) => {
+    if (!initial) setLoading(true);
     try {
       const [reqsRes, affsRes, paysRes, settsRes, ovRes, actRes, promoRes] = await Promise.all([
         fetch("/api/admin/affiliates/requests").then(r => r.json()),
@@ -129,12 +141,45 @@ export default function AffiliatesManagerClient({ userSession }) {
     }
   };
 
+  // Load once on mount; actions call loadData() explicitly afterwards. Switching tabs
+  // only changes ?view= and must not refetch everything.
   useEffect(() => {
-    // Sync tab with ?view= URL param
-    const view = searchParams.get("view");
-    if (view) setActiveTab(view);
-    loadData();
-  }, [searchParams]);
+    // initial: true skips the synchronous setLoading(true) (loading already starts true);
+    // state is only set after the fetches resolve.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData({ initial: true });
+  }, []);
+
+  const resetReviewForm = (app = null) => {
+    setReviewAction("Approve");
+    setRejectionReason("");
+    setNotes("");
+    setCustomCommissionRate(settings.defaultCommissionRate || 5);
+    setCommissionType("Percentage");
+    setReviewDiscountType("None");
+    setReviewDiscountValue("");
+    setReviewReferralCode(app?.referralCode || "");
+    setReferralCodeError("");
+  };
+
+  const closeReviewApplication = () => {
+    setSelectedApplication(null);
+    resetReviewForm();
+  };
+
+  const openPayout = (pay, txId) => {
+    setSelectedPayout(pay);
+    setPayoutAction("Approve");
+    setPayoutTxId(txId);
+    setPayoutNotes("");
+  };
+
+  const closePayout = () => {
+    setSelectedPayout(null);
+    setPayoutAction("Approve");
+    setPayoutTxId("");
+    setPayoutNotes("");
+  };
 
   const handleApplicationReview = async (e) => {
     e.preventDefault();
@@ -160,9 +205,7 @@ export default function AffiliatesManagerClient({ userSession }) {
       if (!res.ok) throw new Error(data.error || "Failed to process review.");
 
       toast.success(reviewAction === "Approve" ? "Application approved!" : "Application rejected.");
-      setSelectedApplication(null);
-      setNotes("");
-      setRejectionReason("");
+      closeReviewApplication();
       loadData();
     } catch (err) {
       toast.error(err.message);
@@ -265,9 +308,7 @@ export default function AffiliatesManagerClient({ userSession }) {
       if (!res.ok) throw new Error(data.error || "Failed to process payout.");
 
       toast.success(payoutAction === "Approve" ? "Payout marked as Paid!" : "Payout request rejected and refunded.");
-      setSelectedPayout(null);
-      setPayoutTxId("");
-      setPayoutNotes("");
+      closePayout();
       loadData();
     } catch (err) {
       toast.error(err.message);
@@ -357,10 +398,10 @@ export default function AffiliatesManagerClient({ userSession }) {
     });
   };
 
+  // Every way of opening the review dialog initialises all review fields from this application.
   const openReviewApplication = (app) => {
+    resetReviewForm(app);
     setSelectedApplication(app);
-    setCustomCommissionRate(settings.defaultCommissionRate || 5);
-    setReviewReferralCode(app.referralCode || "");
   };
 
   return (
@@ -372,7 +413,7 @@ export default function AffiliatesManagerClient({ userSession }) {
         {[
           { id: "overview", label: "Overview", count: null },
           { id: "requests", label: "Applications", count: applications.filter(a => a.status === 'Pending').length },
-          { id: "list", label: "Active Affiliates", count: affiliates.length },
+          { id: "list", label: "Affiliates", count: affiliates.length },
           { id: "links", label: "Referral Links", count: null },
           { id: "orders", label: "Referred Orders", count: activityData.referredOrders?.length ?? null },
           { id: "conversions", label: "Conversions", count: null },
@@ -399,7 +440,7 @@ export default function AffiliatesManagerClient({ userSession }) {
       {activeTab !== "overview" && (
         <div className="wp-stats">
           {[
-            { id: "list", label: "Active partners", value: affiliates.length },
+            { id: "list", label: "Active partners", value: affiliates.filter(a => a.status === "Active").length },
             { id: "requests", label: "Pending reviews", value: applications.filter(a => a.status === 'Pending').length },
             { id: "payouts", label: "Pending payouts", value: payouts.filter(p => p.status === 'Requested').length },
             { id: "settings", label: "Default commission", value: `${settings.defaultCommissionRate}%` }
@@ -540,7 +581,14 @@ export default function AffiliatesManagerClient({ userSession }) {
                     <td className="wp-num">
                       <button
                         type="button"
-                        onClick={() => { navigator.clipboard.writeText(link); toast.success("Link copied!"); }}
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(link);
+                            toast.success("Link copied!");
+                          } catch {
+                            toast.error("Couldn't copy the link. Copy it manually.");
+                          }
+                        }}
                         className="wp-btn"
                         aria-label={`Copy referral link for ${aff.name}`}
                       >
@@ -763,7 +811,7 @@ export default function AffiliatesManagerClient({ userSession }) {
         <div>
           <div className="wp-stats">
             {[
-              { label: "Conversion rate", value: overviewStats?.stats?.conversionRate ? `${overviewStats.stats.conversionRate}%` : `${activityData.clicks?.length > 0 ? ((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1) : 0}%` },
+              { label: "Conversion rate", value: overviewStats?.stats?.conversionRate != null ? `${overviewStats.stats.conversionRate}%` : `${activityData.clicks?.length > 0 ? ((activityData.referredOrders?.length / activityData.clicks?.length) * 100).toFixed(1) : 0}%` },
               { label: "Total clicks", value: overviewStats?.stats?.totalClicks ?? activityData.clicks?.length ?? 0 },
               { label: "Total orders", value: overviewStats?.stats?.totalReferralOrders ?? activityData.referredOrders?.length ?? 0 },
               { label: "Total revenue", value: `$${(overviewStats?.stats?.totalRevenue ?? 0).toFixed(2)}` },
@@ -950,6 +998,11 @@ export default function AffiliatesManagerClient({ userSession }) {
               <FilterLinks
                 label="Filter affiliates by status"
                 options={["All", "Active", "Suspended"]}
+                counts={{
+                  All: affiliates.length,
+                  Active: affiliates.filter(a => a.status === "Active").length,
+                  Suspended: affiliates.filter(a => a.status === "Suspended").length,
+                }}
                 value={listStatusFilter}
                 onChange={setListStatusFilter}
               />
@@ -977,7 +1030,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                 <tbody>
                   {filteredAffs.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="wp-muted">No active affiliates match filter.</td>
+                      <td colSpan="7" className="wp-muted">No affiliates match filter.</td>
                     </tr>
                   ) : (
                     filteredAffs.map(aff => (
@@ -1000,8 +1053,8 @@ export default function AffiliatesManagerClient({ userSession }) {
                         <td className="wp-hide-sm">
                           {aff.commissionType === "Fixed" ? `$${aff.commissionRate} (Fixed)` : `${aff.commissionRate}%`}
                         </td>
-                        <td className="wp-num wp-strong">${aff.balance?.toFixed(2)}</td>
-                        <td className="wp-num wp-hide-sm wp-muted">${aff.lifetimeEarnings?.toFixed(2)}</td>
+                        <td className="wp-num wp-strong">{formatMoney(aff.balance ?? 0)}</td>
+                        <td className="wp-num wp-hide-sm wp-muted">{formatMoney(aff.lifetimeEarnings ?? 0)}</td>
                         <td><AffPill status={aff.status} /></td>
                       </tr>
                     ))
@@ -1066,10 +1119,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                             <button
                               type="button"
                               className="wp-row-title text-left"
-                              onClick={() => {
-                                setSelectedPayout(pay);
-                                setPayoutTxId(`TX-${Date.now()}`);
-                              }}
+                              onClick={() => openPayout(pay, `TX-${Date.now()}`)}
                             >
                               {pay.affiliateId?.name || "Deleted Affiliate"}
                             </button>
@@ -1085,10 +1135,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                               <span>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setSelectedPayout(pay);
-                                    setPayoutTxId(`TX-${Date.now()}`);
-                                  }}
+                                  onClick={() => openPayout(pay, `TX-${Date.now()}`)}
                                 >
                                   Process payout
                                 </button>
@@ -1238,11 +1285,17 @@ export default function AffiliatesManagerClient({ userSession }) {
                     onClick={async () => {
                       if (!(await showConfirm("Deactivate ALL automatic promotions? This will stop all surprise discounts.", "Deactivate all", { confirmText: "Deactivate all", danger: true }))) return;
                       setDisablingPromos(true);
-                      const r = await fetch("/api/admin/promotions", { method: "DELETE" });
-                      const d = await r.json();
-                      if (r.ok) { toast.success(d.message); loadData(); }
-                      else toast.error("Failed.");
-                      setDisablingPromos(false);
+                      try {
+                        const r = await fetch("/api/admin/promotions", { method: "DELETE" });
+                        const d = await r.json().catch(() => ({}));
+                        if (!r.ok) throw new Error(d.error || "Failed to deactivate automatic promotions.");
+                        toast.success(d.message || "Automatic promotions deactivated.");
+                        loadData();
+                      } catch (err) {
+                        toast.error(err.message || "Failed to deactivate automatic promotions.");
+                      } finally {
+                        setDisablingPromos(false);
+                      }
                     }}
                     className="wp-btn"
                     style={DANGER_SOLID}
@@ -1382,8 +1435,7 @@ export default function AffiliatesManagerClient({ userSession }) {
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedApplication(viewingApplication);
-                    setCustomCommissionRate(settings.defaultCommissionRate || 5);
+                    openReviewApplication(viewingApplication);
                     setViewingApplication(null);
                   }}
                   className="wp-btn wp-btn-primary"
@@ -1402,7 +1454,7 @@ export default function AffiliatesManagerClient({ userSession }) {
           <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="aff-review-title" style={{ maxWidth: 520 }}>
             <div className="wp-modal-head">
               <h2 id="aff-review-title">Review: {selectedApplication.name}</h2>
-              <CloseButton onClick={() => setSelectedApplication(null)} />
+              <CloseButton onClick={closeReviewApplication} />
             </div>
 
             <form onSubmit={handleApplicationReview}>
@@ -1550,7 +1602,7 @@ export default function AffiliatesManagerClient({ userSession }) {
               </div>
 
               <div className="wp-modal-foot">
-                <button type="button" onClick={() => setSelectedApplication(null)} className="wp-btn">
+                <button type="button" onClick={closeReviewApplication} className="wp-btn">
                   Cancel
                 </button>
                 <button type="submit" disabled={submittingReview} className="wp-btn wp-btn-primary">
@@ -1918,7 +1970,7 @@ export default function AffiliatesManagerClient({ userSession }) {
           <div className="wp-modal" role="dialog" aria-modal="true" aria-labelledby="aff-payout-title" style={{ maxWidth: 480 }}>
             <div className="wp-modal-head">
               <h2 id="aff-payout-title">Process payout: ${selectedPayout.amount?.toFixed(2)}</h2>
-              <CloseButton onClick={() => setSelectedPayout(null)} />
+              <CloseButton onClick={closePayout} />
             </div>
 
             <form onSubmit={handlePayoutProcess}>
@@ -1965,7 +2017,7 @@ export default function AffiliatesManagerClient({ userSession }) {
               </div>
 
               <div className="wp-modal-foot">
-                <button type="button" onClick={() => setSelectedPayout(null)} className="wp-btn">
+                <button type="button" onClick={closePayout} className="wp-btn">
                   Cancel
                 </button>
                 <button type="submit" disabled={submittingPayout} className="wp-btn wp-btn-primary">
