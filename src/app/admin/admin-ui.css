@@ -344,6 +344,7 @@
   text-align: left; font-weight: 400 !important; font-size: 14px !important; color: #2c3338;
   padding: 9px 10px; border-bottom: 1px solid var(--wp-border); white-space: nowrap;
 }
+.admin-dashboard-container .wp-list-table th.wp-num { text-align: right; }
 .admin-dashboard-container .wp-list-table tfoot th { border-bottom: 0; border-top: 1px solid var(--wp-border); }
 .admin-dashboard-container .wp-list-table td { padding: 10px; vertical-align: top; font-size: 13px !important; color: var(--wp-text-2); border-bottom: 1px solid #f0f0f1; }
 .admin-dashboard-container .wp-list-table tbody tr:nth-child(even) { background: var(--wp-alt); }
