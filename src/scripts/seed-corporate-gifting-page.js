@@ -13,11 +13,10 @@ import * as dotenv from "dotenv";
 import path from "path";
 
 dotenv.config({ path: path.join(process.cwd(), ".env.local") });
-dotenv.config({ path: path.join(process.cwd(), ".env") });
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
-  console.error("MONGODB_URI is not set (.env.local / .env)");
+  console.error("MONGODB_URI is not set in .env.local");
   process.exit(1);
 }
 
