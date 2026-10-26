@@ -35,6 +35,10 @@ const cartName = (item) =>
 
 const fmtDateTime = (v) => (v ? new Date(v).toLocaleString() : "—");
 
+// "Austin, Texas, United States": where the visitor's IP address is, so the shopper's real location can be compared with
+// the address they typed.
+const placeOf = (loc) => (loc ? [loc.city, loc.state, loc.country].filter(Boolean).join(", ") : "");
+
 export default function AbandonedCartsPage() {
   const { showConfirm } = usePopup();
   const [items, setItems] = useState([]);
@@ -395,6 +399,7 @@ export default function AbandonedCartsPage() {
                             {[item.shippingAddress?.city, item.shippingAddress?.state, item.shippingAddress?.country].filter(Boolean).join(", ") || "—"}
                           </div>
                           <div className="wp-small" style={{ marginTop: 2 }}>IP: {item.ipAddress || "—"}</div>
+                          {placeOf(item.ipLocation) && <div className="wp-small" style={{ marginTop: 2 }}>Located: {placeOf(item.ipLocation)}</div>}
                         </td>
                         <td className="wp-hide-sm wp-num" style={{ whiteSpace: "nowrap" }}>
                           <div className="wp-strong">{amount}</div>
@@ -429,6 +434,20 @@ export default function AbandonedCartsPage() {
                                   {item.shippingAddress?.phone || "—"}
                                 </address>
                                 <p className="wp-muted wp-small" style={{ margin: "8px 0 0", wordBreak: "break-all" }}>IP: {item.ipAddress || "—"}</p>
+                                {item.ipLocation && (
+                                  <div className="wp-small" style={{ margin: "6px 0 0", lineHeight: 1.6 }}>
+                                    <strong>Location from IP:</strong> {placeOf(item.ipLocation) || "—"}
+                                    {item.ipLocation.countryCode ? ` (${item.ipLocation.countryCode})` : ""}
+                                    {item.ipLocation.county ? <><br />County: {item.ipLocation.county}</> : null}
+                                    {item.ipLocation.postal && item.ipLocation.postal !== "N/A" ? <><br />Postal / Zip: {item.ipLocation.postal}</> : null}
+                                    {item.ipLocation.isp ? <><br />ISP: {item.ipLocation.isp}</> : null}
+                                    {item.ipLocation.lat != null && item.ipLocation.lon != null ? (
+                                      <><br /><a className="wp-link" target="_blank" rel="noopener noreferrer" href={item.ipLocation.mapsUrl || `https://www.google.com/maps?q=${item.ipLocation.lat},${item.ipLocation.lon}`}>
+                                        Pinpoint map ({Number(item.ipLocation.lat).toFixed(4)}, {Number(item.ipLocation.lon).toFixed(4)})
+                                      </a></>
+                                    ) : null}
+                                  </div>
+                                )}
                               </div>
                               <div style={{ minWidth: 0 }}>
                                 <h3>Cart items</h3>

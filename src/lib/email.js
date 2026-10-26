@@ -1319,3 +1319,85 @@ export async function sendCorporateGiftingAdminNotification(inquiry) {
     critical: true,
   });
 }
+
+// ─── VIDEO REVIEW THANK-YOU ─────────────────────────────────────────────────────
+
+/**
+ * Thank-you email sent when a customer's video review was approved: carries their personal one-time code.
+ * THROWS on a send failure so the caller can record it (approval must never depend on it).
+ */
+export async function sendReviewRewardEmail(email, firstName, code, percent = 10) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+  const name = escapeHtml(String(firstName || '').trim() || 'there');
+
+  const codeHtml = emailPanel(`
+    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here is your personal <strong>${percent}% off</strong> code for your next order:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
+      <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(code)}</span>
+    </td></tr></table>
+    ${emailButton(`${storeUrl}/shop`, 'Shop Now', { align: 'left' })}
+  `, { title: 'Your Thank-You Code', accentColor: BRAND.ink });
+
+  const html = emailShell({
+    eyebrow: 'Thank You',
+    heading: 'Thanks For Your Video Review',
+    subheading: `Hi ${name}, your video review is now live on ${escapeHtml(storeName)}. It means a lot to us and helps other shoppers.`,
+    bodyHtml: `${codeHtml}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:20px;">
+        This code was created just for you. It can be used once, and only with the email address this message was sent to.
+      </p>`,
+    preheader: `Thank you! Here is ${percent}% off your next order.`,
+  });
+
+  return dispatchEmail({
+    to: email,
+    subject: `Thank you! Here is ${percent}% off your next order`,
+    html,
+    from: getFromAddress(storeName),
+    label: `Video review thank-you (${email})`,
+    critical: true,
+  });
+}
+
+// ─── POST-DELIVERY FEEDBACK REQUEST ─────────────────────────────────────────────
+
+const TRUSTPILOT_URL = 'https://www.trustpilot.com/review/pairolifestyle.com';
+
+/** Pure: builds the "how was your order?" email (Trustpilot link + video-review invitation). */
+export function buildFeedbackEmail(order) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+  const firstName = String(order?.shippingAddress?.fullName || '').trim().split(' ')[0] || 'there';
+  const items = (Array.isArray(order?.items) ? order.items : []).filter((i) => i && i.productId).slice(0, 3);
+
+  const productButtons = items.map((item) => `<div style="margin:0 0 10px;">${emailButton(`${storeUrl}/product/${encodeURIComponent(String(item.productId))}`, `Review: ${String(item.name || 'your item').slice(0, 40)}`, { align: 'left', secondary: true })}</div>`).join('');
+
+  const html = emailShell({
+    eyebrow: 'Your Order Was Delivered',
+    heading: 'How Did We Do?',
+    subheading: `Hi ${escapeHtml(firstName)}, your order #${escapeHtml(order?.orderNumber || '')} has been delivered. We hope you love it! Your feedback helps other customers and means the world to us.`,
+    bodyHtml: `
+      ${emailPanel(`<p style="margin:0 0 16px;color:${BRAND.ink};font-size:14px;line-height:1.7;">It takes a minute: tell the world what you think of PAIRO on Trustpilot.</p>${emailButton(TRUSTPILOT_URL, 'Review us on Trustpilot', { align: 'left' })}`, { title: 'Leave a Review', accentColor: BRAND.ink })}
+      ${emailPanel(`<p style="margin:0 0 14px;color:${BRAND.ink};font-size:14px;line-height:1.7;">Record a short video of your PAIRO piece and post it as a review on our website. Once our team approves it, we will email you a personal <strong>10% off</strong> code for your next order.</p>${productButtons}`, { title: 'Share a video review and get 10% off your next order', accentColor: BRAND.ink })}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;">Thank you for choosing ${escapeHtml(storeName)}. If anything is not right with your order, just reply to this email and we will make it right.</p>
+    `,
+    preheader: 'Tell us how we did, and get 10% off your next order with a video review.',
+  });
+  return { subject: `How was your PAIRO order? Share a video review & get 10% off`, html };
+}
+
+/** Sends the feedback request. THROWS when SMTP is missing or the send fails; returns the mail server info. */
+export async function sendFeedbackRequestEmail(order, { to } = {}) {
+  if (!isSmtpConfigured()) throw new Error('SMTP is not configured (SMTP_USER / SMTP_PASS missing) - email was not sent');
+  const { subject, html } = buildFeedbackEmail(order);
+  const info = await dispatchEmail({
+    to: to || order?.customer?.email,
+    subject,
+    html,
+    from: getFromAddress(process.env.STORE_NAME || 'PAIRO Lifestyle'),
+    label: `Feedback request (${to || order?.customer?.email})`,
+    critical: true,
+  });
+  return { ...(info || {}), subject };
+}

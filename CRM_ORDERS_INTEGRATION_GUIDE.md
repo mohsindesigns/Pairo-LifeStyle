@@ -10,7 +10,7 @@ Documentation for connecting Pairo Lifestyle orders with your CRM (`app.mohsinde
 **URL:** `https://pairolifestyle.com/api/orders` *(also available at `https://pairolifestyle.com/api/crm/orders`)*  
 **Content-Type:** `application/json`  
 **CORS:** Cross-origin requests are supported (`Access-Control-Allow-Origin: *`). Can be called from CRM backend or frontend directly without cookies or credentials.  
-**Authentication:** Required on the live site. Set `CRM_API_KEY` in the website environment and pass it with every request via header `x-api-key: <key>`, `Authorization: Bearer <key>`, or query parameter `?api_key=<key>`. If the key is not set, the live site refuses all requests (only a local development server allows access without a key).
+**Authentication:** Required on the live site. Set `CRM_API_KEY` in the website environment and pass it with every request via header `x-api-key: <key>`, `Authorization: Bearer <key>` (the key is not accepted in the URL; it must be at least 32 characters; 10 wrong keys from one address lock it out for 15 minutes; `GET /api/crm/verify` checks the key without returning data). If the key is not set, the live site refuses all requests (only a local development server allows access without a key).
 
 ### Query Parameters
 
@@ -235,3 +235,78 @@ If your CRM has a webhook URL to receive new orders automatically:
 1. Configure `CRM_WEBHOOK_URL` in `/var/www/pairolifestyle.com/.env.local` (e.g. `https://app.mohsindesigns.com/api/webhooks/orders`).
 2. Whenever a customer places an order, Pairo automatically sends an HTTP `POST` to your CRM webhook URL.
 3. Includes header `X-Pairo-Signature: sha256=<hash>` and `X-Pairo-Event: ORDER_CREATED`.
+
+
+---
+
+# Two-way sync (create, update, delete, webhooks)
+
+All endpoints use the same key (`x-api-key: <key>`, or `Authorization: Bearer <key>`). Base: `https://pairolifestyle.com/api/crm`. Every order object has the shape shown in section 1, plus `isDeleted`, `deletedAt`, `paymentStatus`, and `tracking {number, carrier, url, updatedAt}` (also flat as `trackingNumber`, `carrier`, `trackingUrl`).
+
+## 5. Endpoints
+
+| Method | Path | What it does |
+|---|---|---|
+| GET | `/orders` | List. Query: `page`, `limit` (max 100), `status`, `since` (ISO date, orders created or changed since), `orderNumber`, `email`, `includeDeleted=true` (also return Trash orders, with `isDeleted: true`) |
+| POST | `/orders` | Create an order (below) |
+| PATCH | `/orders` | Update; `orderNumber` in the body (older form, still works) |
+| GET | `/orders/{orderNumber}` | One order (Trash orders too) |
+| PATCH | `/orders/{orderNumber}` | Update (below) |
+| DELETE | `/orders/{orderNumber}` | Move to Trash (never erased for good). Safe to repeat |
+| GET | `/products` | Catalogue: `search`, `sku`, `page`, `limit`. Returns `id, name, sku, price, stock, manageStock, status, slug, variants[]` |
+
+`/api/orders` and `/api/orders/{orderNumber}` are aliases of the order endpoints.
+
+Errors: `{ "success": false, "error": "...", "field": "items[0].quantity" }`. 400 bad input, 401 bad key, 404 not found, 409 conflict or not enough stock, 500 server.
+
+## 6. Create an order (POST /orders)
+
+```json
+{
+  "externalId": "CRM-5521",
+  "customer": { "email": "buyer@example.com", "name": "Buyer", "phone": "+15550001" },
+  "shippingAddress": { "fullName": "Buyer One", "street": "1 Main St", "city": "Austin", "state": "TX", "zip": "73301", "country": "United States" },
+  "items": [ { "productId": "<id from /products>", "quantity": 2 }, { "sku": "JKT-BLK-M", "quantity": 1, "priceOverride": 99 } ],
+  "shippingCost": 10,
+  "status": "Confirmed",
+  "payment": { "method": "Manual/Gift", "status": "Paid" },
+  "note": "optional",
+  "sendConfirmation": false
+}
+```
+
+- `externalId` is required. Sending the same one again returns `200 { success: true, duplicate: true, order }` and creates nothing, so retries are safe.
+- Each item needs `productId` or `sku` (product or variant sku); `quantity` is a whole number 1 to 1000. Price comes from our catalogue unless `priceOverride` is given. Draft or unknown products are refused (400); not enough stock gives 409 `insufficient_stock`.
+- `payment.method`: `Manual/Gift`, `Cash on Delivery`, `Card`. `payment.status`: `Paid` or `Pending`. Default status of a new order is `Confirmed`.
+- Stock is taken off immediately, the same as a website order. The customer gets no email unless `sendConfirmation: true`.
+- Success: `201 { success: true, duplicate: false, order }`.
+
+## 7. Update an order (PATCH /orders/{orderNumber})
+
+Send only what changed. All fields optional:
+
+`status`, `trackingNumber`, `carrier`, `trackingUrl`, `adminNote`, `paymentStatus` (`Pending, Paid, Failed, Refunded, Partially Refunded`), `shippingAddress` (partial: only the keys you send change), `customerNote`, `restore: true` (take it out of the Trash), `expectedUpdatedAt`.
+
+Statuses: `Pending, Confirmed, Processing, Packed, Shipped, Out for Delivery, Delivered, Cancelled, Refunded`.
+
+Response: `{ "success": true, "changed": ["status","tracking"], "order": { ... } }`. `changed` is empty when nothing differed (nothing is written, no webhook is sent).
+
+A status change does everything the dashboard does: Cancelled puts stock back once (and un-cancelling takes it again, or returns 409 if stock is gone), coupon usage is released or restored, affiliate commissions are approved on Delivered and cancelled on Cancelled/Refunded.
+
+Conflicts: send `expectedUpdatedAt` (the `updatedAt` you last read). If the order changed since, you get `409 { "error": "conflict", "currentUpdatedAt": "..." }`; re-read it and decide.
+
+## 8. Webhooks (Pairo to CRM)
+
+Set `CRM_WEBHOOK_URL` and `CRM_WEBHOOK_SECRET` on our server. We POST JSON for every change, whoever made it:
+
+`ORDER_CREATED`, `ORDER_STATUS_UPDATED`, `ORDER_CANCELLED`, `ORDER_PAYMENT_UPDATED`, `ORDER_UPDATED` (address, tracking, notes), `ORDER_DELETED`, `ORDER_RESTORED`.
+
+```json
+{ "id": "uuid", "event": "ORDER_STATUS_UPDATED", "origin": "admin", "timestamp": "...", "environment": "production",
+  "data": { "orderNumber": "PL-1001", "status": "Shipped", "oldStatus": "Packed", "newStatus": "Shipped", "isDeleted": false, "tracking": { ... }, "...": "full order as in section 1" } }
+```
+
+- Headers: `X-Pairo-Event`, `X-Pairo-Delivery` (same as `id`), `X-Pairo-Signature: sha256=<hex>`: HMAC-SHA256 of the **raw body** with the secret. Verify it with a constant-time compare.
+- `id` is unique per delivery; we retry failed deliveries up to 3 times, so ignore an `id` you already processed.
+- `origin` says who changed the order: `crm`, `admin`, `website`, `customer`, `system`. Changes you made yourself come back with `origin: "crm"`; skip them to avoid loops.
+- Reply with any 2xx quickly.

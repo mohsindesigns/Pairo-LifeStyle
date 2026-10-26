@@ -50,24 +50,25 @@ export function personalCodeBase(cart, email) {
 }
 
 /**
- * Creates (or reuses) a personalized, single-use code for this customer, e.g. DONALD15.
+ * Creates (or reuses) a personalized, single-use code for this customer, e.g. DONALD15 (the abandoned-cart win-back) or
+ * DONALD10 (the video-review thank-you): `percent` and `source` say which.
  * Locked to their email, 1 use total. If they abandon again before using it, the same unused code
  * is reused instead of minting another. Name clashes (another Donald) get a letter suffix.
  */
-export async function getOrCreatePersonalVoucher(cart, email) {
+export async function getOrCreatePersonalVoucher(cart, email, { percent = PERSONAL_VOUCHER_PERCENT, source = PERSONAL_VOUCHER_SOURCE } = {}) {
   await dbConnect();
   const normalizedEmail = String(email).toLowerCase().trim();
 
   const existing = await Discount.findOne({
-    source: PERSONAL_VOUCHER_SOURCE,
+    source: source,
     specificCustomerEmails: normalizedEmail,
     isActive: true,
     isDeleted: { $ne: true },
     usageCount: { $lt: 1 },
   }).lean();
-  if (existing?.code) return { code: existing.code, label: `${PERSONAL_VOUCHER_PERCENT}% off`, oneTime: true };
+  if (existing?.code) return { code: existing.code, label: `${percent}% off`, oneTime: true };
 
-  const base = `${personalCodeBase(cart, normalizedEmail)}${PERSONAL_VOUCHER_PERCENT}`;
+  const base = `${personalCodeBase(cart, normalizedEmail)}${percent}`;
   const suffixes = ['', ...'ABCDEFGHJKLMNPQRSTUVWXYZ'.split('')];
 
   // After the 25 tidy codes for a name (DONALD15, DONALD15A ... DONALD15Z) are taken, fall back to short random
@@ -82,16 +83,16 @@ export async function getOrCreatePersonalVoucher(cart, email) {
       await Discount.create({
         code,
         type: 'percentage',
-        value: PERSONAL_VOUCHER_PERCENT,
+        value: percent,
         usageLimit: 1,
         usagePerUserLimit: 1,
         specificCustomerEmails: [normalizedEmail],
         // Customer-specific codes cannot be represented in Stripe; local-only like the admin ones.
         stripeSyncStatus: 'unsupported',
-        source: PERSONAL_VOUCHER_SOURCE,
+        source: source,
         isActive: true,
       });
-      return { code, label: `${PERSONAL_VOUCHER_PERCENT}% off`, oneTime: true };
+      return { code, label: `${percent}% off`, oneTime: true };
     } catch (err) {
       if (err?.code === 11000) continue; // code already taken (unique index) - try the next suffix
       throw err;

@@ -37,6 +37,21 @@ const AbandonedCartSchema = new mongoose.Schema({
   },
 
   ipAddress: String,
+  // Where the visitor is, resolved from the IP address (same details the order page shows). Looked up once per IP.
+  ipLocation: {
+    city: String,
+    state: String,
+    county: String,
+    country: String,
+    countryCode: String,
+    postal: String,
+    lat: Number,
+    lon: Number,
+    mapsUrl: String,
+    isp: String,
+    timezone: String,
+    isLocal: Boolean,
+  },
   userAgent: String,
 
   // Set to 'recovered' the moment this session's idempotencyKey turns into a real Order —

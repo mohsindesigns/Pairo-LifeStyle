@@ -258,8 +258,9 @@ export default function CheckoutPage() {
     lastName: "",
     email: "",
     phone: "",
-    country: "United States",
-    countryCode: "US",
+    // No country is pre-selected: the shopper must pick their real one, so the country we record is always their own choice.
+    country: "",
+    countryCode: "",
     state: "",
     stateCode: "",
     street: "",
@@ -455,7 +456,7 @@ export default function CheckoutPage() {
           city: addr.city,
           state: addr.state || "",
           zip: addr.zipCode || addr.zip || "",
-          country: addr.country || "United States",
+          country: addr.country || "",
           phone: addr.phone || ""
         });
       });
@@ -478,7 +479,7 @@ export default function CheckoutPage() {
               city: addr.city,
               state: addr.state || "",
               zip: addr.zip || addr.zipCode || "",
-              country: addr.country || "United States",
+              country: addr.country || "",
               phone: addr.phone || ""
             });
           }
@@ -1079,7 +1080,7 @@ export default function CheckoutPage() {
                               city: addr.city,
                               state: addr.state,
                               zip: addr.zip,
-                              country: addr.country || "United States",
+                              country: addr.country || "",
                               phone: addr.phone || prev.phone
                             }));
                             setErrors({});

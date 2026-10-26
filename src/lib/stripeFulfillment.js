@@ -278,6 +278,7 @@ export async function fulfillPaymentLinkSession(session, log) {
 
   // Payment just landed for this order — ask the customer to confirm their size (no-op if not applicable / already sent).
   autoSendSizeConfirmation(order).catch(() => {});
+  import("@/lib/events").then((m) => m.default.dispatch("ORDER_PAYMENT_UPDATED", { order, origin: "system", oldPaymentStatus: "Pending", newPaymentStatus: "Paid" })).catch(() => {});
   return order;
 }
 

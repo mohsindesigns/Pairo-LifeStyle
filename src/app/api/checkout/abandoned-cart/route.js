@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import AbandonedCart from "@/models/AbandonedCart";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import { resolveIpLocation } from "@/lib/geoIp";
 
 /**
  * Autosaves a snapshot of an in-progress checkout (cart + whatever contact/shipping fields
@@ -29,6 +30,17 @@ export async function POST(req) {
 
     const ipAddress = getClientIp(req);
     const userAgent = req.headers.get("user-agent") || "";
+
+    // Look the IP up once per visit (not on every autosave): only when this cart has no location for this address yet.
+    let ipLocation = null;
+    if (ipAddress && ipAddress !== "unknown") {
+      const known = await AbandonedCart.findOne({ sessionKey }).select("ipAddress ipLocation").lean();
+      const alreadyResolved = known?.ipAddress === ipAddress && known?.ipLocation?.country;
+      if (!alreadyResolved) {
+        const found = await resolveIpLocation(ipAddress).catch(() => null);
+        if (found) { const { ip: _ip, ...details } = found; ipLocation = details; }
+      }
+    }
 
     // Match on sessionKey ALONE, not also status: "active" — if the order already completed
     // in the brief window before this debounced autosave landed (status is now "recovered"),
@@ -66,6 +78,7 @@ export async function POST(req) {
             phone: shippingAddress?.phone || "",
           },
           ipAddress,
+          ...(ipLocation ? { ipLocation } : {}),
           userAgent,
         },
       },

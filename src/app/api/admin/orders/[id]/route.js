@@ -87,6 +87,7 @@ export async function PATCH(req, { params }) {
 
     // 1. If status is changing to Cancelled, revert stock ONLY if it wasn't already cancelled
     if (status === "Cancelled" && oldStatus !== "Cancelled" && order.stockDeducted !== false) {
+      order.stockRestockedAt = new Date();
       for (const item of order.items) {
         if (item.selectedVariant?.title && item.selectedVariant.title !== "Standard") {
            await Product.updateOne(
@@ -126,12 +127,16 @@ export async function PATCH(req, { params }) {
     await order.save();
 
     // Trigger internal event for real-time CRM webhook and listener sync
+    if (adminNotes !== undefined) {
+      pairoEvents.dispatch("ORDER_UPDATED", { order, origin: "admin", fields: ["adminNote"] });
+    }
     if (status && status !== oldStatus) {
       try {
         pairoEvents.dispatch("ORDER_STATUS_UPDATED", {
           order,
           oldStatus,
           newStatus: status,
+          origin: "admin",
         });
       } catch (evErr) {
         console.error("[Order Status Event Dispatch Error]", evErr);

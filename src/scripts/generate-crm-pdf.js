@@ -125,7 +125,7 @@ doc.fontSize(8).font("Helvetica").fillColor(COLOR_TEXT_MUTED).text("(Alternative
 
 doc.moveDown(0.3);
 doc.fontSize(8).font("Helvetica").fillColor(COLOR_TEXT).text(
-  "Cross-origin requests are fully supported. The CRM can query this endpoint directly from server backends or client browsers without cookies or credentials. If CRM_API_KEY is configured in the website environment, pass it via 'x-api-key' header or '?api_key=' parameter; otherwise public read access is open."
+  "Cross-origin requests are fully supported. The CRM can query this endpoint directly from server backends or client browsers without cookies or credentials. If CRM_API_KEY is configured in the website environment, pass it via the 'x-api-key' header; otherwise public read access is open."
 );
 
 addSubSectionTitle("Query Parameters");

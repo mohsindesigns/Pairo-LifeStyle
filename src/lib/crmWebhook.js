@@ -9,8 +9,10 @@ import dbConnect from "@/lib/db";
  * Configured via:
  * - CRM_WEBHOOK_URL: target URL (e.g. https://crm.yourdomain.com/api/webhooks/pairo/order)
  * - CRM_WEBHOOK_SECRET: shared secret for HMAC-SHA256 signature verification
+ * Each delivery carries a unique `id` (also the X-Pairo-Delivery header) so the CRM can ignore a retry it already handled,
+ * and an `origin` ("crm", "admin", "website", "customer", "system") so the CRM can skip changes it made itself.
  */
-export async function dispatchOrderToCRM(event, order) {
+export async function dispatchOrderToCRM(event, order, opts = {}) {
   if (!order || !order.orderNumber) {
     return;
   }
@@ -23,14 +25,26 @@ export async function dispatchOrderToCRM(event, order) {
 
   const webhookSecret = process.env.CRM_WEBHOOK_SECRET || process.env.CRM_API_KEY || "pairo-crm-secret";
 
+  const deliveryId = crypto.randomUUID();
   const payload = {
+    id: deliveryId,
     event,
+    origin: opts.origin || "system",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
     data: {
       orderId: order._id?.toString(),
       orderNumber: order.orderNumber,
       status: order.status,
+      isDeleted: Boolean(order.isDeleted),
+      deletedAt: order.deletedAt || null,
+      ...(opts.extra || {}),
+      tracking: {
+        number: order.tracking?.number || null,
+        carrier: order.tracking?.carrier || null,
+        url: order.tracking?.url || null,
+        updatedAt: order.tracking?.updatedAt || null,
+      },
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       customer: {
@@ -93,7 +107,7 @@ export async function dispatchOrderToCRM(event, order) {
     .digest("hex");
 
   QueueService.push(
-    `CRM_DISPATCH_${event}_${order.orderNumber}`,
+    `CRM_DISPATCH_${event}_${order.orderNumber}_${deliveryId}`,
     async () => {
       const response = await fetch(webhookUrl, {
         method: "POST",
@@ -102,6 +116,7 @@ export async function dispatchOrderToCRM(event, order) {
           "User-Agent": "Pairo-Lifestyle-Webhook/1.0",
           "X-Pairo-Signature": `sha256=${signature}`,
           "X-Pairo-Event": event,
+          "X-Pairo-Delivery": deliveryId,
         },
         body: payloadString,
         signal: AbortSignal.timeout(10000),

@@ -1,1 +1,1 @@
-export { GET, PATCH, OPTIONS } from "@/app/api/crm/orders/route";
+export { GET, POST, PATCH, OPTIONS } from "@/app/api/crm/orders/route";

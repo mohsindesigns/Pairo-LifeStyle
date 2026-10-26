@@ -206,6 +206,26 @@ const OrderSchema = new mongoose.Schema({
   // False only for an admin "Duplicate" draft, which never took stock out of inventory. Cancelling such an order must
   // not put stock back (it would invent inventory). Every other order took its stock when it was created.
   stockDeducted: { type: Boolean, default: true },
+  // Set when a cancellation put the order's stock back, so it is never put back twice (and re-taken if the order is reactivated).
+  stockRestockedAt: { type: Date, default: null },
+
+  // Shipment details, set by the CRM (or staff). Also written to the timeline / adminNotes for the dashboard.
+  tracking: {
+    number: String,
+    carrier: String,
+    url: String,
+    updatedAt: Date,
+  },
+
+  // The post-delivery "how did we do?" email (src/lib/feedbackEmailService.js). `sendingSince` is a short claim so two
+  // senders can never mail the same order.
+  feedbackEmail: {
+    sentAt: Date,
+    messageId: String,
+    lastError: String,
+    lastAttemptAt: Date,
+    sendingSince: Date,
+  },
 
   timeline: [{
     status: String,

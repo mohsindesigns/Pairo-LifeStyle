@@ -107,6 +107,14 @@ export async function POST(req, { params }) {
       }
     }
 
+    try {
+      const { default: pairoEvents } = await import("@/lib/events");
+      pairoEvents.dispatch("ORDER_PAYMENT_UPDATED", { order: claimed, origin: "admin", oldPaymentStatus: order.payment.status, newPaymentStatus: claimed.payment.status });
+      if (isFullyRefunded && oldStatus !== claimed.status) pairoEvents.dispatch("ORDER_STATUS_UPDATED", { order: claimed, origin: "admin", oldStatus, newStatus: claimed.status });
+    } catch (e) {
+      console.error("[Refund Event Dispatch Error]", e);
+    }
+
     if (order.affiliateId) {
       try {
         await CommissionEngine.reverseCommission(order._id, "Refunded", isFullyRefunded ? null : refundAmount);

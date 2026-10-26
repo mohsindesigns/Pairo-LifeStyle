@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { 
   Star, 
@@ -85,7 +84,9 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
   });
 
   // Mock File Upload State
-  const [mockFiles, setMockFiles] = useState([]);
+  // Photos / videos attached to the review: { url, type, name } once uploaded, { uploading: true, name } while in progress.
+  const [media, setMedia] = useState([]);
+  const uploading = media.some((m) => m.uploading);
   const [dragActive, setDragActive] = useState(false);
 
   // Long review expand/collapse tracking
@@ -147,7 +148,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
         customerName: formData.customerName,
         email: formData.email,
         guestEmail: formData.email,
-        recommend: formData.recommend
+        recommend: formData.recommend,
+        media: media.filter((m) => m.url).map(({ url, type }) => ({ url, type })),
       }
 
       const res = await fetch(`/api/products/${productId}/reviews`, {
@@ -159,9 +161,9 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
       const data = await res.json();
 
       if (res.ok) {
-        toast.success(data.message || "Review submitted successfully!");
+        toast.success("Thank you! Your review will appear on the site once our team has approved it.", { duration: 6000 });
         setIsFormOpen(false);
-        setMockFiles([]);
+        setMedia([]);
         // Reset form
         setFormData({
           rating: 5,
@@ -314,33 +316,42 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
     }
   };
 
+  // Uploads each chosen file straight away (one request per file) and keeps the returned address for the review.
+  const addFiles = async (fileList) => {
+    const chosen = Array.from(fileList || []);
+    const room = 3 - media.length;
+    if (chosen.length > room) toast.error("You can add up to 3 photos or videos.");
+    for (const file of chosen.slice(0, Math.max(0, room))) {
+      const key = `${file.name}-${Date.now()}-${Math.random()}`;
+      setMedia((prev) => [...prev, { key, name: file.name, uploading: true }]);
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const res = await fetch("/api/reviews/upload", { method: "POST", body });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) throw new Error(data.error || "Upload failed. Please try again.");
+        setMedia((prev) => prev.map((m) => (m.key === key ? { key, name: file.name, url: data.url, type: data.type } : m)));
+      } catch (err) {
+        toast.error(`${file.name}: ${err.message}`);
+        setMedia((prev) => prev.filter((m) => m.key !== key));
+      }
+    }
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const newFiles = Array.from(e.dataTransfer.files).map(f => ({
-        name: f.name,
-        size: (f.size / (1024 * 1024)).toFixed(2) + " MB",
-        preview: URL.createObjectURL(f)
-      }));
-      setMockFiles(prev => [...prev, ...newFiles].slice(0, 3));
-    }
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) addFiles(e.dataTransfer.files);
   };
 
   const handleFileSelect = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const newFiles = Array.from(e.target.files).map(f => ({
-        name: f.name,
-        size: (f.size / (1024 * 1024)).toFixed(2) + " MB",
-        preview: URL.createObjectURL(f)
-      }));
-      setMockFiles(prev => [...prev, ...newFiles].slice(0, 3));
-    }
+    if (e.target.files && e.target.files[0]) addFiles(e.target.files);
+    e.target.value = ""; // so the same file can be chosen again after removing it
   };
 
-  const removeMockFile = (index) => {
-    setMockFiles(prev => prev.filter((_, i) => i !== index));
+  const removeMedia = (index) => {
+    setMedia((prev) => prev.filter((_, i) => i !== index));
   };
 
   const toggleExpandReview = (reviewId) => {
@@ -543,10 +554,10 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                   </label>
                 </div>
 
-                {/* Interactive Drag & Drop File Upload Mockup */}
+                {/* Photo / video upload: the review is only shown on the site once our team has approved it */}
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
-                    Add Photos/Videos
+                    Add a video or photos (optional)
                   </label>
                   <div
                     onDragEnter={handleDrag}
@@ -559,31 +570,44 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                     onClick={() => document.getElementById("fileUploadInput").click()}
                   >
                     <UploadCloud className="w-8 h-8 text-neutral-400 animate-bounce" />
-                    <span className="text-xs font-bold text-neutral-700">Drag files here or click to upload</span>
-                    <span className="text-[10px] text-neutral-400">PNG, JPG, MP4 (Max 3 files, mock verification)</span>
+                    <span className="text-xs font-bold text-neutral-700">Drag your video or photos here, or click to choose</span>
+                    <span className="text-[10px] text-neutral-400 text-center">Video: MP4, MOV or WebM up to 20 MB · Photos: JPG, PNG or WebP up to 5 MB · up to 3 files. Your review appears after our team approves it.</span>
                     <input
                       id="fileUploadInput"
                       type="file"
                       multiple
-                      accept="image/*,video/*"
+                      accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp"
                       className="hidden"
                       onChange={handleFileSelect}
                     />
                   </div>
 
                   {/* Previews */}
-                  {mockFiles.length > 0 && (
+                  {media.length > 0 && (
                     <div className="grid grid-cols-3 gap-3 pt-2">
-                      {mockFiles.map((file, idx) => (
-                        <div key={idx} className="relative aspect-square rounded-lg border border-neutral-100 overflow-hidden bg-neutral-50 group">
-                          <Image src={file.preview} alt="upload preview" fill className="object-cover" unoptimized />
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); removeMockFile(idx); }}
-                            className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
+                      {media.map((file, idx) => (
+                        <div key={file.key || idx} className="relative aspect-square rounded-lg border border-neutral-100 overflow-hidden bg-neutral-50 group">
+                          {file.uploading ? (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                              Uploading…
+                            </div>
+                          ) : file.type === "video" ? (
+                            <video src={file.url} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={file.url} alt="Your upload" className="absolute inset-0 w-full h-full object-cover" />
+                          )}
+                          {!file.uploading && (
+                            <button
+                              type="button"
+                              aria-label="Remove this file"
+                              onClick={(e) => { e.stopPropagation(); removeMedia(idx); }}
+                              className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -603,10 +627,10 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
               <button
                 type="submit"
                 form="review-submit-form"
-                disabled={submitting}
+                disabled={submitting || uploading}
                 className="w-2/3 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-300 transition-colors px-4 py-3 rounded-full text-xs font-bold uppercase tracking-[0.2em]"
               >
-                {submitting ? "Submitting..." : "Submit Review"}
+                {submitting ? "Submitting..." : uploading ? "Uploading…" : "Submit Review"}
               </button>
             </div>
           </div>
@@ -867,6 +891,20 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                         )}
                       </button>
                     )}
+                  </div>
+                )}
+
+                {/* Photos / video the customer added (shown only after the review was approved) */}
+                {review.media && review.media.length > 0 && (
+                  <div className="flex flex-wrap gap-3">
+                    {review.media.map((m, i) => (
+                      m.type === "video" ? (
+                        <video key={i} src={m.url} controls playsInline preload="metadata" className="w-full max-w-sm rounded-lg bg-black aspect-video" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={i} src={m.url} alt="Customer photo" className="h-32 w-32 rounded-lg object-cover" />
+                      )
+                    ))}
                   </div>
                 )}
 

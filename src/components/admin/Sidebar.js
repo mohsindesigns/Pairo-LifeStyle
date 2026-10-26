@@ -41,10 +41,12 @@ export const MENUS = [
     { href: "/admin/custom-jacket-orders", label: "Custom Orders" },
     { href: "/admin/abandoned-carts", label: "Abandoned Carts" },
     { href: "/admin/abandoned-carts/emails", label: "Recovery Emails" },
+    { href: "/admin/orders/feedback-emails", label: "Feedback Emails" },
     { href: "/admin/size-confirmations", label: "Size Confirmations" },
   ] },
   { id: "products", title: "Products", icon: Tag, perm: "products.view", items: [
     { href: "/admin/products", label: "All Products", also: ["/admin/product"] },
+    { href: "/admin/products?status=draft", label: "Draft Products" },
     { href: "/admin/products/new", label: "Add New", perm: "products.create" },
     { href: "/admin/categories", label: "Categories", also: ["/admin/category", "/admin/products/categories"] },
     { href: "/admin/products/size-charts", label: "Size Charts" },

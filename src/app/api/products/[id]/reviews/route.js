@@ -7,6 +7,7 @@ import Review from "@/models/Review";
 import Order from "@/models/Order";
 import { sanitizeText, sanitizeObject } from "@/lib/sanitize";
 import { toPublicReview } from "@/lib/publicReviewData";
+import { cleanReviewMedia } from "@/lib/reviewMedia";
 import mongoose from "mongoose";
 
 /**
@@ -171,7 +172,7 @@ export async function POST(req, { params }) {
     const { id: paramId } = resolvedParams;
 
     const session = await getServerSession(authOptions);
-    const { rating, title, comment, customerName, recommend, guestEmail, email, orderNumber } = body;
+    const { rating, title, comment, customerName, recommend, guestEmail, email, orderNumber, media } = body;
 
     if (!rating || rating < 1 || rating > 5) {
       return NextResponse.json({ error: "Invalid rating value (must be between 1 and 5)" }, { status: 400 });
@@ -246,6 +247,7 @@ export async function POST(req, { params }) {
       customerEmail: checkEmail,
       status: reviewStatus,
       recommend: recommend !== false,
+      media: cleanReviewMedia(media), // only files uploaded through /api/reviews/upload
       verifiedPurchase: true,
       ipAddress: ip,
       userAgent,

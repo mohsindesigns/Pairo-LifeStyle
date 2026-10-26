@@ -56,6 +56,7 @@ export async function PATCH(req, { params }) {
     });
 
     await Promise.all(stockRollbacks);
+    if (order.stockDeducted !== false) order.stockRestockedAt = new Date();
 
     // 2. Update Status & Timeline
     order.status = "Cancelled";
@@ -76,7 +77,7 @@ export async function PATCH(req, { params }) {
     }
 
     // 3. Dispatch Event
-    pairoEvents.dispatch('ORDER_CANCELLED', order);
+    pairoEvents.dispatch('ORDER_CANCELLED', { order, origin: 'customer' });
 
     return NextResponse.json({ 
       success: true, 

@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Image as ImageIcon, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Page, PageHeader, Notice, Skeleton, formatDate, formatMoney } from "@/components/admin/ui";
 import { getProductUrl } from "@/lib/routes";
@@ -290,10 +291,12 @@ export default function AdminProducts() {
      setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  // Deep links from other screens: /admin/products?category=<id>&status=published|draft|trash
+  // Deep links from other screens (and the sidebar's "Draft Products"): /admin/products?category=<id>&status=published|draft|trash.
+  // Re-read whenever the address changes, so clicking the sidebar link while already on this page switches the tab.
+  const urlQuery = useSearchParams().toString();
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(urlQuery);
     const category = params.get("category");
     const status = (params.get("status") || "").toLowerCase();
     const viewFromStatus = { published: "published", draft: "draft", drafts: "draft", trash: "trash", all: "all" }[status];
@@ -301,7 +304,7 @@ export default function AdminProducts() {
       if (category) setSelectedCategory(category);
       if (viewFromStatus) setView(viewFromStatus);
     });
-  }, []);
+  }, [urlQuery]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -481,6 +484,19 @@ export default function AdminProducts() {
           {selectedCategory !== "All categories" && !categories.some(c => String(c._id) === selectedCategory) && (
             <option value={selectedCategory}>Linked category</option>
           )}
+        </ThemedSelect>
+
+        <label htmlFor="products-filter-status" className="sr-only">Filter by publish status</label>
+        <ThemedSelect
+          id="products-filter-status"
+          className="wp-select"
+          value={view}
+          onChange={(e) => changeView(e.target.value)}
+        >
+          <option value="all">All statuses</option>
+          <option value="published">Published</option>
+          <option value="draft">Draft</option>
+          <option value="trash">Trash</option>
         </ThemedSelect>
 
         <label htmlFor="products-filter-stock" className="sr-only">Filter by stock status</label>

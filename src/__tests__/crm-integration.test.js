@@ -157,7 +157,7 @@ describe("CRM & Orders Integration Suite", () => {
         expect(patch.status).toBe(401);
 
         // A guessed or empty key does not help either.
-        const guess = await GET(new Request("http://localhost:3000/api/crm/orders?api_key=", { headers: { "x-api-key": "" } }));
+        const guess = await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "" } }));
         expect(guess.status).toBe(401);
       } finally {
         vi.unstubAllEnvs();
@@ -166,12 +166,11 @@ describe("CRM & Orders Integration Suite", () => {
 
     it("on a production server the configured key still works, and a key of the wrong length is refused", async () => {
       vi.stubEnv("NODE_ENV", "production");
-      process.env.CRM_API_KEY = "secret-crm-key-123";
+      process.env.CRM_API_KEY = "k".repeat(40);
       try {
         const { GET } = await import("@/app/api/crm/orders/route");
-        expect((await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "secret-crm-key-123" } }))).status).toBe(200);
-        expect((await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "secret-crm-key-12" } }))).status).toBe(401);
-        expect((await GET(new Request("http://localhost:3000/api/crm/orders?api_key=secret-crm-key-123"))).status).toBe(200);
+        expect((await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "k".repeat(40) } }))).status).toBe(200);
+        expect((await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "k".repeat(39) } }))).status).toBe(401);
       } finally {
         vi.unstubAllEnvs();
       }
@@ -316,5 +315,22 @@ describe("CRM & Orders Integration Suite", () => {
       expect(ordersRoute.PATCH).toBe(crmOrdersRoute.PATCH);
       expect(ordersRoute.OPTIONS).toBe(crmOrdersRoute.OPTIONS);
     });
+  });
+});
+
+describe("CRM key hardening", () => {
+  it("verify endpoint accepts the right key, refuses others, ignores the URL, and locks out repeated guesses", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.CRM_API_KEY = "z".repeat(48);
+    try {
+      const { GET } = await import("@/app/api/crm/verify/route");
+      const req = (h, q = "") => new Request("http://localhost:3000/api/crm/verify" + q, { headers: { "x-forwarded-for": "9.9.9.9", ...h } });
+      expect((await GET(req({ "x-api-key": "z".repeat(48) }))).status).toBe(200);
+      expect((await GET(req({}, "?api_key=" + "z".repeat(48)))).status).toBe(401);
+      for (let i = 0; i < 10; i++) await GET(req({ "x-api-key": "wrong" + i }));
+      expect((await GET(req({ "x-api-key": "z".repeat(48) }))).status).toBe(401);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

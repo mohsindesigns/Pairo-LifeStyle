@@ -842,6 +842,29 @@ export default function AdminReviewsPage() {
                       </div>
 
                       <p style={{ margin: 0, whiteSpace: "pre-wrap", color: "#1d2327" }}>{review.comment}</p>
+                      {Array.isArray(review.media) && review.media.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, margin: "10px 0 0" }}>
+                          {review.media.map((m, i) => (
+                            m.type === "video" ? (
+                              <video key={i} src={m.url} controls playsInline preload="metadata" style={{ width: "100%", maxWidth: 360, borderRadius: 6, background: "#000" }} />
+                            ) : (
+                              <a key={i} href={m.url} target="_blank" rel="noopener noreferrer">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={m.url} alt="Customer upload" style={{ height: 110, width: 110, objectFit: "cover", borderRadius: 6 }} />
+                              </a>
+                            )
+                          ))}
+                        </div>
+                      )}
+                      {review.media?.some((m) => m.type === "video") && (
+                        <p className="wp-small" style={{ margin: "8px 0 0", color: review.reward?.code ? "#00a32a" : "#646970" }}>
+                          {review.reward?.code
+                            ? `Video review: 10% thank-you code ${review.reward.code} was emailed to the customer.`
+                            : review.reward?.note
+                              ? `Video review: no thank-you code sent (${review.reward.note}).`
+                              : review.status === "Approved" ? "Video review: approved." : "Video review: watch it, then approve it. Approving also emails the customer a 10% thank-you code."}
+                        </p>
+                      )}
 
                       {/* Staff Reply */}
                       {review.replies && review.replies.length > 0 && (

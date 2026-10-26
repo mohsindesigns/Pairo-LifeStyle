@@ -238,7 +238,7 @@ export async function POST(req) {
   }
 
   if (newOrder && sendConfirmation) {
-    pairoEvents.dispatch("ORDER_CREATED", newOrder);
+    pairoEvents.dispatch("ORDER_CREATED", { order: newOrder, origin: "admin" });
   }
 
   return NextResponse.json({ success: true, order: newOrder });
@@ -277,6 +277,7 @@ export async function DELETE(req) {
     if (!permanent) {
       if (!order.isDeleted) {
         await Order.updateOne({ _id: order._id }, { $set: { isDeleted: true, deletedAt: new Date() } });
+        pairoEvents.dispatch("ORDER_DELETED", { order: await Order.findById(order._id), origin: "admin" });
       }
       return NextResponse.json({ success: true, message: "Order moved to trash" });
     }
@@ -339,6 +340,7 @@ export async function PUT(req) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
+    pairoEvents.dispatch("ORDER_RESTORED", { order, origin: "admin" });
     return NextResponse.json({ success: true, order });
   } catch (error) {
     console.error("Admin Order Restore Error:", error);

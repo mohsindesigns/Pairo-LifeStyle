@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import Review from "@/models/Review";
 import { can } from "@/lib/rbac";
 import { logAction } from "@/lib/audit";
+import { maybeRewardVideoReview } from "@/lib/reviewReward";
 import mongoose from "mongoose";
 
 const notFound = () => NextResponse.json({ error: "Review not found" }, { status: 404 });
@@ -103,6 +104,8 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "Enter a valid author email." }, { status: 400 });
     }
 
+    const wasApproved = review.status === "Approved";
+
     // Update status
     if (status && ["Pending", "Approved", "Rejected", "Spam"].includes(status)) {
       review.status = status;
@@ -154,6 +157,11 @@ export async function PUT(req, { params }) {
     }
 
     await review.save();
+
+    // A video review that was just approved earns the customer a thank-you code (never blocks the approval).
+    if (!wasApproved && review.status === "Approved") {
+      try { await maybeRewardVideoReview(review); } catch (e) { console.error("[ReviewReward]", e.message); }
+    }
 
     // Trigger re-aggregation for product ratings
     if (review.productId) {

@@ -222,6 +222,7 @@ export async function POST(req) {
           );
         });
         await Promise.all(stockRollbacks);
+        if (order.stockDeducted !== false) order.stockRestockedAt = new Date();
 
         order.status = 'Cancelled';
         order.timeline.push({
@@ -241,7 +242,7 @@ export async function POST(req) {
 
         // Dispatch event for listeners (like email)
         const pairoEvents = (await import("@/lib/events")).default;
-        pairoEvents.dispatch('ORDER_CANCELLED', order);
+        pairoEvents.dispatch('ORDER_CANCELLED', { order, origin: 'customer' });
 
         return NextResponse.json({ message: "Order cancelled successfully" });
       }

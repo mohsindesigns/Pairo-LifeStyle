@@ -332,7 +332,7 @@ export async function createOrderFromCheckoutPayload(payload, {
   }
 
   if (checkoutResult) {
-    pairoEvents.dispatch('ORDER_CREATED', checkoutResult);
+    pairoEvents.dispatch('ORDER_CREATED', { order: checkoutResult, origin: 'website' });
     // Server-side Pinterest purchase conversion (Conversions API). Fire-and-forget — never
     // awaited so it can't slow or break checkout; no-ops unless PINTEREST_* env vars are set.
     // Dedupes with the browser pixel via a shared event_id (`checkout_<orderNumber>`).

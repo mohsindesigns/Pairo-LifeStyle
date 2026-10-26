@@ -19,6 +19,7 @@ describe("admin sidebar active item", () => {
     ["/admin/orders/123", "orders", "/admin/orders"],
     ["/admin/orders/new", "orders", "/admin/orders/new"],
     ["/admin/abandoned-carts", "orders", "/admin/abandoned-carts"],
+    ["/admin/orders/feedback-emails", "orders", "/admin/orders/feedback-emails"],
     ["/admin/abandoned-carts/emails", "orders", "/admin/abandoned-carts/emails"],
     ["/admin/reviews", "products", "/admin/reviews"],
     ["/admin/settings/filters", "products", "/admin/settings/filters"],
