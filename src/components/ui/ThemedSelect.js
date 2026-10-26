@@ -136,6 +136,9 @@ export default function ThemedSelect({
     if (disabled) return;
     const idx = options.findIndex((o) => o.value === current && !o.disabled);
     setActiveIndex(idx >= 0 ? idx : enabledIndexes[0] ?? -1);
+    // Safari (and Firefox on macOS) do not focus a button when it is clicked, so the arrow / Enter / Escape keys would go
+    // to the page (Escape would close a parent modal). Focusing the trigger here makes the keyboard work everywhere.
+    if (triggerRef.current) triggerRef.current.focus({ preventScroll: true });
     setOpen(true);
   }, [disabled, options, current, enabledIndexes]);
 
@@ -200,12 +203,12 @@ export default function ThemedSelect({
     };
   }, [open, hide]);
 
-  // keep the active option scrolled into view
+  // keep the active option scrolled into view (also when the list first opens: the popup only exists once it is positioned)
   useEffect(() => {
-    if (!open || activeIndex < 0 || !popupRef.current) return;
+    if (!open || !positioned || activeIndex < 0 || !popupRef.current) return;
     const el = popupRef.current.querySelector(`[data-index="${activeIndex}"]`);
     if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest" });
-  }, [open, activeIndex]);
+  }, [open, positioned, activeIndex]);
 
   const move = (dir) => {
     if (!enabledIndexes.length) return;
@@ -224,14 +227,17 @@ export default function ThemedSelect({
       }
       return;
     }
+    // A space typed while the shopper is spelling an option ("united s...") is part of the word, not "choose this one".
+    const spelling = k === " " && typeAhead.current.text !== "" && Date.now() - typeAhead.current.at <= 600;
     if (k === "ArrowDown") { e.preventDefault(); move(1); }
     else if (k === "ArrowUp") { e.preventDefault(); move(-1); }
     else if (k === "Home") { e.preventDefault(); setActiveIndex(enabledIndexes[0] ?? -1); }
     else if (k === "End") { e.preventDefault(); setActiveIndex(enabledIndexes[enabledIndexes.length - 1] ?? -1); }
-    else if (k === "Enter" || k === " ") { e.preventDefault(); choose(activeIndex); }
+    else if (k === "Enter" || (k === " " && !spelling)) { e.preventDefault(); choose(activeIndex); }
     else if (k === "Escape") { e.preventDefault(); e.stopPropagation(); close(); }
     else if (k === "Tab") { hide(); }
     else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (k === " ") e.preventDefault(); // do not scroll the page
       const now = Date.now();
       const ta = typeAhead.current;
       ta.text = now - ta.at > 600 ? k.toLowerCase() : ta.text + k.toLowerCase();
