@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import dbConnect from './db';
 import AbandonedCart from '@/models/AbandonedCart';
 import AbandonedCartEmailLog from '@/models/AbandonedCartEmailLog';
@@ -19,6 +20,21 @@ const EMAIL_REGEX = new RegExp(EMAIL_PATTERN);
 // bad address can never be hammered every scan (that would also hurt the sender's reputation).
 const MAX_ATTEMPTS = 3;
 const RETRY_BACKOFF_MINUTES = [5, 20];
+// A send is "claimed" for this long. If the process dies mid-send (a restart, a crash) the claim simply runs out and
+// the cart is picked up again, instead of being stuck as "sent" without an email ever going out.
+const CLAIM_LEASE_MINUTES = 10;
+// Problems that are NOT about this shopper's address (mail server down, wrong login, rate limit, no connection) never
+// count against the 3 attempts: otherwise one short outage would give up every queued cart for good.
+const TEMPORARY_BACKOFF_MINUTES = 30;
+const TEMPORARY_ERROR_CODES = new Set(['ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ECONNRESET', 'ECONNREFUSED', 'EDNS', 'ENOTFOUND', 'EAUTH', 'ETLS']);
+
+export function isTemporaryMailError(err) {
+  if (!err) return false;
+  if (/SMTP is not configured/i.test(String(err.message || ''))) return true;
+  if (TEMPORARY_ERROR_CODES.has(err.code)) return true;
+  const reply = Number(err.responseCode);
+  return reply >= 400 && reply < 500; // SMTP 4xx means "try again later" (includes rate limits)
+}
 
 /** "Donald Spanton" -> "DONALD"; strips accents/symbols; falls back to the email prefix, then "WELCOME". */
 export function personalCodeBase(cart, email) {
@@ -54,7 +70,13 @@ export async function getOrCreatePersonalVoucher(cart, email) {
   const base = `${personalCodeBase(cart, normalizedEmail)}${PERSONAL_VOUCHER_PERCENT}`;
   const suffixes = ['', ...'ABCDEFGHJKLMNPQRSTUVWXYZ'.split('')];
 
-  for (const suffix of suffixes) {
+  // After the 25 tidy codes for a name (DONALD15, DONALD15A ... DONALD15Z) are taken, fall back to short random
+  // suffixes (DONALD15K7, then three characters) so a common first name can never run out of codes.
+  const RANDOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const randomSuffix = (length) => Array.from({ length }, () => RANDOM_ALPHABET[randomInt(RANDOM_ALPHABET.length)]).join('');
+  const allSuffixes = [...suffixes, ...Array.from({ length: 30 }, () => randomSuffix(2)), ...Array.from({ length: 30 }, () => randomSuffix(3))];
+
+  for (const suffix of allSuffixes) {
     const code = base + suffix;
     try {
       await Discount.create({
@@ -164,33 +186,68 @@ async function processCart(cart, { trigger = 'scheduler', idleMinutes = null, st
     return { id: cart._id, email, sent: false, status: 'skipped', reason: 'order-exists' };
   }
 
-  // Atomic claim BEFORE sending: two overlapping scans would otherwise both pass the `sent !== true` filter and
-  // both send. Whoever flips `sent` wins. If the send then fails, the claim is reverted below so it can retry.
-  // The claim also re-checks the cart is still live: it may have been trashed or completed since the scan loaded it.
+  // Atomic claim BEFORE sending: two overlapping scans would otherwise both send. Whoever sets `sendingSince` wins; the
+  // claim runs out after CLAIM_LEASE_MINUTES, so a crash mid-send cannot leave the cart stuck. `sent` is only set once the
+  // mail server has accepted the message. The claim also re-checks the cart is still live: it may have been trashed or
+  // completed since the scan loaded it.
   const claimFilter = {
     _id: cart._id,
     status: 'active',
     isDeleted: { $ne: true },
     ...(force ? {} : { 'recoveryEmail.sent': { $ne: true } }),
+    $or: [{ 'recoveryEmail.sendingSince': null }, { 'recoveryEmail.sendingSince': { $lt: new Date(Date.now() - CLAIM_LEASE_MINUTES * 60 * 1000) } }],
   };
   const claim = await AbandonedCart.updateOne(
     claimFilter,
-    { $set: { 'recoveryEmail.sent': true, 'recoveryEmail.sentAt': new Date() } },
+    { $set: { 'recoveryEmail.sendingSince': new Date() } },
     { timestamps: false }
   );
   if (claim.matchedCount === 0) return { id: cart._id, email, sent: false, status: 'skipped', reason: 'already-claimed' };
 
-  const attempt = (cart.recoveryEmail?.attempts || 0) + 1;
-  const wasSent = !!cart.recoveryEmail?.sent; // a forced re-send that fails must not erase an earlier successful send
+  const previousAttempts = cart.recoveryEmail?.attempts || 0;
+  const attempt = previousAttempts + 1;
+  let voucher;
+  let info;
   try {
     // Only the claim winner creates the personal code, so there are no orphan codes from lost races.
-    const voucher = await getOrCreatePersonalVoucher(cart, email);
-    const info = await sendAbandonedCartEmail(email, cart, voucher.code, { discountLabel: voucher.label, oneTime: !!voucher.oneTime });
-
+    voucher = await getOrCreatePersonalVoucher(cart, email);
+    info = await sendAbandonedCartEmail(email, cart, voucher.code, { discountLabel: voucher.label, oneTime: !!voucher.oneTime });
+  } catch (err) {
+    const temporary = isTemporaryMailError(err);
+    // Only problems with this shopper's address count towards giving up; an admin pressing "Send now" never gives up a cart.
+    const countedAttempts = temporary ? previousAttempts : attempt;
+    const gaveUp = !temporary && !force && attempt >= MAX_ATTEMPTS;
+    const backoff = temporary ? TEMPORARY_BACKOFF_MINUTES : RETRY_BACKOFF_MINUTES[Math.min(attempt - 1, RETRY_BACKOFF_MINUTES.length - 1)];
+    // timestamps:false: touching updatedAt would make the cart look "fresh" again and delay the retry.
     await AbandonedCart.updateOne(
       { _id: cart._id },
       {
         $set: {
+          'recoveryEmail.sendingSince': null,
+          'recoveryEmail.attempts': countedAttempts,
+          'recoveryEmail.lastAttemptAt': new Date(),
+          'recoveryEmail.lastError': String(err.message || err).slice(0, 300),
+          'recoveryEmail.nextAttemptAt': gaveUp || force ? null : new Date(Date.now() + backoff * 60 * 1000),
+          'recoveryEmail.gaveUp': gaveUp,
+        },
+      },
+      { timestamps: false }
+    ).catch(() => {});
+    console.error(`[AbandonedCart] Failed to send recovery email for ${email} (attempt ${attempt}${temporary ? ', temporary problem' : ''}):`, err.message);
+    await writeLog({ ...base, status: gaveUp ? 'gave-up' : 'failed', attempt, reason: temporary ? 'mail-server-problem' : 'send-error', error: String(err.message || err).slice(0, 500) });
+    return { id: cart._id, email, sent: false, status: gaveUp ? 'gave-up' : 'failed', reason: 'error', error: err.message, temporary };
+  }
+
+  // The mail server has accepted the message. From here on a bookkeeping hiccup must never be treated as a failed send
+  // (a retry would mail the shopper a second time): it is logged, and the email still counts as sent.
+  try {
+    await AbandonedCart.updateOne(
+      { _id: cart._id },
+      {
+        $set: {
+          'recoveryEmail.sent': true,
+          'recoveryEmail.sentAt': new Date(),
+          'recoveryEmail.sendingSince': null,
           'recoveryEmail.voucherCode': voucher.code,
           'recoveryEmail.messageId': info?.messageId || null,
           'recoveryEmail.attempts': attempt,
@@ -202,43 +259,23 @@ async function processCart(cart, { trigger = 'scheduler', idleMinutes = null, st
       },
       { timestamps: false }
     );
-    await writeLog({
-      ...base,
-      status: 'sent',
-      attempt,
-      subject: info?.subject || '',
-      voucherCode: voucher.code,
-      voucherKind: 'personal',
-      discountLabel: voucher.label || '',
-      messageId: info?.messageId || '',
-      smtpResponse: String(info?.response || '').slice(0, 300),
-      accepted: (info?.accepted || []).map(String),
-      rejected: (info?.rejected || []).map(String),
-    });
-    return { id: cart._id, email, sent: true, status: 'sent', voucherCode: voucher.code, personal: !!voucher.oneTime, messageId: info?.messageId || '' };
   } catch (err) {
-    const gaveUp = !force && attempt >= MAX_ATTEMPTS; // an admin pressing "Send now" never gets a cart given up on
-    const backoff = RETRY_BACKOFF_MINUTES[Math.min(attempt - 1, RETRY_BACKOFF_MINUTES.length - 1)];
-    // timestamps:false: touching updatedAt would make the cart look "fresh" again and delay the retry.
-    await AbandonedCart.updateOne(
-      { _id: cart._id },
-      {
-        $set: {
-          'recoveryEmail.sent': wasSent,
-          'recoveryEmail.sentAt': wasSent ? cart.recoveryEmail?.sentAt || null : null, // the claim stamped "now"; put the real time back
-          'recoveryEmail.attempts': attempt,
-          'recoveryEmail.lastAttemptAt': new Date(),
-          'recoveryEmail.lastError': String(err.message || err).slice(0, 300),
-          'recoveryEmail.nextAttemptAt': gaveUp || force ? null : new Date(Date.now() + backoff * 60 * 1000),
-          'recoveryEmail.gaveUp': gaveUp,
-        },
-      },
-      { timestamps: false }
-    ).catch(() => {});
-    console.error(`[AbandonedCart] Failed to send recovery email for ${email} (attempt ${attempt}):`, err.message);
-    await writeLog({ ...base, status: gaveUp ? 'gave-up' : 'failed', attempt, reason: 'send-error', error: String(err.message || err).slice(0, 500) });
-    return { id: cart._id, email, sent: false, status: gaveUp ? 'gave-up' : 'failed', reason: 'error', error: err.message };
+    console.error(`[AbandonedCart] Email to ${email} was sent but the cart could not be updated:`, err.message);
   }
+  await writeLog({
+    ...base,
+    status: 'sent',
+    attempt,
+    subject: info?.subject || '',
+    voucherCode: voucher.code,
+    voucherKind: 'personal',
+    discountLabel: voucher.label || '',
+    messageId: info?.messageId || '',
+    smtpResponse: String(info?.response || '').slice(0, 300),
+    accepted: (info?.accepted || []).map(String),
+    rejected: (info?.rejected || []).map(String),
+  });
+  return { id: cart._id, email, sent: true, status: 'sent', voucherCode: voucher.code, personal: !!voucher.oneTime, messageId: info?.messageId || '' };
 }
 
 /**
@@ -271,7 +308,11 @@ export async function sendAbandonedCartRecoveryEmails({ trigger = 'scheduler', w
     'contact.email': { $regex: EMAIL_PATTERN },
     'recoveryEmail.sent': { $ne: true },
     'recoveryEmail.gaveUp': { $ne: true },
-    $or: [{ 'recoveryEmail.nextAttemptAt': null }, { 'recoveryEmail.nextAttemptAt': { $lte: new Date(now) } }],
+    $and: [
+      { $or: [{ 'recoveryEmail.nextAttemptAt': null }, { 'recoveryEmail.nextAttemptAt': { $lte: new Date(now) } }] },
+      // not being sent right now (a claim older than the lease belongs to a process that died)
+      { $or: [{ 'recoveryEmail.sendingSince': null }, { 'recoveryEmail.sendingSince': { $lt: new Date(now - CLAIM_LEASE_MINUTES * 60 * 1000) } }] },
+    ],
     updatedAt: { $lte: cutoff, $gte: oldestEligible },
   })
     .sort({ updatedAt: 1 })
@@ -306,7 +347,10 @@ export async function sendRecoveryEmailNow(cartId, { staffId = null } = {}) {
   return processCart(cart, { trigger: 'manual', idleMinutes: settings.idleMinutes, staffId, force: true });
 }
 
-/** Carts that have an email but have not been emailed yet, with how long until they are due. */
+/**
+ * Carts that have an email but have not been emailed yet, with how long until they are due. Carts the scheduler gave up on
+ * are listed too (flagged), so an admin can still press "Send now" after the cause (a mail outage, a typo) is fixed.
+ */
 export async function getWaitingCarts({ limit = 50 } = {}) {
   await dbConnect();
   const settings = await getAbandonedCartSettings();
@@ -316,7 +360,6 @@ export async function getWaitingCarts({ limit = 50 } = {}) {
     isDeleted: { $ne: true },
     'contact.email': { $regex: EMAIL_PATTERN },
     'recoveryEmail.sent': { $ne: true },
-    'recoveryEmail.gaveUp': { $ne: true },
     updatedAt: { $gte: new Date(now - settings.maxAgeHours * 60 * 60 * 1000) },
   })
     .sort({ updatedAt: -1 })
@@ -333,6 +376,7 @@ export async function getWaitingCarts({ limit = 50 } = {}) {
       itemCount: (c.items || []).reduce((n, i) => n + (Number(i.quantity) || 1), 0),
       idleMinutes: idleMin,
       dueInMinutes: Math.max(0, settings.idleMinutes - idleMin),
+      gaveUp: !!c.recoveryEmail?.gaveUp,
       attempts: c.recoveryEmail?.attempts || 0,
       lastError: c.recoveryEmail?.lastError || '',
     };

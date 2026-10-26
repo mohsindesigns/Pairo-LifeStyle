@@ -149,7 +149,8 @@ export async function PUT(req, { params }) {
         }
 
         // The audit log must never receive a password hash (it is readable by anyone who can view the log).
-        const withoutPassword = (doc) => { const { password: _hash, ...rest } = doc.toObject(); return rest; };
+        // toJSON (not toObject): it flattens the role's permissions Map, which would otherwise be saved as an empty object.
+        const withoutPassword = (doc) => { const { password: _hash, ...rest } = doc.toJSON(); return rest; };
         const before = JSON.parse(JSON.stringify(withoutPassword(staff)));
 
         if (name) staff.name = name;

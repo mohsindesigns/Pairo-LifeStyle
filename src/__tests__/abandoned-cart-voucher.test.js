@@ -224,7 +224,8 @@ describe("abandoned-cart voucher: every shopper gets their own one-time code, ma
 
   it("a failed send is logged, not marked as sent, backed off, and retried once the back-off has passed", async () => {
     const { sendAbandonedCartEmail } = await import("@/lib/email");
-    sendAbandonedCartEmail.mockImplementationOnce(async () => { throw new Error("SMTP is not configured"); });
+    // A reply about THIS address (550 = mailbox does not exist) is a real failure that counts towards giving up.
+    sendAbandonedCartEmail.mockImplementationOnce(async () => { throw Object.assign(new Error("550 no such mailbox"), { responseCode: 550 }); });
 
     const email = emailOf("fail1");
     const created = await makeCart("Sam Fail", email);
@@ -233,8 +234,9 @@ describe("abandoned-cart voucher: every shopper gets their own one-time code, ma
     expect(res.failed).toBeGreaterThanOrEqual(1);
 
     let cart = await cartOf(email);
-    expect(cart.recoveryEmail.sent).toBe(false); // claim reverted
-    expect(cart.recoveryEmail).toMatchObject({ attempts: 1, gaveUp: false, lastError: "SMTP is not configured" });
+    expect(cart.recoveryEmail.sent).toBe(false);
+    expect(cart.recoveryEmail.sendingSince).toBeNull(); // the claim was released
+    expect(cart.recoveryEmail).toMatchObject({ attempts: 1, gaveUp: false, lastError: "550 no such mailbox" });
     expect(new Date(cart.recoveryEmail.nextAttemptAt).getTime()).toBeGreaterThan(Date.now());
 
     // Right away it is NOT retried (back-off), so a broken mailbox is never hammered every scan.
@@ -252,8 +254,69 @@ describe("abandoned-cart voucher: every shopper gets their own one-time code, ma
     expect(cart.recoveryEmail).toMatchObject({ sent: true, attempts: 2, lastError: null });
     const logs = await logsOf(created._id);
     expect(logs.map((l) => l.status)).toEqual(["failed", "sent"]);
-    expect(logs[0]).toMatchObject({ reason: "send-error", error: "SMTP is not configured", attempt: 1 });
+    expect(logs[0]).toMatchObject({ reason: "send-error", error: "550 no such mailbox", attempt: 1 });
     expect(logs[1].attempt).toBe(2);
+  });
+
+  it("a mail-server outage never gives up a cart: it keeps waiting and is sent once the server is back", async () => {
+    const { sendAbandonedCartEmail } = await import("@/lib/email");
+    const email = emailOf("outage");
+    const created = await makeCart("Olivia Outage", email);
+    const outages = [
+      Object.assign(new Error("connect ETIMEDOUT"), { code: "ETIMEDOUT" }),
+      Object.assign(new Error("Invalid login"), { code: "EAUTH", responseCode: 535 }),
+      new Error("SMTP is not configured (SMTP_USER / SMTP_PASS missing) - email was not sent"),
+      Object.assign(new Error("421 service not available"), { responseCode: 421 }),
+      Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
+    ];
+    for (const error of outages) {
+      sendAbandonedCartEmail.mockImplementationOnce(async () => { throw error; });
+      const res = await scan();
+      expect(res.results.find((r) => r.email === email)).toMatchObject({ sent: false, status: "failed", temporary: true });
+      const cart = await cartOf(email);
+      expect(cart.recoveryEmail).toMatchObject({ sent: false, gaveUp: false, attempts: 0 }); // nothing counted against the cart
+      expect(new Date(cart.recoveryEmail.nextAttemptAt).getTime()).toBeGreaterThan(Date.now());
+      await AbandonedCart.collection.updateOne({ _id: created._id }, { $set: { "recoveryEmail.nextAttemptAt": new Date(Date.now() - 1000) } }); // let the back-off pass
+    }
+    const logs = await logsOf(created._id);
+    expect(logs).toHaveLength(5);
+    expect(logs.every((l) => l.status === "failed" && l.reason === "mail-server-problem")).toBe(true);
+
+    const recovered = await scan(); // the mail server is back
+    expect(recovered.results.find((r) => r.email === email)).toMatchObject({ sent: true });
+    createdCodes.push(recovered.results.find((r) => r.email === email).voucherCode);
+    expect((await cartOf(email)).recoveryEmail).toMatchObject({ sent: true, attempts: 1 });
+  });
+
+  it("a send that was interrupted (the process died) is picked up again once its claim has run out, but not before", async () => {
+    sent.length = 0;
+    const fresh = emailOf("claim-fresh");
+    const stale = emailOf("claim-stale");
+    const a = await makeCart("Fiona Fresh", fresh);
+    const b = await makeCart("Stan Stale", stale);
+    await AbandonedCart.collection.updateOne({ _id: a._id }, { $set: { "recoveryEmail.sendingSince": new Date(Date.now() - 60 * 1000) } }); // another process is sending right now
+    await AbandonedCart.collection.updateOne({ _id: b._id }, { $set: { "recoveryEmail.sendingSince": new Date(Date.now() - 20 * 60 * 1000) } }); // that process died long ago
+
+    const res = await scan();
+    expect(res.results.find((r) => r.email === fresh)).toBeUndefined();
+    expect(sent.filter((m) => m.email === fresh)).toHaveLength(0);
+    const resent = res.results.find((r) => r.email === stale);
+    expect(resent).toMatchObject({ sent: true });
+    createdCodes.push(resent.voucherCode);
+    expect((await cartOf(stale)).recoveryEmail).toMatchObject({ sent: true, sendingSince: null });
+    expect((await cartOf(fresh)).recoveryEmail.sent).toBe(false); // untouched
+  });
+
+  it("a failed send never marks the cart as sent, so a crash before the end cannot fake a sent email", async () => {
+    const { sendAbandonedCartEmail } = await import("@/lib/email");
+    const email = emailOf("neversent");
+    const created = await makeCart("Nora Never", email);
+    sendAbandonedCartEmail.mockImplementationOnce(async () => { throw Object.assign(new Error("550 gone"), { responseCode: 550 }); });
+    await scan();
+    const cart = await cartOf(email);
+    expect(cart.recoveryEmail.sent).toBe(false);
+    expect(cart.recoveryEmail.sentAt ?? null).toBeNull();
+    expect((await logsOf(created._id)).map((l) => l.status)).toEqual(["failed"]);
   });
 
   it("gives up after 3 failed attempts and never tries that cart again", async () => {
@@ -273,6 +336,28 @@ describe("abandoned-cart voucher: every shopper gets their own one-time code, ma
     await scan();
     expect(sent.filter((m) => m.email === email)).toHaveLength(0);
     expect((await getAbandonedCartDiagnostics({ windowMinutes: 60 })).carts.gaveUp).toBeGreaterThanOrEqual(1);
+
+    // A cart that was given up on is still listed for the admin, and "Send now" can still reach it.
+    const waiting = (await getWaitingCarts({ limit: 500 })).find((w) => w.email === email);
+    expect(waiting).toMatchObject({ gaveUp: true });
+    const manual = await sendRecoveryEmailNow(created._id);
+    expect(manual).toMatchObject({ sent: true });
+    createdCodes.push(manual.voucherCode);
+    expect((await cartOf(email)).recoveryEmail).toMatchObject({ sent: true, gaveUp: false });
+  });
+
+  it("a very common first name never runs out of personal codes", async () => {
+    const base = "ZOE15";
+    const taken = [base, ...["A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M", "N", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"].map((s) => base + s)];
+    await Discount.deleteMany({ code: { $in: taken } });
+    await Discount.insertMany(taken.map((code) => ({ code, type: "percentage", value: 15, isActive: true })));
+    createdCodes.push(...taken);
+    const voucher = await getOrCreatePersonalVoucher({ contact: { firstName: "Zoe" } }, emailOf("zoe26"));
+    createdCodes.push(voucher.code);
+    expect(taken).not.toContain(voucher.code);
+    expect(voucher.code).toMatch(/^ZOE15[A-HJ-NP-Z2-9]{2,3}$/);
+    expect(voucher.oneTime).toBe(true);
+    expect((await Discount.findOne({ code: voucher.code }).lean()).specificCustomerEmails).toEqual([emailOf("zoe26")]);
   });
 
   it("does not email someone who already ordered, and records why", async () => {

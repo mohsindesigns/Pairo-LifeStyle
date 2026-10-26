@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
@@ -62,13 +63,25 @@ export async function PUT(req) {
     // Strip mongo internals
     const { _id, __v, createdAt, updatedAt, ...cleanBody } = body;
 
+    // The page sends back the whole config it loaded. The abandoned-cart recovery settings (and the scheduler's last-run
+    // record) live inside `commerce` but belong to the Recovery emails page: writing the page's possibly stale copy
+    // would silently undo a change another admin just made there (for example switching the emails back on). So
+    // `commerce` is saved key by key, and that one key is never written from here.
+    const { commerce, ...rest } = cleanBody;
+    const changes = { ...rest };
+    if (commerce && typeof commerce === 'object' && !Array.isArray(commerce)) {
+      for (const [key, value] of Object.entries(commerce)) {
+        if (key === 'abandonedCart') continue;
+        changes[`commerce.${key}`] = value;
+      }
+    }
+
     const updated = await SiteConfig.findOneAndUpdate(
       { key: 'main' },
-      { $set: cleanBody },
+      { $set: changes },
       { upsert: true, new: true, runValidators: false }
     );
 
-    const { revalidatePath } = require('next/cache');
     revalidatePath('/', 'layout');
 
     return NextResponse.json(JSON.parse(JSON.stringify(updated.toObject())));

@@ -228,6 +228,31 @@ describe("security hardening", () => {
   });
 
   // ── staff ────────────────────────────────────────────────────────────────────────────────────────
+  describe("editing a staff member keeps a useful, password-free audit entry", () => {
+    it("the 'before' and 'after' snapshots keep the role's permissions and never hold the password hash", async () => {
+      const Role = (await import("@/models/Role")).default;
+      const Staff = (await import("@/models/Staff")).default;
+      const { PUT } = await import("@/app/api/admin/staff/[id]/route");
+      const role = await Role.create({ name: `Role ${TAG}`, slug: `role-${TAG}`, permissions: { orders: ["view", "update"] } });
+      const staff = await Staff.create({ name: `Person ${TAG}`, email: `${TAG}-staff@example.invalid`, password: "$2a$10$staffhashstaffhashstaffhash", roleId: role._id });
+      try {
+        session = superAdmin();
+        const res = await call(PUT, "/x", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `Renamed ${TAG}`, password: "a-new-password-1" }) }, ctxOf(staff._id));
+        expect(res.status).toBe(200);
+        const entry = await AuditLog.collection.findOne({ action: "UPDATE_STAFF", "details.message": { $regex: `${TAG}-staff@example.invalid` } });
+        expect(entry).toBeTruthy();
+        expect(entry.details.before.roleId.permissions).toEqual({ orders: ["view", "update"] });
+        expect(entry.details.before.name).toBe(`Person ${TAG}`);
+        expect(entry.details.after.name).toBe(`Renamed ${TAG}`);
+        expect(JSON.stringify(entry.details)).not.toMatch(/staffhash|\$2a\$|a-new-password-1/);
+        expect(entry.details.message).toMatch(/password changed/);
+      } finally {
+        await Staff.deleteOne({ _id: staff._id });
+        await Role.deleteOne({ _id: role._id });
+      }
+    });
+  });
+
   describe("restoring staff from the Trash", () => {
     const superAdminTarget = { _id: "1", roleId: { slug: "super-admin" } };
     it("only a Super Admin may restore a Super Admin", () => {

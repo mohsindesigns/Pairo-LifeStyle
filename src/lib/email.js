@@ -1141,11 +1141,11 @@ export function buildAbandonedCartEmail(cartSnapshot, voucherCode, { discountPer
     : '';
 
   const voucherHtml = emailPanel(`
-    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here's <strong>${offerText}</strong> your order — on us. Use this code at checkout:</p>
+    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here's <strong>${offerText}</strong> your order — on us. Enter this code in the promo code box at checkout, using the same email address this message was sent to:</p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
       <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(voucherCode)}</span>
     </td></tr></table>
-    ${emailButton(`${storeUrl}/cart`, 'Complete My Order', { align: 'left' })}
+    ${emailButton(`${storeUrl}/checkout`, 'Complete My Order', { align: 'left' })}
   `, { title: 'A Little Something For You', accentColor: BRAND.ink });
 
   const html = emailShell({

@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 // The signed-in staff member for the next request (null = signed out).
+vi.setConfig({ testTimeout: 30_000, hookTimeout: 30_000 }); // the first test loads four whole route modules
+
 let session = null;
 const sent = [];
 

@@ -62,13 +62,16 @@ export default function RecoveryEmailsPage() {
   const searchTimer = useRef(null);
   const pageRef = useRef(1);
   const loadRef = useRef(null);
+  const latestRequest = useRef(0); // only the newest request may change the screen
 
   const load = useCallback(async (page = 1, { silent = false } = {}) => {
+    const mine = ++latestRequest.current;
     if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), status: view, search, limit: "25" });
       const res = await fetch(`/api/admin/abandoned-carts/emails?${params.toString()}`, { cache: "no-store" });
       const body = await res.json().catch(() => ({}));
+      if (mine !== latestRequest.current) return; // a newer search / tab / refresh was started: this answer is out of date
       if (!res.ok || !body.success) throw new Error(body.error || "Failed to load the recovery emails.");
       pageRef.current = body.pagination?.currentPage || 1;
       setData(body);
@@ -80,9 +83,9 @@ export default function RecoveryEmailsPage() {
       setLoadError("");
     } catch (e) {
       console.error(e);
-      if (!silent) setLoadError(e.message || "Failed to load the recovery emails.");
+      if (!silent && mine === latestRequest.current) setLoadError(e.message || "Failed to load the recovery emails.");
     } finally {
-      if (!silent) setLoading(false);
+      if (mine === latestRequest.current) setLoading(false);
     }
   }, [view, search]);
 
@@ -357,7 +360,7 @@ export default function RecoveryEmailsPage() {
                             <div className="wp-small wp-muted">{plural(cart.itemCount, "item")}</div>
                           </td>
                           <td style={{ whiteSpace: "nowrap" }}>
-                            <div>{cart.dueInMinutes > 0 ? `in about ${cart.dueInMinutes} min` : "at the next check"}</div>
+                            <div>{cart.gaveUp ? "gave up after 3 failed tries" : cart.dueInMinutes > 0 ? `in about ${cart.dueInMinutes} min` : "at the next check"}</div>
                             <div className="wp-small wp-muted">idle {cart.idleMinutes} min</div>
                           </td>
                           {canEdit && (

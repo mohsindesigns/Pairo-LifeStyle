@@ -58,6 +58,8 @@ const AbandonedCartSchema = new mongoose.Schema({
     lastError: { type: String, default: null },
     messageId: { type: String, default: null },
     gaveUp: { type: Boolean, default: false },
+    // Set while a send is in progress. A claim older than a few minutes (the process died mid-send) is treated as free.
+    sendingSince: { type: Date, default: null },
   },
 
   // Admin Trash (soft delete). Trashed carts are hidden from the admin list (except the
