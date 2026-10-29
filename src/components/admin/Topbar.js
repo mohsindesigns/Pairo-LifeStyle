@@ -702,7 +702,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
 
           {/* Command Search Results Dropdown */}
           {showSearchResults && (
-            <div className="fixed md:absolute left-0 right-0 top-11 md:top-full md:left-auto md:right-2 md:w-80 max-w-full bg-[#2c3338] shadow-[0_3px_5px_rgba(0,0,0,0.2)] max-h-[min(320px,calc(100dvh-4rem))] overflow-y-auto z-[110] py-1.5">
+            <div className="fixed md:absolute left-0 right-0 top-11 md:top-full md:left-auto md:right-2 md:w-80 max-w-full md:max-w-[calc(100vw-1rem)] bg-[#2c3338] shadow-[0_3px_5px_rgba(0,0,0,0.2)] max-h-[min(320px,calc(100dvh-4rem))] overflow-y-auto z-[110] py-1.5">
               {searchResults.length === 0 ? (
                 <div className="px-3 py-3 text-[13px] text-[#a7aaad]">
                   No matches found.
@@ -755,7 +755,7 @@ export default function AdminTopbar({ onMenuToggle, menuOpen = false }) {
           </button>
 
           {showNotifications && (
-            <div className="fixed md:absolute left-0 right-0 top-11 md:top-full md:left-auto md:right-0 md:w-96 max-w-full bg-white border border-[#c3c4c7] shadow-[0_3px_5px_rgba(0,0,0,0.2)] z-[110] text-[13px] text-[#3c434a] text-left">
+            <div className="fixed md:absolute left-0 right-0 top-11 md:top-full md:left-auto md:right-0 md:w-96 max-w-full md:max-w-[calc(100vw-1rem)] bg-white border border-[#c3c4c7] shadow-[0_3px_5px_rgba(0,0,0,0.2)] z-[110] text-[13px] text-[#3c434a] text-left">
               {/* Header */}
               <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[#dcdcde]">
                 <div className="flex items-center gap-2 min-w-0">
