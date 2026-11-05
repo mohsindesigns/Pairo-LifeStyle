@@ -11,6 +11,7 @@ export default function ProductSection({
   products = [],
   seriesLabel,
   ctaLabel,
+  ctaLink,
   headingLevel = "h2"
 }) {
   const siteData = useSiteData();
@@ -18,6 +19,10 @@ export default function ProductSection({
     seriesLabel: seriesLabel || siteData?.products?.labels?.seriesLabel || "Collection",
     ctaLabel: ctaLabel || siteData?.products?.labels?.archiveIndex || "Explore Collection"
   };
+
+  // Only same-site paths or http(s) links are accepted; anything else falls back to the shop.
+  const link = String(ctaLink || "").trim();
+  const ctaHref = /^(\/(?!\/)|https?:\/\/)/.test(link) ? link : "/shop";
 
   const activeProducts = (products || []).filter(
     (p) => p && !p.isDeleted && p.status === "Published"
@@ -75,7 +80,7 @@ export default function ProductSection({
           <div className="flex items-center justify-between lg:justify-end gap-4 md:gap-8 shrink-0 w-full lg:w-auto">
             {/* CTA Button */}
             <Link
-              href="/shop"
+              href={ctaHref}
               className="group relative flex items-center gap-2 sm:gap-4 border border-primary/40 px-4 py-2.5 sm:px-5 sm:py-3 rounded-full font-bold text-[11px] sm:text-xs md:text-[13.5px] uppercase tracking-[0.2em] overflow-hidden transition-all duration-500 hover:text-background hover:border-primary active:scale-95 shadow-lg shadow-primary/5 text-foreground"
             >
               <span className="relative z-10">{productLabels.ctaLabel}</span>

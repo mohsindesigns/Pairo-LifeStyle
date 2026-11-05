@@ -68,6 +68,7 @@ export const SECTION_SCHEMAS = {
       { name: "title", label: "Section Title", type: "text" },
       { name: "seriesLabel", label: "Series Label (Badge)", type: "text" },
       { name: "ctaLabel", label: "CTA Button Text", type: "text" },
+      { name: "ctaLink", label: "CTA Button Link (e.g. /shop or /jackets - leave empty for /shop)", type: "text" },
       { name: "showType", label: "Display Type", type: "select", default: "collection", options: [
         { label: "Collection", value: "collection" },
         { label: "Specific Products", value: "products" }
