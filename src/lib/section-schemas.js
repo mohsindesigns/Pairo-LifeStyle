@@ -74,7 +74,7 @@ export const SECTION_SCHEMAS = {
         { label: "Specific Products", value: "products" }
       ]},
       { name: "collectionId", label: "Select Collection", type: "select", options: "categories", dependsOn: "showType", visibleIf: "collection" },
-      { name: "productIds", label: "Select Products (Max 16)", type: "multiselect", options: "products", dependsOn: "showType", visibleIf: "products" },
+      { name: "productIds", label: "Select Products (Max 16)", type: "multiselect", options: "products", max: 16, dependsOn: "showType", visibleIf: "products" },
       { name: "limit", label: "Product Limit (Collection only, Max 16)", type: "number", default: 16, dependsOn: "showType", visibleIf: "collection" }
     ]
   },

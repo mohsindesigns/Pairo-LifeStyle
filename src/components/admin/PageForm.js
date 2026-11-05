@@ -12,6 +12,7 @@
  * - Draggable reordering using @dnd-kit.
  */
 
+import MultiSelectChecklist from "@/components/admin/MultiSelectChecklist";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePopup } from "@/context/PopupContext";
@@ -583,30 +584,11 @@ export default function PageForm({ pageId }) {
                </ThemedSelect>
             );
          case "multiselect": {
-            const selected = Array.isArray(value) ? value : [];
             const msOpts = field.options === 'categories' ? dynamicOptions.categories :
                field.options === 'products' ? dynamicOptions.products :
                field.options === 'blogs' ? dynamicOptions.blogs :
                Array.isArray(field.options) ? field.options : [];
-            return (
-               <div className="wp-checklist" style={{ maxHeight: 200, overflowY: "auto" }}>
-                  {msOpts.length === 0 && <span className="wp-muted">No options available</span>}
-                  {msOpts.map(opt => (
-                     <label key={opt.value} className="wp-check">
-                        <input
-                           type="checkbox"
-                           checked={selected.some(v => String(v) === String(opt.value))}
-                           onChange={(e) => onChange(
-                              e.target.checked
-                                 ? [...selected, opt.value]
-                                 : selected.filter(v => String(v) !== String(opt.value))
-                           )}
-                        />
-                        <span>{opt.label}</span>
-                     </label>
-                  ))}
-               </div>
-            );
+            return <MultiSelectChecklist options={msOpts} value={value} onChange={onChange} maxHeight={200} max={field.max} />;
          }
          case "repeater":
             const items = value || [];
