@@ -50,10 +50,10 @@ export default function ProductSection({
   const displayProducts = activeProducts.slice(0, 16);
 
   return (
-    <section className="py-4 md:py-6 bg-background">
-      <div className="container mx-auto px-2 sm:px-4 md:px-8 py-12 md:py-20 overflow-hidden">
+    <section className="py-0 md:py-6 bg-background">
+      <div className="container mx-auto px-2 sm:px-4 md:px-8 py-8 md:py-20 overflow-hidden">
         {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-6 md:mb-14 gap-4 md:gap-6">
+        <div className="flex flex-row items-end justify-between mb-6 md:mb-14 gap-3 md:gap-6">
           <div className="space-y-3 md:space-y-4 flex-1 min-w-0">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -77,11 +77,11 @@ export default function ProductSection({
             </MotionHeading>
           </div>
 
-          <div className="flex items-center justify-start lg:justify-end gap-4 md:gap-8 shrink-0 w-full lg:w-auto">
+          <div className="flex items-center justify-end gap-4 md:gap-8 shrink-0">
             {/* CTA Button */}
             <Link
               href={ctaHref}
-              className="group relative flex items-center justify-center gap-2 sm:gap-4 border border-primary/40 px-4 py-2.5 sm:px-5 sm:py-3 rounded-full font-bold text-[10px] sm:text-xs md:text-[13.5px] uppercase tracking-[0.12em] sm:tracking-[0.2em] max-w-full text-center overflow-hidden transition-all duration-500 hover:text-background hover:border-primary active:scale-95 shadow-lg shadow-primary/5 text-foreground"
+              className="group relative flex items-center justify-center gap-2 sm:gap-4 border border-primary/40 px-3 py-2 sm:px-5 sm:py-3 rounded-full font-bold text-[10px] sm:text-xs md:text-[13.5px] uppercase tracking-[0.12em] sm:tracking-[0.2em] max-w-full text-center overflow-hidden transition-all duration-500 hover:text-background hover:border-primary active:scale-95 shadow-lg shadow-primary/5 text-foreground"
             >
               <span className="relative z-10">{productLabels.ctaLabel}</span>
               <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4 relative z-10 transition-transform duration-500 group-hover:translate-x-1" />

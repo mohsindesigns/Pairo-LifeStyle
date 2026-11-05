@@ -123,7 +123,7 @@ export default function ProductCard({ product, listName = "Product List" }) {
       <div className="mt-3 md:mt-4 space-y-1 md:space-y-2 px-1">
         <h3
           style={{ fontFamily: "var(--brand-font)" }}
-          className="text-[11px] md:text-[13px] font-bold uppercase tracking-wider text-foreground/85 group-hover:text-foreground transition-colors truncate"
+          className="text-[11px] md:text-[13px] font-bold uppercase tracking-wider text-foreground/85 group-hover:text-foreground transition-colors line-clamp-2 leading-snug md:min-h-[2.6em]"
         >
           {product.name}
         </h3>
