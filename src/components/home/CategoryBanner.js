@@ -52,7 +52,7 @@ export default function CategoryBanner({
                 {categoriesConfig.label || "The Collection"}
               </p>
             </div>
-            <HeadingTag className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold heading-font tracking-tighter text-[#000000] uppercase leading-none truncate">
+            <HeadingTag className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold heading-font tracking-tighter text-[#000000] uppercase leading-tight break-words">
               {categoriesConfig.title || "Shop By Category"}
             </HeadingTag>
           </div>

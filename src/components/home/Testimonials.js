@@ -139,7 +139,7 @@ export default function Testimonials({
             <div className="inline-flex items-center bg-black text-white px-3 py-1 rounded-full">
               <p className="text-[8px] md:text-[10px] font-bold tracking-[0.2em] uppercase">{testimonialsConfig.label}</p>
             </div>
-            <h2 className="text-[22px] md:text-[30px] font-bold heading-font tracking-tighter text-[#000000] uppercase leading-none truncate">{testimonialsConfig.title}</h2>
+            <h2 className="text-[22px] md:text-[30px] font-bold heading-font tracking-tighter text-[#000000] uppercase leading-tight break-words">{testimonialsConfig.title}</h2>
           </div>
           <div className="flex gap-2 shrink-0">
             <button onClick={() => handleSwipe("prev")} className="w-10 h-10 md:w-16 md:h-16 rounded-full border border-black/10 flex items-center justify-center hover:bg-black hover:text-white transition-all duration-500 active:scale-90 group"><ChevronLeft className="w-5 h-5 md:w-8 md:h-8 transition-transform duration-500 group-hover:-translate-x-1" /></button>
