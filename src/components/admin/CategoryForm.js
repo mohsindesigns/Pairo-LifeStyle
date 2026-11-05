@@ -449,6 +449,27 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                     onChange={(e) => setItemSearchTerm(e.target.value)}
                     className="wp-input wp-full"
                   />
+                  {filteredItems.length > 0 && (() => {
+                    const allShownOn = filteredItems.every(i => formData.linkedItems.includes(i._id));
+                    return (
+                      <button
+                        type="button"
+                        className="wp-btn"
+                        style={{ marginTop: 8 }}
+                        onClick={() => setFormData(prev => {
+                          const shownIds = filteredItems.map(i => i._id);
+                          return {
+                            ...prev,
+                            linkedItems: allShownOn
+                              ? prev.linkedItems.filter(id => !shownIds.includes(id))
+                              : [...prev.linkedItems, ...shownIds.filter(id => !prev.linkedItems.includes(id))]
+                          };
+                        })}
+                      >
+                        {allShownOn ? "Clear all" : "Select all"}{itemSearchTerm.trim() ? " shown" : ""}
+                      </button>
+                    );
+                  })()}
                   <div className="wp-checklist" style={{ marginTop: 8 }}>
                     {filteredItems.length === 0 ? (
                       <div className="wp-empty">No items available.</div>
