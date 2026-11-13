@@ -8,7 +8,7 @@ export async function POST(req) {
     const form = await req.formData();
     const file = form.get("file");
     if (!file || typeof file.arrayBuffer !== "function") return Promise.reject(Object.assign(new Error("Choose a .glb file."), { status: 400 }));
-    if (file.size > 40 * 1024 * 1024) return Promise.reject(Object.assign(new Error("That file is over 40 MB. Export it without 8K textures."), { status: 400 }));
+    if (file.size > 70 * 1024 * 1024) return Promise.reject(Object.assign(new Error("That file is over 70 MB. Export it without 8K textures."), { status: 400 }));
     const buf = Buffer.from(await file.arrayBuffer());
     return importGlb({ productId: form.get("productId"), color: form.get("color") || "", glb: `data:model/gltf-binary;base64,${buf.toString("base64")}` });
   });

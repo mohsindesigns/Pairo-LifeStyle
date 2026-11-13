@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    // admin 3D rack accepts .glb uploads up to 40MB through the /api/admin proxy matcher (default cap is 10MB)
-    proxyClientMaxBodySize: "45mb",
+    // admin 3D rack accepts .glb uploads up to 70MB through the /api/admin proxy matcher (default cap is 10MB)
+    proxyClientMaxBodySize: "75mb",
   },
   images: {
     unoptimized: true,

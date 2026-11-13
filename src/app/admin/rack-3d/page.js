@@ -235,7 +235,7 @@ function MakeModal({ product, color, onClose, onDone }) {
 function UploadModal({ product, color, onClose, onDone }) {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
-  const tooBig = file && file.size > 40 * 1024 * 1024;
+  const tooBig = file && file.size > 70 * 1024 * 1024;
   const go = async () => {
     setBusy(true);
     try {
@@ -248,9 +248,9 @@ function UploadModal({ product, color, onClose, onDone }) {
   return (
     <Modal title={`Upload a 3D model — ${product.name}${color.label ? " · " + color.label : ""}`} onClose={onClose}
       footer={<><button type="button" className="wp-btn" onClick={onClose}>Cancel</button> <button type="button" className="wp-btn wp-btn-primary" disabled={!file || tooBig || busy} onClick={go}>{busy ? "Uploading…" : "Upload"}</button></>}>
-      <p className="wp-small">Made this piece on the Tripo website (Image to 3D → download as GLB), or have a model from a 3D artist or a scan? Upload the .glb here — it’s turned, sized and optimised for the rack automatically. No API credits used. Keep the file under 40 MB (skip 8K textures when exporting).</p>
+      <p className="wp-small">Made this piece on the Tripo website (Image to 3D → download as GLB), or have a model from a 3D artist or a scan? Upload the .glb here — it’s turned, sized and optimised for the rack automatically. No API credits used. Files up to 70 MB are fine (Tripo exports are usually about 60 MB).</p>
       <div className="wp-field"><label className="wp-label">Model file (.glb)</label><input type="file" accept=".glb,model/gltf-binary" onChange={(e) => setFile(e.target.files[0] || null)} /></div>
-      {tooBig && <Notice type="error">That file is over 40 MB.</Notice>}
+      {tooBig && <Notice type="error">That file is over 70 MB.</Notice>}
     </Modal>
   );
 }
