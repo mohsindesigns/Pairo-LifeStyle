@@ -21,7 +21,8 @@ export const TEMPLATE_REGISTRY = {
       "banner_feature",
       "category_showcase",
       "blog_grid",
-      "testimonials"
+      "testimonials",
+      "rack_3d"
     ],
     defaultSections: [
       { type: "hero_slider", config: {} },

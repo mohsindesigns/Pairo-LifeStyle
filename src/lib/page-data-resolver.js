@@ -239,6 +239,12 @@ export async function resolvePageSections(sections) {
         config.categories = JSON.parse(JSON.stringify(enrichedCategories));
       }
 
+      // 3D rack: what hangs on it is arranged in Admin → Products → 3D Rack
+      if (section.type === 'rack_3d') {
+        const { rackItems } = await import("@/lib/rack3d/server");
+        config.products = await rackItems();
+      }
+
     } catch (err) {
       console.error(`Error resolving data for section ${section.type}:`, err);
     }

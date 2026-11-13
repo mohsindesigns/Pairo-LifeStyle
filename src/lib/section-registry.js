@@ -11,6 +11,7 @@ export const SECTION_REGISTRY = {
   category_showcase: dynamic(() => import("@/components/home/CategoryBanner")),
   blog_grid: dynamic(() => import("@/components/home/BlogSection")),
   testimonials: dynamic(() => import("@/components/home/Testimonials")),
+  rack_3d: dynamic(() => import("@/components/home/Rack3DSection")),
   about_hero: dynamic(() => import("@/components/sections/AboutHero")),
   story_section: dynamic(() => import("@/components/sections/StorySection")),
   studio_gallery: dynamic(() => import("@/components/sections/StudioGallery")),
