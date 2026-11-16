@@ -187,7 +187,15 @@ function Rack3DAdmin() {
 
       <div className="wp-cols">
         <div className="wp-col-main">
-          <Postbox title="On the rack" aside={canEdit && <button type="button" className="wp-btn wp-btn-primary" disabled={!dirty || saving} onClick={() => saveRack()}>{saving ? "Saving…" : "Save rack"}</button>}>
+          <Postbox title="On the rack" aside={canEdit && (
+            <span style={{ display: "inline-flex", gap: 6 }}>
+              <button type="button" className="wp-btn" title="Re-optimise all finished models so each hangs by its shoulders (free — no new AI generation)" onClick={async () => {
+                if (!window.confirm("Refit the hanger on every finished 3D model? Each is re-optimised from its original (free, about a minute each); the current models stay live meanwhile.")) return;
+                try { const r = await api("/api/admin/rack-3d/refit", { method: "POST" }); toast.success(`Refitting ${r.started} model${r.started === 1 ? "" : "s"}…`); if (r.skipped) toast.error(`${r.skipped} skipped: ${r.reason}`); await load(); } catch (e) { toast.error(e.message); }
+              }}>Refit hangers</button>
+              <button type="button" className="wp-btn wp-btn-primary" disabled={!dirty || saving} onClick={() => saveRack()}>{saving ? "Saving…" : "Save rack"}</button>
+            </span>
+          )}>
             <p className="wp-muted">Left to right, as shoppers see it. Size makes a piece hang larger or smaller next to the others.</p>
             <HomepageStatus h={d.homepage} />
             {!items.length && <p className="wp-empty">No order saved — the rack hangs every published product with a finished 3D model automatically (newest first, up to 12). Hang pieces here to choose them and their order yourself.</p>}

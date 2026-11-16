@@ -252,6 +252,24 @@ export async function rotateModel(id, degrees = 180) {
   return m.toObject();
 }
 
+// Re-optimise every finished model from its original at the 3D service (free — no new AI generation), e.g. so
+// older models get the hanger measurements. Each one shows progress like a new model.
+export async function refitAll() {
+  const ms = await Rack3dModel.find({ ...live, status: "ready", jobId: { $ne: "" } });
+  let started = 0;
+  const skipped = [];
+  for (const m of ms) {
+    try {
+      const j = await svc("POST", `/v1/models/${m.jobId}/reprocess`, { rotate_y: Number.isFinite(Number(m.meta?.rotated)) ? Number(m.meta.rotated) : "auto" }, m.jobAuth || "key");
+      m.set({ status: j.status, stage: "optimising", progress: j.progress || 90, error: "", startedAt: new Date() });
+      await m.save();
+      started++;
+    } catch (e) { skipped.push(e.message); }
+  }
+  ensureTicker();
+  return { started, skipped: skipped.length, reason: skipped[0] || null };
+}
+
 export async function retryModel(id) {
   const m = await modelDoc(id);
   if (m.status !== "failed") throw new RackError(409, "Only failed models can be retried.");
@@ -382,6 +400,7 @@ function rackModelFor(p, models) {
   const two = ready.slice(0, 2);
   return {
     lo: ready[0].m.rackUrl, hi: ready[0].m.detailUrl, alt: (two[1] || two[0]).m.detailUrl,
+    hang: ready[0].m.meta?.hang || null, // shoulder line + width measured by the 3D service
     colors: two.map(({ c }) => ({ label: c.label, sw: c.hex || "#cccccc", img: c.image })),
   };
 }

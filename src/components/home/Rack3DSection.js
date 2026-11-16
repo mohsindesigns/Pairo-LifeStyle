@@ -55,7 +55,7 @@ export default function Rack3DSection({ eyebrow = "The rack", title = "Spin it i
       if (!Rack3D.supported()) { setMode("flat"); return; }
       try {
         const eng = new Rack3D(canvasRef.current, {
-          items: items.map((p) => ({ lo: p.rack3d.lo, hi: p.rack3d.hi, alt: p.rack3d.alt, scale: p.rack3d.scale || 1 })),
+          items: items.map((p) => ({ lo: p.rack3d.lo, hi: p.rack3d.hi, alt: p.rack3d.alt, scale: p.rack3d.scale || 1, hangDrop: p.rack3d.hang?.drop || 0, barHalf: p.rack3d.hang?.half || 0 })),
           onProgress: (v) => !dead && setProgress(v),
           onReady: () => { if (dead) return; setMode("gl"); requestAnimationFrame(() => { eng.resize(); eng.intro(0.05); }); },
           onFail: () => { if (!dead) setMode("flat"); },

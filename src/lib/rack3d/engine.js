@@ -305,7 +305,11 @@
   Rack3D.prototype._mount = function (item, g) {
     var sc = this.k * (item.def.scale || 1);
     g.scale.setScalar(sc);
-    g.position.y = -0.155;
+    // Pairo: hang by the shoulder line measured by the 3D service (def.hangDrop, in garment heights) instead
+    // of the very top, so collars/hoods rise around the hook and the hanger bar sits inside the shoulders.
+    item.lift = item.def.hangDrop > 0 ? Math.min(0.35, item.def.hangDrop) * sc : 0;
+    g.position.y = -0.155 + item.lift;
+    if (item.def.barHalf > 0) item.bar.scale.z = Math.max(0.35, Math.min(1, (item.def.barHalf * sc * 0.9) / 0.17));
     if (item.model) item.turn.remove(item.model);
     item.model = g;
     item.turn.add(g);
@@ -389,7 +393,7 @@
   Rack3D.prototype._productTarget = function (it) {
     var h = it.height || 0.8;
     var sc = Math.min(1.9, 1.1 / h);
-    var topOffset = 0.155 * 1;
+    var topOffset = 0.155 - (it.lift || 0);
     return { x: 0, z: 0.4, scale: sc, y: 0.7 + (topOffset + h / 2) * sc, op: 1 };
   };
 
