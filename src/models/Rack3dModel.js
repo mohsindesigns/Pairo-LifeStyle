@@ -18,6 +18,7 @@ const Rack3dModelSchema = new mongoose.Schema({
   views: { front: { type: String, default: '' }, back: { type: String, default: '' } },
   quality: { type: String, default: 'detailed' },
   addToRack: { type: Boolean, default: false },  // hang it on the rack as soon as it is ready
+  startedAt: { type: Date, default: null },       // when the latest job was started (for elapsed time)
 
   // current files (kept live while a new model is being made)
   rackUrl: { type: String, default: '' },        // light model (~20k triangles) shown on the rack

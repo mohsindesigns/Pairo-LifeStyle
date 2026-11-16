@@ -168,7 +168,7 @@ export async function queueFromPhotos({ productId, color = "", views = {}, quali
   if (!front) throw new RackError(400, `“${p.name}” has no photo to make a model from.`);
   const doc = await Rack3dModel.findOneAndUpdate(
     { product: p._id, color: c.label },
-    { $set: { status: "waiting", stage: "", progress: 0, error: "", jobId: "", jobAuth: "key", views: { front, back: views.back || "" }, quality: (quality || (await rt()).defaultQuality) === "standard" ? "standard" : "detailed", addToRack: !!addToRack, isDeleted: false, deletedAt: null } },
+    { $set: { status: "waiting", stage: "", progress: 0, startedAt: new Date(), error: "", jobId: "", jobAuth: "key", views: { front, back: views.back || "" }, quality: (quality || (await rt()).defaultQuality) === "standard" ? "standard" : "detailed", addToRack: !!addToRack, isDeleted: false, deletedAt: null } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   ).lean();
   pump().catch((e) => console.error("[rack3d] pump", e.message));
@@ -231,7 +231,7 @@ export async function importGlb({ productId, color, glb }) {
   const j = await svc("POST", "/v1/models", { glb, name: `${p.name}${c.label ? " — " + c.label : ""} (upload)`, external_id: `pairo-${p._id}-${slug(c.label)}` }, "token");
   return Rack3dModel.findOneAndUpdate(
     { product: p._id, color: c.label },
-    { $set: { status: j.status, stage: j.stage || "", progress: j.progress || 0, error: "", jobId: j.id, jobAuth: "token", isDeleted: false, deletedAt: null } },
+    { $set: { status: j.status, stage: j.stage || "", progress: j.progress || 0, startedAt: new Date(), error: "", jobId: j.id, jobAuth: "token", isDeleted: false, deletedAt: null } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   ).lean();
 }
@@ -341,6 +341,8 @@ export async function refreshModels() {
           stored.push({ url: saved.url, publicId: saved.publicId || "" });
           return saved.url;
         };
+        m.set({ stage: "saving", progress: 96 });
+        await m.save();
         const base = `rack-${m.product}-${slug(m.color)}-${j.id.slice(-8)}`;
         const rackUrl = await grab(j.files.rack, `${base}-rack.glb`);
         const detailUrl = await grab(j.files.detail, `${base}-detail.glb`);
@@ -366,7 +368,7 @@ export function ensureTicker() {
     Rack3dModel.exists({ ...live, status: { $in: BUSY } })
       .then((any) => any && refreshModels())
       .catch((e) => console.error("[rack3d] tick", e.message));
-  }, Number(process.env.RACK3D_POLL_MS || 8000));
+  }, Number(process.env.RACK3D_POLL_MS || 4000));
   globalThis.__rack3dTicker.unref?.();
 }
 
@@ -436,7 +438,22 @@ export async function saveRack(items) {
 const modelOut = (m) => m && {
   id: String(m._id), color: m.color, status: m.status, stage: m.stage, progress: m.progress, error: m.error,
   hasFiles: !!m.detailUrl, rackUrl: m.rackUrl, detailUrl: m.detailUrl, previewUrl: m.previewUrl, auth: m.jobAuth, meta: m.meta || {}, updatedAt: m.updatedAt,
+  startedAt: m.startedAt,
 };
+
+// Everything being made right now, with progress (shown above the product grid whatever the page/filter)
+async function makingList(models) {
+  const busy = models.filter((m) => BUSY.includes(m.status));
+  if (!busy.length) return [];
+  const ps = await Product.find({ _id: { $in: busy.map((m) => m.product) } }).select("name images image").lean();
+  const order = { processing: 0, queued: 1, waiting: 2 };
+  return busy
+    .sort((a, b) => (order[a.status] - order[b.status]) || (new Date(a.startedAt || a.updatedAt) - new Date(b.startedAt || b.updatedAt)))
+    .map((m) => {
+      const p = ps.find((x) => String(x._id) === String(m.product));
+      return { ...modelOut(m), productId: String(m.product), productName: p?.name || "(product)", image: p?.images?.[0] || p?.image || "" };
+    });
+}
 
 // Back-office view: one page of products (with photos, colours + model status), filters with counts, and the rack.
 // Model progress is brought up to date in the background, so this never waits on the 3D service.
@@ -483,6 +500,7 @@ export async function adminView({ q = "", filter = "all", page = 1, per = 24 } =
   return plain({
     serviceUrl: run.url, keys: { tripo: !!run.key, token: !!run.token }, settings: { defaultQuality: run.defaultQuality, autoHang: run.autoHang, maxRunning: run.maxRunning }, rack, counts, filter: f, q: search, page: pg, pages, total, perPage,
     waiting: models.filter((m) => m.status === "waiting").length,
+    making: await makingList(models),
     running: models.filter((m) => ACTIVE.includes(m.status)).length,
     hangable: hangable ? (await Product.find({ _id: { $in: oid(withModel.filter((id) => !onRackIds.includes(id))) }, isDeleted: { $ne: true } }).select("name images").lean()).map((p) => ({ id: String(p._id), name: p.name, image: p.images?.[0] || "" })) : [],
     products: products.map((p) => ({

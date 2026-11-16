@@ -11,7 +11,81 @@ import { Page, PageHeader, Postbox, Notice } from "@/components/admin/ui";
 import RequirePermission from "@/components/admin/RequirePermission";
 import { can } from "@/lib/rbac";
 
-const STAGE = { sending: "Sending photos", uploading: "Sending photos", generating: "AI is building it", downloading: "Downloading", optimising: "Optimising for the web" };
+// The steps a model goes through, with where each sits on the progress bar
+const STEPS = [
+  { key: "waiting", label: "In line", at: 0 },
+  { key: "service", label: "Waiting for the 3D service", at: 1 },
+  { key: "sending", label: "Sending photo", at: 2 },
+  { key: "generating", label: "AI building the 3D model", at: 6 },
+  { key: "downloading", label: "Downloading", at: 86 },
+  { key: "optimising", label: "Optimising for the web", at: 92 },
+  { key: "saving", label: "Saving to the store", at: 96 },
+];
+function stepOf(m) {
+  if (m.status === "waiting") return 0;
+  if (m.status === "queued" && !m.stage) return 1; // sent; queued at the service behind other models
+  const st = { uploading: "sending", sending: "sending", generating: "generating", downloading: "downloading", optimising: "optimising", saving: "saving" }[m.stage] || (m.status === "queued" ? "sending" : "generating");
+  return STEPS.findIndex((x) => x.key === st);
+}
+const pctOf = (m) => Math.max(STEPS[Math.max(0, stepOf(m))].at, Math.min(99, Math.round(m.progress || 0)));
+const since = (t, now) => { if (!t) return ""; const s = Math.max(0, Math.round((now - new Date(t).getTime()) / 1000)); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`; };
+function useNow(on) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { if (!on) return undefined; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [on]);
+  return now;
+}
+
+// Progress bar for one model: step name, percent, elapsed time and the step dots
+function ProgressBar({ m, compact = false }) {
+  const now = useNow(true);
+  const i = Math.max(0, stepOf(m));
+  const pct = pctOf(m);
+  const waiting = m.status === "waiting" || i === 1;
+  return (
+    <div style={{ width: "100%" }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="3D model progress">
+      <div className="wp-small" style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+        <span style={{ fontWeight: 600 }}>{STEPS[i].label}{waiting ? "…" : ""}</span>
+        <span className="wp-muted">{waiting ? "waiting" : `${pct}%`}{m.startedAt ? ` · ${since(m.startedAt, now)}` : ""}</span>
+      </div>
+      <div style={{ height: compact ? 6 : 8, background: "#e0e0e0", borderRadius: 99, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${waiting ? 3 : pct}%`, background: waiting ? "#a7aaad" : "linear-gradient(90deg,#2271b1,#4f94d4)", borderRadius: 99, transition: "width 1.2s ease", backgroundSize: "200% 100%", animation: waiting ? "none" : "rack3dStripe 1.6s linear infinite" }} />
+      </div>
+      {!compact && (
+        <div style={{ display: "flex", gap: 3, marginTop: 5 }} aria-hidden="true">
+          {STEPS.map((st, k) => <span key={st.key} title={st.label} style={{ flex: 1, height: 3, borderRadius: 2, background: k < i ? "#00a32a" : k === i ? "#2271b1" : "#dcdcde" }} />)}
+        </div>
+      )}
+      {m.hasFiles && <div className="wp-small wp-muted" style={{ marginTop: 4 }}>The current model stays live until the new one is ready.</div>}
+    </div>
+  );
+}
+
+// Everything being made, whatever page or filter is open
+function MakingPanel({ list }) {
+  if (!list || !list.length) return null;
+  const done = list.filter((m) => m.status !== "waiting");
+  const avg = Math.round(list.reduce((a, m) => a + (m.status === "waiting" ? 0 : pctOf(m)), 0) / list.length);
+  return (
+    <Postbox title={`Being made (${list.length})`} aside={<span className="wp-small wp-muted">{done.length} in progress · {list.length - done.length} in line · about 1–3 min each</span>}>
+      <div style={{ marginBottom: 10 }}>
+        <div className="wp-small" style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><strong>Overall</strong><span>{avg}%</span></div>
+        <div style={{ height: 10, background: "#e0e0e0", borderRadius: 99, overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.max(2, avg)}%`, background: "#00a32a", borderRadius: 99, transition: "width 1.2s ease" }} /></div>
+      </div>
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}>
+        {list.map((m) => (
+          <div key={m.id} style={{ display: "grid", gridTemplateColumns: "44px 1fr", gap: 10, alignItems: "center", padding: 8, border: "1px solid #dcdcde", borderRadius: 4, background: "#fff" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {m.image ? <img src={m.image} alt="" style={{ width: 44, height: 52, objectFit: "contain", background: "#f6f7f7", borderRadius: 3 }} /> : <span />}
+            <div style={{ minWidth: 0 }}>
+              <div className="wp-small wp-strong" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 }}>{m.productName}{m.color ? ` · ${m.color}` : ""}</div>
+              <ProgressBar m={m} compact />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Postbox>
+  );
+}
 const isBusy = (m) => m && ["waiting", "queued", "processing"].includes(m.status);
 const FILTERS = [["all", "All products"], ["without", "No 3D model"], ["with", "Has 3D model"], ["onrack", "On the rack"], ["busy", "Being made"], ["failed", "Failed"]];
 const readFile = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
@@ -63,7 +137,7 @@ function Rack3DAdmin() {
   useEffect(() => { const t = setTimeout(() => setQuery((x) => (x.q === search ? x : { ...x, q: search, page: 1 })), 350); return () => clearTimeout(t); }, [search]);
 
   const working = d && (d.waiting + d.running > 0);
-  useEffect(() => { if (!working) return undefined; const t = setInterval(load, 5000); return () => clearInterval(t); }, [working, load]);
+  useEffect(() => { if (!working) return undefined; const t = setInterval(load, 3000); return () => clearInterval(t); }, [working, load]);
 
   if (err && !d) return <Page><PageHeader title="3D Rack" /><Notice type="error">{err}</Notice></Page>;
   if (!d) return <Page><PageHeader title="3D Rack" /><p className="wp-muted"><Loader2 className="inline w-4 h-4 animate-spin" /> Loading…</p></Page>;
@@ -156,6 +230,9 @@ function Rack3DAdmin() {
           <SettingsBox canEdit={canEdit} canKeys={canKeys} onSaved={load} />
         </div>
       </div>
+
+      <style>{`@keyframes rack3dStripe { from { background-position: 200% 0 } to { background-position: 0 0 } }`}</style>
+      <MakingPanel list={d.making} />
 
       <Postbox title="Products">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 10 }}>
@@ -268,8 +345,7 @@ function ProductCard({ p, canEdit, keys, selected, onToggle, onMake, onUpload, o
 
 function ModelState({ m }) {
   if (!m) return <span className="wp-small wp-muted">No 3D model yet</span>;
-  if (m.status === "waiting") return <span className="wp-small"><Loader2 className="inline w-3.5 h-3.5 animate-spin" /> Waiting in line…{m.hasFiles && <span className="wp-muted"> (current model stays live)</span>}</span>;
-  if (isBusy(m)) return <span className="wp-small"><Loader2 className="inline w-3.5 h-3.5 animate-spin" /> {STAGE[m.stage] || "Starting"} · {m.progress || 0}%{m.hasFiles && <span className="wp-muted"> (current model stays live)</span>}</span>;
+  if (isBusy(m)) return <ProgressBar m={m} />;
   return (
     <span className="wp-small" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
       {m.hasFiles && <span style={{ color: "#00a32a", fontWeight: 600 }}>✓ 3D model ready</span>}
