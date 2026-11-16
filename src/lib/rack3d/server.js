@@ -2,6 +2,7 @@
 // a few models at a time, copying finished models into our own storage (so the live rack never depends on
 // the service), and building the rack data.
 import fs from "fs";
+import crypto from "crypto";
 import path from "path";
 import mongoose from "mongoose";
 import Product from "@/models/Product";
@@ -13,9 +14,85 @@ export class RackError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
-export const serviceUrl = () => String(process.env.RACK3D_SERVICE_URL || "https://3d.mohsindesigns.com").replace(/\/$/, "");
-export const keys = () => ({ tripo: !!process.env.TRIPO_API_KEY, token: !!process.env.RACK3D_SERVICE_TOKEN });
-const MAX_RUNNING = Math.max(1, Number(process.env.RACK3D_MAX_RUNNING || 6)); // the service allows 10 per client
+const DEFAULT_SERVICE = "https://3d.mohsindesigns.com";
+
+// ---------- settings & keys (set in Admin → Products → 3D Rack; env vars are only a fallback) ----------
+// Keys are encrypted at rest with AES-256-GCM, keyed from RACK3D_SECRET or NEXTAUTH_SECRET.
+function cipherKey() {
+  const s = process.env.RACK3D_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!s) throw new RackError(500, "NEXTAUTH_SECRET is not set on the server, so keys cannot be stored safely.");
+  return crypto.createHash("sha256").update("rack3d:" + s).digest();
+}
+function seal(text) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv("aes-256-gcm", cipherKey(), iv);
+  const enc = Buffer.concat([c.update(String(text), "utf8"), c.final()]);
+  return [iv, c.getAuthTag(), enc].map((b) => b.toString("base64")).join(".");
+}
+function open(blob) {
+  if (!blob) return "";
+  try {
+    const [iv, tag, enc] = blob.split(".").map((x) => Buffer.from(x, "base64"));
+    const d = crypto.createDecipheriv("aes-256-gcm", cipherKey(), iv);
+    d.setAuthTag(tag);
+    return Buffer.concat([d.update(enc), d.final()]).toString("utf8");
+  } catch { return ""; } // secret changed: the key has to be entered again
+}
+
+let rtCache = null;
+// Current settings + keys (cached for a few seconds)
+export async function rt() {
+  if (rtCache && rtCache.at > Date.now() - 5000) return rtCache.v;
+  const cfg = (await Rack3dConfig.findOne({ key: "main" }).select("settings secrets").lean()) || {};
+  const s = cfg.settings || {}, sec = cfg.secrets || {};
+  const dbKey = open(sec.tripoKey), dbToken = open(sec.serviceToken);
+  const v = {
+    url: String(s.serviceUrl || process.env.RACK3D_SERVICE_URL || DEFAULT_SERVICE).replace(/\/$/, ""),
+    key: dbKey || process.env.TRIPO_API_KEY || "",
+    token: dbToken || process.env.RACK3D_SERVICE_TOKEN || "",
+    keySource: dbKey ? "admin" : process.env.TRIPO_API_KEY ? "server environment" : null,
+    tokenSource: dbToken ? "admin" : process.env.RACK3D_SERVICE_TOKEN ? "server environment" : null,
+    maxRunning: Math.max(1, Math.min(10, Number(s.maxRunning) || Number(process.env.RACK3D_MAX_RUNNING) || 6)), // the service allows 10 per client
+    defaultQuality: s.defaultQuality === "standard" ? "standard" : "detailed",
+    autoHang: s.autoHang !== false,
+  };
+  rtCache = { at: Date.now(), v };
+  return v;
+}
+const preview = (k) => (k ? "••••" + k.slice(-4) : "");
+export async function settingsView() {
+  const v = await rt();
+  const cfg = (await Rack3dConfig.findOne({ key: "main" }).select("settings").lean()) || {};
+  return {
+    serviceUrl: v.url, serviceUrlSaved: cfg.settings?.serviceUrl || "", defaultServiceUrl: process.env.RACK3D_SERVICE_URL || DEFAULT_SERVICE,
+    maxRunning: v.maxRunning, defaultQuality: v.defaultQuality, autoHang: v.autoHang,
+    tripoKey: { set: !!v.key, preview: preview(v.key), source: v.keySource },
+    serviceToken: { set: !!v.token, preview: preview(v.token), source: v.tokenSource },
+  };
+}
+// Save settings. tripoKey / serviceToken: a new value replaces, "" keeps, null removes the saved one.
+export async function saveSettings(b = {}, { canKeys = false } = {}) {
+  const set = {};
+  if (b.serviceUrl !== undefined) {
+    const u = String(b.serviceUrl || "").trim().replace(/\/$/, "");
+    if (u && !/^https?:\/\/[^\s/]+/.test(u)) throw new RackError(400, "Enter the 3D service address, e.g. https://3d.example.com");
+    set["settings.serviceUrl"] = u;
+  }
+  if (b.maxRunning !== undefined) set["settings.maxRunning"] = Math.max(1, Math.min(10, Number(b.maxRunning) || 6));
+  if (b.defaultQuality !== undefined) set["settings.defaultQuality"] = b.defaultQuality === "standard" ? "standard" : "detailed";
+  if (b.autoHang !== undefined) set["settings.autoHang"] = !!b.autoHang;
+  for (const [field, name] of [["tripoKey", "Tripo API key"], ["serviceToken", "3D service token"]]) {
+    if (b[field] === undefined || b[field] === "") continue;
+    if (!canKeys) throw new RackError(403, `Only staff who can manage settings can change the ${name}.`);
+    if (b[field] === null) { set[`secrets.${field}`] = ""; continue; }
+    const val = String(b[field]).trim();
+    if (val.length < 8) throw new RackError(400, `That ${name} looks too short.`);
+    set[`secrets.${field}`] = seal(val);
+  }
+  await Rack3dConfig.findOneAndUpdate({ key: "main" }, { $set: set }, { upsert: true });
+  rtCache = null;
+  return settingsView();
+}
 const ACTIVE = ["queued", "processing"];
 const BUSY = ["waiting", ...ACTIVE];
 const live = { isDeleted: { $ne: true } };
@@ -23,20 +100,19 @@ const live = { isDeleted: { $ne: true } };
 // auth: 'key' = as our Tripo API key (needed to make models from photos);
 //       'token' = as our service token (enough for uploaded .glb models, no AI provider needed)
 export async function svc(method, p, body, auth = "key") {
-  const key = process.env.TRIPO_API_KEY;
-  const token = process.env.RACK3D_SERVICE_TOKEN;
-  if (auth === "key" && !key) throw new RackError(400, "Making models from photos needs a Tripo API key (TRIPO_API_KEY). You can still use Upload .glb.");
-  if (auth === "token" && !token) throw new RackError(400, "The 3D service token (RACK3D_SERVICE_TOKEN) is not set on the server.");
+  const { url, key, token } = await rt();
+  if (auth === "key" && !key) throw new RackError(400, "Making models from photos needs a Tripo API key — add it in 3D Rack → Settings & keys. You can still use Upload .glb.");
+  if (auth === "token" && !token) throw new RackError(400, "Add the 3D service token in 3D Rack → Settings & keys.");
   let r;
   try {
-    r = await fetch(serviceUrl() + p, {
+    r = await fetch(url + p, {
       method,
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(90000),
       headers: { "Content-Type": "application/json", ...(auth === "key" ? { "X-Tripo-Key": key } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     });
   } catch (e) {
-    throw new RackError(424, `Can't reach the 3D service at ${serviceUrl()} (${e.cause?.code || e.message}).`);
+    throw new RackError(424, `Can't reach the 3D service at ${url} (${e.cause?.code || e.message}).`);
   }
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new RackError(r.status === 401 ? 400 : r.status >= 500 ? 424 : r.status, j.error || `3D service error (${r.status}).`);
@@ -83,7 +159,7 @@ function colourOf(p, color) {
 // Queue a model of one product colour made from its photos (sent to the 3D service a few at a time)
 export async function queueFromPhotos({ productId, color = "", views = {}, quality, addToRack = false }) {
   ensureTicker();
-  if (!process.env.TRIPO_API_KEY) throw new RackError(400, "Making models from photos needs a Tripo API key (TRIPO_API_KEY). You can still use Upload .glb.");
+  if (!(await rt()).key) throw new RackError(400, "Making models from photos needs a Tripo API key — add it in 3D Rack → Settings & keys. You can still use Upload .glb.");
   const p = await findProduct(productId);
   const c = colourOf(p, color);
   const m = await Rack3dModel.findOne({ product: p._id, color: c.label });
@@ -92,7 +168,7 @@ export async function queueFromPhotos({ productId, color = "", views = {}, quali
   if (!front) throw new RackError(400, `“${p.name}” has no photo to make a model from.`);
   const doc = await Rack3dModel.findOneAndUpdate(
     { product: p._id, color: c.label },
-    { $set: { status: "waiting", stage: "", progress: 0, error: "", jobId: "", jobAuth: "key", views: { front, back: views.back || "" }, quality: quality === "standard" ? "standard" : "detailed", addToRack: !!addToRack, isDeleted: false, deletedAt: null } },
+    { $set: { status: "waiting", stage: "", progress: 0, error: "", jobId: "", jobAuth: "key", views: { front, back: views.back || "" }, quality: (quality || (await rt()).defaultQuality) === "standard" ? "standard" : "detailed", addToRack: !!addToRack, isDeleted: false, deletedAt: null } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   ).lean();
   pump().catch((e) => console.error("[rack3d] pump", e.message));
@@ -115,15 +191,17 @@ export async function queueMany({ productIds = [], addToRack = false, quality })
   return { queued, skipped };
 }
 
-// Send waiting models to the 3D service while fewer than MAX_RUNNING are being made
+// Send waiting models to the 3D service while fewer than the "models at once" setting are being made
 let pumping = false;
 export async function pump() {
-  if (pumping || !process.env.TRIPO_API_KEY) return;
+  if (pumping) return;
+  const { key, maxRunning } = await rt();
+  if (!key) return;
   pumping = true;
   try {
     for (;;) {
       const running = await Rack3dModel.countDocuments({ ...live, status: { $in: ACTIVE }, jobId: { $ne: "" }, jobAuth: "key" });
-      if (running >= MAX_RUNNING) break;
+      if (running >= maxRunning) break;
       const m = await Rack3dModel.findOneAndUpdate({ ...live, status: "waiting" }, { $set: { status: "queued", stage: "sending" } }, { sort: { updatedAt: 1 }, new: true });
       if (!m) break;
       try {
@@ -254,9 +332,10 @@ export async function refreshModels() {
       }
       try {
         const stored = [];
+        const base0 = (await rt()).url;
         const grab = async (fileUrl, name) => {
-          const u = new URL(fileUrl, serviceUrl());
-          const r = await fetch(serviceUrl() + u.pathname, { signal: AbortSignal.timeout(120000) });
+          const u = new URL(fileUrl, base0);
+          const r = await fetch(base0 + u.pathname, { signal: AbortSignal.timeout(120000) });
           if (!r.ok) throw new Error(`download failed (${r.status})`);
           const saved = await uploadToStorage(Buffer.from(await r.arrayBuffer()), name, "pairo-3d");
           stored.push({ url: saved.url, publicId: saved.publicId || "" });
@@ -363,6 +442,7 @@ const modelOut = (m) => m && {
 // Model progress is brought up to date in the background, so this never waits on the 3D service.
 export async function adminView({ q = "", filter = "all", page = 1, per = 24 } = {}) {
   ensureTicker();
+  const run = await rt();
   refreshModels().catch((e) => console.error("[rack3d] refresh", e.message));
 
   const cfg = await getConfig();
@@ -401,7 +481,7 @@ export async function adminView({ q = "", filter = "all", page = 1, per = 24 } =
   }
   const hangable = withModel.length > onRackIds.length || withModel.some((id) => !onRackIds.includes(id));
   return plain({
-    serviceUrl: serviceUrl(), keys: keys(), rack, counts, filter: f, q: search, page: pg, pages, total, perPage,
+    serviceUrl: run.url, keys: { tripo: !!run.key, token: !!run.token }, settings: { defaultQuality: run.defaultQuality, autoHang: run.autoHang, maxRunning: run.maxRunning }, rack, counts, filter: f, q: search, page: pg, pages, total, perPage,
     waiting: models.filter((m) => m.status === "waiting").length,
     running: models.filter((m) => ACTIVE.includes(m.status)).length,
     hangable: hangable ? (await Product.find({ _id: { $in: oid(withModel.filter((id) => !onRackIds.includes(id))) }, isDeleted: { $ne: true } }).select("name images").lean()).map((p) => ({ id: String(p._id), name: p.name, image: p.images?.[0] || "" })) : [],
@@ -415,12 +495,13 @@ export async function adminView({ q = "", filter = "all", page = 1, per = 24 } =
 
 export async function testConnection() {
   let health;
-  try { health = await (await fetch(serviceUrl() + "/health", { signal: AbortSignal.timeout(10000) })).json(); } catch {
-    throw new RackError(424, `Can't reach the 3D service at ${serviceUrl()}.`);
+  const { url, key } = await rt();
+  try { health = await (await fetch(url + "/health", { signal: AbortSignal.timeout(10000) })).json(); } catch {
+    throw new RackError(424, `Can't reach the 3D service at ${url}.`);
   }
-  if (!process.env.TRIPO_API_KEY) {
+  if (!key) {
     await svc("GET", "/v1/models?limit=1", null, "token");
-    return `Connected to the 3D service (v${health.version}). No Tripo API key: you can upload .glb models; add TRIPO_API_KEY to make models from photos.`;
+    return `Connected to the 3D service (v${health.version}). No Tripo API key: you can upload .glb models; add a key to make models from photos.`;
   }
   const a = await svc("GET", "/v1/account");
   return `Connected to the 3D service (v${health.version}). Tripo API credits: ${a.balance ?? "?"}.`;

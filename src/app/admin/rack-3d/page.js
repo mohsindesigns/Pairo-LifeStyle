@@ -34,6 +34,7 @@ export default function Rack3DAdminPage() {
 function Rack3DAdmin() {
   const { data: session } = useSession();
   const canEdit = can(session?.user, "products.edit");
+  const canKeys = can(session?.user, "settings.manage");
   const [d, setD] = useState(null);
   const [err, setErr] = useState("");
   const [query, setQuery] = useState({ q: "", filter: "all", page: 1 });
@@ -46,7 +47,6 @@ function Rack3DAdmin() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [make, setMake] = useState(null);
   const [upload, setUpload] = useState(null);
-  const [testMsg, setTestMsg] = useState("");
   const dirtyRef = useRef(false);
   useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
 
@@ -54,7 +54,7 @@ function Rack3DAdmin() {
     try {
       const sp = new URLSearchParams({ q: query.q, filter: query.filter, page: String(query.page) });
       const j = await api(`/api/admin/rack-3d?${sp}`);
-      setD(j); setErr("");
+      setD((prev) => { if (!prev && j.settings) setBulkHang(j.settings.autoHang); return j; }); setErr("");
       if (!dirtyRef.current) setItems(j.rack.map((x) => ({ ...x })));
     } catch (e) { setErr(e.message); }
   }, [query]);
@@ -81,7 +81,6 @@ function Rack3DAdmin() {
   };
   const unhang = (p) => { const next = items.filter((x) => x.id !== p.id); if (dirty) setRack(next); else saveRack(next); };
   const act = async (fn, ok) => { try { await fn(); if (ok) toast.success(ok); await load(); } catch (e) { toast.error(e.message); } };
-  const test = async () => { setTestMsg("Testing…"); try { setTestMsg((await api("/api/admin/rack-3d/test", { method: "POST" })).message); } catch (e) { setTestMsg(e.message); } };
   const toggle = (id) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   const pageIds = d.products.map((p) => p.id);
   const allOnPage = pageIds.length > 0 && pageIds.every((id) => sel.includes(id));
@@ -154,13 +153,7 @@ function Rack3DAdmin() {
         </div>
 
         <div className="wp-col-side">
-          <Postbox title="3D service">
-            <p className="wp-small">Models are made by the OFFCUT 3D service at <code>{d.serviceUrl}</code> from the product photos. Finished files are copied into this store’s own storage, so the rack keeps working even if the service is down.</p>
-            {!d.keys.tripo && <p className="wp-small">No Tripo <strong>API</strong> key yet: <strong>Make 3D</strong> needs one (add <code>TRIPO_API_KEY</code> to the server environment; about 30–40 Tripo API credits per model). Without it, make the model on the Tripo website (Image to 3D → download GLB) and use <strong>Upload .glb</strong>.</p>}
-            {!d.keys.token && <Notice type="warning">The 3D service token (<code>RACK3D_SERVICE_TOKEN</code>) is not set on the server.</Notice>}
-            <button type="button" className="wp-btn" onClick={test} disabled={!d.keys.tripo && !d.keys.token}><RefreshCw className="inline w-3.5 h-3.5" /> Test connection</button>
-            {testMsg && <p className="wp-small" style={{ marginTop: 8 }}>{testMsg}</p>}
-          </Postbox>
+          <SettingsBox canEdit={canEdit} canKeys={canKeys} onSaved={load} />
         </div>
       </div>
 
@@ -215,7 +208,7 @@ function Rack3DAdmin() {
         )}
       </Postbox>
 
-      {make && <MakeModal {...make} onClose={() => setMake(null)} onDone={() => { setMake(null); load(); }} />}
+      {make && <MakeModal {...make} defaults={d.settings} onClose={() => setMake(null)} onDone={() => { setMake(null); load(); }} />}
       {upload && <UploadModal {...upload} onClose={() => setUpload(null)} onDone={() => { setUpload(null); load(); }} />}
     </Page>
   );
@@ -317,12 +310,12 @@ function PhotoPick({ label, value, onChange, choices, optional }) {
   );
 }
 
-function MakeModal({ product, color, onClose, onDone }) {
+function MakeModal({ product, color, defaults = {}, onClose, onDone }) {
   const choices = [...new Set([color.image, ...product.images].filter(Boolean))];
   const [front, setFront] = useState(color.image || choices[0] || "");
   const [back, setBack] = useState("");
-  const [quality, setQuality] = useState("detailed");
-  const [addToRack, setAddToRack] = useState(!product.onRack);
+  const [quality, setQuality] = useState(defaults.defaultQuality || "detailed");
+  const [addToRack, setAddToRack] = useState(!product.onRack && defaults.autoHang !== false);
   const [busy, setBusy] = useState(false);
   const go = async () => {
     setBusy(true);
@@ -361,5 +354,71 @@ function UploadModal({ product, color, onClose, onDone }) {
       <div className="wp-field"><label className="wp-label">Model file (.glb)</label><input type="file" accept=".glb,model/gltf-binary" onChange={(e) => setFile(e.target.files[0] || null)} /></div>
       {tooBig && <Notice type="error">That file is over 70 MB.</Notice>}
     </Modal>
+  );
+}
+
+// Settings & keys for the 3D rack (no server environment needed). Keys are write-only: they are stored
+// encrypted and only their last 4 characters are ever shown.
+function SettingsBox({ canEdit, canKeys, onSaved }) {
+  const [v, setV] = useState(null);
+  const [f, setF] = useState(null);
+  const [newKey, setNewKey] = useState("");
+  const [newToken, setNewToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const read = useCallback(async () => {
+    try { const j = await api("/api/admin/rack-3d/settings"); setV(j); setF({ serviceUrl: j.serviceUrlSaved, maxRunning: j.maxRunning, defaultQuality: j.defaultQuality, autoHang: j.autoHang }); } catch (e) { setMsg(e.message); }
+  }, []);
+  useEffect(() => { Promise.resolve().then(read); }, [read]);
+  if (!v || !f) return <Postbox title="Settings & keys"><p className="wp-muted"><Loader2 className="inline w-4 h-4 animate-spin" /> Loading…</p></Postbox>;
+
+  const save = async (extra = {}) => {
+    setSaving(true); setMsg("");
+    try {
+      const body = { ...f, ...extra };
+      if (newKey) body.tripoKey = newKey;
+      if (newToken) body.serviceToken = newToken;
+      const j = await api("/api/admin/rack-3d/settings", { method: "PUT", body });
+      setV(j); setNewKey(""); setNewToken(""); toast.success("Settings saved"); onSaved && onSaved();
+    } catch (e) { toast.error(e.message); }
+    setSaving(false);
+  };
+  const test = async () => { setMsg("Testing…"); try { setMsg((await api("/api/admin/rack-3d/test", { method: "POST" })).message); } catch (e) { setMsg(e.message); } };
+  const keyRow = (label, info, value, setValue, field, help) => (
+    <div className="wp-field" style={{ marginBottom: 12 }}>
+      <label className="wp-label">{label}</label>
+      <div className="wp-small" style={{ marginBottom: 4 }}>
+        {info.set ? <>Saved <code>{info.preview}</code>{info.source === "server environment" && <span className="wp-muted"> (from the server environment)</span>}</> : <span className="wp-muted">Not set</span>}
+        {canKeys && info.set && info.source === "admin" && <button type="button" className="wp-link" style={{ marginLeft: 8, background: "none", border: 0, cursor: "pointer", color: "#d63638" }} onClick={() => { if (window.confirm(`Remove the saved ${label}?`)) save({ [field]: null }); }}>Remove</button>}
+      </div>
+      {canKeys ? <input className="wp-input" type="password" autoComplete="new-password" style={{ width: "100%" }} placeholder={info.set ? "Paste a new one to replace it" : "Paste it here"} value={value} onChange={(e) => setValue(e.target.value)} /> : <p className="wp-small wp-muted">Only staff who can manage settings can change this.</p>}
+      <p className="wp-small wp-muted" style={{ marginTop: 4 }}>{help}</p>
+    </div>
+  );
+
+  return (
+    <Postbox title="Settings & keys">
+      {keyRow("Tripo API key", v.tripoKey, newKey, setNewKey, "tripoKey", <>Makes 3D models from your product photos (about 30–40 Tripo API credits each). Get it at <a className="wp-link" href="https://developers.tripo3d.ai/en/keys" target="_blank" rel="noreferrer">developers.tripo3d.ai</a> — website plan credits don’t work here.</>)}
+      {keyRow("3D service token", v.serviceToken, newToken, setNewToken, "serviceToken", "Access token for the OFFCUT 3D service. Needed for everything, including Upload .glb.")}
+      <div className="wp-field" style={{ marginBottom: 12 }}>
+        <label className="wp-label">3D service address</label>
+        <input className="wp-input" style={{ width: "100%" }} disabled={!canEdit} value={f.serviceUrl} placeholder={v.defaultServiceUrl} onChange={(e) => setF({ ...f, serviceUrl: e.target.value })} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div className="wp-field"><label className="wp-label">Models made at once</label>
+          <select className="wp-select" disabled={!canEdit} value={f.maxRunning} onChange={(e) => setF({ ...f, maxRunning: Number(e.target.value) })}>{[1, 2, 3, 4, 5, 6, 8, 10].map((n) => <option key={n} value={n}>{n}</option>)}</select></div>
+        <div className="wp-field"><label className="wp-label">Default quality</label>
+          <select className="wp-select" disabled={!canEdit} value={f.defaultQuality} onChange={(e) => setF({ ...f, defaultQuality: e.target.value })}><option value="detailed">Detailed</option><option value="standard">Standard (fewer credits)</option></select></div>
+      </div>
+      <label className="wp-small" style={{ display: "flex", alignItems: "center", gap: 6, margin: "10px 0" }}>
+        <input type="checkbox" disabled={!canEdit} checked={f.autoHang} onChange={(e) => setF({ ...f, autoHang: e.target.checked })} /> Hang new models on the rack when they’re ready
+      </label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {canEdit && <button type="button" className="wp-btn wp-btn-primary" disabled={saving} onClick={() => save()}>{saving ? "Saving…" : "Save settings"}</button>}
+        <button type="button" className="wp-btn" onClick={test} disabled={!v.tripoKey.set && !v.serviceToken.set}><RefreshCw className="inline w-3.5 h-3.5" /> Test connection</button>
+      </div>
+      {msg && <p className="wp-small" style={{ marginTop: 8 }}>{msg}</p>}
+      <p className="wp-small wp-muted" style={{ marginTop: 8 }}>Finished models are copied into this store’s own storage, so the rack keeps working even if the 3D service is down.</p>
+    </Postbox>
   );
 }

@@ -11,7 +11,7 @@ export async function guarded(permission, fn) {
   if (!can(session.user, permission)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   await dbConnect();
   try {
-    return NextResponse.json(await fn());
+    return NextResponse.json(await fn(session.user));
   } catch (e) {
     const status = e.status || 500;
     if (status >= 500) console.error("[rack-3d]", e);
