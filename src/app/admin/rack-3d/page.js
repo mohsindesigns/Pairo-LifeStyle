@@ -189,7 +189,8 @@ function Rack3DAdmin() {
         <div className="wp-col-main">
           <Postbox title="On the rack" aside={canEdit && <button type="button" className="wp-btn wp-btn-primary" disabled={!dirty || saving} onClick={() => saveRack()}>{saving ? "Saving…" : "Save rack"}</button>}>
             <p className="wp-muted">Left to right, as shoppers see it. Size makes a piece hang larger or smaller next to the others.</p>
-            {!items.length && <p className="wp-empty">Nothing on the rack yet — make 3D models below, then hang them here.</p>}
+            <HomepageStatus h={d.homepage} />
+            {!items.length && <p className="wp-empty">No order saved — the rack hangs every published product with a finished 3D model automatically (newest first, up to 12). Hang pieces here to choose them and their order yourself.</p>}
             <ol style={{ listStyle: "none", margin: "8px 0 0", padding: 0, display: "grid", gap: 8 }}>
               {items.map((it, i) => (
                 <li key={it.id} style={{ display: "grid", gridTemplateColumns: "24px 48px 1fr auto", gap: 10, alignItems: "center", padding: 8, border: "1px solid #dcdcde", borderRadius: 4, background: "#fff" }}>
@@ -496,5 +497,26 @@ function SettingsBox({ canEdit, canKeys, onSaved }) {
       {msg && <p className="wp-small" style={{ marginTop: 8 }}>{msg}</p>}
       <p className="wp-small wp-muted" style={{ marginTop: 8 }}>Finished models are copied into this store’s own storage, so the rack keeps working even if the 3D service is down.</p>
     </Postbox>
+  );
+}
+
+// Exactly what the homepage 3D Rack section shows right now, and why anything is left out
+function HomepageStatus({ h }) {
+  if (!h) return null;
+  const ok = h.count > 0;
+  return (
+    <div className={`wp-notice wp-notice-${ok ? "info" : "warning"}`} style={{ margin: "8px 0 12px" }}>
+      <p style={{ margin: 0 }}>
+        <strong>On the homepage now:</strong>{" "}
+        {ok ? <>{h.count} piece{h.count === 1 ? "" : "s"} ({h.mode === "auto" ? "chosen automatically" : "your saved order"}) — {h.names.slice(0, 4).join(", ")}{h.names.length > 4 ? "…" : ""}</>
+          : <>nothing yet, so the 3D Rack section stays hidden. It appears as soon as a <strong>published</strong> product has a finished 3D model.</>}
+      </p>
+      {h.skipped.length > 0 && (
+        <ul style={{ margin: "6px 0 0 18px", listStyle: "disc" }}>
+          {h.skipped.slice(0, 6).map((x) => <li key={x.id} className="wp-small">Not shown: <strong>{x.name}</strong> — {x.reason}.</li>)}
+          {h.skipped.length > 6 && <li className="wp-small">…and {h.skipped.length - 6} more.</li>}
+        </ul>
+      )}
+    </div>
   );
 }

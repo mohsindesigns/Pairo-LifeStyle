@@ -391,29 +391,50 @@ export async function getConfig() {
 }
 
 // What the homepage rack shows (published products with a finished model, in rack order)
-export async function rackItems({ includeDrafts = false } = {}) {
+const AUTO_MAX = 12;
+
+// Which products hang on the rack: the saved order, or — when nothing is saved — automatically every
+// product that has a finished 3D model (newest model first). Returns ids + sizes in order.
+async function rackPlan() {
   const cfg = await getConfig();
-  if (!cfg.items.length) return [];
-  const ids = cfg.items.map((i) => i.product);
-  const q = { _id: { $in: ids }, isDeleted: { $ne: true } };
-  if (!includeDrafts) q.status = "Published";
-  const [products, models] = await Promise.all([Product.find(q).lean(), Rack3dModel.find({ product: { $in: ids }, ...live }).lean()]);
-  const out = [];
-  for (const it of cfg.items) {
-    const p = products.find((x) => String(x._id) === String(it.product));
-    if (!p) continue;
-    const r = rackModelFor(p, models.filter((m) => String(m.product) === String(p._id)));
-    if (!r) continue;
-    out.push(plain({
-      _id: p._id, id: String(p._id), name: p.name, slug: p.slug, status: p.status, productType: p.productType,
-      price: p.price, compareAtPrice: p.compareAtPrice, sku: p.sku, stock: p.stock, manageStock: p.manageStock,
-      image: p.images?.[0] || p.image || "", images: p.images || [],
-      attributes: p.attributes || [], variantCombinations: p.variantCombinations || [],
-      sizes: sizesOf(p),
-      rack3d: { ...r, scale: it.scale || 1 },
-    }));
+  if (cfg.items.length) return { mode: "manual", items: cfg.items.map((i) => ({ product: String(i.product), scale: i.scale || 1 })) };
+  const ready = await Rack3dModel.find({ ...live, rackUrl: { $ne: "" }, detailUrl: { $ne: "" } }).sort({ updatedAt: -1 }).select("product").lean();
+  const ids = [...new Set(ready.map((m) => String(m.product)))];
+  return { mode: "auto", items: ids.map((product) => ({ product, scale: 1 })) };
+}
+
+const rackProduct = (p, r, scale) => plain({
+  _id: p._id, id: String(p._id), name: p.name, slug: p.slug, status: p.status, productType: p.productType,
+  price: p.price, compareAtPrice: p.compareAtPrice, sku: p.sku, stock: p.stock, manageStock: p.manageStock,
+  image: p.images?.[0] || p.image || "", images: p.images || [],
+  attributes: p.attributes || [], variantCombinations: p.variantCombinations || [],
+  sizes: sizesOf(p),
+  rack3d: { ...r, scale: scale || 1 },
+});
+
+// What the homepage rack shows (published products with a finished model, in rack order) + what was left out and why
+export async function rackReport({ includeDrafts = false } = {}) {
+  const plan = await rackPlan();
+  const ids = plan.items.map((i) => i.product).filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const [products, models] = await Promise.all([
+    Product.find({ _id: { $in: ids } }).lean(),
+    Rack3dModel.find({ product: { $in: ids }, ...live }).lean(),
+  ]);
+  const shown = [], skipped = [];
+  for (const it of plan.items) {
+    const p = products.find((x) => String(x._id) === it.product);
+    if (!p || p.isDeleted) { skipped.push({ id: it.product, name: p?.name || "(deleted product)", reason: "the product was deleted" }); continue; }
+    if (!includeDrafts && p.status !== "Published") { skipped.push({ id: it.product, name: p.name, reason: `it is a ${String(p.status || "draft").toLowerCase()} product — publish it to show it` }); continue; }
+    const r = rackModelFor(p, models.filter((m) => String(m.product) === it.product));
+    if (!r) { skipped.push({ id: it.product, name: p.name, reason: "it has no finished 3D model" }); continue; }
+    if (plan.mode === "auto" && shown.length >= AUTO_MAX) break;
+    shown.push(rackProduct(p, r, it.scale));
   }
-  return out;
+  return { mode: plan.mode, items: shown, skipped };
+}
+
+export async function rackItems(opts) {
+  return (await rackReport(opts)).items;
 }
 
 export async function saveRack(items) {
@@ -501,6 +522,7 @@ export async function adminView({ q = "", filter = "all", page = 1, per = 24 } =
     serviceUrl: run.url, keys: { tripo: !!run.key, token: !!run.token }, settings: { defaultQuality: run.defaultQuality, autoHang: run.autoHang, maxRunning: run.maxRunning }, rack, counts, filter: f, q: search, page: pg, pages, total, perPage,
     waiting: models.filter((m) => m.status === "waiting").length,
     making: await makingList(models),
+    homepage: await (async () => { const r = await rackReport(); return { mode: r.mode, count: r.items.length, names: r.items.map((x) => x.name), skipped: r.skipped }; })(),
     running: models.filter((m) => ACTIVE.includes(m.status)).length,
     hangable: hangable ? (await Product.find({ _id: { $in: oid(withModel.filter((id) => !onRackIds.includes(id))) }, isDeleted: { $ne: true } }).select("name images").lean()).map((p) => ({ id: String(p._id), name: p.name, image: p.images?.[0] || "" })) : [],
     products: products.map((p) => ({
