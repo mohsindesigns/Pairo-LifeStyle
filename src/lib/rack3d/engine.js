@@ -107,8 +107,15 @@
 
   var cache = {};
   function loadModel(url) {
-    if (cache[url]) return cache[url];
-    cache[url] = fetch(url).then(function (r) {
+    // Pairo: every caller gets its own copy (geometry/materials shared). The cache outlives the rack when shoppers
+    // leave the home page and come back; handing the same object to the new rack kept the old rack's transforms,
+    // so garments were drawn far below their hangers.
+    if (!cache[url]) cache[url] = fetchModel(url);
+    return cache[url].then(function (scene) { return scene.clone(true); });
+  }
+
+  function fetchModel(url) {
+    return fetch(url).then(function (r) {
       if (!r.ok) throw new Error('http ' + r.status);
       return r.arrayBuffer();
     }).then(function (buf) {
@@ -142,11 +149,14 @@
         return scene;
       });
     });
-    return cache[url];
   }
 
   // Wrap a loaded scene so its top-centre sits at the origin; return group + size (unit height)
   function normalise(scene) {
+    // measure in the model's own space (Pairo: never inherit a transform from wherever it was before)
+    if (scene.parent) scene.parent.remove(scene);
+    scene.position.set(0, 0, 0); scene.rotation.set(0, 0, 0); scene.scale.set(1, 1, 1);
+    scene.updateMatrixWorld(true);
     var box = new T.Box3().setFromObject(scene);
     var size = box.getSize(new T.Vector3());
     var c = box.getCenter(new T.Vector3());
@@ -344,7 +354,7 @@
   Rack3D.prototype.slots = function () {
     var xs = [], it = this.items, x = 0;
     for (var i = 0; i < it.length; i++) {
-      if (i > 0) x += ((it[i - 1].depth || 0.3) + (it[i].depth || 0.3)) / 2 * 0.86;
+      if (i > 0) x += ((it[i - 1].depth || 0.3) + (it[i].depth || 0.3)) / 2 + 0.015; // Pairo: no overlap at rest
       xs.push(x);
     }
     var mid = (xs[0] + xs[xs.length - 1]) / 2;
@@ -366,7 +376,9 @@
       gsap.to(st, Object.assign(t, { duration: 1.05, ease: 'expo.out', overwrite: 'auto' }));
     });
     var span = xs[xs.length - 1] - xs[0] + 0.7;
+    var grew = Math.abs(span - (this._fitLen || 0)) > 0.05;
     this.railLen = span;
+    if (grew && this.renderer && h < 0) { this._fitLen = span; this.resize(); }
   };
 
   Rack3D.prototype.setHover = function (h) {
@@ -538,7 +550,7 @@
     var a = w / h;
     this.cam.aspect = a;
     // fit the rack width on narrow screens
-    var need = 3.9;
+    var need = Math.max(3.9, (this.railLen || 0) + 0.35); // Pairo: keep a long rack in view
     var halfW = Math.tan((this.cam.fov * PI / 180) / 2) * a;
     this.dist = Math.max(4.9, (need / 2) / halfW + 0.5);
     this.cam.updateProjectionMatrix();
@@ -587,11 +599,13 @@
       if (h !== this.hover) this.setHover(h);
     }
 
+    if (this.mode === 'rack') this._closet(dt);
     for (var i = 0; i < this.items.length; i++) {
       var it = this.items[i], st = it.state;
-      // swing physics driven by acceleration of the hook along the rail
-      var vx = (st.x - it.px) / Math.max(dt, 1e-3), ax = (vx - it.vx) / Math.max(dt, 1e-3);
-      it.px = st.x; it.vx = vx;
+      // swing physics driven by acceleration of the hook along the rail (incl. the closet slide)
+      var sx = st.x + (it.slide || 0);
+      var vx = (sx - it.px) / Math.max(dt, 1e-3), ax = (vx - it.vx) / Math.max(dt, 1e-3);
+      it.px = sx; it.vx = vx;
       var vz = (st.z - it.pz) / Math.max(dt, 1e-3), az = (vz - it.vz) / Math.max(dt, 1e-3);
       it.pz = st.z; it.vz = vz;
       var kS = 38, cS = 2.4;
@@ -601,7 +615,7 @@
       it.swingX += it.swingXv * dt;
       var idle = Math.sin(t * 0.7 + i * 1.7) * 0.012;
       var p = it.pivot;
-      p.position.set(st.x, st.y, st.z);
+      p.position.set(st.x + (it.slide || 0), st.y, st.z);
       p.rotation.set(it.swingX * (this.mode === 'product' && i === this.sel ? 0.3 : 1), 0, (it.swingZ + idle) * (this.mode === 'product' && i === this.sel ? 0.2 : 1));
       var yaw = (this.mode === 'product' && i === this.sel) ? this.spin.yaw : st.yaw;
       it.turn.rotation.set(i === this.sel ? this.spin.tilt : 0, yaw, 0);
@@ -615,6 +629,60 @@
       }
     }
     this.renderer.render(this.scene, this.cam);
+  };
+
+  // Pairo: closet physics. The cursor brushes through the garments — the ones it sweeps across swing and slide
+  // along the rail, then spring back — and neighbours push each other apart instead of passing through.
+  var _plane = new T.Plane(new T.Vector3(0, 0, 1), 0), _hit = new T.Vector3(), _ndc = new T.Vector2();
+  Rack3D.prototype._closet = function (dt) {
+    var m = this.mouse, items = this.items, mx = null, my = 0;
+    if (m.on && this.ready) {
+      _ndc.set(m.nx, m.ny);
+      this.ray.setFromCamera(_ndc, this.cam);
+      if (this.ray.ray.intersectPlane(_plane, _hit)) { mx = _hit.x; my = _hit.y; }
+    }
+    var mvx = (mx !== null && this._mx != null) ? Math.max(-6, Math.min(6, (mx - this._mx) / Math.max(dt, 1e-3))) : 0;
+    this._mx = mx;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      it.slide = it.slide || 0; it.slideV = it.slideV || 0;
+      if (!it.model) continue;
+      var push = 0;
+      if (mx !== null && i !== this.hover && Math.abs(mvx) > 0.05) {
+        var half = (it.depth || 0.3) / 2 + 0.06, dx = mx - (it.state.x + it.slide);
+        var top = it.state.y - 0.1, bottom = it.state.y - 0.155 - (it.height || 0.7);
+        if (Math.abs(dx) < half && my < top && my > bottom) {
+          var f = 1 - Math.abs(dx) / half;
+          it.swingZv += mvx * f * 0.09;         // brushed: swing the way the cursor moves
+          push = mvx * f * 9;                   // …and slide along the rail a little
+        }
+      }
+      it.slideV += (-55 * it.slide - 8 * it.slideV + push) * dt;
+      it.slide = Math.max(-0.3, Math.min(0.3, it.slide + it.slideV * dt));
+    }
+    // a hanging garment only swings so far (keeps it cloth-like, not flailing)
+    for (var q = 0; q < items.length; q++) {
+      var g2 = items[q];
+      if (g2.swingZ > 0.34) { g2.swingZ = 0.34; if (g2.swingZv > 0) g2.swingZv *= -0.3; }
+      else if (g2.swingZ < -0.34) { g2.swingZ = -0.34; if (g2.swingZv < 0) g2.swingZv *= -0.3; }
+    }
+    // neighbours never pass through each other: compare their middles (swing moves the hem sideways)
+    for (var pass = 0; pass < 2; pass++) {
+      for (var j = 0; j + 1 < items.length; j++) {
+        var a = items[j], b = items[j + 1];
+        if (!a.model || !b.model) continue;
+        var ea = j === this.hover ? (a.width || 0.45) : (a.depth || 0.3);
+        var eb = j + 1 === this.hover ? (b.width || 0.45) : (b.depth || 0.3);
+        var xa = a.state.x + a.slide + Math.sin(a.swingZ) * (a.height || 0.7) * 0.5;
+        var xb = b.state.x + b.slide + Math.sin(b.swingZ) * (b.height || 0.7) * 0.5;
+        var over = (ea + eb) / 2 - (xb - xa);
+        if (over > 0) {
+          a.slide -= over / 2; b.slide += over / 2;
+          var rv = b.swingZv - a.swingZv;   // moving into each other: share the swing, like cloth bumping cloth
+          if (rv < 0) { a.swingZv += rv * 0.5; b.swingZv -= rv * 0.5; }
+        }
+      }
+    }
   };
 
   // keep the rack-resolution model around so exit can restore it
