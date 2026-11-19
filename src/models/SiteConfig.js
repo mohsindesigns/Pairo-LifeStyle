@@ -127,6 +127,13 @@ const SiteConfigSchema = new mongoose.Schema({
     frequency: { type: String, enum: ['session', 'daily', 'always'], default: 'session' },
   },
 
+  // ─── Floating "Google Reviews" side tab ────────────────────
+  floatingReviews: {
+    enabled: { type: Boolean, default: true },
+    label: { type: String, default: 'Google Reviews' },
+    topOffset: { type: Number, default: 50 }, // vertical position, % of viewport height
+  },
+
   // ─── Store Commerce Settings ───────────────────────────────────────────────
   // Global defaults used by the shipping engine, tax service, and checkout
   commerce: {

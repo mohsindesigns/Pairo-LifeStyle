@@ -10,7 +10,7 @@ const BlogCard = ({ post, readMoreLabel }) => (
   <Link href={`/blog/${post.slug}`} className="group cursor-pointer w-full block">
     <div className="relative aspect-square bg-[#F7F7F7] rounded-[16px] md:rounded-[24px] overflow-hidden border border-black/5">
       <div className="absolute inset-0">
-        <Image src={post.image || "/placeholder.jpg"} alt={post.title} fill className="object-cover transition-transform duration-1000 group-hover:scale-105" />
+        <Image src={post.image || "/placeholder.jpg"} alt={post.title} fill className="object-contain transition-transform duration-1000 group-hover:scale-105" />
       </div>
       {post.category && (
         <div className="absolute top-2 md:top-4 left-2 md:left-4 z-10">

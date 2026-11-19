@@ -3,14 +3,14 @@ const decodeBasicEntities = (t) =>
     .replace(/&quot;/gi, '"').replace(/&#0?39;|&apos;/gi, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
 
 /**
- * H1-H3 headings of a blog post's HTML as table-of-contents entries: [{ id, title }].
+ * H2 headings of a blog post's HTML as table-of-contents entries: [{ id, title }].
  * Pure string work (no DOM), so it gives the same result on the server and in the browser and the
  * table of contents is already in the server-rendered HTML.
  */
 export function extractTocSections(html) {
   if (!html) return [];
   const out = [];
-  const re = /<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1>/gi;
+  const re = /<h(2)\b[^>]*>([\s\S]*?)<\/h\1>/gi;
   let m;
   while ((m = re.exec(html))) {
     const text = decodeBasicEntities(m[2].replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
