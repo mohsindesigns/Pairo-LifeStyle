@@ -8,10 +8,9 @@ import { useSiteData } from "@/context/SiteContext";
 
 const BlogCard = ({ post, readMoreLabel }) => (
   <Link href={`/blog/${post.slug}`} className="group cursor-pointer w-full block">
-    <div className="relative aspect-square bg-[#F7F7F7] rounded-[16px] md:rounded-[24px] overflow-hidden border border-black/5">
-      <div className="absolute inset-0">
-        <Image src={post.image || "/placeholder.jpg"} alt={post.title} fill className="object-contain transition-transform duration-1000 group-hover:scale-105" />
-      </div>
+    <div className="relative rounded-[16px] md:rounded-[24px] overflow-hidden">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={post.image || "/placeholder.jpg"} alt={post.title} loading="lazy" className="block w-full h-auto transition-transform duration-1000 group-hover:scale-105" />
       {post.category && (
         <div className="absolute top-2 md:top-4 left-2 md:left-4 z-10">
           <p className="bg-black/80 backdrop-blur-md text-white text-[6px] md:text-[8px] font-bold px-2 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg tracking-[0.1em] md:tracking-[0.2em] uppercase shadow-lg">{post.category}</p>

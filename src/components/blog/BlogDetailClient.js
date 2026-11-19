@@ -39,12 +39,12 @@ const BlogCard = ({ post }) => (
   <Link href={`/blog/${post.slug}`} className="group block h-full">
     <article className="h-full flex flex-col bg-white border border-neutral-100 overflow-hidden hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300">
       {/* Thumbnail */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100 shrink-0">
+      <div className="relative overflow-hidden shrink-0">
         {post.image ? (
           <img
             src={post.image}
             alt={post.title}
-            className="w-full h-full object-contain transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            className="block w-full h-auto transition-transform duration-500 ease-out group-hover:scale-[1.04]"
             loading="lazy"
           />
         ) : (
@@ -405,8 +405,8 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
          <div className="container mx-auto px-2 sm:px-4 md:px-8 py-4 md:py-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-14">
                <div id="blog-main-content" className="lg:col-span-8">
-                  <div className="aspect-[16/9] rounded-[4px] overflow-hidden bg-neutral-100 border border-black/5 shadow-sm mb-6">
-                     <img src={post.image} alt={post.imageAlts?.[post.image] || post.title || "Blog Image"} className="w-full h-full object-contain" />
+                  <div className="rounded-[4px] overflow-hidden mb-6">
+                     <img src={post.image} alt={post.imageAlts?.[post.image] || post.title || "Blog Image"} className="block w-full h-auto" />
                   </div>
 
                   <div className="block lg:hidden bg-[#FAF9F6] border border-black/[0.04] rounded-[4px] p-5 mb-6 space-y-6">

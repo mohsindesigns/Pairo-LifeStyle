@@ -8,7 +8,7 @@ const ctrlWrap = { flex: "1 1 320px", minWidth: 0 };
 export default function FloatingReviewsTab({ config, onChange }) {
   const fr = {
     enabled: true,
-    label: "Google Reviews",
+    label: "Reviews",
     topOffset: 50,
     ...(config.floatingReviews || {}),
   };
@@ -64,11 +64,11 @@ export default function FloatingReviewsTab({ config, onChange }) {
             type="text"
             value={fr.label || ""}
             onChange={(e) => update("label", e.target.value)}
-            placeholder="Google Reviews"
+            placeholder="Reviews"
             className="wp-input"
             maxLength={40}
           />
-          <p className="wp-hint">Text shown vertically on the tab. Defaults to &quot;Google Reviews&quot; when empty.</p>
+          <p className="wp-hint">Text shown vertically on the tab. Defaults to &quot;Reviews&quot; when empty.</p>
         </div>
 
         <div className="wp-frow">

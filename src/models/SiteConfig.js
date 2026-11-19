@@ -127,10 +127,10 @@ const SiteConfigSchema = new mongoose.Schema({
     frequency: { type: String, enum: ['session', 'daily', 'always'], default: 'session' },
   },
 
-  // ─── Floating "Google Reviews" side tab ────────────────────
+  // ─── Floating "Reviews" side tab ────────────────────
   floatingReviews: {
     enabled: { type: Boolean, default: true },
-    label: { type: String, default: 'Google Reviews' },
+    label: { type: String, default: 'Reviews' },
     topOffset: { type: Number, default: 50 }, // vertical position, % of viewport height
   },
 

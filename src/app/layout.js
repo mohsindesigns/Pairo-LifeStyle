@@ -90,7 +90,7 @@ export default async function RootLayout({ children }) {
     footer: { sections: [{}, { links: [] }] },
     categories: { items: [] },
     popup: { enabled: false },
-    floatingReviews: { enabled: true, label: 'Google Reviews', topOffset: 50 },
+    floatingReviews: { enabled: true, label: 'Reviews', topOffset: 50 },
     _dbCategories: [],
     _dbPages: [],
     _dbBlogs: [],
@@ -173,7 +173,7 @@ export default async function RootLayout({ children }) {
         ...sanitizedConfig,
         ...JSON.parse(JSON.stringify(config)),
         popup: config.popup || { enabled: false },
-        floatingReviews: { enabled: true, label: 'Google Reviews', topOffset: 50, ...(config.floatingReviews || {}) },
+        floatingReviews: { enabled: true, label: 'Reviews', topOffset: 50, ...(config.floatingReviews || {}) },
       };
     }
 

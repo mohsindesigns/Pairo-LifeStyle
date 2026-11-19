@@ -4,17 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { Star, X } from "lucide-react";
 import { useSiteData } from "@/context/SiteContext";
 
-function GoogleG({ className = "w-5 h-5" }) {
-  return (
-    <svg className={className} viewBox="0 0 48 48" aria-hidden="true">
-      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-    </svg>
-  );
-}
-
 function relativeDate(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -32,12 +21,22 @@ export default function FloatingReviews() {
   const siteData = useSiteData();
   const [open, setOpen] = useState(false);
   const closeRef = useRef(null);
+  const [reviews, setReviews] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/reviews/verified")
+      .then((r) => (r.ok ? r.json() : { reviews: [] }))
+      .then((d) => { if (!cancelled) setReviews(Array.isArray(d?.reviews) ? d.reviews : []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const cfg = siteData?.floatingReviews || {};
   const enabled = cfg.enabled !== false;
-  const label = String(cfg.label || "").trim() || "Google Reviews";
+  const rawLabel = String(cfg.label || "").trim();
+  const label = !rawLabel || rawLabel === "Google Reviews" ? "Reviews" : rawLabel;
   const top = Number.isFinite(Number(cfg.topOffset)) ? Number(cfg.topOffset) : 50;
-  const reviews = Array.isArray(siteData?.testimonials?.reviews) ? siteData.testimonials.reviews : [];
   const visible = enabled && reviews.length > 0;
 
   useEffect(() => {
@@ -90,7 +89,6 @@ export default function FloatingReviews() {
         >
           <div className="flex items-center justify-between gap-3 px-5 py-4 bg-white border-b border-black/5">
             <div className="flex items-center gap-2 min-w-0">
-              <GoogleG className="w-5 h-5 shrink-0" />
               <h2 className="text-sm font-bold uppercase tracking-tight text-black truncate">{label}</h2>
               <span className="text-[11px] text-black/40 font-bold">({reviews.length})</span>
             </div>
@@ -126,9 +124,9 @@ export default function FloatingReviews() {
                       <div className="min-w-0">
                         <h3 className="text-black font-bold text-[13px] heading-font tracking-tight uppercase truncate">{name}</h3>
                         {date && <span className="text-black/40 text-[10px] font-medium">{date}</span>}
+                        {review?.product && <span className="block text-black/50 text-[10px] font-medium truncate">on {review.product}</span>}
                       </div>
                     </div>
-                    <GoogleG className="w-5 h-5 shrink-0" />
                   </div>
                   <div className="flex gap-0.5" role="img" aria-label={`${rating} out of 5 stars`}>
                     {[...Array(5)].map((_, s) => (
