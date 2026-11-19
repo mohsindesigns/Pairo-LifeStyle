@@ -46,6 +46,7 @@ export async function GET(req) {
         frequency: 'session',
       };
     }
+    config.floatingReviews = { enabled: true, label: 'Google Reviews', topOffset: 50, ...(config.floatingReviews || {}) };
     return NextResponse.json(JSON.parse(JSON.stringify(config)));
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -44,7 +44,7 @@ const BlogCard = ({ post }) => (
           <img
             src={post.image}
             alt={post.title}
-            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            className="w-full h-full object-contain transition-transform duration-500 ease-out group-hover:scale-[1.04]"
             loading="lazy"
           />
         ) : (
@@ -218,7 +218,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
        const assignIds = () => {
           const contentEl = document.querySelector(".blog-content");
           if (!contentEl) return;
-          const headings = contentEl.querySelectorAll("h1, h2, h3");
+          const headings = contentEl.querySelectorAll("h2");
           headings.forEach((el, i) => {
              if (tocSections[i]) {
                 el.id = tocSections[i].id;
@@ -237,7 +237,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
            // Fallback: search headings in .blog-content for matching text
            const contentEl = document.querySelector(".blog-content");
            if (contentEl) {
-              const headings = Array.from(contentEl.querySelectorAll("h1, h2, h3"));
+              const headings = Array.from(contentEl.querySelectorAll("h2"));
               element = headings.find(h => h.textContent.trim() === title);
            }
         }
@@ -405,8 +405,8 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
          <div className="container mx-auto px-2 sm:px-4 md:px-8 py-4 md:py-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-14">
                <div id="blog-main-content" className="lg:col-span-8">
-                  <div className="aspect-[16/9] rounded-[4px] overflow-hidden border border-black/5 shadow-sm mb-6">
-                     <img src={post.image} alt={post.imageAlts?.[post.image] || post.title || "Blog Image"} className="w-full h-full object-cover" />
+                  <div className="aspect-[16/9] rounded-[4px] overflow-hidden bg-neutral-100 border border-black/5 shadow-sm mb-6">
+                     <img src={post.image} alt={post.imageAlts?.[post.image] || post.title || "Blog Image"} className="w-full h-full object-contain" />
                   </div>
 
                   <div className="block lg:hidden bg-[#FAF9F6] border border-black/[0.04] rounded-[4px] p-5 mb-6 space-y-6">
