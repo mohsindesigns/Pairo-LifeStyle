@@ -4,17 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { Star, X } from "lucide-react";
 import { useSiteData } from "@/context/SiteContext";
 
-function relativeDate(value) {
+// Same format as the product page reviews (e.g. "Oct 2, 2026"); shown as written, never "Today"/"ago" guesses.
+function formatDate(value) {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-  if (days < 1) return "Today";
-  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
-  if (days < 30) { const w = Math.floor(days / 7); return `${w} week${w === 1 ? "" : "s"} ago`; }
-  if (days < 365) { const m = Math.floor(days / 30); return `${m} month${m === 1 ? "" : "s"} ago`; }
-  const y = Math.floor(days / 365);
-  return `${y} year${y === 1 ? "" : "s"} ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function FloatingReviews() {
@@ -107,7 +102,7 @@ export default function FloatingReviews() {
             {reviews.map((review, i) => {
               const name = String(review?.name || "").trim() || "Customer";
               const rating = Number(review?.rating) || 0;
-              const date = relativeDate(review?.date || review?.createdAt);
+              const date = formatDate(review?.date || review?.createdAt);
               const image = review?.image || review?.avatar;
               return (
                 <li key={i} className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 flex flex-col gap-3">
