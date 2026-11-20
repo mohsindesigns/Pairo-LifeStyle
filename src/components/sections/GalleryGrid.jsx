@@ -35,7 +35,7 @@ function GalleryCard({ item, index, onClick }) {
           </div>
         )}
 
-        {/* Hover overlay with title + caption */}
+        {/* Hover overlay with the name only */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 md:p-4">
           {item.title && (
             <p
@@ -45,20 +45,9 @@ function GalleryCard({ item, index, onClick }) {
               {item.title}
             </p>
           )}
-          {item.description && (
-            <p className="hidden md:block mt-1 text-white/75 text-xs leading-snug line-clamp-2">
-              {item.description}
-            </p>
-          )}
         </div>
       </div>
 
-      {/* Always-visible title (touch devices have no hover) */}
-      {item.title && (
-        <p className="mt-2.5 px-1 text-[11px] md:text-xs font-bold uppercase tracking-[1.5px] text-foreground/80 line-clamp-1 md:group-hover:text-foreground">
-          {item.title}
-        </p>
-      )}
     </motion.button>
   );
 }
@@ -137,14 +126,6 @@ function GalleryDetailModal({ item, onClose }) {
               {item.title}
             </h2>
           </div>
-
-          {item.description && (
-            <div className="border-t border-border pt-4 overflow-y-auto flex-1 max-h-[160px] md:max-h-[240px] pr-2 mt-4">
-              <p className="text-foreground/60 text-xs md:text-sm leading-relaxed">
-                {item.description}
-              </p>
-            </div>
-          )}
 
           {/* Bottom: View Product button */}
           <div className="pt-4 mt-4 border-t border-border flex flex-col gap-4">
