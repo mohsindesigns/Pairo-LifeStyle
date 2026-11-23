@@ -15,13 +15,16 @@ function slimCat(c) {
   };
 }
 
-export async function getProductsForShop() {
+// categoryId: when set (collection pages), only that category's products are loaded. This matches the
+// client's category filter (p.categories contains the category _id), so the visible grid is unchanged —
+// collection pages just stop shipping the entire catalog.
+export async function getProductsForShop({ categoryId } = {}) {
   await dbConnect();
-  
-  const products = await Product.find({
-    status: 'Published',
-    isDeleted: { $ne: true }
-  })
+
+  const query = { status: 'Published', isDeleted: { $ne: true } };
+  if (categoryId) query.categories = categoryId;
+
+  const products = await Product.find(query)
   .select('name slug price compareAtPrice image images categories primaryCategory rating reviewCount isFeatured type productType status attributes variantCombinations')
   .populate('categories')
   .populate('primaryCategory')
