@@ -26,12 +26,12 @@ const BlogCard = ({ post }) => (
   <Link href={`/blog/${post.slug}`} className="group block h-full">
     <article className="h-full flex flex-col bg-white border border-neutral-100 overflow-hidden hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300">
       {/* Thumbnail */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100 shrink-0">
+      <div className="relative overflow-hidden shrink-0">
         {post.image ? (
           <img
             src={post.image}
             alt={post.title}
-            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            className="block w-full h-auto transition-transform duration-500 ease-out group-hover:scale-[1.04]"
             loading="lazy"
           />
         ) : (

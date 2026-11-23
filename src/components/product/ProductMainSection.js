@@ -212,10 +212,20 @@ export default function ProductMainSection({ product, topReview = null }) {
           )}
 
           {deliveryRange && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-black/10 bg-white/80 text-[11px] font-semibold text-black tracking-wide shadow-sm">
-              <Truck className="w-3 h-3 text-black/50 shrink-0" />
-              Delivered between&nbsp;<span className="font-bold">{deliveryRange}</span>
-            </span>
+            <div className="flex items-center gap-3 md:gap-4 rounded-xl border-2 border-emerald-600/30 bg-emerald-50 px-4 py-3 md:px-5 md:py-3.5 shadow-sm">
+              <span className="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-full bg-emerald-600 text-white shrink-0 shadow-md">
+                <Truck className="w-5 h-5 md:w-6 md:h-6" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] md:text-[12px] font-bold uppercase tracking-wider text-emerald-700">
+                  Estimated Delivery
+                </p>
+                <p className="text-[16px] md:text-[18px] font-semibold text-primary leading-tight">
+                  Delivered between{" "}
+                  <span className="font-extrabold text-emerald-700 whitespace-nowrap">{deliveryRange}</span>
+                </p>
+              </div>
+            </div>
           )}
 
           {/* Variant Selector + Stock + ATC */}

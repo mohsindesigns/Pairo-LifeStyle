@@ -2,6 +2,34 @@ import Product from "@/models/Product";
 import Category from "@/models/Category";
 import Blog from "@/models/Blog";
 
+// Fields the storefront cards, size modal, cart and GA events actually read.
+// Sending whole product docs (descriptions, FAQs, SEO, size charts, populated
+// categories with their own long HTML) made the homepage RSC payload ~4MB.
+const CARD_FIELDS = [
+  '_id', 'id', 'name', 'title', 'slug', 'sku', 'price', 'compareAtPrice', 'oldPrice',
+  'image', 'image2', 'images', 'productType', 'rating', 'reviewCount', 'attributes',
+  'variants', 'variantCombinations', 'madeToMeasure', 'corporateGifting', 'weight',
+  'currency', 'collections', 'status', 'isDeleted', 'stock', 'manageStock', 'availabilityStatus',
+];
+
+function slimCategory(c) {
+  if (!c || typeof c !== 'object') return c;
+  return { _id: c._id, name: c.name, slug: c.slug };
+}
+
+function slimProduct(p, altMap = {}) {
+  const out = {};
+  for (const k of CARD_FIELDS) if (p[k] !== undefined) out[k] = p[k];
+  if (Array.isArray(p.categories)) out.categories = p.categories.map(slimCategory);
+  if (p.primaryCategory) out.primaryCategory = slimCategory(p.primaryCategory);
+  const imageAlts = {};
+  for (const url of [...(p.images || []), p.image, p.image2]) {
+    if (url && altMap[url]) imageAlts[url] = altMap[url];
+  }
+  out.imageAlts = imageAlts;
+  return out;
+}
+
 export async function resolvePageSections(sections) {
   const resolvedSections = await Promise.all(sections.map(async (section) => {
     const config = { ...(section.config || {}) };
@@ -87,7 +115,7 @@ export async function resolvePageSections(sections) {
           if (p.image) allUrls.push(p.image);
         });
         const altMap = await getAltTextMap(allUrls);
-        const enriched = products.map(p => ({ ...p, imageAlts: altMap }));
+        const enriched = products.map(p => slimProduct(p, altMap));
           
         config.products = JSON.parse(JSON.stringify(enriched));
       }
@@ -160,7 +188,7 @@ export async function resolvePageSections(sections) {
             categorySlug: categorySlug || null,
             total,
             randomize,
-            products: JSON.parse(JSON.stringify(picked.map((p) => ({ ...p, imageAlts: altMap })))),
+            products: JSON.parse(JSON.stringify(picked.map((p) => slimProduct(p, altMap)))),
           };
         }));
       }
@@ -179,8 +207,7 @@ export async function resolvePageSections(sections) {
             if (product) {
                const { getAltTextMap } = await import("@/lib/mediaUsage");
                const altMap = await getAltTextMap([...(product.images || []), product.image]);
-               product.imageAlts = altMap;
-               config.product = JSON.parse(JSON.stringify(product));
+               config.product = JSON.parse(JSON.stringify(slimProduct(product, altMap)));
             }
          }
          if (config.collectionId) {
@@ -232,8 +259,12 @@ export async function resolvePageSections(sections) {
         const categoryUrls = categories.map(c => c.image).filter(Boolean);
         const altMap = await getAltTextMap(categoryUrls);
         const enrichedCategories = categories.map(c => ({
-          ...c,
-          imageAlts: altMap
+          _id: c._id,
+          name: c.name,
+          slug: c.slug,
+          image: c.image,
+          showBannerOverlay: c.showBannerOverlay,
+          imageAlts: c.image && altMap[c.image] ? { [c.image]: altMap[c.image] } : {},
         }));
 
         config.categories = JSON.parse(JSON.stringify(enrichedCategories));

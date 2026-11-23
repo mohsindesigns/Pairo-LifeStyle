@@ -90,6 +90,7 @@ export default async function RootLayout({ children }) {
     footer: { sections: [{}, { links: [] }] },
     categories: { items: [] },
     popup: { enabled: false },
+    floatingReviews: { enabled: true, label: 'Reviews', topOffset: 50 },
     _dbCategories: [],
     _dbPages: [],
     _dbBlogs: [],
@@ -160,7 +161,9 @@ export default async function RootLayout({ children }) {
       }
     });
 
-    const dbCategories = dbCategoriesRaw.map((cat) => {
+    // Every page ships this list to the client (Navbar/Footer/Search/Shop), so drop the heavy
+    // per-category page content (rich HTML, FAQs, SEO, size charts) — it made each page ~1MB+ heavier.
+    const dbCategories = dbCategoriesRaw.map(({ content, faqs, faqSchemaCustom, seo, sizeChart, deletedAt, ...cat }) => {
       if (cat.type === 'product' || !cat.type) {
         return { ...cat, productCount: countMap[cat._id.toString()] || 0 };
       }
@@ -172,6 +175,7 @@ export default async function RootLayout({ children }) {
         ...sanitizedConfig,
         ...JSON.parse(JSON.stringify(config)),
         popup: config.popup || { enabled: false },
+        floatingReviews: { enabled: true, label: 'Reviews', topOffset: 50, ...(config.floatingReviews || {}) },
       };
     }
 
@@ -189,7 +193,11 @@ export default async function RootLayout({ children }) {
     console.error("Layout DB connection failed:", error.message);
   }
 
-  const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_FORCE_SECURITY_SHIELD === "true";
+  // Anti-inspect lockdown is OFF by default: its DevTools heuristics (outer/inner window size gap,
+  // debugger timing) false-positive on mobile and in-app browsers (Instagram/Facebook ad traffic),
+  // calling window.stop() and blanking the page for real shoppers. Opt in with
+  // PAIRO_ENABLE_ANTI_INSPECT=true only if you accept that risk.
+  const isProduction = process.env.PAIRO_ENABLE_ANTI_INSPECT === "true";
 
   return (
       <html lang="en">

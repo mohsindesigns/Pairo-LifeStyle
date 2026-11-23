@@ -7,47 +7,48 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingBag, X } from "lucide-react";
 
 function GalleryCard({ item, index, onClick }) {
-  const [isHovered, setIsHovered] = useState(false);
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.5, delay: (index % 3) * 0.1 }}
-      className="group cursor-pointer w-full"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      transition={{ duration: 0.5, delay: (index % 4) * 0.08 }}
+      className="group block w-full text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 rounded-[14px] md:rounded-[20px]"
       onClick={onClick}
+      aria-label={`View ${item.title || "gallery item"}`}
     >
-      {/* Product Image Container */}
-      <div className="relative aspect-[3/4] bg-[var(--secondary)] rounded-[16px] md:rounded-[24px] overflow-hidden border border-[var(--border)] shadow-md hover:shadow-xl transition-all duration-500">
-        {/* Main Image */}
-        <motion.div
-          animate={{ scale: isHovered ? 1.05 : 1 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute inset-0"
-        >
-          {item.image ? (
-            <Image
-              src={item.image}
-              alt={item.title || "Gallery Item"}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover"
-              quality={75}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-border">
-              <ShoppingBag className="w-12 h-12 text-border" />
-            </div>
-          )}
-        </motion.div>
+      <div className="relative aspect-[4/5] bg-[var(--secondary)] rounded-[14px] md:rounded-[20px] overflow-hidden border border-[var(--border)] shadow-sm group-hover:shadow-lg transition-shadow duration-500">
+        {item.image ? (
+          <Image
+            src={item.image}
+            alt={item.title || "Gallery Item"}
+            fill
+            loading="lazy"
+            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 280px"
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            quality={75}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-muted">
+            <ShoppingBag className="w-10 h-10 text-border" />
+          </div>
+        )}
 
-        {/* Hover Image Overlay with subtle darken to indicate clickability */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300 flex items-center justify-center z-10" />
+        {/* Hover overlay with the name only */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3 md:p-4">
+          {item.title && (
+            <p
+              style={{ fontFamily: "var(--brand-font)" }}
+              className="font-heading font-black text-white text-sm md:text-base leading-tight line-clamp-2"
+            >
+              {item.title}
+            </p>
+          )}
+        </div>
       </div>
-    </motion.div>
+
+    </motion.button>
   );
 }
 
@@ -82,26 +83,27 @@ function GalleryDetailModal({ item, onClose }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="relative max-w-4xl w-full bg-white rounded-[24px] md:rounded-[32px] overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-2 h-auto md:h-[520px] max-h-[95vh]"
+        className="relative max-w-4xl w-full bg-white rounded-[20px] md:rounded-[28px] overflow-hidden shadow-2xl grid grid-cols-1 md:grid-cols-[1.2fr_1fr] h-auto md:h-[min(85vh,560px)] max-h-[92vh] overflow-y-auto md:overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
         <button
           onClick={onClose}
+          aria-label="Close"
           className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 text-black shadow-md flex items-center justify-center hover:bg-white hover:scale-105 transition-all z-20"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Left Side: Image */}
-        <div className="relative aspect-[4/3] md:aspect-auto md:h-full bg-muted min-h-[250px] md:min-h-[520px]">
+        <div className="relative h-[45vh] md:h-full bg-neutral-100 min-h-[240px]">
           {item.image ? (
             <Image
               src={item.image}
               alt={item.title || "Gallery Product"}
               fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 55vw"
+              className="object-contain"
               priority
             />
           ) : (
@@ -124,14 +126,6 @@ function GalleryDetailModal({ item, onClose }) {
               {item.title}
             </h2>
           </div>
-
-          {item.description && (
-            <div className="border-t border-border pt-4 overflow-y-auto flex-1 max-h-[160px] md:max-h-[240px] pr-2 mt-4">
-              <p className="text-foreground/60 text-xs md:text-sm leading-relaxed">
-                {item.description}
-              </p>
-            </div>
-          )}
 
           {/* Bottom: View Product button */}
           <div className="pt-4 mt-4 border-t border-border flex flex-col gap-4">
@@ -184,7 +178,7 @@ export default function GalleryGrid({
   }, [customItems]);
 
   return (
-    <section className="container mx-auto px-4 md:px-8 py-10 md:py-16">
+    <section className="container mx-auto max-w-6xl px-4 md:px-8 py-10 md:py-16">
       {/* Section Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -206,15 +200,10 @@ export default function GalleryGrid({
 
       {/* Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {[0, 1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="bg-white rounded-[20px] overflow-hidden border border-border animate-pulse">
-              <div className="aspect-[3/4] bg-muted" />
-              <div className="p-5 space-y-3">
-                <div className="h-5 bg-muted rounded w-3/4" />
-                <div className="h-4 bg-muted rounded w-full" />
-                <div className="h-4 bg-muted rounded w-1/2" />
-              </div>
+            <div key={i} className="rounded-[14px] md:rounded-[20px] overflow-hidden border border-border animate-pulse">
+              <div className="aspect-[4/5] bg-muted" />
             </div>
           ))}
         </div>
@@ -226,7 +215,7 @@ export default function GalleryGrid({
           <p className="text-foreground/40 text-base">{emptyText}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {items.map((item, index) => (
             <GalleryCard
               key={item._id || index}

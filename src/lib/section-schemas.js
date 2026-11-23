@@ -160,6 +160,16 @@ export const SECTION_SCHEMAS = {
       { name: "readMore", label: "Read More Label", type: "text" }
     ]
   },
+  rack_3d: {
+    name: "3D Rack",
+    icon: "Shirt",
+    fields: [
+      { name: "eyebrow", label: "Small label above the title", type: "text", default: "The rack" },
+      { name: "title", label: "Section Title", type: "text", default: "Spin it in 3D" },
+      { name: "subtitle", label: "Side text", type: "textarea", default: "Hover the rail to browse. Click any piece to spin it in 360°." },
+      { name: "height", label: "Rack height in px (desktop)", type: "number", default: 720 }
+    ]
+  },
   testimonials: {
     name: "Testimonial Slider",
     icon: "Star",

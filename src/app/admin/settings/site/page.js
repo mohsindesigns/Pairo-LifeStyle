@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import MediaPickerModal from "@/components/admin/MediaPickerModal";
 import PopupTab from "@/components/admin/settings/PopupTab";
+import FloatingReviewsTab from "@/components/admin/settings/FloatingReviewsTab";
 import { migrateLegalLinks, normalizePublishedProducts } from "@/components/admin/settings/siteSettingsUtils";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
@@ -1347,6 +1348,7 @@ const TABS = [
   { key: 'footer', label: 'Footer' },
   { key: 'social', label: 'Social Links' },
   { key: 'popup', label: 'Popup' },
+  { key: 'floating-reviews', label: 'Floating Reviews' },
   { key: 'redirects', label: 'Redirects' },
 ];
 
@@ -1468,6 +1470,7 @@ export default function SiteSettingsPage() {
         {tab === 'footer' && <FooterTab config={config} onChange={setConfig} dbCategories={dbCategories} dbBlogs={dbBlogs} dbPages={dbPages} />}
         {tab === 'social' && <SocialLinksTab config={config} onChange={setConfig} />}
         {tab === 'popup' && <PopupTab config={config} onChange={setConfig} />}
+        {tab === 'floating-reviews' && <FloatingReviewsTab config={config} onChange={setConfig} />}
         {tab === 'redirects' && <RedirectsTab />}
       </div>
 

@@ -50,6 +50,7 @@ export const MENUS = [
     { href: "/admin/products/new", label: "Add New", perm: "products.create" },
     { href: "/admin/categories", label: "Categories", also: ["/admin/category", "/admin/products/categories"] },
     { href: "/admin/products/size-charts", label: "Size Charts" },
+    { href: "/admin/rack-3d", label: "3D Rack" },
     { href: "/admin/size-chart-items", label: "Size Chart Items", perm: "products.edit" },
     { href: "/admin/reviews", label: "Reviews", perm: "reviews.view" },
     { href: "/admin/product-questions", label: "Questions" },

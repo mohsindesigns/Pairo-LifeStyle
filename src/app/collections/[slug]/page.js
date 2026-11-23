@@ -83,7 +83,7 @@ export default async function DynamicCategoryCatcherPage({ params, searchParams 
   });
 
   const { getProductsForShop } = await import("@/lib/products-server");
-  const products = await getProductsForShop();
+  const products = await getProductsForShop({ categoryId: category._id });
 
   return (
     <>
