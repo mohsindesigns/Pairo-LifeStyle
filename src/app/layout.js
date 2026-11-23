@@ -193,7 +193,11 @@ export default async function RootLayout({ children }) {
     console.error("Layout DB connection failed:", error.message);
   }
 
-  const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_FORCE_SECURITY_SHIELD === "true";
+  // Anti-inspect lockdown is OFF by default: its DevTools heuristics (outer/inner window size gap,
+  // debugger timing) false-positive on mobile and in-app browsers (Instagram/Facebook ad traffic),
+  // calling window.stop() and blanking the page for real shoppers. Opt in with
+  // PAIRO_ENABLE_ANTI_INSPECT=true only if you accept that risk.
+  const isProduction = process.env.PAIRO_ENABLE_ANTI_INSPECT === "true";
 
   return (
       <html lang="en">
