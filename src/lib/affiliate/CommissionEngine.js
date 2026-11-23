@@ -53,7 +53,6 @@ export class CommissionEngine {
       commissionAmount,
       commissionType,
       status: 'Pending',
-      tenantId: affiliate.tenantId || 'default',
       snapshot: {
         commissionRate: rate,
         commissionType,
@@ -103,7 +102,6 @@ export class CommissionEngine {
     // Record Credit in the Immutable Financial Ledger (updating Affiliate balance atomically)
     await AffiliateLedger.record({
       affiliateId: commission.affiliateId,
-      tenantId: commission.tenantId,
       type: 'Credit',
       amount: commission.commissionAmount,
       source: 'Commission',
@@ -161,7 +159,6 @@ export class CommissionEngine {
         // Record a Debit in the Immutable Ledger (deducts from balance)
         await AffiliateLedger.record({
           affiliateId: affiliate._id,
-          tenantId: commission.tenantId || affiliate.tenantId,
           type: 'Debit',
           amount: reversalAmount,
           source: 'Reversal',
@@ -183,7 +180,6 @@ export class CommissionEngine {
         // Record full Debit reversal in ledger
         await AffiliateLedger.record({
           affiliateId: affiliate._id,
-          tenantId: commission.tenantId || affiliate.tenantId,
           type: 'Debit',
           amount: commission.commissionAmount,
           source: 'Reversal',

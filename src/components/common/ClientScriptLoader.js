@@ -11,6 +11,11 @@ import { usePathname } from "next/navigation";
 export default function ClientScriptLoader({ scripts = [], location = "head" }) {
   const pathname = usePathname();
 
+  // Completely disable any client-side tracking or analytics script execution on admin routes
+  if (pathname?.startsWith("/admin") || pathname?.startsWith("/admin-login")) {
+    return null;
+  }
+
   // 1. Filter by Location
   const locationScripts = scripts.filter(s => s.location === location);
 

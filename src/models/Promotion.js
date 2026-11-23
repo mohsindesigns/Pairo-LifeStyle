@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 const PromotionSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true }, // Mandatory SaaS Isolation
   title: { type: String, required: true },
   description: String,
   code: { type: String, sparse: true, index: true },
@@ -102,10 +101,10 @@ const PromotionSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Composite Index for SaaS Uniqueness (allowing multiple automatic promotions without codes)
+// Index for uniqueness (allowing multiple automatic promotions without codes)
 PromotionSchema.index(
-  { tenantId: 1, code: 1 }, 
-  { 
+  { code: 1 },
+  {
     unique: true, 
     partialFilterExpression: { code: { $type: "string" } } 
   }

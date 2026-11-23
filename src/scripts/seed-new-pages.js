@@ -135,7 +135,6 @@ async function seedPages() {
 
       await pagesCollection.insertOne({
         ...pageData,
-        tenantId: "DEFAULT_STORE",
         createdAt: new Date(),
         updatedAt: new Date()
       });

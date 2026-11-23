@@ -1,16 +1,20 @@
 import { getServerSession } from "next-auth";
+import mongoose from "mongoose";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
+import PromotionRevision from "@/models/PromotionRevision";
+import PromotionCustomerUsage from "@/models/PromotionCustomerUsage";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
+import Validator from "@/lib/promotionEngine/Validator";
 import { syncPromotionToStripe, deactivatePromotionStripeCode } from "@/lib/promotionEngine/StripeSync";
 import { cache } from "@/lib/cache";
 import { can } from "@/lib/rbac";
 
 // Fields the server owns — never let a client set them via the request body. Otherwise a
 // staff user could reset a coupon's used-count (usageLimits.currentTotalUses), forge its
-// analytics, or hijack its Stripe linkage. (tenantId is intentionally left writable.)
+// analytics, or hijack its Stripe linkage.
 function stripServerManagedFields(data) {
   if (!data || typeof data !== "object") return data;
   const { _id, analytics, stripeCouponId, stripePromotionCodeId, stripeSyncStatus, stripeSyncError, stripeSyncKey, createdAt, updatedAt, ...safe } = data;
@@ -31,6 +35,10 @@ export async function GET(req, { params }) {
   }
 
   const { id } = await params;
+  // A malformed id (e.g. a mistyped URL) is "not found", not a server error.
+  if (!mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+  }
   await dbConnect();
   try {
     const promotion = await Promotion.findById(id);
@@ -53,13 +61,26 @@ export async function PUT(req, { params }) {
   }
 
   const { id } = await params;
+  // A malformed id (e.g. a mistyped URL) is "not found", not a server error.
+  if (!mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+  }
   await dbConnect();
   try {
     const data = await req.json();
     const oldPromo = await Promotion.findById(id);
     if (!oldPromo) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const promotion = await Promotion.findByIdAndUpdate(id, stripServerManagedFields(data), { new: true, runValidators: true });
+    const safeData = stripServerManagedFields(data);
+
+    // Server-side enforcement — see the matching comment in the promotions list POST route.
+    // The admin editor's client-side Validator check is easy to bypass.
+    const validation = Validator.validate({ ...oldPromo.toObject(), ...safeData });
+    if (!validation.isValid) {
+      return NextResponse.json({ error: validation.errors[0]?.message || "Invalid promotion configuration", errors: validation.errors }, { status: 400 });
+    }
+
+    const promotion = await Promotion.findByIdAndUpdate(id, safeData, { new: true, runValidators: true });
 
     // Track History
     const diff = HistoryService.generateDiff(oldPromo.toObject(), promotion.toObject());
@@ -91,6 +112,10 @@ export async function PATCH(req, { params }) {
   }
 
   const { id } = await params;
+  // A malformed id (e.g. a mistyped URL) is "not found", not a server error.
+  if (!mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+  }
   await dbConnect();
   try {
     const data = await req.json();
@@ -130,13 +155,55 @@ export async function DELETE(req, { params }) {
   }
 
   const { id } = await params;
+  // A malformed id (e.g. a mistyped URL) is "not found", not a server error.
+  if (!mongoose.isValidObjectId(id)) {
+    return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+  }
   await dbConnect();
+  const adminName = session.user.name || session.user.email;
   try {
-    // Instead of hard delete, we archive
+    const { searchParams } = new URL(req.url);
+    const permanent = searchParams.get('permanent') === '1';
+
+    if (permanent) {
+      // Permanent delete is only allowed from the Trash (an already-archived promotion),
+      // so a live promotion can never be hard-deleted in one step.
+      const existing = await Promotion.findById(id);
+      if (!existing) {
+        return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+      }
+      if (existing.adminStatus !== 'Archived') {
+        return NextResponse.json({ error: "Archive the promotion before deleting it permanently." }, { status: 409 });
+      }
+
+      await deactivatePromotionStripeCode(existing);
+      await Promotion.deleteOne({ _id: id });
+
+      // Revision snapshots and per-customer usage counters only make sense for an existing
+      // promotion, so they go with it. The audit log is kept as the permanent record, with a
+      // DELETE entry describing what was removed. Orders keep their own appliedPromotions copy.
+      await PromotionRevision.deleteMany({ promotionId: id });
+      await PromotionCustomerUsage.deleteMany({ promotionId: id });
+      await HistoryService.logAction('DELETE', id, {
+        adminName,
+        metadata: { title: existing.title, code: existing.code || null }
+      });
+
+      await cache.clearActivePromotionCache();
+      return NextResponse.json({ success: true, message: "Promotion deleted permanently" });
+    }
+
+    // Default: soft delete (move to Trash) by archiving
+    const oldPromo = await Promotion.findById(id);
+    if (!oldPromo) {
+      return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+    }
     const promotion = await Promotion.findByIdAndUpdate(id, { adminStatus: 'Archived' }, { new: true });
 
-    if (!promotion) {
-      return NextResponse.json({ error: "Promotion not found" }, { status: 404 });
+    if (oldPromo.adminStatus !== 'Archived') {
+      await HistoryService.logAction('ARCHIVE', id, { adminName }, [
+        { field: 'adminStatus', oldValue: oldPromo.adminStatus, newValue: 'Archived' }
+      ]);
     }
 
     await deactivatePromotionStripeCode(promotion);

@@ -21,18 +21,29 @@ export default class ActionExecutor {
     for (const action of promotion.actions) {
       let currentActionDiscount = 0;
 
+      // A target of 'product'/'category'/'collection' with no targetIds is a broken/
+      // misconfigured promotion, not "no restriction" — it must NEVER silently fall back to
+      // discounting the whole cart (that turned a "100% off one product" promo into "100%
+      // off everything" when targetIds was empty). Only an explicit 'cart' target (or no
+      // target at all) discounts the whole cart.
+      const isTargeted = action.target === 'product' || action.target === 'category' || action.target === 'collection';
+
       switch (action.type) {
         case 'percentage_discount':
-          if ((action.target === 'product' || action.target === 'category' || action.target === 'collection') && action.targetIds?.length > 0) {
-            currentActionDiscount = this.calculateTargetedDiscount(cart, action, 'percentage');
+          if (isTargeted) {
+            currentActionDiscount = action.targetIds?.length > 0
+              ? this.calculateTargetedDiscount(cart, action, 'percentage')
+              : 0;
           } else {
             currentActionDiscount = (cart.subtotal * (parseFloat(action.value) || 0)) / 100;
           }
           break;
 
         case 'fixed_discount':
-          if ((action.target === 'product' || action.target === 'category' || action.target === 'collection') && action.targetIds?.length > 0) {
-            currentActionDiscount = this.calculateTargetedDiscount(cart, action, 'fixed');
+          if (isTargeted) {
+            currentActionDiscount = action.targetIds?.length > 0
+              ? this.calculateTargetedDiscount(cart, action, 'fixed')
+              : 0;
           } else {
             currentActionDiscount = parseFloat(action.value) || 0;
           }

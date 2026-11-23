@@ -9,6 +9,11 @@ import bcrypt from "bcryptjs";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { rateLimit } from "@/lib/rateLimit";
 
+// Staff session lifetime: "Remember me" on the admin login keeps staff signed in for 30 days,
+// otherwise 12 hours. (Customer/affiliate sessions keep NextAuth's default lifetime.)
+const STAFF_REMEMBER_MS = 30 * 24 * 60 * 60 * 1000;
+const STAFF_SESSION_MS = 12 * 60 * 60 * 1000;
+
 export const authOptions = {
   providers: [
     CredentialsProvider({
@@ -17,7 +22,8 @@ export const authOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
         loginType: { label: "Type", type: "text" }, // 'staff', 'customer', or 'affiliate'
-        turnstileToken: { label: "Turnstile Token", type: "text" }
+        turnstileToken: { label: "Turnstile Token", type: "text" },
+        rememberMe: { label: "Remember Me", type: "text" } // staff login only: "true" | "false"
       },
       async authorize(credentials, req) {
         await dbConnect();
@@ -42,6 +48,8 @@ export const authOptions = {
         if (!credentials.loginType || credentials.loginType === 'staff') {
             const staff = await Staff.findOne({ email: cleanEmail }).populate('roleId').lean();
             if (staff) {
+                // A staff member in the Trash can't sign in (trashing also suspends them).
+                if (staff.isDeleted) throw new Error("Invalid email or password");
                 if (staff.status !== 'Active') {
                     throw new Error(staff.status === 'Suspended' ? "Account suspended" : "Account locked");
                 }
@@ -66,7 +74,8 @@ export const authOptions = {
                         email: staff.email, 
                         role: staff.roleId, 
                         isStaff: true,
-                        isAffiliate: false
+                        isAffiliate: false,
+                        rememberMe: credentials?.rememberMe === "true"
                     };
                 }
                 throw new Error("Invalid email or password");
@@ -77,7 +86,7 @@ export const authOptions = {
         if (!credentials.loginType || credentials.loginType === 'affiliate') {
             const affiliate = await Affiliate.findOne({ email: cleanEmail }).lean();
             if (affiliate) {
-                if (affiliate.status !== 'Active') {
+                if (affiliate.isDeleted || affiliate.status !== 'Active') {
                     throw new Error("Affiliate account is suspended or inactive");
                 }
 
@@ -98,6 +107,10 @@ export const authOptions = {
         // 5. Try Customer
         if (!credentials.loginType || credentials.loginType === 'customer') {
             const customer = await Customer.findOne({ email: cleanEmail }).lean();
+            // A customer an admin moved to the Trash can't sign in.
+            if (customer?.isDeleted) {
+                throw new Error("Invalid email or password");
+            }
             if (customer) {
                 const isMatch = await bcrypt.compare(password, customer.password);
                 if (isMatch) {
@@ -129,7 +142,15 @@ export const authOptions = {
         token.isAffiliate = user.isAffiliate || false;
         if (user.isStaff) {
             token.role = user.role;
+            token.staffExpiresAt = Date.now() + (user.rememberMe ? STAFF_REMEMBER_MS : STAFF_SESSION_MS);
         }
+      }
+
+      // Staff sessions end at their own expiry (see STAFF_*_MS). Clearing the token signs the
+      // user out, same as the suspended-account check below. Tokens issued before this field
+      // existed have no expiry and are left alone.
+      if (token?.isStaff && token.staffExpiresAt && Date.now() > token.staffExpiresAt) {
+          return {};
       }
 
       // Security: Re-verify staff status AND role/permissions from DB on every request, so
@@ -139,8 +160,14 @@ export const authOptions = {
       if (token?.isStaff && token.id) {
           try {
               await dbConnect();
-              const staff = await Staff.findById(token.id).select('status roleId').populate('roleId');
-              if (!staff || staff.status !== 'Active') {
+              // .lean() is essential here, not just a performance nicety: Role.permissions is a
+              // Mongoose Map field, and without .lean() this stays a live Map instance all the
+              // way into the session object. rbac.js's can() does plain `permissions[module]`
+              // property access, which silently returns undefined on a real Map (it needs
+              // .get()) — every fine-grained permission check was returning false for every
+              // non-super-admin role, every request, with no error anywhere to reveal it.
+              const staff = await Staff.findById(token.id).select('status roleId isDeleted').populate('roleId').lean();
+              if (!staff || staff.isDeleted || staff.status !== 'Active') {
                   return {};
               }
               token.role = staff.roleId || token.role;
@@ -153,9 +180,9 @@ export const authOptions = {
       if (token?.isAffiliate && token.id) {
           try {
               await dbConnect();
-              const affiliate = await Affiliate.findById(token.id).select('status');
+              const affiliate = await Affiliate.findById(token.id).select('status isDeleted');
               console.log("[NextAuth] Re-verifying affiliate:", token.id, "Found:", !!affiliate, "Status:", affiliate?.status);
-              if (!affiliate || affiliate.status !== 'Active') {
+              if (!affiliate || affiliate.isDeleted || affiliate.status !== 'Active') {
                   console.log("[NextAuth] Clearing token because affiliate is missing or inactive!");
                   return {};
               }
@@ -164,16 +191,33 @@ export const authOptions = {
           }
       }
 
+      // A customer an admin moved to the Trash (or deleted) is signed out on their next request.
+      if (token?.id && !token.isStaff && !token.isAffiliate) {
+          try {
+              await dbConnect();
+              const customer = await Customer.findById(token.id).select('isDeleted').lean();
+              if (!customer || customer.isDeleted) return {};
+          } catch (e) {
+              console.error("JWT Customer Check Error:", e.message);
+          }
+      }
+
       return token;
     },
     async session({ session, token }) {
-      if (token && token.id) {
-        session.user.id = token.id;
-        session.user.isStaff = token.isStaff;
-        session.user.isAffiliate = token.isAffiliate || false;
-        if (token.isStaff) {
-            session.user.role = token.role;
-        }
+      // The jwt callback above signs someone out (expired staff session, suspended / trashed / deleted account) by
+      // returning {} - but next-auth still builds { user: { name, email } } from the raw cookie and hands it to this
+      // callback, so without this line getServerSession() would return a "signed in" user that has no id. Routes that
+      // only check `if (!session)` then run queries with `session.user.id === undefined`, which Mongoose sends as null
+      // and which matches every guest order. An empty object is what next-auth treats as "no session" everywhere
+      // (getServerSession returns null, useSession reports unauthenticated).
+      if (!token?.id) return {};
+
+      session.user.id = token.id;
+      session.user.isStaff = token.isStaff;
+      session.user.isAffiliate = token.isAffiliate || false;
+      if (token.isStaff) {
+          session.user.role = token.role;
       }
       return session;
     }

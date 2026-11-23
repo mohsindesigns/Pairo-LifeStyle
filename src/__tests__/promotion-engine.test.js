@@ -30,7 +30,6 @@ describe("Enterprise Promotion Engine — Complete Level-by-Level Verification S
 
     // Create 3 temporary products
     prodA = await Product.create({
-      tenantId: "DEFAULT_STORE",
       name: "Test Leather Jacket",
       slug: "test-leather-jacket-" + Date.now(),
       price: 200,
@@ -40,7 +39,6 @@ describe("Enterprise Promotion Engine — Complete Level-by-Level Verification S
     createdProducts.push(prodA._id);
 
     prodB = await Product.create({
-      tenantId: "DEFAULT_STORE",
       name: "Test Slim Jeans",
       slug: "test-slim-jeans-" + Date.now(),
       price: 100,
@@ -49,7 +47,6 @@ describe("Enterprise Promotion Engine — Complete Level-by-Level Verification S
     createdProducts.push(prodB._id);
 
     prodC = await Product.create({
-      tenantId: "DEFAULT_STORE",
       name: "Test White T-Shirt",
       slug: "test-white-tshirt-" + Date.now(),
       price: 50,

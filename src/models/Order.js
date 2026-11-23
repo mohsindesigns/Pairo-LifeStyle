@@ -1,8 +1,7 @@
 import mongoose from 'mongoose';
 
 const OrderSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', index: true },
-  orderNumber: { type: String, required: true, index: true },
+  orderNumber: { type: String, required: true },
   status: { 
     type: String, 
     enum: ['Pending', 'Confirmed', 'Processing', 'Packed', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Refunded'],
@@ -57,6 +56,19 @@ const OrderSchema = new mongoose.Schema({
         back:       { url: String, name: String },
         other:      { url: String, name: String, note: String }
       }
+    },
+    // Corporate Gifting selection data — which configurable items the shopper picked
+    // for this line, with a snapshot of each item's name/price and the uploaded logo/artwork.
+    corporateGifting: {
+      enabled: { type: Boolean, default: false },
+      minSelections: { type: Number, default: 3 },
+      selections: [{
+        itemId: { type: mongoose.Schema.Types.ObjectId },
+        name: { type: String },
+        image: { type: String },
+        priceDelta: { type: Number, default: 0 },
+        artwork: { url: String, name: String }
+      }]
     }
   }],
 
@@ -84,7 +96,7 @@ const OrderSchema = new mongoose.Schema({
   },
   
   payment: {
-    method: { type: String, enum: ['Cash on Delivery', 'Card', 'Custom Inquiry', 'Custom Order'], default: 'Cash on Delivery' },
+    method: { type: String, enum: ['Cash on Delivery', 'Card', 'Custom Inquiry', 'Custom Order', 'Manual/Gift'], default: 'Cash on Delivery' },
     status: { type: String, enum: ['Pending', 'Paid', 'Failed', 'Refunded', 'Partially Refunded'], default: 'Pending' },
     provider: { type: String, default: null },
     stripePaymentIntentId: { type: String, index: true, sparse: true },
@@ -134,7 +146,21 @@ const OrderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', index: true },
     email: { type: String, index: true },
     isGuest: { type: Boolean, default: false },
-    ipAddress: String
+    ipAddress: String,
+    ipLocation: {
+      city: String,
+      state: String,
+      county: String,
+      country: String,
+      countryCode: String,
+      postal: String,
+      lat: Number,
+      lon: Number,
+      mapsUrl: String,
+      isp: String,
+      timezone: String,
+      isLocal: Boolean
+    }
   },
 
   shippingAddress: {
@@ -142,12 +168,13 @@ const OrderSchema = new mongoose.Schema({
     street: String,
     city: String,
     state: String,
+    county: String,
     zip: String,
     country: String,
     phone: String
   },
 
-  idempotencyKey: { type: String, unique: true, sparse: true, index: true },
+  idempotencyKey: { type: String },
   customerNote: String,
   adminNotes: [String],
 
@@ -156,9 +183,9 @@ const OrderSchema = new mongoose.Schema({
   // creation — changes to zones/methods do not affect historical orders.
   shippingSnapshot: {
     version:    { type: Number, default: 1 },                                    // schema version guard for future migrations
-    zoneId:     { type: mongoose.Schema.Types.ObjectId, ref: 'ShippingZone' },
+    zoneId:     { type: mongoose.Schema.Types.Mixed },
     zoneName:   String,
-    methodId:   { type: mongoose.Schema.Types.ObjectId, ref: 'ShippingMethod' },
+    methodId:   { type: mongoose.Schema.Types.Mixed },
     methodName: String,
     provider:   String,
     cost:       { type: Number, default: 0 },
@@ -171,6 +198,35 @@ const OrderSchema = new mongoose.Schema({
   affiliateId: { type: mongoose.Schema.Types.ObjectId, ref: 'Affiliate', index: true },
   affiliateReferralCode: { type: String, index: true },
 
+  // Soft delete ("Trash"). Trashed orders are hidden from admin lists/counts/stats
+  // until restored; only an explicit "Delete Permanently" removes the document.
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
+
+  // False only for an admin "Duplicate" draft, which never took stock out of inventory. Cancelling such an order must
+  // not put stock back (it would invent inventory). Every other order took its stock when it was created.
+  stockDeducted: { type: Boolean, default: true },
+  // Set when a cancellation put the order's stock back, so it is never put back twice (and re-taken if the order is reactivated).
+  stockRestockedAt: { type: Date, default: null },
+
+  // Shipment details, set by the CRM (or staff). Also written to the timeline / adminNotes for the dashboard.
+  tracking: {
+    number: String,
+    carrier: String,
+    url: String,
+    updatedAt: Date,
+  },
+
+  // The post-delivery "how did we do?" email (src/lib/feedbackEmailService.js). `sendingSince` is a short claim so two
+  // senders can never mail the same order.
+  feedbackEmail: {
+    sentAt: Date,
+    messageId: String,
+    lastError: String,
+    lastAttemptAt: Date,
+    sendingSince: Date,
+  },
+
   timeline: [{
     status: String,
     message: String,
@@ -179,9 +235,9 @@ const OrderSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
-// SaaS Unique Constraints
-OrderSchema.index({ tenantId: 1, orderNumber: 1 }, { unique: true });
-OrderSchema.index({ tenantId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
+// Unique Constraints
+OrderSchema.index({ orderNumber: 1 }, { unique: true });
+OrderSchema.index({ idempotencyKey: 1 }, { unique: true, sparse: true });
 
 // Performance Indexes
 OrderSchema.index({ createdAt: -1 });

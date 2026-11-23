@@ -4,45 +4,26 @@ import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import Customer from "@/models/Customer";
-import Counter from "@/models/Counter";
+import AbandonedCart from "@/models/AbandonedCart";
+import { ensureOrderCounter, getNextOrderNumber } from "@/lib/orderNumber";
+import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 import pairoEvents from "@/lib/events";
-import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { assertValidCartItems, computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
+import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { sendPinterestPurchaseEvent } from "@/lib/pinterestCapi";
 import {
   buildGuestCheckoutAccountPayload,
   resolveGuestCheckoutCustomerAction,
 } from "@/lib/guestCheckoutAccount";
+import { resolveIpLocation } from "@/lib/geoIp";
 
-/**
- * Ensures the per-tenant order-number counter exists, seeded from the highest existing
- * order number so numbering stays continuous with any orders created before this counter
- * was introduced. Idempotent and safe to call concurrently (a duplicate-key from a racing
- * seed is harmless). Runs OUTSIDE the order transaction so first-ever concurrent orders
- * don't collide on the counter's insert.
- */
-async function ensureOrderCounter(tenantId) {
-  const counterId = `order:${tenantId}`;
-  const existing = await Counter.findById(counterId);
-  if (existing) return;
-
-  const lastOrder = await Order.findOne({ tenantId }).sort({ createdAt: -1 }).select("orderNumber");
-  const lastSeq = parseInt(String(lastOrder?.orderNumber || "").match(/(\d+)\s*$/)?.[1] || "1000", 10);
-  try {
-    await Counter.updateOne(
-      { _id: counterId },
-      { $setOnInsert: { seq: Number.isFinite(lastSeq) ? lastSeq : 1000 } },
-      { upsert: true }
-    );
-  } catch (e) {
-    // Another concurrent checkout seeded it first — that's fine.
-    if (e?.code !== 11000) throw e;
-  }
-}
+// Order numbering lives in its own module so lightweight routes can use it without loading checkout; re-exported
+// here because the admin order routes import it from this file.
+export { getNextOrderNumber };
 
 export async function createOrderFromCheckoutPayload(payload, {
-  tenantId,
   orderUserId = null,
   checkoutEmail = "",
   isGuestSession = true,
@@ -50,10 +31,32 @@ export async function createOrderFromCheckoutPayload(payload, {
   paymentInfo = null,
   clientUserAgent = null,
 } = {}) {
-  const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode } = payload;
+  const { items, shippingAddress, financials, customerEmail, customerNote, idempotencyKey, shippingSnapshot, referralCode, expectedFree } = payload;
+
+  // The checkout UI's "required" form fields are a client-side convenience only — nothing
+  // stopped a request built directly (devtools, a script, a retried/malformed request) from
+  // skipping the browser form entirely and submitting a blank shippingAddress. That produced
+  // real, paid orders with no name/street/city on file — unfulfillable, and unrecoverable
+  // after the fact. This is the one chokepoint every order-creation path (COD, and the Stripe
+  // webhook after a card payment succeeds) goes through, so it's enforced here, not just in
+  // the UI.
+  const requiredAddressFields = ['fullName', 'street', 'city', 'country'];
+  const missingAddressFields = requiredAddressFields.filter(f => !String(shippingAddress?.[f] || '').trim());
+  if (missingAddressFields.length > 0) {
+    throw new Error(`Shipping address is incomplete (missing: ${missingAddressFields.join(', ')}). Please provide a full shipping address before placing an order.`);
+  }
+  if (isRestrictedCountry(shippingAddress?.country, shippingAddress?.countryCode)) {
+    throw new Error(RESTRICTED_COUNTRY_MESSAGE);
+  }
+  // Same rule as the pricing step, checked first so a bad cart fails before a database transaction is even opened.
+  assertValidCartItems(items);
+  const resolvedEmail = (customerEmail || checkoutEmail || '').trim();
+  if (!resolvedEmail) {
+    throw new Error('A valid email address is required to place an order.');
+  }
 
   await dbConnect();
-  await ensureOrderCounter(tenantId);
+  await ensureOrderCounter();
   const mongoSession = await mongoose.startSession();
   let checkoutResult = null;
 
@@ -65,7 +68,6 @@ export async function createOrderFromCheckoutPayload(payload, {
         referralCode,
         checkoutEmail,
         orderUserId,
-        tenantId,
         shippingAddress,
         shippingSnapshot,
         mongoSession,
@@ -90,10 +92,15 @@ export async function createOrderFromCheckoutPayload(payload, {
 
       const orderItems = [];
       for (const item of items) {
-        const product = await Product.findOne({ _id: item.id || item._id, tenantId }).session(mongoSession);
+        const product = await Product.findOne({ _id: item.id || item._id }).session(mongoSession);
         if (!product) throw new Error(`Product ${item.id} not found.`);
 
-        if (product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
+        // Corporate Gifting replaces the standard variant/attribute picker with its own
+        // item-selection UI entirely, so a line with corporateGifting selections never carries
+        // selectedOptions by design — the required-attribute gate below doesn't apply to it,
+        // same as made-to-measure replacing the Size attribute with custom measurements.
+        const isCorporateGifting = !!item.corporateGifting?.enabled;
+        if (!isCorporateGifting && product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
           const isMadeToMeasure = !!item.madeToMeasure?.enabled;
           const missingAttrs = product.attributes.filter((attr) => {
             // Made-to-measure orders replace the standard Size selection with custom measurements.
@@ -107,7 +114,7 @@ export async function createOrderFromCheckoutPayload(payload, {
 
         if (product.manageStock) {
           const invRes = await Product.findOneAndUpdate(
-            { _id: product._id, tenantId, stock: { $gte: item.quantity } },
+            { _id: product._id, stock: { $gte: item.quantity } },
             { $inc: { stock: -item.quantity } },
             { session: mongoSession, new: true }
           );
@@ -122,6 +129,14 @@ export async function createOrderFromCheckoutPayload(payload, {
             || Object.values(selectedOptions).join(" / ")
           : null;
 
+        // Corporate Gifting — re-validate the minimum-selection gate and re-resolve each
+        // selected item against the product's own catalog server-side (never trusting the
+        // client's name/priceDelta), the same way variant stock/attrs are re-checked above.
+        // Shared with create-payment-intent's pre-charge check so the two can never disagree.
+        const corporateGiftingResult = validateCorporateGiftingSelections(item, product);
+        if (!corporateGiftingResult.valid) throw new Error(corporateGiftingResult.error);
+        const corporateGiftingData = corporateGiftingResult.data;
+
         orderItems.push({
           productId: product._id,
           name: product.name,
@@ -131,32 +146,49 @@ export async function createOrderFromCheckoutPayload(payload, {
           quantity: item.quantity,
           ...(variantTitle ? { selectedVariant: { title: variantTitle, options: selectedOptions } } : {}),
           ...(item.madeToMeasure?.enabled ? { madeToMeasure: item.madeToMeasure } : {}),
-          ...(item.customization?.enabled ? { customization: item.customization } : {})
+          ...(item.customization?.enabled ? { customization: item.customization } : {}),
+          ...(corporateGiftingData ? { corporateGifting: corporateGiftingData } : {})
         });
       }
 
-      // Atomic, race-safe order number. Two concurrent checkouts $inc the same counter doc,
-      // which produces a WriteConflict (retried by withTransaction / the checkout route's
-      // retry loop) rather than the duplicate order numbers that countDocuments+1 allowed.
-      const bumped = await Counter.findByIdAndUpdate(
-        `order:${tenantId}`,
-        { $inc: { seq: 1 } },
-        { session: mongoSession, new: true, upsert: true }
-      );
-      const orderNumber = `PAI-${bumped.seq}`;
+      // The checkout UI hides all payment methods and shows "no payment required" when it
+      // believes the order is free. If the server's authoritative total disagrees (a promo/
+      // affiliate discount resolved differently between the client's estimate and the real
+      // DB-backed calculation), fail loudly instead of silently falling through to an unpaid
+      // Cash on Delivery order the customer was never shown or asked to consent to.
+      if (expectedFree && authoritativeTotal > 0 && !paymentInfo) {
+        throw new Error("Your order total has changed and is no longer $0. Please review your order and select a payment method.");
+      }
+
+      const orderNumber = await getNextOrderNumber(mongoSession);
 
       // Shipping cost is no longer taken from the client at all — computeAuthoritativeCheckout
       // above already re-derived it from the real ShippingZone/ShippingMethod config and threw
       // if the selected method wasn't actually available, so there's nothing further to verify here.
 
-      const isPaid = paymentInfo?.status === 'Paid';
+      // A fully-discounted (100%-off coupon) order has nothing to collect — auto-confirm it as
+      // Paid instead of leaving it "Pending" forever waiting for a COD cash payment that will
+      // never happen. Only applies to the no-payment (COD-style) path; the card path already
+      // passes its own paymentInfo when Stripe actually confirms a charge.
+      const isFreeOrder = authoritativeTotal === 0 && !paymentInfo;
+      const isPaid = paymentInfo?.status === 'Paid' || isFreeOrder;
       const initialStatus = isPaid ? 'Confirmed' : 'Pending';
-      const initialMessage = isPaid
-        ? 'Payment confirmed via Card. Order is being processed.'
-        : 'Order placed successfully. Pending confirmation.';
+      const initialMessage = isFreeOrder
+        ? 'Order total is $0 (fully discounted) — no payment required.'
+        : isPaid
+          ? 'Payment confirmed via Card. Order is being processed.'
+          : 'Order placed successfully. Pending confirmation.';
+
+      let ipLocation = null;
+      if (ipAddress && ipAddress !== "unknown") {
+        try {
+          ipLocation = await resolveIpLocation(ipAddress);
+        } catch {
+          // Non-blocking
+        }
+      }
 
       const orderDoc = {
-        tenantId,
         orderNumber,
         idempotencyKey,
         status: initialStatus,
@@ -185,10 +217,23 @@ export async function createOrderFromCheckoutPayload(payload, {
           userId: orderUserId,
           email: customerEmail || checkoutEmail,
           isGuest: isGuestSession,
-          ipAddress
+          ipAddress,
+          ipLocation
         },
         shippingAddress,
-        shippingSnapshot: shippingSnapshot ?? null,
+        shippingSnapshot: shippingSnapshot || (authoritativeShippingCost === 0 ? {
+          version: 1,
+          zoneId: null,
+          zoneName: 'Free Delivery',
+          methodId: 'free-delivery',
+          methodName: 'Free Delivery',
+          provider: 'FREE_SHIPPING',
+          cost: 0,
+          currency: financials.currency || 'USD',
+          settings: null,
+          conditions: null,
+          capturedAt: new Date()
+        } : null),
         customerNote
       };
 
@@ -202,6 +247,8 @@ export async function createOrderFromCheckoutPayload(payload, {
           receiptUrl: paymentInfo.receiptUrl || null,
           paidAt: paymentInfo.paidAt || null,
         };
+      } else if (isFreeOrder) {
+        orderDoc.payment = { method: 'Cash on Delivery', status: 'Paid', paidAt: new Date() };
       }
 
       const [newOrder] = await Order.create([orderDoc], { session: mongoSession });
@@ -273,7 +320,10 @@ export async function createOrderFromCheckoutPayload(payload, {
 
       checkoutResult = newOrder;
 
-      if (affiliateId && activeAffiliate) {
+      // A fully-discounted order generated $0 in revenue — paying the affiliate a commission
+      // computed off the pre-discount subtotal would be a straight payout on a sale that
+      // never happened.
+      if (affiliateId && activeAffiliate && authoritativeTotal > 0) {
         await CommissionEngine.calculateCommission(checkoutResult, activeAffiliate, mongoSession);
       }
     });
@@ -282,11 +332,21 @@ export async function createOrderFromCheckoutPayload(payload, {
   }
 
   if (checkoutResult) {
-    pairoEvents.dispatch('ORDER_CREATED', checkoutResult);
+    pairoEvents.dispatch('ORDER_CREATED', { order: checkoutResult, origin: 'website' });
     // Server-side Pinterest purchase conversion (Conversions API). Fire-and-forget — never
     // awaited so it can't slow or break checkout; no-ops unless PINTEREST_* env vars are set.
     // Dedupes with the browser pixel via a shared event_id (`checkout_<orderNumber>`).
     sendPinterestPurchaseEvent(checkoutResult, { clientIp: ipAddress, clientUserAgent }).catch(() => {});
+
+    // This checkout session completed for real — its autosaved abandoned-cart snapshot (if
+    // any) is no longer an abandonment, just an in-progress record that finished. Best-effort
+    // only; never let this affect the order that was already successfully created.
+    if (idempotencyKey) {
+      AbandonedCart.updateOne(
+        { sessionKey: idempotencyKey },
+        { $set: { status: 'recovered', orderId: checkoutResult._id } }
+      ).catch(() => {});
+    }
   }
 
   return checkoutResult;

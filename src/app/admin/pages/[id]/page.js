@@ -1,9 +1,15 @@
 "use client";
 
 import PageForm from "@/components/admin/PageForm";
-import { use } from "react";
+import { useParams } from "next/navigation";
+import RequirePermission from "@/components/admin/RequirePermission";
 
-export default function EditPage({ params }) {
-  const { id } = use(params);
-  return <PageForm pageId={id} />;
+export default function EditPage({ params: propParams }) {
+  const routeParams = useParams();
+  const id = routeParams?.id || propParams?.id;
+  return (
+    <RequirePermission permission="pages.edit">
+      <PageForm pageId={id} />
+    </RequirePermission>
+  );
 }

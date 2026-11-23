@@ -24,6 +24,7 @@ import {
   Menu,
   X
 } from "lucide-react";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 export default function AffiliateDashboardClient({ userSession }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -657,7 +658,7 @@ export default function AffiliateDashboardClient({ userSession }) {
 
                 <div className="space-y-1.5">
                   <label className="text-[11px] uppercase tracking-wider font-bold text-neutral-500">Payment Method *</label>
-                  <select
+                  <ThemedSelect
                     value={payoutMethod}
                     onChange={(e) => setPayoutMethod(e.target.value)}
                     className="w-full px-4 py-3 rounded-lg border border-[#8c8f94] bg-white focus:border-[#2271b1] focus:ring-1 focus:ring-[#2271b1] focus:outline-none text-[13px] transition-all font-semibold cursor-pointer"
@@ -666,7 +667,7 @@ export default function AffiliateDashboardClient({ userSession }) {
                     <option value="IBAN">IBAN Account Transfer</option>
                     <option value="PayPal">PayPal Account</option>
                     <option value="Wise">Wise Direct Transfer</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
 
                 <button 

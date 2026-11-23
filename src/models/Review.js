@@ -8,7 +8,6 @@ const ReplySchema = new mongoose.Schema({
 });
 
 const ReviewSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: "DEFAULT_STORE", index: true },
   productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true, index: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", index: true },
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true, index: true },
@@ -29,6 +28,7 @@ const ReviewSchema = new mongoose.Schema({
   voters: [{ type: String }], // IP + UserAgent hashes to prevent duplicate voting
   reported: { type: Boolean, default: false, index: true },
   reportsCount: { type: Number, default: 0 },
+  reporters: [{ type: String }], // IP + UserAgent hashes to prevent duplicate reporting
   replies: [ReplySchema],
   isFeatured: { type: Boolean, default: false, index: true },
   media: [{
@@ -36,12 +36,21 @@ const ReviewSchema = new mongoose.Schema({
     type: { type: String, enum: ["image", "video"] }
   }],
   recommend: { type: Boolean, default: true },
+  // The thank-you code emailed when a review with a video was approved (see src/lib/reviewReward.js).
+  reward: {
+    code: String,
+    percent: Number,
+    sentAt: Date,
+    messageId: String,
+    note: String, // why no code was sent, when that is the case
+  },
   ipAddress: { type: String },
   userAgent: { type: String },
   spamScore: { type: Number, default: 0 },
   fingerprint: { type: String, index: true },
   shadowBanned: { type: Boolean, default: false, index: true },
-  isDeleted: { type: Boolean, default: false, index: true } // Soft delete support
+  isDeleted: { type: Boolean, default: false, index: true }, // Soft delete support
+  deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 // Compound unique index: prevent duplicate reviews for the same product in the same order

@@ -6,8 +6,11 @@ import Customer from "@/models/Customer";
 import Product from "@/models/Product";
 import Category from "@/models/Category";
 import { NextResponse } from "next/server";
+
 import { can } from "@/lib/rbac";
 import { syncDiscountToStripe, deactivateDiscountStripeCode } from "@/lib/discountStripeSync";
+import { sendCouponAssignedEmail } from "@/lib/email";
+import { copyCodeCandidate } from "@/components/admin/discounts/couponUtils";
 
 // Verify session is staff AND (when a permission is given) holds that permission.
 // Coupons live under the "promotions" permission module — previously any staff role
@@ -23,20 +26,53 @@ async function checkAuth(permission = null) {
   return session;
 }
 
-// Resolves a comma/newline-separated list of customer emails (the admin-facing
-// input format) into Customer ObjectIds for storage on Discount.specificCustomers.
-async function resolveCustomerIds(emailsInput) {
+// Parses the admin-facing comma/newline-separated email input into a clean,
+// deduped, lowercased list — this is the full target audience for a coupon
+// restricted to specific customers, regardless of whether any of them have
+// a registered account yet.
+function parseEmailList(emailsInput) {
   if (!emailsInput || typeof emailsInput !== "string") return [];
   const emails = emailsInput.split(/[,\n]/).map(e => e.trim().toLowerCase()).filter(Boolean);
-  if (emails.length === 0) return [];
+  return [...new Set(emails)];
+}
 
-  const customers = await Customer.find({ email: { $in: emails } }).select("_id email");
-  const foundEmails = new Set(customers.map(c => c.email.toLowerCase()));
-  const notFound = emails.filter(e => !foundEmails.has(e));
-  if (notFound.length > 0) {
-    throw new Error(`No customer account found for: ${notFound.join(", ")}`);
-  }
+// Resolves whichever of those emails already have a registered Customer account into
+// ObjectIds, for Discount.specificCustomers (used for fast ID-based matching when that
+// customer is logged in at checkout — see couponValidator.js). An email with no account
+// yet is NOT an error: it still gets stored on Discount.specificCustomerEmails and is
+// still matched at checkout by email, and still gets the notification email below — an
+// admin can legitimately target someone who's never signed up.
+async function resolveCustomerIds(emails) {
+  if (!emails.length) return [];
+  const customers = await Customer.find({ email: { $in: emails } }).select("_id");
   return customers.map(c => c._id);
+}
+
+// Emails everyone in `targetEmails` who hasn't already been notified for this coupon,
+// but only when the coupon is actually active — an admin building out a draft coupon
+// with a customer list shouldn't trigger emails until they flip it on. Returns the
+// updated notified-list; best-effort (a failed send is logged, not thrown) so one bad
+// address never blocks saving the coupon.
+async function notifyNewCouponRecipients(discount, targetEmails, alreadyNotified) {
+  // Mirrors discountStripeSync.js's hasStarted check — a coupon with isActive:true but a
+  // future startDate isn't actually usable yet, so don't email a code that would fail at
+  // checkout. Left un-notified (not added to notifiedCustomerEmails) so a later save of
+  // this coupon, once startDate has passed, still catches and sends it then.
+  const hasStarted = !discount.startDate || new Date(discount.startDate) <= new Date();
+  if (!discount.isActive || !hasStarted || targetEmails.length === 0) return alreadyNotified;
+  const notifiedSet = new Set(alreadyNotified);
+  const toNotify = targetEmails.filter(e => !notifiedSet.has(e));
+  if (toNotify.length === 0) return alreadyNotified;
+
+  await Promise.all(toNotify.map(async (email) => {
+    try {
+      await sendCouponAssignedEmail(email, discount);
+      notifiedSet.add(email);
+    } catch (err) {
+      console.error(`[Discounts] Failed to notify ${email} of coupon ${discount.code}:`, err.message);
+    }
+  }));
+  return [...notifiedSet];
 }
 
 export async function GET(req) {
@@ -82,9 +118,11 @@ export async function GET(req) {
 
     // 2. Search Filter
     if (search) {
+      // Matched literally and length-capped (the text is typed by the user, never a pattern).
+      const term = String(search).trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       query.$or = [
-        { code: { $regex: search.trim(), $options: "i" } },
-        { type: { $regex: search.trim(), $options: "i" } }
+        { code: { $regex: term, $options: "i" } },
+        { type: { $regex: term, $options: "i" } }
       ];
     }
 
@@ -147,10 +185,26 @@ export async function POST(req) {
       return NextResponse.json({ error: "Code and value are required fields." }, { status: 400 });
     }
 
-    const codeUpper = body.code.toUpperCase().trim();
+    let codeUpper = String(body.code).toUpperCase().trim();
+    const isDuplicate = body.duplicate === true;
+
+    if (isDuplicate) {
+      // Duplicate: derive a unique "<CODE>-COPY", "<CODE>-COPY-2", … code here on the
+      // server (checked against every coupon, including Trash) instead of trusting a
+      // client-made random suffix.
+      let found = null;
+      for (let n = 1; n <= 100; n++) {
+        const candidate = copyCodeCandidate(codeUpper, n);
+        if (!(await Discount.exists({ code: candidate }))) { found = candidate; break; }
+      }
+      if (!found) {
+        return NextResponse.json({ error: `Could not find a free copy code for "${codeUpper}".` }, { status: 400 });
+      }
+      codeUpper = found;
+    }
 
     // Check uniqueness (across all, including Trash, due to DB index uniqueness constraints)
-    const existing = await Discount.findOne({ code: codeUpper });
+    const existing = isDuplicate ? null : await Discount.findOne({ code: codeUpper });
     if (existing) {
       if (existing.isDeleted) {
         return NextResponse.json({ error: `Coupon code "${codeUpper}" already exists in Trash. Please restore or permanently delete it first.` }, { status: 400 });
@@ -194,14 +248,12 @@ export async function POST(req) {
       }
     }
 
-    let specificCustomers;
-    try {
-      specificCustomers = await resolveCustomerIds(body.specificCustomerEmails);
-    } catch (err) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
+    const specificCustomerEmails = parseEmailList(body.specificCustomerEmails);
+    const specificCustomers = await resolveCustomerIds(specificCustomerEmails);
 
-    // Sanitize values to prevent CastErrors
+    // Sanitize values to prevent CastErrors. Only admin-editable fields are read from the
+    // body — server-managed fields (isDeleted, usageCount, stripe* sync fields,
+    // notifiedCustomerEmails, redeemedFingerprints, timestamps) are never taken from it.
     const data = {
       code: codeUpper,
       type: body.type || "percentage",
@@ -210,7 +262,8 @@ export async function POST(req) {
       usageLimit: (body.usageLimit && body.usageLimit !== "") ? Number(body.usageLimit) : null,
       startDate,
       endDate: expiryDate,
-      isActive: body.isActive !== undefined ? body.isActive : true,
+      // A duplicate always starts inactive so it can't go live (or email customers) by accident.
+      isActive: isDuplicate ? false : (body.isActive !== undefined ? !!body.isActive : true),
       firstOrderOnly: body.firstOrderOnly !== undefined ? !!body.firstOrderOnly : false,
       userRegistrationRequired: body.userRegistrationRequired !== undefined ? !!body.userRegistrationRequired : false,
       newsletterSubscribedOnly: body.newsletterSubscribedOnly !== undefined ? !!body.newsletterSubscribedOnly : false,
@@ -222,6 +275,7 @@ export async function POST(req) {
       minQuantity: (body.minQuantity !== undefined && body.minQuantity !== "" && body.minQuantity !== null) ? Number(body.minQuantity) : 0,
       excludeSaleItems: body.excludeSaleItems !== undefined ? !!body.excludeSaleItems : false,
       specificCustomers,
+      specificCustomerEmails,
       oneRedemptionPerDevice: body.oneRedemptionPerDevice !== undefined ? !!body.oneRedemptionPerDevice : false
     };
 
@@ -255,6 +309,7 @@ export async function POST(req) {
 
     const stripeState = await syncDiscountToStripe(discount);
     Object.assign(discount, stripeState);
+    discount.notifiedCustomerEmails = await notifyNewCouponRecipients(discount, specificCustomerEmails, []);
     await discount.save();
 
     return NextResponse.json(discount, { status: 201 });
@@ -281,6 +336,7 @@ export async function PUT(req) {
     // Handle Restore
     if (body.restore) {
       discount.isDeleted = false;
+      discount.deletedAt = null;
       const stripeState = await syncDiscountToStripe(discount);
       Object.assign(discount, stripeState);
       await discount.save();
@@ -413,20 +469,44 @@ export async function PUT(req) {
     if (body.excludeSaleItems !== undefined) discount.excludeSaleItems = !!body.excludeSaleItems;
     if (body.oneRedemptionPerDevice !== undefined) discount.oneRedemptionPerDevice = !!body.oneRedemptionPerDevice;
 
+    // The admin form always re-submits the full current email list on every save (even one
+    // touching an unrelated field like minPurchase), so "body.specificCustomerEmails is
+    // present" can't be the notify trigger — that would mass-resend the assigned-coupon
+    // email to an existing coupon's entire customer list on its very next unrelated edit.
+    // Instead: diff against what was actually stored before this request, and only notify
+    // emails that are genuinely new to the list in this edit, or the whole current list when
+    // this request is the one actually flipping the coupon on.
+    const previousEmails = new Set(discount.specificCustomerEmails || []);
+    const wasActive = discount.isActive;
+    let newlyAddedEmails = [];
+
     if (body.specificCustomerEmails !== undefined) {
-      try {
-        discount.specificCustomers = await resolveCustomerIds(body.specificCustomerEmails);
-      } catch (err) {
-        return NextResponse.json({ error: err.message }, { status: 400 });
+      const emails = parseEmailList(body.specificCustomerEmails);
+      const invalidEmail = emails.find((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+      if (invalidEmail) {
+        return NextResponse.json({ error: `"${invalidEmail}" doesn't look like a valid email address.` }, { status: 400 });
       }
+      newlyAddedEmails = emails.filter((e) => !previousEmails.has(e));
+      discount.specificCustomerEmails = emails;
+      discount.specificCustomers = await resolveCustomerIds(emails);
     }
 
     if (body.isActive !== undefined) {
       discount.isActive = body.isActive;
     }
+    const isBeingActivatedNow = !wasActive && discount.isActive === true;
 
     const stripeState = await syncDiscountToStripe(discount);
     Object.assign(discount, stripeState);
+
+    const audienceToNotify = isBeingActivatedNow
+      ? (discount.specificCustomerEmails || [])
+      : newlyAddedEmails;
+    discount.notifiedCustomerEmails = await notifyNewCouponRecipients(
+      discount,
+      audienceToNotify,
+      discount.notifiedCustomerEmails || []
+    );
     await discount.save();
     return NextResponse.json(discount);
   } catch (error) {
@@ -444,20 +524,31 @@ export async function DELETE(req) {
     const id = searchParams.get("id");
     if (!id) return NextResponse.json({ error: "Missing coupon ID." }, { status: 400 });
 
+    const permanent = searchParams.get("permanent") === "1";
+
     const discount = await Discount.findById(id);
     if (!discount) return NextResponse.json({ error: "Coupon not found." }, { status: 404 });
 
-    if (discount.isDeleted) {
-      // Hard delete if already soft-deleted
+    if (permanent) {
+      // Permanent delete only from the Trash, so a live coupon can't be destroyed in one step.
+      if (!discount.isDeleted) {
+        return NextResponse.json({ error: "Move the coupon to Trash before deleting it permanently." }, { status: 409 });
+      }
+      await deactivateDiscountStripeCode(discount);
       await Discount.findByIdAndDelete(id);
       return NextResponse.json({ success: true, message: "Coupon permanently deleted." });
-    } else {
-      // Soft delete
-      discount.isDeleted = true;
-      await deactivateDiscountStripeCode(discount);
-      await discount.save();
-      return NextResponse.json({ success: true, message: "Coupon moved to Trash." });
     }
+
+    if (discount.isDeleted) {
+      return NextResponse.json({ success: true, message: "Coupon is already in Trash." });
+    }
+
+    // Soft delete (move to Trash)
+    discount.isDeleted = true;
+    discount.deletedAt = new Date();
+    await deactivateDiscountStripeCode(discount);
+    await discount.save();
+    return NextResponse.json({ success: true, message: "Coupon moved to Trash." });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CreditCard, Truck, ShieldCheck, ArrowRight, Loader2, ChevronDown, Search } from "lucide-react";
 import { Elements } from "@stripe/react-stripe-js";
-import { useCart } from "@/context/CartContext";
+import { useCart, getCartItemKey } from "@/context/CartContext";
 import { useSiteData } from "@/context/SiteContext";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -14,6 +14,8 @@ import StripePaymentForm from "@/components/checkout/StripePaymentForm";
 import { usePopup } from "@/context/PopupContext";
 import { getProductUrl } from "@/lib/routes";
 import { trackBeginCheckout, trackAddShippingInfo, trackAddPaymentInfo } from "@/lib/analytics";
+import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -54,6 +56,34 @@ const STRIPE_APPEARANCE = {
       boxShadow: "0 0 0 1px #000000"
     }
   }
+};
+
+// Synthetic shipping selection used only when the order total is fully discounted to $0 —
+// module-level so it's a stable reference across renders (avoids re-triggering the
+// selection effect on every render the way an inline object literal would).
+const FREE_ORDER_SHIPPING = {
+  methodId: "free-order",
+  methodName: "Free Shipping",
+  cost: 0,
+  provider: "free",
+  zoneId: null,
+  zoneName: null,
+  currency: "USD",
+  settings: null,
+  conditions: null,
+};
+
+// Synthetic shipping selection used when shipping module is disabled in admin
+const FREE_DELIVERY_METHOD = {
+  methodId: "free-delivery",
+  methodName: "Free Delivery",
+  cost: 0,
+  provider: "FREE_SHIPPING",
+  zoneId: null,
+  zoneName: null,
+  currency: "USD",
+  settings: null,
+  conditions: null,
 };
 
 function getReferralCode() {
@@ -228,12 +258,14 @@ export default function CheckoutPage() {
     lastName: "",
     email: "",
     phone: "",
-    country: "United States",
-    countryCode: "US",
+    // No country is pre-selected: the shopper must pick their real one, so the country we record is always their own choice.
+    country: "",
+    countryCode: "",
     state: "",
     stateCode: "",
     street: "",
     city: "",
+    county: "",
     zip: "",
     customerNote: ""
   });
@@ -249,6 +281,66 @@ export default function CheckoutPage() {
   const [shippingRates, setShippingRates] = useState([]);
   const [loadingRates, setLoadingRates] = useState(false);
   const [shippingRatesFetched, setShippingRatesFetched] = useState(false);
+
+  // Shipping module enabled/disabled state (defaults from SiteConfig, synced with server)
+  const [serverShippingEnabled, setServerShippingEnabled] = useState(
+    siteData?.commerce?.shippingEnabled !== false
+  );
+  const shippingEnabled = serverShippingEnabled;
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/shipping/calculate", { cache: "no-store" });
+        const data = await res.json();
+        if (active && data.success && typeof data.shippingEnabled === "boolean") {
+          setServerShippingEnabled(data.shippingEnabled);
+        }
+      } catch (e) {
+        // Fallback to siteData
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  // A 100%-off coupon (or affiliate discount) can bring the pre-shipping amount to $0 —
+  // in that case shipping is free and there's nothing to pay by card, so the checkout UI
+  // switches to a simplified "no payment required" flow instead of the normal Stripe/COD choice.
+  const isFreeOrder = Math.max(0, (cartSubtotal || 0) - (discountTotal || 0) - (affiliateDiscountAmount || 0)) <= 0;
+
+  // We don't ship to / serve some countries at all — block the entire rest of checkout the
+  // moment that's selected, both here (immediate feedback) and authoritatively on the server
+  // (so it can't be bypassed by skipping the UI).
+  const isRestricted = isRestrictedCountry(formData.country, formData.countryCode);
+
+  // "Personal information" — everything needed to actually fulfill and contact the customer
+  // about this order. No payment method should even be offered until this is filled in, so a
+  // shopper can't pay before we have anywhere to ship to or any way to reach them.
+  const requiredFieldsFilled = ["email", "firstName", "lastName", "street", "city", "phone", "zip", "country"]
+    .every(f => String(formData[f] || "").trim().length > 0);
+
+  // Automatically assign FREE_DELIVERY_METHOD when shipping module is off.
+  // Force the free-shipping selection while the order is $0, and release it back to a real
+  // rate selection once it no longer is (e.g. the coupon is removed or shipping is re-enabled).
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      if (!shippingEnabled) {
+        if (selectedShipping?.methodId !== FREE_DELIVERY_METHOD.methodId) {
+          setSelectedShipping(FREE_DELIVERY_METHOD);
+        }
+      } else if (isFreeOrder) {
+        if (selectedShipping?.methodId !== FREE_ORDER_SHIPPING.methodId) {
+          setSelectedShipping(FREE_ORDER_SHIPPING);
+        }
+      } else if (
+        selectedShipping?.methodId === FREE_ORDER_SHIPPING.methodId ||
+        selectedShipping?.methodId === FREE_DELIVERY_METHOD.methodId
+      ) {
+        setSelectedShipping(null);
+      }
+    });
+  }, [shippingEnabled, isFreeOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Generate unique key for this session to prevent double-orders
@@ -364,7 +456,7 @@ export default function CheckoutPage() {
           city: addr.city,
           state: addr.state || "",
           zip: addr.zipCode || addr.zip || "",
-          country: addr.country || "United States",
+          country: addr.country || "",
           phone: addr.phone || ""
         });
       });
@@ -387,7 +479,7 @@ export default function CheckoutPage() {
               city: addr.city,
               state: addr.state || "",
               zip: addr.zip || addr.zipCode || "",
-              country: addr.country || "United States",
+              country: addr.country || "",
               phone: addr.phone || ""
             });
           }
@@ -413,7 +505,7 @@ export default function CheckoutPage() {
 
   // Fetch shipping rates when address fields are filled
   const fetchRates = useCallback(async () => {
-    if (!formData.country) return;
+    if (!shippingEnabled || isFreeOrder || !formData.country) return;
     setLoadingRates(true);
     try {
       const res = await fetch('/api/shipping/calculate', {
@@ -421,12 +513,19 @@ export default function CheckoutPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           address: { country: formData.country, state: formData.state, city: formData.city, zip: formData.zip },
-          subtotal: cartSubtotal,
+          // Post-discount subtotal, so rate eligibility (e.g. "free shipping over $100")
+          // matches what the server evaluates in checkoutPricing.js, not the pre-discount cart value.
+          subtotal: Math.max(0, cartSubtotal - (discountTotal || 0) - (affiliateDiscountAmount || 0)),
           items: cartItems
         })
       });
       const data = await res.json();
       if (data.success) {
+        if (data.shippingEnabled === false) {
+          setServerShippingEnabled(false);
+          setSelectedShipping(FREE_DELIVERY_METHOD);
+          return;
+        }
         setShippingRates(data.rates || []);
         setShippingRatesFetched(true);
         // Auto-select first rate if none selected
@@ -436,13 +535,14 @@ export default function CheckoutPage() {
       }
     } catch (e) { console.error('Failed to fetch shipping rates', e); }
     finally { setLoadingRates(false); }
-  }, [formData.country, formData.state, formData.city, formData.zip, cartSubtotal, cartItems, selectedShipping, setSelectedShipping]);
+  }, [shippingEnabled, isFreeOrder, formData.country, formData.state, formData.city, formData.zip, cartSubtotal, discountTotal, affiliateDiscountAmount, cartItems, selectedShipping, setSelectedShipping]);
 
-  // Debounce: fetch rates when address changes
+  // Debounce: fetch rates when address changes (skipped once the order is free or shipping module is off).
   useEffect(() => {
+    if (!shippingEnabled || isFreeOrder) return;
     const t = setTimeout(fetchRates, 600);
     return () => clearTimeout(t);
-  }, [fetchRates]);
+  }, [fetchRates, shippingEnabled, isFreeOrder]);
 
   // Debounced email-change promo code validation
   useEffect(() => {
@@ -467,7 +567,7 @@ export default function CheckoutPage() {
     let error = "";
     const cleanVal = (value || "").trim();
 
-    if (["email", "lastName", "street", "city", "phone"].includes(name) && !cleanVal) {
+    if (["email", "firstName", "lastName", "street", "city", "phone", "country"].includes(name) && !cleanVal) {
       return "This field is required";
     }
 
@@ -574,7 +674,7 @@ export default function CheckoutPage() {
   const validateForm = () => {
     const newErrors = {};
     Object.keys(formData).forEach(key => {
-      if (key !== "customerNote" && key !== "stateCode" && key !== "countryCode" && key !== "firstName") {
+      if (key !== "customerNote" && key !== "stateCode" && key !== "countryCode") {
         const err = validateField(key, formData[key]);
         if (err) {
           newErrors[key] = err;
@@ -608,30 +708,47 @@ export default function CheckoutPage() {
     items: cartItems,
     idempotencyKey,
           turnstileToken,
+    expectedFree: isFreeOrder,
     customerEmail: formData.email,
     customerNote: formData.customerNote,
     shippingAddress: {
       fullName: `${formData.firstName} ${formData.lastName}`,
       street: formData.street,
       city: formData.city,
+      county: formData.county || "",
       state: formData.state,
       zip: formData.zip,
       phone: formData.phone,
-      country: formData.country
+      country: formData.country,
+      countryCode: formData.countryCode
     },
-    shippingSnapshot: selectedShipping ? {
-      version: 1,
-      zoneId: selectedShipping.zoneId,
-      zoneName: selectedShipping.zoneName,
-      methodId: selectedShipping.methodId,
-      methodName: selectedShipping.methodName,
-      provider: selectedShipping.provider,
-      cost: selectedShipping.cost,
-      currency: selectedShipping.currency,
-      settings: selectedShipping.settings,
-      conditions: selectedShipping.conditions,
-      capturedAt: new Date().toISOString()
-    } : null,
+    shippingSnapshot: (!shippingEnabled)
+      ? {
+          version: 1,
+          zoneId: null,
+          zoneName: 'Free Delivery',
+          methodId: 'free-delivery',
+          methodName: 'Free Delivery',
+          provider: 'FREE_SHIPPING',
+          cost: 0,
+          currency: 'USD',
+          settings: null,
+          conditions: null,
+          capturedAt: new Date().toISOString()
+        }
+      : selectedShipping ? {
+          version: 1,
+          zoneId: selectedShipping.zoneId,
+          zoneName: selectedShipping.zoneName,
+          methodId: selectedShipping.methodId,
+          methodName: selectedShipping.methodName,
+          provider: selectedShipping.provider,
+          cost: selectedShipping.cost,
+          currency: selectedShipping.currency,
+          settings: selectedShipping.settings,
+          conditions: selectedShipping.conditions,
+          capturedAt: new Date().toISOString()
+        } : null,
     referralCode: getReferralCode(),
     financials: {
       subtotal: cartSubtotal,
@@ -671,10 +788,15 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  // Debounce: (re)create the PaymentIntent when priced inputs change
+  // Debounce: (re)create the PaymentIntent when priced inputs change. Never called for a
+  // free ($0) order — Stripe can't create a $0 PaymentIntent, and there's nothing to pay.
   useEffect(() => {
-    if (paymentMethod !== "card") return;
+    if (paymentMethod !== "card" || isFreeOrder) return;
     if (!idempotencyKey || !cartItems || cartItems.length === 0) return;
+    // Don't create (or leak money-collecting intent for) a PaymentIntent until there's
+    // somewhere to ship to and someone to contact — also avoids ever snapshotting a blank
+    // checkout payload in the first place.
+    if (isRestricted || !requiredFieldsFilled) return;
 
     Promise.resolve().then(() => {
       setClientSecret("");
@@ -685,7 +807,83 @@ export default function CheckoutPage() {
       fetchClientSecret(buildCheckoutPayloadRef.current());
     }, 600);
     return () => clearTimeout(t);
-  }, [paymentMethod, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret]);
+  }, [paymentMethod, isFreeOrder, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret, isRestricted, requiredFieldsFilled]);
+
+  // Autosave an abandoned-cart snapshot once the shopper has actually started entering their
+  // details (not just landed on the page with items in cart) — so if they leave without
+  // finishing, the admin can still see who they were, what they wanted, and when. Debounced to
+  // avoid hammering the server on every keystroke; marked "recovered" server-side the moment
+  // this same idempotencyKey turns into a real order.
+  const hasStartedCheckout = Boolean((formData.email || formData.lastName || formData.street || "").trim());
+  useEffect(() => {
+    if (!idempotencyKey || !hasStartedCheckout || !cartItems || cartItems.length === 0) return;
+
+    const t = setTimeout(() => {
+      fetch("/api/checkout/abandoned-cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionKey: idempotencyKey,
+          items: cartItems,
+          cartSubtotal,
+          cartTotal,
+          contact: { email: formData.email, firstName: formData.firstName, lastName: formData.lastName, phone: formData.phone },
+          shippingAddress: {
+            fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+            street: formData.street,
+            city: formData.city,
+            county: formData.county || "",
+            state: formData.state,
+            zip: formData.zip,
+            country: formData.country,
+            phone: formData.phone,
+          },
+        }),
+      }).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idempotencyKey, hasStartedCheckout, cartItems, cartSubtotal, cartTotal, formData.email, formData.firstName, formData.lastName, formData.phone, formData.street, formData.city, formData.state, formData.zip, formData.country]);
+
+  // The PaymentIntent above is created/refreshed only when cart contents, shipping cost,
+  // promo code, or the selected shipping method change — NOT when the shopper edits their
+  // email, name, street, or phone. Those fields can be auto-selected (e.g. the default
+  // "United States" country already lets a shipping rate resolve before the shopper has
+  // typed anything else) long before the contact/address fields are filled in, so the very
+  // first PaymentIntent snapshot can capture a nearly-blank form. The server only ever builds
+  // the final order from whatever was last stored against this PaymentIntent — never anything
+  // sent at the moment of clicking "pay" — so without this, a shopper who fills the form in a
+  // particular order (or whose browser autofills address but not name/email) can pay
+  // successfully while the saved order ends up with a blank/incomplete shipping address, with
+  // no error shown anywhere. Re-sending the payload right before confirming payment guarantees
+  // the stored checkout data matches what just passed validation, not a stale early snapshot.
+  const finalizeAndValidateForPayment = async () => {
+    if (!validateForm()) return false;
+    try {
+      const res = await fetch("/api/checkout/create-payment-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCheckoutPayloadRef.current())
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showPopup({
+          title: "Order Details Changed",
+          message: data.error || "Please double-check your information and try again.",
+          type: "error",
+        });
+        return false;
+      }
+      return true;
+    } catch (err) {
+      showPopup({
+        title: "Network Error",
+        message: "Could not confirm your order details. Please check your connection and try again.",
+        type: "error",
+      });
+      return false;
+    }
+  };
 
   const handlePayment = async () => {
     if (!validateForm()) return;
@@ -693,7 +891,7 @@ export default function CheckoutPage() {
     // GA4 Event: add_payment_info — the shopper submitted the order with payment details.
     if (!hasFiredPayment.current) {
       hasFiredPayment.current = true;
-      trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, paymentMethod === "cod" ? "Cash on Delivery" : "Card");
+      trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, isFreeOrder ? "Free" : (paymentMethod === "cod" ? "Cash on Delivery" : "Card"));
     }
 
     setIsProcessing(true);
@@ -866,7 +1064,7 @@ export default function CheckoutPage() {
                   <div className="space-y-1 bg-[#FAF9F6] border border-black/[0.04] p-4 rounded-[4px] mb-2">
                     <label className={`${labelClass} text-black font-bold`}>Use Saved Address for Faster Checkout</label>
                     <div className="relative">
-                      <select
+                      <ThemedSelect
                         onChange={(e) => {
                           const idx = parseInt(e.target.value);
                           if (!isNaN(idx) && savedAddresses[idx]) {
@@ -882,7 +1080,7 @@ export default function CheckoutPage() {
                               city: addr.city,
                               state: addr.state,
                               zip: addr.zip,
-                              country: addr.country || "United States",
+                              country: addr.country || "",
                               phone: addr.phone || prev.phone
                             }));
                             setErrors({});
@@ -897,8 +1095,7 @@ export default function CheckoutPage() {
                             {addr.fullName} — {addr.street}, {addr.city} ({addr.type})
                           </option>
                         ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-black absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </ThemedSelect>
                     </div>
                   </div>
                 )}
@@ -912,13 +1109,21 @@ export default function CheckoutPage() {
                   labelClass={labelClass}
                   required
                   onChange={(val, matched) => {
+                    const countryCode = matched ? matched.isoCode : "";
                     setFormData(prev => ({
                       ...prev,
                       country: val,
-                      countryCode: matched ? matched.isoCode : "",
+                      countryCode,
                       state: "", stateCode: "", city: ""
                     }));
                     setErrors(prev => ({ ...prev, country: "" }));
+                    if (isRestrictedCountry(val, countryCode)) {
+                      showPopup({
+                        title: "Shipping Not Available",
+                        message: RESTRICTED_COUNTRY_MESSAGE,
+                        type: "error",
+                      });
+                    }
                   }}
                 />
                 {errors.country && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.country}</p>}
@@ -926,7 +1131,7 @@ export default function CheckoutPage() {
                 {/* Names */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className={labelClass}>First name (optional)</label>
+                    <label className={labelClass}>First name *</label>
                     <input
                       type="text"
                       name="firstName"
@@ -934,6 +1139,7 @@ export default function CheckoutPage() {
                       onChange={handleInputChange}
                       placeholder="First name"
                       className={`${inputClass} ${errors.firstName ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                      required
                     />
                     {errors.firstName && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.firstName}</p>}
                   </div>
@@ -1056,6 +1262,19 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
+                {/* County */}
+                <div className="space-y-1">
+                  <label className={labelClass}>County / District</label>
+                  <input
+                    type="text"
+                    name="county"
+                    value={formData.county}
+                    onChange={handleInputChange}
+                    placeholder="County (optional)"
+                    className={inputClass}
+                  />
+                </div>
+
                 {/* Phone */}
                 <div className="space-y-1">
                   <label className={labelClass}>Phone *</label>
@@ -1089,6 +1308,33 @@ export default function CheckoutPage() {
             {/* 3. Shipping Method */}
             <section className="space-y-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-black">Shipping Method</h2>
+              {isRestricted ? (
+                <div className="border border-red-200 bg-red-50 rounded-[4px] p-4">
+                  <p className="text-[13px] font-bold text-red-800">Shipping Unavailable</p>
+                  <p className="text-[11px] text-red-700 mt-0.5">{RESTRICTED_COUNTRY_MESSAGE}</p>
+                </div>
+              ) : isFreeOrder ? (
+                <div className="border border-neutral-200 rounded-[4px] bg-white p-4 flex items-center justify-between">
+                  <p className="text-[13px] font-semibold text-black">Free Shipping</p>
+                  <span className="text-[13px] font-bold text-black font-mono">Free</span>
+                </div>
+              ) : !shippingEnabled ? (
+                <div className="border border-neutral-200 rounded-[4px] bg-white p-4 flex items-center justify-between shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-neutral-100 text-black flex items-center justify-center">
+                      <Truck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold text-black">Free Delivery</p>
+                      <p className="text-[11px] text-neutral-500">Free delivery on all orders</p>
+                    </div>
+                  </div>
+                  <span className="text-[13px] font-bold text-black font-mono bg-neutral-100 px-2.5 py-0.5 rounded">
+                    Free
+                  </span>
+                </div>
+              ) : (
+                <>
               {loadingRates && (
                 <div className="flex items-center gap-2 py-3 text-xs text-neutral-500">
                   <Loader2 className="w-4 h-4 animate-spin text-black" />
@@ -1126,11 +1372,30 @@ export default function CheckoutPage() {
                   ))}
                 </div>
               )}
+                </>
+              )}
             </section>
 
             {/* 4. Payment Method */}
             <section className="space-y-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-black">Payment</h2>
+              {isRestricted ? (
+                <div className="border border-red-200 bg-red-50 rounded-[4px] p-4">
+                  <p className="text-[13px] font-bold text-red-800">Checkout Unavailable</p>
+                  <p className="text-[11px] text-red-700 mt-0.5">{RESTRICTED_COUNTRY_MESSAGE}</p>
+                </div>
+              ) : !requiredFieldsFilled ? (
+                <div className="border border-neutral-200 bg-[#FAF9F6] rounded-[4px] p-4">
+                  <p className="text-[13px] font-semibold text-black">Complete your contact & delivery details above</p>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">Payment options will appear once your name, email, address, and phone number are filled in.</p>
+                </div>
+              ) : isFreeOrder ? (
+                <div className="border border-green-200 bg-green-50 rounded-[4px] p-4">
+                  <p className="text-[13px] font-bold text-green-800">No payment required</p>
+                  <p className="text-[11px] text-green-700 mt-0.5">Your order total is $0 — nothing to charge.</p>
+                </div>
+              ) : (
+                <>
               <div className="border border-neutral-200 rounded-[4px] divide-y divide-neutral-200 overflow-hidden bg-white">
                 {cardMethodEnabled && (
                   <label
@@ -1172,15 +1437,6 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Security check — required before either payment method can submit */}
-              <div className="pt-4">
-                <TurnstileWidget
-                  ref={turnstileRef}
-                  onVerify={(token) => setTurnstileToken(token)}
-                  onExpire={() => setTurnstileToken("")}
-                />
-              </div>
-
               {paymentMethod === "card" && (
                 <div className="pt-1">
                   {loadingClientSecret && !clientSecret && (
@@ -1200,7 +1456,7 @@ export default function CheckoutPage() {
                       <StripePaymentForm
                         returnUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/checkout/success?idempotencyKey=${idempotencyKey}`}
                         idempotencyKey={idempotencyKey}
-                        onValidate={validateForm}
+                        onValidate={finalizeAndValidateForPayment}
                         onBeforeSubmit={() => {
                           if (!hasFiredPayment.current) {
                             hasFiredPayment.current = true;
@@ -1213,10 +1469,23 @@ export default function CheckoutPage() {
                   )}
                 </div>
               )}
+                </>
+              )}
+
+              {/* Security check — required before any payment method (including a free order) can submit */}
+              {!isRestricted && requiredFieldsFilled && (
+                <div className="pt-4">
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken("")}
+                  />
+                </div>
+              )}
             </section>
 
-            {/* Submit Action (Cash on Delivery only — Card has its own submit button above) */}
-            {paymentMethod === "cod" && (
+            {/* Submit Action (Cash on Delivery / free order only — Card has its own submit button above) */}
+            {!isRestricted && requiredFieldsFilled && (isFreeOrder || paymentMethod === "cod") && (
               <div className="space-y-4">
                 <button
                   type="button"
@@ -1240,7 +1509,7 @@ export default function CheckoutPage() {
               {(cartItems || []).map((item, index) => {
                 const itemImage = item.image || (Array.isArray(item.images) && item.images[0]) || "/placeholder.jpg";
                 const itemKey = `${item.id || item._id}-${item.selectedSize || "Standard"}-${item.selectedColor || "Standard"}-${index}`;
-                const uniqueKeyForCart = `${item.id}-${item.selectedSize || "Standard"}-${item.selectedColor || "Standard"}`;
+                const uniqueKeyForCart = getCartItemKey(item);
                 return (
                   <div key={itemKey} className="flex gap-4 items-center py-3.5 first:pt-0 last:pb-0">
                     <div className="relative shrink-0 w-14 h-18">
@@ -1283,6 +1552,25 @@ export default function CheckoutPage() {
                                 <span key={k}><span className="font-bold capitalize text-black">{k.replace(/([A-Z])/g, ' $1')}</span>: {v} {item.madeToMeasure.unit}</span>
                               ) : null)}
                               {item.madeToMeasure.notes && <span className="col-span-2 italic text-black/80 font-semibold">Note: {item.madeToMeasure.notes}</span>}
+                            </div>
+                          </details>
+                        </div>
+                      )}
+
+                      {/* Corporate Gifting Badge */}
+                      {item.corporateGifting?.enabled && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-wide">
+                            ✦ Corporate Gifting — {(item.corporateGifting.selections || []).length} items
+                          </span>
+                          <details className="mt-1">
+                            <summary className="text-[9px] text-black/60 cursor-pointer hover:text-black transition-colors select-none">View selected items</summary>
+                            <div className="mt-1.5 space-y-0.5 text-[9px] text-black font-semibold">
+                              {(item.corporateGifting.selections || []).map((sel, selIdx) => (
+                                <div key={sel.itemId || selIdx}>
+                                  {sel.name}{sel.priceDelta > 0 ? ` (+$${Number(sel.priceDelta).toFixed(2)})` : ""}{sel.artwork?.name ? ` — logo: ${sel.artwork.name}` : " — no logo uploaded"}
+                                </div>
+                              ))}
                             </div>
                           </details>
                         </div>
@@ -1368,7 +1656,7 @@ export default function CheckoutPage() {
                 <span className="text-black font-bold font-mono">
                   {selectedShipping
                     ? (shippingCost === 0 ? "Free" : `$${shippingCost.toLocaleString()}`)
-                    : "Calculated at next step"}
+                    : (!shippingEnabled ? "Free" : "Calculated at next step")}
                 </span>
               </div>
 

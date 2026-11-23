@@ -39,7 +39,6 @@ describe("Coupons Validate API Route — E2E Integration Suite", () => {
 
     // Create a mock product
     prodA = await Product.create({
-      tenantId: "DEFAULT_STORE",
       name: "API Test Shirt",
       slug: "api-test-shirt-" + Date.now(),
       price: 100,
@@ -84,7 +83,6 @@ describe("Coupons Validate API Route — E2E Integration Suite", () => {
 
   it("should return automatic promotions even if no coupon code is supplied", async () => {
     const promo = await Promotion.create({
-      tenantId: "DEFAULT_STORE",
       title: "Automatic $10 Off",
       isAutomatic: true,
       priority: 10,
@@ -117,7 +115,6 @@ describe("Coupons Validate API Route — E2E Integration Suite", () => {
   it("should validate and apply an enterprise coupon code", async () => {
     const codeName = "ENTERPRISE20";
     const promo = await Promotion.create({
-      tenantId: "DEFAULT_STORE",
       title: "20% Enterprise Coupon",
       isAutomatic: false,
       code: codeName,
@@ -191,7 +188,6 @@ describe("Coupons Validate API Route — E2E Integration Suite", () => {
 
     // Create a segment promotion for returning customers
     const promo = await Promotion.create({
-      tenantId: "DEFAULT_STORE",
       title: "Welcome Back $30 Off",
       isAutomatic: true,
       priority: 20,
@@ -223,7 +219,6 @@ describe("Coupons Validate API Route — E2E Integration Suite", () => {
 
     // 2. Insert a mock completed order for this email
     const order = await Order.create({
-      tenantId: "DEFAULT_STORE",
       orderNumber: "API-ORD-" + Math.floor(Math.random() * 1000000),
       idempotencyKey: "api_key_" + Date.now(),
       status: "Confirmed",

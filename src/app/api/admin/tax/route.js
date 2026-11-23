@@ -7,14 +7,19 @@ import { getServerSession } from 'next-auth';
 import { authOptions }      from '@/app/api/auth/[...nextauth]/route';
 import { can }              from '@/lib/rbac';
 
-async function requireSettings() {
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+async function requireSettings(action = 'manage') {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) return null;
-  if (!can(session.user, 'settings.manage')) return null;
+  if (action === 'view') {
+    if (!can(session.user, 'settings.view') && !can(session.user, 'settings.manage') && !can(session.user, 'settings.edit')) return null;
+  } else {
+    if (!can(session.user, 'settings.manage') && !can(session.user, 'settings.edit')) return null;
+  }
   return session;
 }
-
-const TENANT_ID = 'DEFAULT_STORE';
 
 function defaultTaxClasses() {
   return [
@@ -96,7 +101,7 @@ async function migrateLegacyTaxSettings(doc) {
   ];
 
   const updated = await TaxSettings.findOneAndUpdate(
-    { tenantId: TENANT_ID },
+    {},
     {
       $set: { taxClasses },
       $unset: { taxLabel: 1, defaultTaxRate: 1, taxRules: 1, zonalRules: 1, applyToShipping: 1 },
@@ -109,14 +114,13 @@ async function migrateLegacyTaxSettings(doc) {
 
 export async function GET(req) {
   try {
-    if (!await requireSettings()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!await requireSettings('view')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     await dbConnect();
 
-    let doc = await TaxSettings.findOne({ tenantId: TENANT_ID }).lean();
+    let doc = await TaxSettings.findOne().lean();
 
     if (!doc) {
       const created = await TaxSettings.create({
-        tenantId: TENANT_ID,
         enabled: false,
         calculationMethod: 'exclusive',
         taxRoundingMode: 'round',
@@ -164,7 +168,7 @@ export async function PUT(req) {
     }
 
     const settings = await TaxSettings.findOneAndUpdate(
-      { tenantId: TENANT_ID },
+      {},
       {
         $set: {
           enabled: enabled ?? false,
@@ -176,6 +180,27 @@ export async function PUT(req) {
       },
       { upsert: true, new: true, runValidators: true }
     );
+    return NextResponse.json({ success: true, settings });
+  } catch (e) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}
+
+// PATCH — update only the `enabled` flag (used by the "Enable taxes" switch so
+// it never persists unsaved class/rate edits from the page).
+export async function PATCH(req) {
+  try {
+    if (!await requireSettings()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    await dbConnect();
+    const body = await req.json();
+    if (typeof body?.enabled !== 'boolean') {
+      return NextResponse.json({ error: '`enabled` must be true or false.' }, { status: 400 });
+    }
+    const settings = await TaxSettings.findOneAndUpdate(
+      {},
+      { $set: { enabled: body.enabled } },
+      { upsert: true, new: true, runValidators: true }
+    ).lean();
     return NextResponse.json({ success: true, settings });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

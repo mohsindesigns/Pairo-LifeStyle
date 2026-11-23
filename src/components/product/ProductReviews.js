@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { 
   Star, 
@@ -23,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 // Helper to generate initials from customer name
 const getInitials = (name) => {
@@ -69,9 +69,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
     title: "",
     comment: "",
     customerName: session?.user?.name || "",
-    recommend: true,
-    guestEmail: "",
-    orderNumber: ""
+    email: session?.user?.email || "",
+    recommend: true
   });
 
   // Customer edit review drawer state
@@ -81,13 +80,13 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
     rating: 5,
     title: "",
     comment: "",
-    recommend: true,
-    guestEmail: "",
-    orderNumber: ""
+    recommend: true
   });
 
   // Mock File Upload State
-  const [mockFiles, setMockFiles] = useState([]);
+  // Photos / videos attached to the review: { url, type, name } once uploaded, { uploading: true, name } while in progress.
+  const [media, setMedia] = useState([]);
+  const uploading = media.some((m) => m.uploading);
   const [dragActive, setDragActive] = useState(false);
 
   // Long review expand/collapse tracking
@@ -100,7 +99,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
   useEffect(() => {
     if (session?.user) {
       Promise.resolve().then(() => {
-        setFormData(prev => ({ ...prev, customerName: session.user.name || "" }));
+        setFormData(prev => ({ ...prev, customerName: prev.customerName || session.user.name || "", email: prev.email || session.user.email || "" }));
       });
     }
   }, [session]);
@@ -147,12 +146,10 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
         title: formData.title,
         comment: formData.comment,
         customerName: formData.customerName,
-        recommend: formData.recommend
-      };
-
-      if (!session) {
-        submitBody.guestEmail = formData.guestEmail;
-        submitBody.orderNumber = formData.orderNumber;
+        email: formData.email,
+        guestEmail: formData.email,
+        recommend: formData.recommend,
+        media: media.filter((m) => m.url).map(({ url, type }) => ({ url, type })),
       }
 
       const res = await fetch(`/api/products/${productId}/reviews`, {
@@ -164,18 +161,17 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
       const data = await res.json();
 
       if (res.ok) {
-        toast.success(data.message || "Review submitted successfully!");
+        toast.success("Thank you! Your review will appear on the site once our team has approved it.", { duration: 6000 });
         setIsFormOpen(false);
-        setMockFiles([]);
+        setMedia([]);
         // Reset form
         setFormData({
           rating: 5,
           title: "",
           comment: "",
           customerName: session?.user?.name || "",
-          recommend: true,
-          guestEmail: "",
-          orderNumber: ""
+          email: session?.user?.email || "",
+          recommend: true
         });
         fetchReviews(1);
       } else {
@@ -202,11 +198,6 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
         comment: editFormData.comment,
         recommend: editFormData.recommend
       };
-
-      if (!session) {
-        submitBody.guestEmail = editFormData.guestEmail;
-        submitBody.orderNumber = editFormData.orderNumber;
-      }
 
       const res = await fetch(`/api/products/${productId}/reviews`, {
         method: "PUT",
@@ -325,33 +316,42 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
     }
   };
 
+  // Uploads each chosen file straight away (one request per file) and keeps the returned address for the review.
+  const addFiles = async (fileList) => {
+    const chosen = Array.from(fileList || []);
+    const room = 3 - media.length;
+    if (chosen.length > room) toast.error("You can add up to 3 photos or videos.");
+    for (const file of chosen.slice(0, Math.max(0, room))) {
+      const key = `${file.name}-${Date.now()}-${Math.random()}`;
+      setMedia((prev) => [...prev, { key, name: file.name, uploading: true }]);
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const res = await fetch("/api/reviews/upload", { method: "POST", body });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.url) throw new Error(data.error || "Upload failed. Please try again.");
+        setMedia((prev) => prev.map((m) => (m.key === key ? { key, name: file.name, url: data.url, type: data.type } : m)));
+      } catch (err) {
+        toast.error(`${file.name}: ${err.message}`);
+        setMedia((prev) => prev.filter((m) => m.key !== key));
+      }
+    }
+  };
+
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const newFiles = Array.from(e.dataTransfer.files).map(f => ({
-        name: f.name,
-        size: (f.size / (1024 * 1024)).toFixed(2) + " MB",
-        preview: URL.createObjectURL(f)
-      }));
-      setMockFiles(prev => [...prev, ...newFiles].slice(0, 3));
-    }
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) addFiles(e.dataTransfer.files);
   };
 
   const handleFileSelect = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const newFiles = Array.from(e.target.files).map(f => ({
-        name: f.name,
-        size: (f.size / (1024 * 1024)).toFixed(2) + " MB",
-        preview: URL.createObjectURL(f)
-      }));
-      setMockFiles(prev => [...prev, ...newFiles].slice(0, 3));
-    }
+    if (e.target.files && e.target.files[0]) addFiles(e.target.files);
+    e.target.value = ""; // so the same file can be chosen again after removing it
   };
 
-  const removeMockFile = (index) => {
-    setMockFiles(prev => prev.filter((_, i) => i !== index));
+  const removeMedia = (index) => {
+    setMedia((prev) => prev.filter((_, i) => i !== index));
   };
 
   const toggleExpandReview = (reviewId) => {
@@ -365,9 +365,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
       rating: review.rating,
       title: review.title || "",
       comment: review.comment || "",
-      recommend: review.recommend,
-      guestEmail: "",
-      orderNumber: ""
+      recommend: review.recommend
     });
     setIsEditOpen(true);
   };
@@ -460,7 +458,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} id="review-submit-form" className="space-y-6">
                 {/* Rating selection */}
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
@@ -484,47 +482,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                   </div>
                 </div>
 
-                {/* Verification fields for guests */}
-                {!session && (
-                  <div className="bg-neutral-50 border border-neutral-200/60 p-4 rounded-xl space-y-4">
-                    <div className="flex items-start gap-2.5 text-neutral-500 text-xs">
-                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <p className="leading-relaxed">
-                        <strong>Verified Purchase Check:</strong> Pairo requires checkout validation. Please provide the checkout email and order number to review this item.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                          Checkout Email
-                        </label>
-                        <input
-                          required
-                          type="email"
-                          placeholder="e.g. name@domain.com"
-                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
-                          value={formData.guestEmail}
-                          onChange={e => setFormData(prev => ({ ...prev, guestEmail: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                          Order Number
-                        </label>
-                        <input
-                          required
-                          type="text"
-                          placeholder="e.g. PO-89021"
-                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
-                          value={formData.orderNumber}
-                          onChange={e => setFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Customer name */}
+                                {/* Customer name */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
                     Your Name
@@ -536,6 +494,21 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                     className="w-full border border-neutral-200 rounded-lg p-3 text-xs outline-none focus:border-black transition-colors"
                     value={formData.customerName}
                     onChange={e => setFormData(prev => ({ ...prev, customerName: e.target.value }))}
+                  />
+                </div>
+
+                {/* Email address */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
+                    Your Email
+                  </label>
+                  <input
+                    required
+                    type="email"
+                    placeholder="e.g. name@domain.com"
+                    className="w-full border border-neutral-200 rounded-lg p-3 text-xs outline-none focus:border-black transition-colors"
+                    value={formData.email}
+                    onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   />
                 </div>
 
@@ -581,10 +554,10 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                   </label>
                 </div>
 
-                {/* Interactive Drag & Drop File Upload Mockup */}
+                {/* Photo / video upload: the review is only shown on the site once our team has approved it */}
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest block">
-                    Add Photos/Videos
+                    Add a video or photos (optional)
                   </label>
                   <div
                     onDragEnter={handleDrag}
@@ -597,31 +570,44 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                     onClick={() => document.getElementById("fileUploadInput").click()}
                   >
                     <UploadCloud className="w-8 h-8 text-neutral-400 animate-bounce" />
-                    <span className="text-xs font-bold text-neutral-700">Drag files here or click to upload</span>
-                    <span className="text-[10px] text-neutral-400">PNG, JPG, MP4 (Max 3 files, mock verification)</span>
+                    <span className="text-xs font-bold text-neutral-700">Drag your video or photos here, or click to choose</span>
+                    <span className="text-[10px] text-neutral-400 text-center">Video: MP4, MOV or WebM up to 20 MB · Photos: JPG, PNG or WebP up to 5 MB · up to 3 files. Your review appears after our team approves it.</span>
                     <input
                       id="fileUploadInput"
                       type="file"
                       multiple
-                      accept="image/*,video/*"
+                      accept="video/mp4,video/quicktime,video/webm,image/jpeg,image/png,image/webp"
                       className="hidden"
                       onChange={handleFileSelect}
                     />
                   </div>
 
                   {/* Previews */}
-                  {mockFiles.length > 0 && (
+                  {media.length > 0 && (
                     <div className="grid grid-cols-3 gap-3 pt-2">
-                      {mockFiles.map((file, idx) => (
-                        <div key={idx} className="relative aspect-square rounded-lg border border-neutral-100 overflow-hidden bg-neutral-50 group">
-                          <Image src={file.preview} alt="upload preview" fill className="object-cover" unoptimized />
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); removeMockFile(idx); }}
-                            className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
+                      {media.map((file, idx) => (
+                        <div key={file.key || idx} className="relative aspect-square rounded-lg border border-neutral-100 overflow-hidden bg-neutral-50 group">
+                          {file.uploading ? (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                              <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                              Uploading…
+                            </div>
+                          ) : file.type === "video" ? (
+                            <video src={file.url} muted playsInline preload="metadata" className="absolute inset-0 w-full h-full object-cover" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={file.url} alt="Your upload" className="absolute inset-0 w-full h-full object-cover" />
+                          )}
+                          {!file.uploading && (
+                            <button
+                              type="button"
+                              aria-label="Remove this file"
+                              onClick={(e) => { e.stopPropagation(); removeMedia(idx); }}
+                              className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black text-white rounded-full transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -639,11 +625,12 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                 Cancel
               </button>
               <button
-                onClick={handleSubmit}
-                disabled={submitting}
+                type="submit"
+                form="review-submit-form"
+                disabled={submitting || uploading}
                 className="w-2/3 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-300 transition-colors px-4 py-3 rounded-full text-xs font-bold uppercase tracking-[0.2em]"
               >
-                {submitting ? "Submitting..." : "Submit Review"}
+                {submitting ? "Submitting..." : uploading ? "Uploading…" : "Submit Review"}
               </button>
             </div>
           </div>
@@ -695,46 +682,6 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                     ))}
                   </div>
                 </div>
-
-                {/* Verification fields for guests */}
-                {!session && (
-                  <div className="bg-neutral-50 border border-neutral-200/60 p-4 rounded-xl space-y-4">
-                    <div className="flex items-start gap-2.5 text-neutral-500 text-xs">
-                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                      <p className="leading-relaxed">
-                        <strong>Verify Purchase Info:</strong> Provide your checkout details to modify this review.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                          Checkout Email
-                        </label>
-                        <input
-                          required
-                          type="email"
-                          placeholder="e.g. name@domain.com"
-                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
-                          value={editFormData.guestEmail}
-                          onChange={e => setEditFormData(prev => ({ ...prev, guestEmail: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
-                          Order Number
-                        </label>
-                        <input
-                          required
-                          type="text"
-                          placeholder="e.g. PO-89021"
-                          className="w-full border border-neutral-200 bg-white rounded-lg p-2.5 text-xs outline-none focus:border-black transition-colors"
-                          value={editFormData.orderNumber}
-                          onChange={e => setEditFormData(prev => ({ ...prev, orderNumber: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Review title */}
                 <div className="space-y-1.5">
@@ -808,7 +755,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
           </span>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Sort:</span>
-            <select
+            <ThemedSelect
               value={sort}
               onChange={e => setSort(e.target.value)}
               className="border-none bg-transparent text-xs font-bold text-black uppercase tracking-wider focus:ring-0 outline-none p-1 pr-6 cursor-pointer"
@@ -817,7 +764,7 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
               <option value="most_helpful">Most Helpful</option>
               <option value="highest_rated">Highest Rated</option>
               <option value="lowest_rated">Lowest Rated</option>
-            </select>
+            </ThemedSelect>
           </div>
         </div>
       )}
@@ -874,11 +821,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
               ? `${review.comment.substring(0, 280)}...` 
               : review.comment;
             
-            // Check if reviewer is owner of this review to allow editing
-            const isOwner = session && (
-              review.customerId === session.user.id || 
-              review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase()
-            );
+            // The server says whether this review belongs to the signed-in visitor (it no longer sends authors' emails).
+            const isOwner = !!session && !!review.isOwner;
 
             return (
               <div key={review._id} className="border-b border-black/5 pb-8 last:border-0 last:pb-0 space-y-4">
@@ -921,9 +865,6 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                           <CheckCircle className="w-2.5 h-2.5 fill-emerald-600 text-white" />
                           Verified Purchase
                         </span>
-                        <span className="text-[9px] text-[#6F655B]/50 font-normal normal-case">
-                          Purchased on {new Date(review.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                        </span>
                       </div>
                     )}
                     {review.recommend ? (
@@ -950,6 +891,20 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                         )}
                       </button>
                     )}
+                  </div>
+                )}
+
+                {/* Photos / video the customer added (shown only after the review was approved) */}
+                {review.media && review.media.length > 0 && (
+                  <div className="flex flex-wrap gap-3">
+                    {review.media.map((m, i) => (
+                      m.type === "video" ? (
+                        <video key={i} src={m.url} controls playsInline preload="metadata" className="w-full max-w-sm rounded-lg bg-black aspect-video" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={i} src={m.url} alt="Customer photo" className="h-32 w-32 rounded-lg object-cover" />
+                      )
+                    ))}
                   </div>
                 )}
 
@@ -1005,8 +960,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {/* Customer editing option if they are owners (30 day check is enforced on server) */}
-                    {(isOwner || !session) && (
+                    {/* Customer editing option - only the owning logged-in customer can edit */}
+                    {isOwner && (
                       <button
                         onClick={() => handleOpenEdit(review)}
                         className="flex items-center gap-1 text-[10px] text-[#6F655B]/60 hover:text-[#1E1B19] font-medium uppercase tracking-wider"
@@ -1015,8 +970,8 @@ export default function ProductReviews({ productId, productName, autoOpen = fals
                         Edit Review
                       </button>
                     )}
-                    
-                    {(isOwner || !session) && <span className="text-neutral-250 text-xs">|</span>}
+
+                    {isOwner && <span className="text-neutral-250 text-xs">|</span>}
 
                     <button
                       onClick={() => handleReport(review._id)}

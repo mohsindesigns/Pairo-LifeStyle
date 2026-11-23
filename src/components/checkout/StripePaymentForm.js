@@ -19,11 +19,16 @@ export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidat
     e.preventDefault();
     setErrorMessage("");
 
-    if (typeof onValidate === "function" && !onValidate()) {
-      return;
+    if (typeof onValidate === "function") {
+      setIsSubmitting(true);
+      const isValid = await onValidate();
+      if (!isValid) {
+        setIsSubmitting(false);
+        return;
+      }
     }
 
-    if (!isReady) return;
+    if (!isReady) { setIsSubmitting(false); return; }
 
     // GA4 add_payment_info (card path) — after validation, before confirming payment.
     if (typeof onBeforeSubmit === "function") onBeforeSubmit();

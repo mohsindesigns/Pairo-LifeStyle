@@ -9,6 +9,7 @@ import siteData from "@/lib/data.json";
 import { useSiteData } from "@/context/SiteContext";
 import { getProductUrl, getCategoryUrl } from "@/lib/routes";
 import { trackSearch } from "@/lib/analytics";
+import { recordSearchResult } from "@/lib/siteAnalytics";
 
 export default function SearchModal({ isOpen, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -16,6 +17,7 @@ export default function SearchModal({ isOpen, onClose }) {
   const [results, setResults] = useState({ products: [], categories: [] });
   const inputRef = useRef(null);
   const lastSearchTracked = useRef("");
+  const lastResultCount = useRef(0);
 
   // GA4 search + Pinterest search — fire once per settled query (debounced), not per keystroke.
   useEffect(() => {
@@ -26,6 +28,7 @@ export default function SearchModal({ isOpen, onClose }) {
       if (lastSearchTracked.current !== key) {
         lastSearchTracked.current = key;
         trackSearch(q);
+        if (dbProducts.length || dbCategories.length) recordSearchResult(q, lastResultCount.current);
       }
     }, 900);
     return () => clearTimeout(t);
@@ -82,8 +85,10 @@ export default function SearchModal({ isOpen, onClose }) {
           c.slug?.toLowerCase().includes(query)
         ).slice(0, 4);
 
+        lastResultCount.current = filteredProducts.length + filteredCategories.length;
         setResults({ products: filteredProducts, categories: filteredCategories });
       } else {
+        lastResultCount.current = 0;
         setResults((prev) => 
           prev.products.length === 0 && prev.categories.length === 0 
             ? prev 

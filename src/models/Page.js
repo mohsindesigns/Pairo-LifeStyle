@@ -51,14 +51,19 @@ const PageSchema = new mongoose.Schema({
   },
   template: {
     type: String,
-    enum: ["home", "about", "contact", "default", "custom-jacket", "gallery", "size-chart"],
+    enum: ["home", "about", "contact", "default", "custom-jacket", "corporate-gifting", "gallery", "size-chart"],
     default: "default",
     required: true
   },
-  isSystem: { 
-    type: Boolean, 
-    default: false 
+  isSystem: {
+    type: Boolean,
+    default: false
   },
+  // Soft delete (Trash). System pages can never be trashed.
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date, default: null },
+  // Status the page had when trashed, so a restore can put it back.
+  statusBeforeTrash: { type: String, enum: ["Draft", "Published", null], default: null },
   sections: [SectionSchema],
   seo: {
     title: String,
@@ -78,12 +83,11 @@ const PageSchema = new mongoose.Schema({
     structuredData: String // JSON-LD
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
-  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
-  tenantId: { type: String, default: 'DEFAULT_STORE' }
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" }
 }, { timestamps: true });
 
 // Ensure slugs are indexable
-PageSchema.index({ slug: 1, tenantId: 1 }, { unique: true });
+PageSchema.index({ slug: 1 }, { unique: true });
 
 delete mongoose.models.Page;
 export default mongoose.models.Page || mongoose.model("Page", PageSchema);

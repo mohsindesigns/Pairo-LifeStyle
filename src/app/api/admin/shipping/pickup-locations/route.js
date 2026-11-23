@@ -18,8 +18,6 @@ async function requireAdmin() {
   return session;
 }
 
-const TENANT_ID = 'DEFAULT_STORE';
-
 // ─── GET /api/admin/shipping/pickup-locations ─────────────────────────────────
 export async function GET(req) {
   if (!await requireAdmin()) {
@@ -28,7 +26,7 @@ export async function GET(req) {
   await dbConnect();
 
   const locations = await PickupLocation
-    .find({ tenantId: TENANT_ID })
+    .find()
     .sort({ sortOrder: 1 })
     .lean();
 
@@ -46,7 +44,7 @@ export async function POST(req) {
   if (!body.name?.trim()) {
     return NextResponse.json({ error: 'Location name is required.' }, { status: 400 });
   }
-  const location = await PickupLocation.create({ tenantId: TENANT_ID, ...body, name: body.name.trim() });
+  const location = await PickupLocation.create({ ...body, name: body.name.trim() });
 
   return NextResponse.json({ success: true, location }, { status: 201 });
 }
@@ -66,7 +64,7 @@ export async function PUT(req) {
   rest.name = rest.name.trim();
 
   const location = await PickupLocation.findOneAndUpdate(
-    { _id: id, tenantId: TENANT_ID },
+    { _id: id },
     { $set: rest },
     { new: true, runValidators: true }
   );
@@ -87,7 +85,7 @@ export async function DELETE(req) {
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'Location id is required.' }, { status: 400 });
 
-  const result = await PickupLocation.findOneAndDelete({ _id: id, tenantId: TENANT_ID });
+  const result = await PickupLocation.findOneAndDelete({ _id: id });
   if (!result) return NextResponse.json({ error: 'Location not found.' }, { status: 404 });
 
   return NextResponse.json({ success: true, message: 'Pickup location deleted.' });

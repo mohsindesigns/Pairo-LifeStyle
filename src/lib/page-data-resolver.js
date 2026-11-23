@@ -2,6 +2,34 @@ import Product from "@/models/Product";
 import Category from "@/models/Category";
 import Blog from "@/models/Blog";
 
+// Fields the storefront cards, size modal, cart and GA events actually read.
+// Sending whole product docs (descriptions, FAQs, SEO, size charts, populated
+// categories with their own long HTML) made the homepage RSC payload ~4MB.
+const CARD_FIELDS = [
+  '_id', 'id', 'name', 'title', 'slug', 'sku', 'price', 'compareAtPrice', 'oldPrice',
+  'image', 'image2', 'images', 'productType', 'rating', 'reviewCount', 'attributes',
+  'variants', 'variantCombinations', 'madeToMeasure', 'corporateGifting', 'weight',
+  'currency', 'collections', 'status', 'isDeleted', 'stock', 'manageStock', 'availabilityStatus',
+];
+
+function slimCategory(c) {
+  if (!c || typeof c !== 'object') return c;
+  return { _id: c._id, name: c.name, slug: c.slug };
+}
+
+function slimProduct(p, altMap = {}) {
+  const out = {};
+  for (const k of CARD_FIELDS) if (p[k] !== undefined) out[k] = p[k];
+  if (Array.isArray(p.categories)) out.categories = p.categories.map(slimCategory);
+  if (p.primaryCategory) out.primaryCategory = slimCategory(p.primaryCategory);
+  const imageAlts = {};
+  for (const url of [...(p.images || []), p.image, p.image2]) {
+    if (url && altMap[url]) imageAlts[url] = altMap[url];
+  }
+  out.imageAlts = imageAlts;
+  return out;
+}
+
 export async function resolvePageSections(sections) {
   const resolvedSections = await Promise.all(sections.map(async (section) => {
     const config = { ...(section.config || {}) };
@@ -9,7 +37,7 @@ export async function resolvePageSections(sections) {
     try {
       // Resolve Product Grid Data
       if (section.type === 'product_grid') {
-        const query = { isDeleted: false, status: 'Published', tenantId: 'DEFAULT_STORE' };
+        const query = { isDeleted: { $ne: true }, status: 'Published' };
         let products = [];
 
         if (config.showType === 'products' && config.productIds && config.productIds.length > 0) {
@@ -87,9 +115,82 @@ export async function resolvePageSections(sections) {
           if (p.image) allUrls.push(p.image);
         });
         const altMap = await getAltTextMap(allUrls);
-        const enriched = products.map(p => ({ ...p, imageAlts: altMap }));
+        const enriched = products.map(p => slimProduct(p, altMap));
           
         config.products = JSON.parse(JSON.stringify(enriched));
+      }
+
+      // Resolve Price Range Showcase Data
+      if (section.type === 'price_range_showcase') {
+        const { getAltTextMap } = await import("@/lib/mediaUsage");
+        const perRange = Math.min(Number(config.productsPerRange) || 8, 16);
+        const shuffleAll = config.shuffle !== 'no';
+        const showCount = config.showCount !== 'no';
+        const ranges = (Array.isArray(config.ranges) ? config.ranges : [])
+          .filter((range) => range && range.visible !== 'no')
+          .slice(0, 20);
+
+        config.ranges = await Promise.all(ranges.map(async (range) => {
+          const min = Number(range.minPrice) || 0;
+          const hasMax = range.maxPrice !== '' && range.maxPrice !== null && range.maxPrice !== undefined && !Number.isNaN(Number(range.maxPrice));
+          const max = hasMax ? Number(range.maxPrice) : null;
+          const priceQuery = { $gte: min };
+          if (max !== null) priceQuery.$lte = max;
+          const baseQuery = { isDeleted: false, status: 'Published', price: priceQuery };
+
+          // Filter by particular Category if chosen
+          let categorySlug = null;
+          if (range.category) {
+            try {
+              const mongoose = (await import("mongoose")).default;
+              const Category = mongoose.models.Category || (await import("@/models/Category")).default;
+              const catDoc = await Category.findById(range.category).lean().catch(() => null);
+              if (catDoc) categorySlug = catDoc.slug;
+            } catch {
+              // Ignore
+            }
+            baseQuery.$or = [
+              { categories: range.category },
+              { primaryCategory: range.category },
+              { category: range.category }
+            ];
+          }
+
+          // Filter by particular Products if chosen
+          if (Array.isArray(range.productIds) && range.productIds.length > 0) {
+            baseQuery._id = { $in: range.productIds };
+          }
+
+          const sortKey = range.sort || 'shuffle';
+          const randomize = sortKey === 'shuffle' && shuffleAll;
+          const sortSpec = sortKey === 'price_asc' ? { price: 1 } : sortKey === 'price_desc' ? { price: -1 } : { createdAt: -1 };
+
+          const [total, pool] = await Promise.all([
+            showCount ? Product.countDocuments(baseQuery) : Promise.resolve(0),
+            Product.find(baseQuery)
+              .populate('categories')
+              .populate('primaryCategory')
+              .sort(sortSpec)
+              .limit(randomize ? 60 : perRange)
+              .lean(),
+          ]);
+          const picked = randomize
+            ? [...pool].sort(() => Math.random() - 0.5).slice(0, perRange)
+            : pool.slice(0, perRange);
+
+          const altMap = await getAltTextMap(picked.flatMap((p) => [...(p.images || []), p.image].filter(Boolean)));
+          return {
+            label: range.label || '',
+            badge: range.badge || '',
+            minPrice: min,
+            maxPrice: max,
+            category: range.category || null,
+            categorySlug: categorySlug || null,
+            total,
+            randomize,
+            products: JSON.parse(JSON.stringify(picked.map((p) => slimProduct(p, altMap)))),
+          };
+        }));
       }
 
       // Resolve Banner Feature Data
@@ -106,13 +207,12 @@ export async function resolvePageSections(sections) {
             if (product) {
                const { getAltTextMap } = await import("@/lib/mediaUsage");
                const altMap = await getAltTextMap([...(product.images || []), product.image]);
-               product.imageAlts = altMap;
-               config.product = JSON.parse(JSON.stringify(product));
+               config.product = JSON.parse(JSON.stringify(slimProduct(product, altMap)));
             }
          }
          if (config.collectionId) {
             const mongoose = require('mongoose');
-            const query = { isDeleted: false };
+            const query = { isDeleted: false, status: 'Published' };
             if (mongoose.Types.ObjectId.isValid(config.collectionId)) {
                query._id = config.collectionId;
             } else {
@@ -145,7 +245,7 @@ export async function resolvePageSections(sections) {
               { _id: { $in: objectIds } },
               { slug: { $in: slugs } }
             ],
-            isDeleted: false,
+            isDeleted: { $ne: true },
             status: 'Published'
           }).lean();
         }
@@ -159,8 +259,12 @@ export async function resolvePageSections(sections) {
         const categoryUrls = categories.map(c => c.image).filter(Boolean);
         const altMap = await getAltTextMap(categoryUrls);
         const enrichedCategories = categories.map(c => ({
-          ...c,
-          imageAlts: altMap
+          _id: c._id,
+          name: c.name,
+          slug: c.slug,
+          image: c.image,
+          showBannerOverlay: c.showBannerOverlay,
+          imageAlts: c.image && altMap[c.image] ? { [c.image]: altMap[c.image] } : {},
         }));
 
         config.categories = JSON.parse(JSON.stringify(enrichedCategories));

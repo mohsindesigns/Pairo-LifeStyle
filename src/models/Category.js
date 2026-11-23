@@ -5,12 +5,14 @@ const CategorySchema = new mongoose.Schema({
   slug: { type: String, required: true },
   image: { type: String },
   banner: { type: String },
+  showBannerOverlay: { type: Boolean, default: false },
   description: { type: String }, // Short description
   content: { type: String }, // Full description
   status: { type: String, enum: ['Draft', 'Published'], default: 'Published' },
   isFeatured: { type: Boolean, default: false },
   showInFilters: { type: Boolean, default: true },
-  isDeleted: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
   seo: {
     title: String,
     description: String,

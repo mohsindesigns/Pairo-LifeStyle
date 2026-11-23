@@ -60,7 +60,6 @@ export async function POST(req) {
     const name = sanitize(formData.get("name"));
     const phone = sanitize(formData.get("phone"));
     const dob = formData.get("dob");
-    const tenantId = sanitize(formData.get("tenantId")) || "default";
 
     if (!email || !name || !phone || !dob) {
       return NextResponse.json({ error: "Missing required personal fields." }, { status: 400 });
@@ -255,7 +254,6 @@ export async function POST(req) {
       liveSelfie: liveSelfieFilename,
       bankVerificationDocument: bankDocFilename,
       status: 'Pending',
-      tenantId,
       emailVerified: false,
       verificationToken,
       verificationTokenExpiry

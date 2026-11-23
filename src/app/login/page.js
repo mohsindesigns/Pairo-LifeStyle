@@ -4,18 +4,40 @@ import { useState, useRef } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Mail, Lock } from "lucide-react";
+import { ArrowRight, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [hpField, setHpField] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState("");
   const router = useRouter();
+
+  const handleResendFromLogin = async () => {
+    if (resending || !email) return;
+    setResending(true);
+    setResendStatus("");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setResendStatus(data.message || "Verification email sent! Check your inbox.");
+    } catch (err) {
+      setResendStatus("Failed to resend. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,11 +106,23 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <p className="uppercase tracking-widest">Email Not Verified</p>
                   <p className="normal-case tracking-normal font-semibold text-amber-600">
-                    Please check your inbox and click the verification link before signing in.
+                    Please check your inbox (and spam folder) and click the verification link before signing in.
                   </p>
-                  <Link href="/signup" className="inline-block underline underline-offset-2 text-amber-700 font-black uppercase tracking-widest text-[9px]">
-                    Resend Verification Email
-                  </Link>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={handleResendFromLogin}
+                      disabled={resending}
+                      className="inline-block underline underline-offset-2 text-amber-800 hover:text-black font-black uppercase tracking-widest text-[9px] cursor-pointer disabled:opacity-50"
+                    >
+                      {resending ? "Sending..." : "Resend Verification Email"}
+                    </button>
+                    {resendStatus && (
+                      <p className="mt-2 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 p-2 rounded">
+                        {resendStatus}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <p className="uppercase tracking-widest">{error}</p>
@@ -114,14 +148,24 @@ export default function LoginPage() {
                 <label className="text-[9px] font-black uppercase tracking-widest text-black/60">Password</label>
                 <Link href="/forgot-password" className="text-[9px] font-bold text-neutral-400 hover:text-black uppercase tracking-widest transition-colors">Forgot?</Link>
               </div>
-              <input
-                type="password"
-                required
-                className="block w-full px-4 py-3 bg-white border border-black/10 rounded-[4px] text-xs font-semibold text-black placeholder-neutral-300 focus:border-black outline-none transition-all"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  className="block w-full px-4 py-3 pr-12 bg-white border border-black/10 rounded-[4px] text-xs font-semibold text-black placeholder-neutral-300 focus:border-black outline-none transition-all"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           </div>
 

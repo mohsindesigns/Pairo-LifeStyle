@@ -1,6 +1,7 @@
 "use client";
 
-import { useCart } from "@/context/CartContext";
+import { useCart, getCartItemKey } from "@/context/CartContext";
+import { useSiteData } from "@/context/SiteContext";
 import Image from "next/image";
 import Link from "next/link";
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, ShieldCheck, Truck, Sparkles } from "lucide-react";
@@ -10,6 +11,7 @@ import { getProductUrl } from "@/lib/routes";
 import { trackBeginCheckout, trackViewCart } from "@/lib/analytics";
 
 export default function CartPage() {
+  const siteData = useSiteData();
   const { 
     cartItems, 
     updateQuantity, 
@@ -171,7 +173,7 @@ export default function CartPage() {
 
             <div className="divide-y divide-black/5">
               {cartItems.map((item, idx) => {
-                const uniqueKey = `${item.id}-${item.selectedSize}-${item.selectedColor}`;
+                const uniqueKey = getCartItemKey(item);
                 return (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
@@ -230,7 +232,14 @@ export default function CartPage() {
                           </div>
                         )}
 
-                        <button 
+                        {/* Corporate Gifting Label */}
+                        {item.corporateGifting?.enabled && (
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-wide w-fit">
+                            ✦ Corporate Gifting — {(item.corporateGifting.selections || []).length} items
+                          </div>
+                        )}
+
+                        <button
                           onClick={() => removeFromCart(uniqueKey)}
                           className="text-[10px] font-bold text-black/60 hover:text-red-500 transition-colors uppercase tracking-wider w-fit text-left pt-1 cursor-pointer"
                         >
@@ -307,7 +316,7 @@ export default function CartPage() {
               
               <div className="flex justify-between items-center text-[11px] font-bold text-black/60 uppercase tracking-wider">
                 <span>Shipping</span>
-                <span>Calculated next</span>
+                <span>{siteData?.commerce?.shippingEnabled === false ? "Free" : "Calculated next"}</span>
               </div>
               <div className="flex justify-between items-center text-[11px] font-bold text-black/60 uppercase tracking-wider">
                 <span>Estimated Tax</span>

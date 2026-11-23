@@ -12,8 +12,10 @@ export async function GET(req) {
 
   await dbConnect();
   try {
+    // ?trash=true lists the trash; legacy items without isDeleted count as live.
+    const trash = new URL(req.url).searchParams.get("trash") === "true";
     const items = await SizeChartItem
-      .find({ tenantId: "DEFAULT_STORE" })
+      .find(trash ? { isDeleted: true } : { isDeleted: { $ne: true } })
       .sort({ order: 1, createdAt: -1 })
       .lean();
     return NextResponse.json(items);
@@ -35,7 +37,7 @@ export async function POST(req) {
     if (!image) return NextResponse.json({ error: "Image is required" }, { status: 400 });
     if (!title?.trim()) return NextResponse.json({ error: "Title is required" }, { status: 400 });
 
-    const maxItem = await SizeChartItem.findOne({ tenantId: "DEFAULT_STORE" }).sort({ order: -1 }).lean();
+    const maxItem = await SizeChartItem.findOne({ isDeleted: { $ne: true } }).sort({ order: -1 }).lean();
     const nextOrder = order !== undefined ? order : ((maxItem?.order ?? -1) + 1);
 
     const item = await SizeChartItem.create({
@@ -43,8 +45,7 @@ export async function POST(req) {
       description: description?.trim() || "",
       image,
       order: nextOrder,
-      enabled: enabled !== undefined ? enabled : true,
-      tenantId: "DEFAULT_STORE"
+      enabled: enabled !== undefined ? enabled : true
     });
 
     return NextResponse.json(item, { status: 201 });

@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { History, RotateCcw, Clock, User, ChevronDown, ChevronUp } from 'lucide-react';
+import { usePopup } from "@/context/PopupContext";
 
-export default function RevisionHistory({ promotionId, onRollback }) {
+export default function RevisionHistory({ promotionId, onRollback, onCountChange }) {
+  const { showConfirm } = usePopup();
   const [revisions, setRevisions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -11,13 +12,19 @@ export default function RevisionHistory({ promotionId, onRollback }) {
     try {
       const res = await fetch(`/api/admin/promotions/${promotionId}/revisions`);
       const data = await res.json();
-      if (res.ok) setRevisions(data);
+      if (res.ok && Array.isArray(data)) {
+        setRevisions(data);
+        onCountChange?.(data.length);
+      } else {
+        onCountChange?.(undefined);
+      }
     } catch (err) {
       console.error("Failed to fetch revisions:", err);
+      onCountChange?.(undefined);
     } finally {
       setLoading(false);
     }
-  }, [promotionId]);
+  }, [promotionId, onCountChange]);
 
   useEffect(() => {
     if (promotionId) {
@@ -28,7 +35,7 @@ export default function RevisionHistory({ promotionId, onRollback }) {
   }, [promotionId, fetchRevisions]);
 
   const handleRestore = async (version) => {
-    if (!confirm(`Are you sure you want to rollback to Version ${version}? Current unsaved changes will be lost.`)) return;
+    if (!(await showConfirm(`Are you sure you want to rollback to Version ${version}? Current unsaved changes will be lost.`, "Restore revision", { confirmText: "Restore" }))) return;
     try {
         const res = await fetch(`/api/admin/promotions/${promotionId}/revisions`, {
             method: 'POST',
@@ -46,57 +53,52 @@ export default function RevisionHistory({ promotionId, onRollback }) {
   };
 
   return (
-    <div className="bg-white border border-[#ccd0d4] shadow-sm rounded-sm overflow-hidden">
-      <div className="bg-[#f6f7f7] border-b border-[#ccd0d4] px-4 py-2 flex items-center gap-2">
-        <History className="w-4 h-4 text-[#1d2327]" />
-        <span className="text-[12px] font-bold text-[#1d2327]">Revision History</span>
-      </div>
-
-      <div className="max-h-[400px] overflow-y-auto">
-        {loading ? (
-            <div className="p-4 text-center text-gray-400 text-[12px] italic">Loading history...</div>
-        ) : revisions.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 text-[12px] italic">No historical records found.</div>
-        ) : (
-            <div className="divide-y divide-gray-100">
-                {revisions.map((rev, idx) => (
-                    <div key={rev._id} className="p-3 hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                                <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-bold">V{rev.version}</span>
-                                <span className="text-[12px] font-bold text-[#1d2327]">
-                                    {idx === 0 ? 'Current Version' : `Version ${rev.version}`}
-                                </span>
-                            </div>
-                            <button 
-                                onClick={() => handleRestore(rev.version)}
-                                className="text-[10px] text-[#2271b1] hover:underline flex items-center gap-1 font-bold"
-                            >
-                                <RotateCcw className="w-3 h-3" /> RESTORE
-                            </button>
-                        </div>
-                        
-                        <div className="flex flex-col gap-1 text-[11px] text-gray-500">
-                            <div className="flex items-center gap-1.5">
-                                <Clock className="w-3 h-3" />
-                                <span>{new Date(rev.createdAt).toLocaleString()}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <User className="w-3 h-3" />
-                                <span>{rev.createdBy || 'System'}</span>
-                            </div>
-                        </div>
-
-                        {rev.changeSummary && (
-                            <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded-sm text-[11px] border border-blue-100">
-                                {rev.changeSummary}
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
+    <section className="wp-postbox" aria-labelledby="promo-revisions-title">
+      <div className="wp-postbox-head">
+        <h2 id="promo-revisions-title">Revision history</h2>
+        {!loading && revisions.length > 0 && (
+          <span className="wp-postbox-aside">{revisions.length} revision{revisions.length === 1 ? '' : 's'}</span>
         )}
       </div>
-    </div>
+
+      <div className="wp-inside overflow-y-auto" style={{ maxHeight: 420 }}>
+        {loading ? (
+          <p className="wp-muted" style={{ margin: 0 }}>Loading history…</p>
+        ) : revisions.length === 0 ? (
+          <p className="wp-empty" style={{ margin: 0 }}>No historical records found.</p>
+        ) : (
+          <ul className="flex flex-col gap-3" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {revisions.map((rev, idx) => (
+              <li key={rev._id}>
+                <div className={`wp-note-body ${idx === 0 ? 'is-customer' : ''}`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="wp-strong flex-1">
+                      {idx === 0 ? `Current version (v${rev.version})` : `Version ${rev.version}`}
+                    </span>
+                  </div>
+                  {rev.changeSummary && (
+                    <p style={{ margin: '4px 0 0', wordBreak: 'break-word' }}>{rev.changeSummary}</p>
+                  )}
+                </div>
+                <div className="wp-note-meta">
+                  <span>{new Date(rev.createdAt).toLocaleString()}</span>
+                  <span>by {rev.createdBy || 'System'}</span>
+                  <span aria-hidden="true">·</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRestore(rev.version)}
+                    className="wp-link min-h-6 max-[782px]:min-h-10"
+                    style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
+                    aria-label={`Restore version ${rev.version}`}
+                  >
+                    Restore this version
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }

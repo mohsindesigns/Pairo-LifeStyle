@@ -6,6 +6,14 @@ import { trackAddToCart, trackRemoveFromCart } from "@/lib/analytics";
 
 const CartContext = createContext();
 
+// Stable per-line key for a cart item. Unique lines (made-to-measure / Corporate Gifting)
+// each carry their own `lineId` (stamped on add, since two such lines for the same
+// product/size/color are NOT the same line and must never collide/merge on remove or
+// quantity-update); every other line falls back to the mergeable id-size-color composite.
+export function getCartItemKey(item) {
+  return item?.lineId || `${item.id}-${item.selectedSize}-${item.selectedColor}`;
+}
+
 export function CartProvider({ children }) {
   const { data: session, status } = useSession();
   const [cartItems, setCartItems] = useState([]);
@@ -170,32 +178,35 @@ export function CartProvider({ children }) {
       image: product.image || (product.images && product.images[0]) || "/placeholder.jpg",
     };
 
-    // Items with madeToMeasure are always unique (never merged)
-    const isM2M = !!normalizedProduct.madeToMeasure?.enabled;
+    // Items with madeToMeasure or Corporate Gifting selections are always unique (never merged) —
+    // each line can carry a different set of selected items/uploaded logos.
+    const isUniqueLine = !!normalizedProduct.madeToMeasure?.enabled || !!normalizedProduct.corporateGifting?.enabled;
 
     setCartItems((prevItems) => {
-      if (!isM2M) {
-        const existingItem = prevItems.find(
-          (item) =>
-            item.id === normalizedProduct.id &&
-            item.selectedSize === normalizedProduct.selectedSize &&
-            item.selectedColor === normalizedProduct.selectedColor &&
-            !item.madeToMeasure?.enabled
-        );
+      if (!isUniqueLine) {
+        const isMergeable = (item) =>
+          item.id === normalizedProduct.id &&
+          item.selectedSize === normalizedProduct.selectedSize &&
+          item.selectedColor === normalizedProduct.selectedColor &&
+          !item.madeToMeasure?.enabled &&
+          !item.corporateGifting?.enabled;
 
+        const existingItem = prevItems.find(isMergeable);
         if (existingItem) {
           return prevItems.map((item) =>
-            (item.id === normalizedProduct.id &&
-             item.selectedSize === normalizedProduct.selectedSize &&
-             item.selectedColor === normalizedProduct.selectedColor &&
-             !item.madeToMeasure?.enabled)
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
+            isMergeable(item) ? { ...item, quantity: item.quantity + 1 } : item
           );
         }
       }
 
-      return [...prevItems, { ...normalizedProduct, quantity: 1 }];
+      // Unique lines (made-to-measure / Corporate Gifting) are added once per add-to-cart
+      // action, not merged, and get their own stable key so two differently-configured lines
+      // for the same product/size/color never collide on remove/quantity-update.
+      const initialQuantity = isUniqueLine ? Math.max(1, Number(normalizedProduct.quantity) || 1) : 1;
+      const lineId = isUniqueLine
+        ? `${normalizedProduct.id}-u-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+        : undefined;
+      return [...prevItems, { ...normalizedProduct, quantity: initialQuantity, ...(lineId ? { lineId } : {}) }];
     });
     if (openDrawer) {
       setIsCartOpen(true);
@@ -207,25 +218,17 @@ export function CartProvider({ children }) {
 
   const removeFromCart = useCallback((uniqueKey) => {
     // GA4 Event: remove_from_cart — fire with the removed line's details before it's gone.
-    const removed = cartItems.find(
-      (item) => `${item.id}-${item.selectedSize}-${item.selectedColor}` === uniqueKey
-    );
+    const removed = cartItems.find((item) => getCartItemKey(item) === uniqueKey);
     if (removed) trackRemoveFromCart(removed);
 
-    setCartItems((prevItems) =>
-      prevItems.filter((item) => {
-        const itemKey = `${item.id}-${item.selectedSize}-${item.selectedColor}`;
-        return itemKey !== uniqueKey;
-      })
-    );
+    setCartItems((prevItems) => prevItems.filter((item) => getCartItemKey(item) !== uniqueKey));
   }, [cartItems]);
 
   const updateQuantity = useCallback((uniqueKey, delta) => {
     setCartItems((prevItems) =>
       prevItems
         .map((item) => {
-          const itemKey = `${item.id}-${item.selectedSize}-${item.selectedColor}`;
-          if (itemKey === uniqueKey) {
+          if (getCartItemKey(item) === uniqueKey) {
             return { ...item, quantity: Math.max(0, item.quantity + delta) };
           }
           return item;

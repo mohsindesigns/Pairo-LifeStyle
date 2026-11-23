@@ -12,7 +12,6 @@ async function requireSettings() {
   return session;
 }
 
-const TENANT_ID = 'DEFAULT_STORE';
 const HEADER = ['Country', 'State', 'Postcode', 'City', 'Rate', 'Name', 'Priority', 'Compound', 'Shipping'];
 
 function csvEscape(value) {
@@ -31,7 +30,7 @@ export async function GET(req) {
     const classKey = searchParams.get('classKey');
     if (!classKey) return NextResponse.json({ error: 'classKey is required.' }, { status: 400 });
 
-    const settings = await TaxSettings.findOne({ tenantId: TENANT_ID }).lean();
+    const settings = await TaxSettings.findOne().lean();
     const taxClass = settings?.taxClasses?.find(c => c.key === classKey);
     if (!taxClass) return NextResponse.json({ error: 'Tax class not found.' }, { status: 404 });
 

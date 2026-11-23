@@ -7,9 +7,7 @@ const AffiliateClickSchema = new mongoose.Schema({
   referrer: String,
   ip: { type: String, index: true },
   userAgent: String,
-  
-  tenantId: { type: String, default: 'default', index: true }, // SaaS multi-tenancy
-  
+
   utmParameters: {
     source: String,
     medium: String,

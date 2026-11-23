@@ -4,13 +4,14 @@ import dbConnect from "@/lib/db";
 import Promotion from "@/models/Promotion";
 import { NextResponse } from "next/server";
 import HistoryService from "@/lib/promotionEngine/HistoryService";
+import Validator from "@/lib/promotionEngine/Validator";
 import { syncPromotionToStripe } from "@/lib/promotionEngine/StripeSync";
 import { cache } from "@/lib/cache";
 import { can } from "@/lib/rbac";
 
 // Fields the server owns — never let a client set them via the request body. Otherwise a
 // staff user could reset a coupon's used-count (usageLimits.currentTotalUses), forge its
-// analytics, or hijack its Stripe linkage. (tenantId is intentionally left writable.)
+// analytics, or hijack its Stripe linkage.
 function stripServerManagedFields(data) {
   if (!data || typeof data !== "object") return data;
   const { _id, analytics, stripeCouponId, stripePromotionCodeId, stripeSyncStatus, stripeSyncError, stripeSyncKey, createdAt, updatedAt, ...safe } = data;
@@ -34,11 +35,11 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
-    const tenantId = searchParams.get('tenantId') || "DEFAULT_STORE";
-    
-    const query = { 
-        tenantId,
-        adminStatus: { $ne: 'Archived' } 
+    // includeArchived=1 also returns archived (trashed) promotions, for the list's Trash view.
+    const includeArchived = searchParams.get('includeArchived') === '1';
+
+    const query = includeArchived ? {} : {
+        adminStatus: { $ne: 'Archived' }
     };
     
     if (status && status !== 'All') {
@@ -69,11 +70,16 @@ export async function POST(req) {
         return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
-    // Ensure tenantId is present (Mandatory for SaaS Hardening)
-    const promotionData = {
-        ...stripServerManagedFields(data),
-        tenantId: data.tenantId || "DEFAULT_STORE"
-    };
+    const promotionData = stripServerManagedFields(data);
+
+    // Server-side enforcement of the same checks the admin editor shows client-side (e.g. a
+    // product/category/collection target must have at least one targetId) — the client check
+    // is easy to bypass (devtools, a direct API call, a UI bug), and a promotion that skips
+    // it can silently discount the entire cart instead of the intended scope.
+    const validation = Validator.validate(promotionData);
+    if (!validation.isValid) {
+      return NextResponse.json({ error: validation.errors[0]?.message || "Invalid promotion configuration", errors: validation.errors }, { status: 400 });
+    }
 
     const promotion = await Promotion.create(promotionData);
 

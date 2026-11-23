@@ -4,7 +4,9 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import GalleryItem from "@/models/GalleryItem";
 import { can } from "@/lib/rbac";
+import { galleryListQuery } from "./helpers";
 
+// GET /api/admin/gallery-items[?view=all|visible|hidden|trash][&counts=true]
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -12,8 +14,17 @@ export async function GET(req) {
 
   await dbConnect();
   try {
+    const { searchParams } = new URL(req.url);
+
+    if (searchParams.get("counts") === "true") {
+      const [all, visible, hidden, trash] = await Promise.all(
+        ["all", "visible", "hidden", "trash"].map((v) => GalleryItem.countDocuments(galleryListQuery(v)))
+      );
+      return NextResponse.json({ all, visible, hidden, trash });
+    }
+
     const items = await GalleryItem
-      .find({ tenantId: "DEFAULT_STORE" })
+      .find(galleryListQuery(searchParams.get("view") || "all"))
       .populate("linkedProduct", "slug name image")
       .sort({ order: 1, createdAt: -1 })
       .lean();
@@ -38,8 +49,9 @@ export async function POST(req) {
     if (!title?.trim()) return NextResponse.json({ error: "Title is required" }, { status: 400 });
 
     // Get max order
-    const maxOrderItem = await GalleryItem.findOne({ tenantId: "DEFAULT_STORE" }).sort({ order: -1 }).lean();
-    const nextOrder = order !== undefined ? order : ((maxOrderItem?.order ?? -1) + 1);
+    const maxOrderItem = await GalleryItem.findOne().sort({ order: -1 }).lean();
+    const parsedOrder = order === undefined || order === "" ? NaN : Number(order);
+    const nextOrder = Number.isFinite(parsedOrder) ? parsedOrder : ((maxOrderItem?.order ?? -1) + 1);
 
     const item = await GalleryItem.create({
       image,
@@ -47,8 +59,7 @@ export async function POST(req) {
       description: description?.trim() || "",
       linkedProduct: linkedProduct || null,
       order: nextOrder,
-      enabled: enabled !== undefined ? enabled : true,
-      tenantId: "DEFAULT_STORE"
+      enabled: enabled !== undefined ? enabled : true
     });
 
     return NextResponse.json(item, { status: 201 });

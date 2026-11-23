@@ -1,9 +1,15 @@
 "use client";
 
 import ProductForm from "@/components/admin/ProductForm";
-import { use } from "react";
+import { useParams } from "next/navigation";
+import RequirePermission from "@/components/admin/RequirePermission";
 
-export default function EditProductPage({ params }) {
-  const { id } = use(params);
-  return <ProductForm productId={id} />;
+export default function EditProductPage({ params: propParams }) {
+  const routeParams = useParams();
+  const id = routeParams?.id || propParams?.id;
+  return (
+    <RequirePermission permission="products.view">
+      <ProductForm productId={id} />
+    </RequirePermission>
+  );
 }

@@ -74,7 +74,6 @@ export async function POST(req) {
       referrer: referrer || "",
       ip,
       userAgent,
-      tenantId: affiliate.tenantId || "default",
       utmParameters: {
         source: utm?.source || "",
         medium: utm?.medium || "",

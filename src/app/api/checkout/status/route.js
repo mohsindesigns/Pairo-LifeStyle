@@ -6,7 +6,6 @@ import { fulfillSucceededPaymentIntent } from "@/lib/stripeFulfillment";
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
-  const tenantId = req.headers.get("x-tenant-id") || "DEFAULT_STORE";
   const { searchParams } = new URL(req.url);
   const idempotencyKey = searchParams.get("idempotencyKey");
 
@@ -18,8 +17,8 @@ export async function GET(req) {
     await dbConnect();
 
     const [order, pending] = await Promise.all([
-      Order.findOne({ tenantId, idempotencyKey }),
-      PendingCheckout.findOne({ tenantId, idempotencyKey }),
+      Order.findOne({ idempotencyKey }),
+      PendingCheckout.findOne({ idempotencyKey }),
     ]);
 
     if (order) {

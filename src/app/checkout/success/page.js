@@ -100,7 +100,9 @@ export default function SuccessPage() {
         setOrderNumber(orderNum);
       }
 
-      const lookupKey = id || orderNum;
+      // Only the order's own id can fetch its details: the order number is just shown on the page (the tracking API
+      // rejects order numbers, which are sequential and guessable).
+      const lookupKey = id;
 
       if (lookupKey) {
         try {

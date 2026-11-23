@@ -17,7 +17,7 @@ export async function GET() {
         }
 
         // 2. Fetch only active scripts with minimal fields
-        const scripts = await Script.find({ isActive: true })
+        const scripts = await Script.find({ isActive: true, isDeleted: { $ne: true } })
             .select('name type code location templateConfig loadStrategy targeting priority')
             .sort({ priority: 1 })
             .lean();

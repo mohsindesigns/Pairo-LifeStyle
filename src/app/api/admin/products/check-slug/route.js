@@ -25,11 +25,8 @@ export async function GET(req) {
 
     await dbConnect();
 
-    // Look for matching slug, excluding the current product ID and deleted products
-    const query = {
-      slug,
-      isDeleted: { $ne: true }
-    };
+    // Trashed products still hold their slug (the slug index is unique), so they count as taken
+    const query = { slug };
     if (excludeId) {
       query._id = { $ne: excludeId };
     }

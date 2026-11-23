@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
-import { Mail } from "lucide-react";
+import { Mail, Eye, EyeOff } from "lucide-react";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
 import { trackSignup } from "@/lib/analytics";
 
@@ -10,12 +10,40 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [hpField, setHpField] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const turnstileRef = useRef(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+  const [resendError, setResendError] = useState("");
+
+  const handleResend = async () => {
+    if (resending || !email) return;
+    setResending(true);
+    setResendMessage("");
+    setResendError("");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResendMessage(data.message || "Verification email resent! Please check your inbox and spam folder.");
+      } else {
+        setResendError(data.message || "Failed to resend verification email. Please try again.");
+      }
+    } catch (err) {
+      setResendError("Network error. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -88,11 +116,26 @@ export default function SignupPage() {
           <div className="border-t border-black/10 pt-5 space-y-3">
             <p className="text-[10px] text-black/50 uppercase tracking-widest">Didn&apos;t receive it?</p>
             <button
-              onClick={() => handleSubmit({ preventDefault: () => {} })}
-              className="text-[10px] font-black uppercase tracking-widest text-black underline underline-offset-4 hover:opacity-70 transition cursor-pointer"
+              type="button"
+              onClick={handleResend}
+              disabled={resending}
+              className="text-[10px] font-black uppercase tracking-widest text-black underline underline-offset-4 hover:opacity-70 transition cursor-pointer disabled:opacity-50"
             >
-              Resend Verification Email
+              {resending ? "Sending..." : "Resend Verification Email"}
             </button>
+            {resendMessage && (
+              <p className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-[3px] text-center">
+                {resendMessage}
+              </p>
+            )}
+            {resendError && (
+              <p className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-[3px] text-center">
+                {resendError}
+              </p>
+            )}
+            <p className="text-[9px] text-black/50 leading-relaxed">
+              Be sure to check your <strong>Spam / Junk</strong> folder as verification emails can sometimes land there.
+            </p>
           </div>
           <Link
             href="/login"
@@ -148,15 +191,25 @@ export default function SignupPage() {
 
             <div className="space-y-1.5">
               <label className="text-[9px] font-black uppercase tracking-widest text-black px-0.5">Password</label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                className="block w-full px-4 py-3 bg-white border border-black/10 rounded-[4px] text-xs font-semibold text-black placeholder-neutral-300 focus:border-black outline-none transition-all"
-                placeholder="Minimum 8 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  className="block w-full px-4 py-3 pr-12 bg-white border border-black/10 rounded-[4px] text-xs font-semibold text-black placeholder-neutral-300 focus:border-black outline-none transition-all"
+                  placeholder="Minimum 8 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           </div>
 

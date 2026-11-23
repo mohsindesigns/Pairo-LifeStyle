@@ -57,7 +57,6 @@ describe("Reviews Hardening Verification Suite", () => {
   it("should aggregate product ratings accurately and concurrently without race conditions", async () => {
     // Create a temporary mock product
     const product = await Product.create({
-      tenantId: "DEFAULT_STORE",
       id: 9999,
       name: "Vitest Concurrency Test Jacket",
       slug: "vitest-concurrency-test-jacket-" + Date.now(),
@@ -73,7 +72,6 @@ describe("Reviews Hardening Verification Suite", () => {
     for (let i = 1; i <= 5; i++) {
       reviewPromises.push(
         Review.create({
-          tenantId: "DEFAULT_STORE",
           productId: product._id,
           orderId: new mongoose.Types.ObjectId(),
           rating: i,

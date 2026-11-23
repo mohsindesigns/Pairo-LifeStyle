@@ -9,6 +9,10 @@ import mongoose from "mongoose";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { reconcilePaymentLinkOrder } from "@/lib/stripeFulfillment";
 import { reconcilePromotionUsage, isUsageReleasingTransition, isUsageRestoringTransition } from "@/lib/promotionUsageReconciliation";
+import pairoEvents from "@/lib/events";
+import { resolveIpLocation } from "@/lib/geoIp";
+import { orderLookupQuery } from "@/lib/orderLookup";
+import { orderStatusChangeError } from "@/lib/order-status-flow";
 
 export async function GET(req, { params }) {
   try {
@@ -24,13 +28,26 @@ export async function GET(req, { params }) {
     }
 
     const { id } = await params;
-    let order = await Order.findById(id).populate("affiliateId", "name email affiliateId referralCode");
+    let order = await orderLookupQuery(id).populate("affiliateId", "name email affiliateId referralCode");
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     // Self-heal: if this is a Custom Order with an unpaid Stripe payment link,
     // check Stripe directly in case the checkout.session.completed webhook
     // never arrived. No-op once the order is Paid or has no payment link.
     order = await reconcilePaymentLinkOrder(order, null);
+
+    // Auto-resolve pinpoint IP geolocation if order has an IP address but no stored location yet
+    if (order.customer?.ipAddress && order.customer.ipAddress !== "unknown" && (!order.customer?.ipLocation || !order.customer?.ipLocation?.city)) {
+      try {
+        const location = await resolveIpLocation(order.customer.ipAddress);
+        if (location) {
+          order.customer.ipLocation = location;
+          await Order.updateOne({ _id: order._id }, { $set: { "customer.ipLocation": location } });
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
 
     return NextResponse.json({ success: true, order });
 
@@ -48,25 +65,29 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!can(session.user, "orders.edit")) {
+    // "orders.update" is the permission roles can actually be given (the role editor offers view / create / update /
+    // refund) and what every other order action uses. This route asked for "orders.edit", which no role can hold, so
+    // only a Super Admin could change an order's status or add a note.
+    if (!can(session.user, "orders.update")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await params;
     const { status, adminNotes, timelineMessage } = await req.json();
-    const order = await Order.findById(id);
+    const order = await orderLookupQuery(id);
 
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     const oldStatus = order.status;
     
-    // Prevent invalid transitions if order is already delivered/cancelled (Optional strict check)
-    if (oldStatus === "Cancelled" && status !== "Cancelled") {
-      // Logic for re-activating a cancelled order if needed, but for now we keep it strict
+    const transitionError = orderStatusChangeError(oldStatus, status);
+    if (transitionError) {
+      return NextResponse.json({ error: transitionError }, { status: 409 });
     }
 
     // 1. If status is changing to Cancelled, revert stock ONLY if it wasn't already cancelled
-    if (status === "Cancelled" && oldStatus !== "Cancelled") {
+    if (status === "Cancelled" && oldStatus !== "Cancelled" && order.stockDeducted !== false) {
+      order.stockRestockedAt = new Date();
       for (const item of order.items) {
         if (item.selectedVariant?.title && item.selectedVariant.title !== "Standard") {
            await Product.updateOne(
@@ -104,6 +125,23 @@ export async function PATCH(req, { params }) {
     }
 
     await order.save();
+
+    // Trigger internal event for real-time CRM webhook and listener sync
+    if (adminNotes !== undefined) {
+      pairoEvents.dispatch("ORDER_UPDATED", { order, origin: "admin", fields: ["adminNote"] });
+    }
+    if (status && status !== oldStatus) {
+      try {
+        pairoEvents.dispatch("ORDER_STATUS_UPDATED", {
+          order,
+          oldStatus,
+          newStatus: status,
+          origin: "admin",
+        });
+      } catch (evErr) {
+        console.error("[Order Status Event Dispatch Error]", evErr);
+      }
+    }
 
     // Release/restore any usage-limit "slots" this order's promo codes consumed
     // when it moves into/out of Cancelled or Refunded.

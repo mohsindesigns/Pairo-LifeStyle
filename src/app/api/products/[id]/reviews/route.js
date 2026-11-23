@@ -6,6 +6,8 @@ import Product from "@/models/Product";
 import Review from "@/models/Review";
 import Order from "@/models/Order";
 import { sanitizeText, sanitizeObject } from "@/lib/sanitize";
+import { toPublicReview } from "@/lib/publicReviewData";
+import { cleanReviewMedia } from "@/lib/reviewMedia";
 import mongoose from "mongoose";
 
 /**
@@ -64,7 +66,8 @@ export async function GET(req, { params }) {
         { _id: mongoose.isValidObjectId(paramId) ? paramId : null },
         { id: /^\d+$/.test(paramId) ? parseInt(paramId) : -1 },
         { slug: paramId }
-      ]
+      ],
+      isDeleted: { $ne: true }
     }).select("_id rating reviewCount ratingBreakdown name").lean();
 
     if (!product) {
@@ -125,6 +128,10 @@ export async function GET(req, { params }) {
 
     const reviews = await reviewsQuery.limit(limit).lean();
 
+    // Only used to tell the signed-in visitor which reviews are theirs (so they get an Edit button).
+    const viewerSession = await getServerSession(authOptions).catch(() => null);
+    const viewer = viewerSession?.user?.id ? { id: viewerSession.user.id, email: viewerSession.user.email } : null;
+
     let nextCursor = null;
     if (reviews.length === limit) {
       const lastReview = reviews[reviews.length - 1];
@@ -138,7 +145,7 @@ export async function GET(req, { params }) {
     }
 
     return NextResponse.json({
-      reviews,
+      reviews: reviews.map((review) => toPublicReview(review, viewer)),
       pagination: {
         page,
         limit,
@@ -165,7 +172,7 @@ export async function POST(req, { params }) {
     const { id: paramId } = resolvedParams;
 
     const session = await getServerSession(authOptions);
-    const { rating, title, comment, customerName, recommend, guestEmail, orderNumber, status: customStatus } = body;
+    const { rating, title, comment, customerName, recommend, guestEmail, email, orderNumber, media } = body;
 
     if (!rating || rating < 1 || rating > 5) {
       return NextResponse.json({ error: "Invalid rating value (must be between 1 and 5)" }, { status: 400 });
@@ -183,14 +190,25 @@ export async function POST(req, { params }) {
         { _id: mongoose.isValidObjectId(paramId) ? paramId : null },
         { id: /^\d+$/.test(paramId) ? parseInt(paramId) : -1 },
         { slug: paramId }
-      ]
+      ],
+      isDeleted: { $ne: true }
     }).select("_id name").lean();
 
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const checkEmail = session ? session.user.email?.toLowerCase().trim() : (guestEmail?.toLowerCase().trim() || "guest@example.com");
+    // session.user.email is normally guaranteed (it's the same email used to log in), but a
+    // session created before this field existed on the JWT, or any other edge case that leaves
+    // it empty, must not crash into a raw Mongoose "customerEmail is required" error — fall back
+    // to a submitted guestEmail if present, otherwise ask the shopper to re-authenticate.
+    const checkEmail = session
+      ? (session.user.email?.toLowerCase().trim() || email?.toLowerCase().trim() || guestEmail?.toLowerCase().trim() || "")
+      : (email?.toLowerCase().trim() || guestEmail?.toLowerCase().trim() || "");
+
+    if (!checkEmail) {
+      return NextResponse.json({ error: "We couldn't verify your account email. Please log out and log back in, then try again." }, { status: 400 });
+    }
 
     const ip = req.headers.get("x-forwarded-for") || req.ip || "127.0.0.1";
     const userAgent = req.headers.get("user-agent") || "unknown";
@@ -215,11 +233,10 @@ export async function POST(req, { params }) {
     const sanitizedTitle = maskProfanity(sanitizeText(title || ""));
     const sanitizedComment = maskProfanity(sanitizeText(comment || ""));
 
-    // 4. Review Creation (allows approved direct status or pending)
-    const reviewStatus = customStatus || (isSpam ? "Spam" : "Approved");
+    // 4. Review Creation - new reviews always require admin approval (never auto-approved)
+    const reviewStatus = isSpam ? "Spam" : "Pending";
 
     const review = await Review.create({
-      tenantId: "DEFAULT_STORE",
       productId: product._id,
       customerId: session ? session.user.id : null,
       orderId: new mongoose.Types.ObjectId(),
@@ -230,26 +247,18 @@ export async function POST(req, { params }) {
       customerEmail: checkEmail,
       status: reviewStatus,
       recommend: recommend !== false,
+      media: cleanReviewMedia(media), // only files uploaded through /api/reviews/upload
       verifiedPurchase: true,
       ipAddress: ip,
       userAgent,
       spamScore
     });
 
-    // Automatically update product aggregated ratings if Approved
-    if (reviewStatus === "Approved") {
-      try {
-        const { aggregateProductRatings } = await import("@/lib/review-aggregator");
-        await aggregateProductRatings(product._id);
-      } catch (aggErr) {
-        console.error("Aggregation error:", aggErr);
-      }
-    }
-
+    // The stored review (email, IP, spam score...) is not echoed back: the page reloads the public list itself.
     return NextResponse.json({
       success: true,
       message: "Review created successfully.",
-      review
+      review: { _id: review._id, status: review.status }
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -259,9 +268,18 @@ export async function POST(req, { params }) {
 export async function PUT(req, { params }) {
   try {
     const session = await getServerSession(authOptions);
+
+    // Editing a review requires being logged in as its owner. There is no reliable way to
+    // verify a guest's identity after the fact (the guest email at submission time is
+    // client-supplied and unverified), so guest-submitted reviews cannot be edited later.
+    // A session without an id must not pass the ownership test below (undefined === undefined on guest reviews).
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "You must be logged in to edit a review." }, { status: 401 });
+    }
+
     const rawBody = await req.json().catch(() => ({}));
     const body = sanitizeObject(rawBody);
-    const { reviewId, rating, title, comment, recommend, guestEmail, orderNumber } = body;
+    const { reviewId, rating, title, comment, recommend } = body;
 
     if (!reviewId || !mongoose.isValidObjectId(reviewId)) {
       return NextResponse.json({ error: "Invalid review ID" }, { status: 400 });
@@ -278,13 +296,11 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
 
-    // 1. Verify Ownership if customer
-    if (session && session.user.role !== "Admin") {
-      const isOwner = review.customerId?.toString() === session.user.id ||
-        review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase();
-      if (!isOwner) {
-        return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
-      }
+    // Verify ownership
+    const isOwner = review.customerId?.toString() === session.user.id ||
+      review.customerEmail?.toLowerCase() === session.user.email?.toLowerCase();
+    if (!isOwner) {
+      return NextResponse.json({ error: "Unauthorized. You do not own this review." }, { status: 403 });
     }
 
     // 2. Profanity Masking & Sanitization
@@ -323,7 +339,7 @@ export async function PUT(req, { params }) {
     return NextResponse.json({
       success: true,
       message: "Review updated successfully.",
-      review
+      review: { _id: review._id, status: review.status }
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

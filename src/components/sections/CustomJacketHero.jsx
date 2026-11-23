@@ -55,7 +55,7 @@ export default function CustomJacketHero({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="hidden md:flex items-center gap-1.5 text-white/60 text-[12px]"
+              className="hidden md:flex items-center gap-1.5 text-white/80 text-[12px]"
               aria-label="Breadcrumb"
             >
               <Link href="/" className="hover:text-white transition-colors">Home</Link>
@@ -74,7 +74,7 @@ export default function CustomJacketHero({
               <Heading className="font-heading text-white text-4xl md:text-5xl lg:text-6xl font-black leading-[1.05] tracking-tight mb-5">
                 {title}
               </Heading>
-              <p className="text-white/80 text-base md:text-lg leading-relaxed mb-8 max-w-lg">
+              <p className="text-white/90 text-base md:text-lg leading-relaxed mb-8 max-w-lg">
                 {subtitle}
               </p>
               {buttonText && (
@@ -94,7 +94,7 @@ export default function CustomJacketHero({
           {/* Bottom Decorative Bar */}
           <div className="flex items-center gap-4">
             <div className="h-px flex-1 bg-white/20" />
-            <span className="text-white/40 text-[10px] uppercase tracking-[4px] font-medium">Pairo Bespoke</span>
+            <span className="text-white/60 text-[10px] uppercase tracking-[4px] font-medium">Pairo Bespoke</span>
             <div className="h-px flex-1 bg-white/20" />
           </div>
         </div>

@@ -133,7 +133,7 @@ export async function GET(req) {
     };
 
     const updated = await Page.findOneAndUpdate(
-      { slug: 'home', tenantId: 'DEFAULT_STORE' },
+      { slug: 'home' },
       { ...homePage, updatedBy: session.user.id },
       { upsert: true, new: true, runValidators: true }
     );

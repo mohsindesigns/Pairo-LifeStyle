@@ -4,7 +4,8 @@ import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
-import { registerRedirect } from "@/lib/redirect-resolver";
+import { planProductRedirects, applyProductRedirects } from "@/lib/product-redirects";
+import { slugify, uniqueSlug } from "@/lib/admin-products-utils";
 
 // GET single product with relations
 export async function GET(req, { params }) {
@@ -39,6 +40,10 @@ export async function PUT(req, { params }) {
   await dbConnect();
   try {
     const data = await req.json();
+    // A plain save never trashes or restores: that goes through DELETE and the restore action (which also record the
+    // status the product had). Without this, anyone with products.edit could trash any product, or bring one back
+    // from the Trash as Published, by adding the trash fields to the body.
+    delete data.isDeleted; delete data.deletedAt; delete data.statusBeforeTrash;
     
     const oldProduct = await Product.findById(id).populate('categories').populate('primaryCategory');
     if (!oldProduct) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -51,41 +56,17 @@ export async function PUT(req, { params }) {
     }
     if (!slug) slug = oldProduct.slug || "product";
 
-    // Ensure uniqueness within the tenant without appending suffixes unless a duplicate exists
-    let finalSlug = slug;
-    let counter = 1;
-    const tenantId = oldProduct.tenantId || "DEFAULT_STORE";
-    while (await Product.findOne({ slug: finalSlug, tenantId, _id: { $ne: id }, isDeleted: { $ne: true } })) {
-      finalSlug = `${slug}-${counter}`;
-      counter++;
-    }
+    // Unique across ALL products (trashed ones still hold their slug in the unique index)
+    const finalSlug = slugify(slug) === oldProduct.slug
+      ? oldProduct.slug
+      : await uniqueSlug(slugify(slug) || "product", (candidate) => Product.exists({ slug: candidate, _id: { $ne: id } }));
     data.slug = finalSlug;
 
-    // Register redirect if slug or primary category changed
-    const { getProductPrimaryCategorySlug } = await import("@/lib/routes");
-    const oldCatSlugRaw = getProductPrimaryCategorySlug(oldProduct);
-    const oldCatSlug = oldCatSlugRaw === 'uncategorized' ? 'shop' : oldCatSlugRaw;
-
-    const tempNewProduct = {
-      ...oldProduct.toObject(),
-      ...data
-    };
-    const newCatSlugRaw = getProductPrimaryCategorySlug(tempNewProduct);
-    const newCatSlug = newCatSlugRaw === 'uncategorized' ? 'shop' : newCatSlugRaw;
-
-    const slugChanged = oldProduct.slug !== finalSlug;
-    const categoryChanged = oldCatSlug !== newCatSlug;
-
-    if (slugChanged || categoryChanged) {
-      const oldPath = `/${oldCatSlug}/${oldProduct.slug}`;
-      const newPath = `/product/${finalSlug}`;
-      await registerRedirect(oldPath, newPath);
-      await registerRedirect(`/product/${oldProduct.slug}`, newPath);
-      await registerRedirect(`/product-category/${oldCatSlug}/${oldProduct.slug}`, newPath);
-      await registerRedirect(`/collections/${oldCatSlug}/${oldProduct.slug}`, newPath);
-    }
+    // Old URLs 301 to the new one when the slug or primary category changes
+    const redirects = await planProductRedirects(id, data);
 
     const product = await Product.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
+    await applyProductRedirects(redirects);
     return NextResponse.json(product);
   } catch (error) {
     console.error("PUT Error:", error);
@@ -134,10 +115,13 @@ export async function DELETE(req, { params }) {
       await Product.findByIdAndDelete(id);
       return NextResponse.json({ message: "Product permanently deleted" });
     } else {
-      product.isDeleted = true;
-      product.status = 'Draft';
-      await product.save();
-      return NextResponse.json({ message: "Product moved to trash", product });
+      // Remember the pre-trash status so a restore can put it back (not a schema field → strict:false).
+      const trashed = await Product.findByIdAndUpdate(
+        id,
+        { $set: { isDeleted: true, deletedAt: new Date(), status: 'Draft', statusBeforeTrash: product.status || 'Draft' } },
+        { new: true, strict: false }
+      );
+      return NextResponse.json({ message: "Product moved to trash", product: trashed });
     }
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

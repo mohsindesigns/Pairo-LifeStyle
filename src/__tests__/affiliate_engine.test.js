@@ -132,7 +132,6 @@ async function runTests() {
     // Record credit transaction
     const ledgerEntry = await AffiliateLedger.record({
       affiliateId: affiliate._id,
-      tenantId: "default",
       type: "Credit",
       amount: 50.00,
       source: "Adjustment",
@@ -175,8 +174,7 @@ async function runTests() {
       status: "Confirmed",
       affiliateId: affiliate._id,
       affiliateReferralCode: affiliate.referralCode,
-      financials: { subtotal: 500.00 },
-      tenantId: "default"
+      financials: { subtotal: 500.00 }
     });
 
     // A. Calculate Pending Commission
@@ -217,7 +215,6 @@ async function runTests() {
       referrer: "google.com",
       ip: "10.0.0.1",
       userAgent: "TestBrowser",
-      tenantId: "default",
       utmParameters: { source: "test" }
     };
 

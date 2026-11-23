@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HelpCircle, ChevronDown, MessageSquareText } from "lucide-react";
 import dynamic from "next/dynamic";
+import { sanitizeRichHtml } from "@/lib/sanitize";
 
 const ProductReviews = dynamic(() => import("./ProductReviews"), {
   ssr: false,
@@ -77,7 +78,7 @@ export default function ClientTabSystem({ product }) {
                   <div>
                      <div 
                          className="editorial-content-rich w-full max-w-none"
-                         dangerouslySetInnerHTML={{ __html: makeLinksDofollow(product.description || "Detailed overview coming soon...") }}
+                         dangerouslySetInnerHTML={{ __html: makeLinksDofollow(sanitizeRichHtml(product.description || "Detailed overview coming soon...")) }}
                        />
                   </div>
                </motion.div>

@@ -21,8 +21,7 @@ const StaffSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   roleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Role', required: true },
-  status: { type: String, enum: ['Active', 'Suspended', 'Locked'], default: 'Active' },
-  tenantId: { type: String, default: 'DEFAULT_STORE' }
+  status: { type: String, enum: ['Active', 'Suspended', 'Locked'], default: 'Active' }
 }, { timestamps: true });
 
 const Role = mongoose.models.Role || mongoose.model('Role', RoleSchema);

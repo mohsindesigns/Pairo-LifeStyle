@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 
 const AffiliateLedgerSchema = new mongoose.Schema({
   affiliateId: { type: mongoose.Schema.Types.ObjectId, ref: 'Affiliate', required: true, index: true },
-  tenantId: { type: String, default: 'default', index: true },
   type: { type: String, enum: ['Credit', 'Debit'], required: true },
   amount: { type: Number, required: true },
   source: { type: String, enum: ['Commission', 'Payout', 'Reversal', 'Adjustment'], required: true },
@@ -15,7 +14,7 @@ const AffiliateLedgerSchema = new mongoose.Schema({
 
 // Compound indexes for rapid month-end audits and dashboard queries
 AffiliateLedgerSchema.index({ affiliateId: 1, createdAt: -1 });
-AffiliateLedgerSchema.index({ tenantId: 1, source: 1 });
+AffiliateLedgerSchema.index({ source: 1 });
 
 /**
  * Helper to record an immutable financial transaction and update the affiliate balance atomically.
@@ -23,7 +22,6 @@ AffiliateLedgerSchema.index({ tenantId: 1, source: 1 });
  */
 AffiliateLedgerSchema.statics.record = async function({
   affiliateId,
-  tenantId,
   type,
   amount,
   source,
@@ -53,7 +51,6 @@ AffiliateLedgerSchema.statics.record = async function({
   const Ledger = this;
   const ledgerDoc = new Ledger({
     affiliateId,
-    tenantId: tenantId || affiliate.tenantId || "default",
     type,
     amount: parsedAmount,
     source,

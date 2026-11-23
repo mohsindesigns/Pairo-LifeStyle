@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Review from "@/models/Review";
+import crypto from "crypto";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(req, { params }) {
   try {
@@ -10,6 +12,18 @@ export async function POST(req, { params }) {
     const body = await req.json().catch(() => ({}));
     const { reason } = body;
 
+    const { success } = await checkRateLimit(req, { limit: 5, window: 3600, keyPrefix: "REVIEW_REPORT" });
+    if (!success) {
+      return NextResponse.json({ error: "Too many reports. Please try again later." }, { status: 429 });
+    }
+
+    const ip = getClientIp(req);
+    const userAgent = req.headers.get("user-agent") || "unknown";
+    const reporterFingerprint = crypto
+      .createHash("sha256")
+      .update(`${ip}-${userAgent}`)
+      .digest("hex");
+
     await dbConnect();
 
     const review = await Review.findById(id);
@@ -17,6 +31,11 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
 
+    if (review.reporters.includes(reporterFingerprint)) {
+      return NextResponse.json({ error: "You have already reported this review" }, { status: 400 });
+    }
+
+    review.reporters.push(reporterFingerprint);
     review.reported = true;
     review.reportsCount += 1;
 

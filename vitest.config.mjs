@@ -23,6 +23,10 @@ export default defineConfig({
   ],
   test: {
     environment: "node",
+    // Several suites load whole route modules (the page builder, checkout) for the first time, which can take longer than
+    // the 5 s default on a busy machine.
+    testTimeout: 30000,
+    hookTimeout: 30000,
   },
   resolve: {
     alias: {

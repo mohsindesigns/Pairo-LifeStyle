@@ -52,7 +52,7 @@ export default function CategoryBanner({
                 {categoriesConfig.label || "The Collection"}
               </p>
             </div>
-            <HeadingTag className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold heading-font tracking-tighter text-[#000000] uppercase leading-none truncate">
+            <HeadingTag className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold heading-font tracking-tighter text-[#000000] uppercase leading-tight break-words">
               {categoriesConfig.title || "Shop By Category"}
             </HeadingTag>
           </div>
@@ -94,15 +94,17 @@ export default function CategoryBanner({
                   )}
                 </div>
 
-                {/* Overlay for Text Visibility */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-500" />
+                {/* Overlay for Text Visibility — only when enabled on category */}
+                {Boolean(category.showBannerOverlay) && (
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-75 group-hover:opacity-90 transition-opacity duration-500" />
+                )}
 
                 {/* Content Area */}
                 <div className={`absolute inset-0 p-5 sm:p-8 md:p-12 flex flex-col justify-end items-center text-center ${isSmall ? '' : 'sm:items-start sm:text-left'}`}>
                   <div className={`space-y-3 sm:space-y-5 w-full flex flex-col items-center ${isSmall ? '' : 'sm:items-start'}`}>
                     <div className="space-y-1 sm:space-y-2">
 
-                      <h3 className="text-[16px] sm:text-xl md:text-2xl lg:text-3xl font-bold text-white uppercase tracking-tighter leading-[0.9]">
+                      <h3 className="text-[16px] sm:text-xl md:text-2xl lg:text-3xl font-bold text-white uppercase tracking-tighter leading-[0.9] [text-shadow:_0_2px_10px_rgb(0_0_0_/_75%)]">
                         {category.name}
                       </h3>
                     </div>

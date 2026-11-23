@@ -22,8 +22,6 @@ export default class Engine {
    * Wraps evaluation in a safety timeout to prevent Event Loop blocking.
    */
   static async evaluate(cart, context = {}) {
-    const { tenantId = 'DEFAULT_STORE' } = context;
-    
     const evalPromise = this._internalEvaluate(cart, context);
     const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('EVAL_TIMEOUT')), this.EVAL_TIMEOUT_MS)
@@ -33,7 +31,7 @@ export default class Engine {
         return await Promise.race([evalPromise, timeoutPromise]);
     } catch (err) {
         if (err.message === 'EVAL_TIMEOUT') {
-            console.error(`[Engine:Critical] Evaluation timeout exceeded for tenant ${tenantId}. Returning subtotal.`);
+            console.error(`[Engine:Critical] Evaluation timeout exceeded. Returning subtotal.`);
             return {
                 subtotal: cart.subtotal,
                 discountTotal: 0,
@@ -48,7 +46,7 @@ export default class Engine {
   }
 
   static async _internalEvaluate(cart, context = {}) {
-    const { couponCodes = [], tenantId = 'DEFAULT_STORE' } = context;
+    const { couponCodes = [] } = context;
     console.log(`[Engine:Main] Starting evaluation for cart: { subtotal: ${cart.subtotal}, itemsCount: ${cart.items?.length || 0} }`);
 
     // 0. Enrich Cart Phase (SaaS price and target loading safety)
@@ -87,8 +85,8 @@ export default class Engine {
       promotions = context.activePromotions;
       console.log(`[Engine:Loader] Using ${promotions.length} provided promotions (Simulation Mode)`);
     } else {
-      promotions = await Loader.loadPromotions(context.couponCodes || [], tenantId);
-      console.log(`[Engine:Main] Loaded ${promotions.length} potential promotions from DB (Tenant: ${tenantId})`);
+      promotions = await Loader.loadPromotions(context.couponCodes || []);
+      console.log(`[Engine:Main] Loaded ${promotions.length} potential promotions from DB`);
     }
     
     // 2. Collection Phase (Evaluation & Execution Math)

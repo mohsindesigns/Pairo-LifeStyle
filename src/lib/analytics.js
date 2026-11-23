@@ -4,6 +4,8 @@
  * and fail-safe execution.
  */
 
+import { recordSiteEvent } from "@/lib/siteAnalytics";
+
 function safeNumber(val, fallback = 0) {
   if (typeof val === "number") return Number.isFinite(val) ? val : fallback;
   if (typeof val === "string") {
@@ -27,6 +29,18 @@ function mapCartItem(item = {}) {
 
 export function trackGAEvent(eventName, params = {}) {
   if (typeof window === "undefined") return;
+
+  // Never track on admin, staff login, or internal admin routes
+  try {
+    const currentPath = window.location?.pathname || "";
+    if (currentPath.startsWith("/admin") || currentPath.startsWith("/admin-login")) {
+      return;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  recordSiteEvent(eventName, params);
 
   try {
     // Always push to the dataLayer in GA4 ecommerce format so Google Tag Manager can pick up,

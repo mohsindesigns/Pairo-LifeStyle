@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
  * Send an enterprise email reply to a submission
  */
 export async function POST(req, { params }) {
-  const { id } = params;
+  const { id } = await params;
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   

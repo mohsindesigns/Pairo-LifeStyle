@@ -27,7 +27,6 @@ export async function createStripePaymentLinkForOrder(order) {
     allow_promotion_codes: true,
     metadata: {
       orderId: order._id.toString(),
-      tenantId: order.tenantId,
       orderNumber: order.orderNumber,
     },
   });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Review from "@/models/Review";
 import crypto from "crypto";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(req, { params }) {
   try {
@@ -15,7 +16,12 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Invalid vote type" }, { status: 400 });
     }
 
-    const ip = req.headers.get("x-forwarded-for") || req.ip || "127.0.0.1";
+    const { success } = await checkRateLimit(req, { limit: 20, window: 60, keyPrefix: "REVIEW_VOTE" });
+    if (!success) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
+    const ip = getClientIp(req);
     const userAgent = req.headers.get("user-agent") || "unknown";
 
     // Hash user fingerprint to prevent double voting

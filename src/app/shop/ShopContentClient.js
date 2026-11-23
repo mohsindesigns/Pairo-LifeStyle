@@ -8,8 +8,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import siteData from "@/lib/data.json";
 import ProductCard from "@/components/home/ProductCard";
 import { trackViewItemList } from "@/lib/analytics";
+import { sanitizeRichHtml } from "@/lib/sanitize";
 import { useSiteData } from "@/context/SiteContext";
 import { getSwatchBackground } from "@/lib/swatchRenderer";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const ITEMS_PER_PAGE = 24;
 
@@ -310,6 +312,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
   // States for filters
   const [maxPrice, setMaxPrice] = useState(2000);
+  const [minPrice, setMinPrice] = useState(0);
   const [sliderValue, setSliderValue] = useState(2000);
   const [selectedColors, setSelectedColors] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -331,8 +334,12 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   // Sync price limits on product load
   useEffect(() => {
     if (products.length > 0) {
-      setMaxPrice(priceLimits.max);
-      setSliderValue(priceLimits.max);
+      const urlMax = searchParams.get("priceMax");
+      const urlMin = searchParams.get("priceMin");
+      const max = urlMax !== null && !Number.isNaN(Number(urlMax)) ? Number(urlMax) : priceLimits.max;
+      setMaxPrice(max);
+      setSliderValue(max);
+      setMinPrice(urlMin !== null && !Number.isNaN(Number(urlMin)) ? Number(urlMin) : 0);
     }
   }, [priceLimits, products.length]);
 
@@ -385,7 +392,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     }
 
     // Price filter
-    result = result.filter(p => p.price <= maxPrice);
+    result = result.filter(p => p.price <= maxPrice && p.price >= minPrice);
 
     // Color filter
     if (selectedColors.length > 0) {
@@ -459,7 +466,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     }
 
     return result;
-  }, [products, selectedCategory, maxPrice, selectedColors, selectedSizes, selectedTypes, selectedCustomAttrs, sortBy, searchQuery]);
+  }, [products, selectedCategory, maxPrice, minPrice, selectedColors, selectedSizes, selectedTypes, selectedCustomAttrs, sortBy, searchQuery]);
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
   const paginatedProducts = filteredProducts.slice(
@@ -546,6 +553,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setTimeout(() => {
       setSliderValue(priceLimits.max);
       setMaxPrice(priceLimits.max);
+      setMinPrice(0);
       setSelectedColors([]);
       setSelectedSizes([]);
       setSelectedTypes([]);
@@ -567,6 +575,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     if (selectedTypes.length > 0) count++;
     if (searchQuery.trim()) count++;
     if (maxPrice < priceLimits.max) count++;
+    if (minPrice > 0) count++;
     Object.keys(selectedCustomAttrs).forEach(k => {
       if (selectedCustomAttrs[k].length > 0) count++;
     });
@@ -808,12 +817,12 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/20" />
+              {Boolean(currentDbCategory.showBannerOverlay) && (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/20" />
+              )}
 
-              {/* Banner content — all 
-              
-              at bottom */}
-              <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 text-white z-10">
+              {/* Banner content — all at bottom */}
+              <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 text-white z-10 [text-shadow:_0_1px_6px_rgb(0_0_0_/_60%)]">
                 {/* Breadcrumbs — above category name */}
                 <div className="flex items-center gap-2 text-white/60 text-[9px] font-bold uppercase tracking-widest mb-3">
                   <Link href="/" className="hover:text-white transition-colors">Home</Link>
@@ -843,7 +852,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
-                  <select
+                  <ThemedSelect
                     value={sortBy}
                     onChange={(e) => { scrollToGridTop(); setSortBy(e.target.value); setCurrentPage(1); }}
                     className="font-bold text-xs bg-transparent focus:outline-none cursor-pointer uppercase text-foreground max-w-[130px] sm:max-w-none"
@@ -854,7 +863,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                     <option>Price: High to Low</option>
                     <option>Name: A to Z</option>
                     <option>Name: Z to A</option>
-                  </select>
+                  </ThemedSelect>
                 </div>
                 <button
                   type="button"
@@ -900,7 +909,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
             <div className="flex items-center justify-between gap-3 border-t border-border md:border-none pt-6 md:pt-0 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-foreground/40 uppercase tracking-widest hidden sm:inline">Sort by:</span>
-                <select
+                <ThemedSelect
                   value={sortBy}
                   onChange={(e) => { scrollToGridTop(); setSortBy(e.target.value); setCurrentPage(1); }}
                   className="font-bold text-xs bg-transparent focus:outline-none cursor-pointer uppercase text-foreground max-w-[130px] sm:max-w-none"
@@ -911,7 +920,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   <option>Price: High to Low</option>
                   <option>Name: A to Z</option>
                   <option>Name: Z to A</option>
-                </select>
+                </ThemedSelect>
               </div>
               <button
                 type="button"
@@ -1010,7 +1019,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
         {/* Category Full Description (content) */}
         {currentDbCategory && currentDbCategory.content && (
           <div className="mt-16 border-t border-border pt-12 editorial-content-rich w-full max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: currentDbCategory.content.replace(/<a\s+([^>]*href=["']([^"']*)["'][^>]*)>/gi, (m, b) => /rel=["']([^"']*)["']/i.test(b) ? m.replace(/rel=["']([^"']*)["']/gi, (rm, rv) => { const c = rv.replace(/\bnofollow\b/gi, '').replace(/\bnoindex\b/gi, '').replace(/\s+/g, ' ').trim(); return c ? `rel="${c}"` : ''; }) : m) }} />
+            <div dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(currentDbCategory.content).replace(/<a\s+([^>]*href=["']([^"']*)["'][^>]*)>/gi, (m, b) => /rel=["']([^"']*)["']/i.test(b) ? m.replace(/rel=["']([^"']*)["']/gi, (rm, rv) => { const c = rv.replace(/\bnofollow\b/gi, '').replace(/\bnoindex\b/gi, '').replace(/\s+/g, ' ').trim(); return c ? `rel="${c}"` : ''; }) : m) }} />
           </div>
         )}
 

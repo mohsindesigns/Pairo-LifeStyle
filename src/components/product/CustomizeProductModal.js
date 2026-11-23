@@ -7,23 +7,11 @@ import {
   Loader2, User, Mail, Phone, AlertCircle, Scissors,
 } from "lucide-react";
 
-const CHANGE_LEATHER_COLORS = ["None", "Black", "Brown", "Blue", "Other"];
-const CHANGE_LEATHER_TYPES = ["None", "Sheepskin", "Goatskin", "Cowhide", "Calfhide", "Other"];
-const CHANGE_INNER_LININGS = ["None", "Non Quilted (Polyester)", "Change Color (Quilted)", "Change Color (Non-Quilted)", "Synthetic Fur", "Other"];
-const CHANGE_HARDWARE_COLORS = ["None", "Silver", "Brass", "Black", "Other"];
-const CHANGE_FUR_TYPES = ["None", "Faux Fur", "Shearling", "Rabbit", "Fox", "Mink", "Wool", "Other"];
-const CHANGE_FUR_COLORS = ["White", "Black", "Brown", "Grey", "Cream", "Beige", "Custom"];
-const CHANGE_FUR_PLACEMENTS = ["Collar", "Hood", "Sleeves", "Cuffs", "Front", "Back"];
-const CHANGE_FUR_DENSITIES = ["Light", "Medium", "Heavy"];
-const ARTWORK_SLOTS = [
-  { key: "leftChest", label: "Left Chest" },
-  { key: "rightChest", label: "Right Chest" },
-  { key: "leftArm", label: "Left Arm" },
-  { key: "rightArm", label: "Right Arm" },
-  { key: "back", label: "Back" },
-  { key: "other", label: "Other Placement" },
-];
-const ACCEPTED_FORMATS = ".png,.jpg,.jpeg,.svg,.pdf,.ai,.eps,.webp";
+import {
+  CHANGE_LEATHER_COLORS, CHANGE_LEATHER_TYPES, CHANGE_INNER_LININGS, CHANGE_HARDWARE_COLORS,
+  CHANGE_FUR_TYPES, CHANGE_FUR_COLORS, CHANGE_FUR_PLACEMENTS, CHANGE_FUR_DENSITIES,
+  ARTWORK_SLOTS, ARTWORK_ACCEPTED_FORMATS as ACCEPTED_FORMATS,
+} from "@/lib/customizationOptions";
 
 /* ─── Shared input class ── */
 const inputCls = "w-full border border-black rounded-[var(--radius,0px)] px-3 py-2.5 text-[12px] font-medium text-black bg-white outline-none focus:ring-1 focus:ring-black transition-all placeholder-black/30";

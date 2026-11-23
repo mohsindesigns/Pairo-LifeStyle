@@ -17,7 +17,14 @@ export async function GET(req) {
 
     await dbConnect();
     try {
-        const pages = await Page.find({ tenantId: 'DEFAULT_STORE' }).sort({ createdAt: -1 }).lean();
+        // Trashed pages are hidden by default; ?trash=1 returns only the Trash, ?scope=all returns both.
+        const { searchParams } = new URL(req.url);
+        const filter = searchParams.get("scope") === "all"
+            ? {}
+            : searchParams.get("trash") === "1"
+                ? { isDeleted: true }
+                : { isDeleted: { $ne: true } };
+        const pages = await Page.find(filter).sort({ createdAt: -1 }).lean();
         return NextResponse.json(pages);
     } catch (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -33,6 +40,13 @@ export async function POST(req) {
     await dbConnect();
     try {
         const body = await req.json();
+        // Trash fields are managed only by DELETE / restore, never set on create.
+        delete body.isDeleted;
+        delete body.deletedAt;
+        delete body.statusBeforeTrash;
+        // System pages are seeded, never created from the admin.
+        delete body.isSystem;
+        delete body._id;
         const { title, slug, template, sections } = body;
 
         if (!title || !slug) {
@@ -53,15 +67,20 @@ export async function POST(req) {
             }
         }
 
+        const cleanSlug = slug.toLowerCase().trim().replace(/[^a-z0-9-_]+/g, '-');
+        if (!cleanSlug) {
+            return NextResponse.json({ error: "Invalid slug" }, { status: 400 });
+        }
+
         // Prevent collisions with reserved system routes
         const { isReservedPath } = await import("@/lib/redirect-resolver");
-        if (isReservedPath(slug)) {
+        if (isReservedPath(cleanSlug)) {
             return NextResponse.json({ error: "Slug collides with a reserved system route" }, { status: 400 });
         }
 
-        const existing = await Page.findOne({ slug, tenantId: 'DEFAULT_STORE' });
+        const existing = await Page.findOne({ slug: cleanSlug });
         if (existing) {
-            return NextResponse.json({ error: "Page with this slug already exists" }, { status: 400 });
+            return NextResponse.json({ error: existing.isDeleted ? "A page with this slug is in the Trash" : "Page with this slug already exists" }, { status: 400 });
         }
 
         // Seed template default sections if no sections are explicitly provided
@@ -78,11 +97,11 @@ export async function POST(req) {
 
         const newPage = await Page.create({
             ...body,
+            slug: cleanSlug,
             template: templateKey,
             sections: pageSections,
             createdBy: session.user.id,
-            updatedBy: session.user.id,
-            tenantId: 'DEFAULT_STORE'
+            updatedBy: session.user.id
         });
 
         await logAction(req, session, 'CREATE_PAGE', 'page', {

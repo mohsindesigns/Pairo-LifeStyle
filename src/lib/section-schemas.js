@@ -3,7 +3,9 @@ export const SECTION_SCHEMAS = {
     name: "Hero Slider",
     icon: "Layout",
     fields: [
+      { name: "badge", label: "Hero Badge / Tagline (Default)", type: "text" },
       { name: "slides", label: "Slides", type: "repeater", fields: [
+        { name: "badge", label: "Slide Badge (e.g. Handcrafted Luxury)", type: "text" },
         { name: "title", label: "Title", type: "text" },
         { name: "subtitle", label: "Subtitle", type: "textarea" },
         { name: "image", label: "Image URL", type: "image" },
@@ -12,7 +14,7 @@ export const SECTION_SCHEMAS = {
         { name: "link", label: "Button Link", type: "text" }
       ]},
       { name: "brand", label: "Brand Settings", type: "group", fields: [
-        { name: "tagline", label: "Tagline", type: "text" }
+        { name: "tagline", label: "Tagline / Badge Fallback", type: "text" }
       ]},
       { name: "labels", label: "Labels", type: "group", fields: [
         { name: "viewCollection", label: "View Collection Label", type: "text" },
@@ -24,6 +26,41 @@ export const SECTION_SCHEMAS = {
       ]}
     ]
   },
+  trust_badges: {
+    name: "Trust Badges & Stats",
+    icon: "Shield",
+    fields: [
+      {
+        name: "items",
+        label: "Badges & Stats Items",
+        type: "repeater",
+        fields: [
+          { name: "title", label: "Stat / Badge Title (e.g. Real Lambskin)", type: "text" },
+          { name: "description", label: "Description / Subtitle (e.g. Leather)", type: "text" },
+          { name: "icon", label: "Icon from Library", type: "icon" },
+          { name: "customIcon", label: "Or Upload Custom Icon Image", type: "image" },
+          { name: "link", label: "Optional Link URL", type: "text" }
+        ]
+      }
+    ]
+  },
+  dual_category_banner: {
+    name: "Side-by-Side Category Banners",
+    icon: "Grid",
+    fields: [
+      {
+        name: "banners",
+        label: "Banners (Side by Side)",
+        type: "repeater",
+        fields: [
+          { name: "image", label: "Banner Image", type: "image" },
+          { name: "heading", label: "Heading (Bottom Center - Leave empty to hide)", type: "text" },
+          { name: "buttonText", label: "Button Text (Bottom Center - Leave empty to hide)", type: "text" },
+          { name: "link", label: "Link URL", type: "text" }
+        ]
+      }
+    ]
+  },
   product_grid: {
     name: "Product Collection",
     icon: "ShoppingBag",
@@ -31,13 +68,64 @@ export const SECTION_SCHEMAS = {
       { name: "title", label: "Section Title", type: "text" },
       { name: "seriesLabel", label: "Series Label (Badge)", type: "text" },
       { name: "ctaLabel", label: "CTA Button Text", type: "text" },
+      { name: "ctaLink", label: "CTA Button Link (e.g. /shop or /jackets - leave empty for /shop)", type: "text" },
       { name: "showType", label: "Display Type", type: "select", default: "collection", options: [
         { label: "Collection", value: "collection" },
         { label: "Specific Products", value: "products" }
       ]},
       { name: "collectionId", label: "Select Collection", type: "select", options: "categories", dependsOn: "showType", visibleIf: "collection" },
-      { name: "productIds", label: "Select Products (Max 16)", type: "multiselect", options: "products", dependsOn: "showType", visibleIf: "products" },
+      { name: "productIds", label: "Select Products (Max 16)", type: "multiselect", options: "products", max: 16, dependsOn: "showType", visibleIf: "products" },
       { name: "limit", label: "Product Limit (Collection only, Max 16)", type: "number", default: 16, dependsOn: "showType", visibleIf: "collection" }
+    ]
+  },
+  price_range_showcase: {
+    name: "Price Range Showcase",
+    icon: "ShoppingBag",
+    fields: [
+      { name: "eyebrow", label: "Eyebrow Text (small line above the title)", type: "text", default: "Shop by budget" },
+      { name: "title", label: "Section Title", type: "text", default: "Find your piece" },
+      { name: "subtitle", label: "Subtitle", type: "textarea" },
+      { name: "background", label: "Background", type: "select", default: "light", options: [
+        { label: "Light", value: "light" },
+        { label: "Dark", value: "dark" }
+      ]},
+      { name: "layout", label: "Product Layout", type: "select", default: "grid", options: [
+        { label: "Grid", value: "grid" },
+        { label: "Horizontal scroll", value: "scroller" }
+      ]},
+      { name: "columns", label: "Columns on desktop (grid layout)", type: "select", default: "4", options: [
+        { label: "2 columns", value: "2" },
+        { label: "3 columns", value: "3" },
+        { label: "4 columns", value: "4" }
+      ]},
+      { name: "productsPerRange", label: "Products shown per range (max 16)", type: "number", default: 8 },
+      { name: "exploreLabel", label: "Explore Button Text", type: "text", default: "Explore More" },
+      { name: "shuffle", label: "Shuffle products on every visit", type: "select", default: "yes", options: [
+        { label: "Yes", value: "yes" },
+        { label: "No", value: "no" }
+      ]},
+      { name: "showCount", label: "Show product count per range", type: "select", default: "yes", options: [
+        { label: "Yes", value: "yes" },
+        { label: "No", value: "no" }
+      ]},
+      { name: "ranges", label: "Price Ranges (add as many as you want)", type: "repeater", fields: [
+        { name: "label", label: "Range Label (e.g. Everyday Essentials)", type: "text" },
+        { name: "badge", label: "Badge (optional, e.g. Best Seller)", type: "text" },
+        { name: "minPrice", label: "Min Price ($)", type: "number" },
+        { name: "maxPrice", label: "Max Price ($) - leave empty for no upper limit", type: "number" },
+        { name: "category", label: "Filter by Particular Category (optional)", type: "select", options: "categories" },
+        { name: "productIds", label: "Select Particular Products for this range (optional)", type: "multiselect", options: "products" },
+        { name: "sort", label: "Product order", type: "select", default: "shuffle", options: [
+          { label: "Shuffle", value: "shuffle" },
+          { label: "Newest first", value: "newest" },
+          { label: "Price: low to high", value: "price_asc" },
+          { label: "Price: high to low", value: "price_desc" }
+        ]},
+        { name: "visible", label: "Show this range on the site", type: "select", default: "yes", options: [
+          { label: "Yes", value: "yes" },
+          { label: "No (hidden)", value: "no" }
+        ]}
+      ]}
     ]
   },
   feature_marquee: {
@@ -70,6 +158,16 @@ export const SECTION_SCHEMAS = {
       { name: "label", label: "Section Badge", type: "text" },
       { name: "blogIds", label: "Select Blogs to Show", type: "multiselect", options: "blogs" },
       { name: "readMore", label: "Read More Label", type: "text" }
+    ]
+  },
+  rack_3d: {
+    name: "3D Rack",
+    icon: "Shirt",
+    fields: [
+      { name: "eyebrow", label: "Small label above the title", type: "text", default: "The rack" },
+      { name: "title", label: "Section Title", type: "text", default: "Spin it in 3D" },
+      { name: "subtitle", label: "Side text", type: "textarea", default: "Hover the rail to browse. Click any piece to spin it in 360°." },
+      { name: "height", label: "Rack height in px (desktop)", type: "number", default: 720 }
     ]
   },
   testimonials: {
@@ -299,6 +397,87 @@ export const SECTION_SCHEMAS = {
     fields: [
       { name: "formTitle", label: "Form Title", type: "text" },
       { name: "formSubtitle", label: "Form Subtitle", type: "textarea" }
+    ]
+  },
+
+  // ─── CORPORATE GIFTING SECTIONS ────────────────────────────
+  corporate_gifting_hero: {
+    name: "Corporate Gifting Hero",
+    icon: "Gift",
+    fields: [
+      { name: "label", label: "Badge Label", type: "text" },
+      { name: "title", label: "Hero Title", type: "text" },
+      { name: "subtitle", label: "Hero Subtitle", type: "textarea" },
+      { name: "image", label: "Background Image (optional)", type: "image" },
+      { name: "primaryButtonText", label: "Primary Button Text", type: "text" },
+      { name: "primaryButtonLink", label: "Primary Button Link", type: "text" },
+      { name: "secondaryButtonText", label: "Secondary Button Text", type: "text" },
+      { name: "secondaryButtonLink", label: "Secondary Button Link", type: "text" },
+      { name: "breadcrumb", label: "Breadcrumb Label", type: "text" }
+    ]
+  },
+  corporate_gifting_process: {
+    name: "Corporate Gifting Process Steps",
+    icon: "Layers",
+    fields: [
+      { name: "sectionLabel", label: "Section Label", type: "text" },
+      { name: "sectionTitle", label: "Section Title", type: "text" },
+      { name: "sectionDescription", label: "Section Description", type: "textarea" },
+      { name: "steps", label: "Steps (leave empty for defaults)", type: "repeater", fields: [
+        { name: "title", label: "Step Title", type: "text" },
+        { name: "description", label: "Step Description", type: "textarea" },
+        { name: "image", label: "Step Image", type: "image" }
+      ]}
+    ]
+  },
+  corporate_gifting_form: {
+    name: "Corporate Gifting Inquiry Form",
+    icon: "Mail",
+    fields: [
+      { name: "eyebrow", label: "Small Label Above Title", type: "text" },
+      { name: "formTitle", label: "Form Title", type: "text" },
+      { name: "formSubtitle", label: "Form Subtitle", type: "textarea" },
+      { name: "companyTitle", label: "Step 1 Title (Company)", type: "text" },
+      { name: "packTitle", label: "Step 2 Title (Pack details)", type: "text" },
+      { name: "packItemsLabel", label: "Pack Items Question", type: "text" },
+      { name: "brandingTitle", label: "Step 3 Title (Branding)", type: "text" },
+      { name: "logoLabel", label: "Logo Upload Label", type: "text" },
+      { name: "referenceTitle", label: "Step 4 Title (Reference images)", type: "text" },
+      { name: "referenceDescription", label: "Reference Images Description", type: "textarea" },
+      { name: "notesTitle", label: "Step 5 Title (Notes)", type: "text" },
+      { name: "notesPlaceholder", label: "Notes Placeholder", type: "text" },
+      { name: "submitText", label: "Submit Button Text", type: "text" },
+      { name: "disclaimer", label: "Text Under Submit Button", type: "textarea" },
+      { name: "successTitle", label: "Success Title", type: "text" },
+      { name: "successMessage", label: "Success Message", type: "textarea" },
+      { name: "minQuantity", label: "Minimum Number of Packs", type: "number", default: 10 },
+      { name: "maxLogos", label: "Max Logo Files", type: "number", default: 3 },
+      { name: "maxReferenceImages", label: "Max Reference Images", type: "number", default: 10 },
+      { name: "packItems", label: "Pack Items (tiles customers pick from)", type: "repeater", fields: [
+        { name: "label", label: "Item Name", type: "text" },
+        { name: "icon", label: "Icon", type: "icon" }
+      ]},
+      { name: "occasions", label: "Occasion Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "budgets", label: "Budget Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "brandingStyles", label: "Branding Style Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "packagingOptions", label: "Packaging Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "leatherTypes", label: "Leather Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "countries", label: "Country Options", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
+      { name: "referenceTags", label: "Reference Image Hint Tags", type: "repeater", fields: [
+        { name: "label", label: "Option", type: "text" }
+      ]},
     ]
   },
 

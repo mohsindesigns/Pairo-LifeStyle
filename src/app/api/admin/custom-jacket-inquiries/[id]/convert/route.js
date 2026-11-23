@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import CustomJacketInquiry from "@/models/CustomJacketInquiry";
 import Order from "@/models/Order";
+import { getNextOrderNumber } from "@/lib/orderNumber";
 import { can } from "@/lib/rbac";
 import crypto from "crypto";
 
@@ -25,17 +26,18 @@ export async function POST(req, { params }) {
 
     const inquiry = await CustomJacketInquiry.findById(id);
     if (!inquiry) return NextResponse.json({ error: "Inquiry not found" }, { status: 404 });
+    if (inquiry.isDeleted) {
+      return NextResponse.json({ error: "Restore this inquiry from the Trash before converting it" }, { status: 409 });
+    }
     if (inquiry.orderId) {
       return NextResponse.json({ error: "This inquiry has already been converted to an order" }, { status: 409 });
     }
 
-    const tenantId = inquiry.tenantId || "DEFAULT_STORE";
-    const count = await Order.countDocuments({ tenantId });
-    const orderNumber = `PAI-${1000 + count + 1}`;
+    // The shared atomic counter, like checkout: counting documents gave numbers that collided with the counter's.
+    const orderNumber = await getNextOrderNumber();
     const idempotencyKey = `custom-jacket-${crypto.randomUUID()}`;
 
     const order = await Order.create({
-      tenantId,
       orderNumber,
       status: "Pending",
       items: [

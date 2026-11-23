@@ -10,9 +10,9 @@ import { reconcilePromotionUsage, isUsageReleasingTransition } from "@/lib/promo
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     await dbConnect();
-    
+
     // Fetch Customer
     let customer = await Customer.findById(session.user.id).select("-password").lean();
     if (!customer) {
@@ -31,7 +31,7 @@ export async function GET() {
           };
           const orders = await Order.find({
             "customer.email": staff.email,
-            tenantId: 'DEFAULT_STORE'
+            isDeleted: { $ne: true }
           }).sort({ createdAt: -1 }).lean();
           if (orders.length > 0) {
             const productIds = orders.flatMap(o => (o.items || []).map(item => item.productId)).filter(Boolean);
@@ -61,9 +61,9 @@ export async function GET() {
     }
 
     // Fetch Orders from Order collection (Live data)
-    const orders = await Order.find({ 
+    const orders = await Order.find({
       "customer.userId": session.user.id,
-      tenantId: 'DEFAULT_STORE' // or dynamic tenantId
+      isDeleted: { $ne: true }
     }).sort({ createdAt: -1 }).lean();
 
     // Fetch product images for any orders with missing image URLs
@@ -101,7 +101,7 @@ export async function GET() {
 export async function POST(req) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!session?.user?.id) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     const body = await req.json();
     const { action, data } = body;
     await dbConnect();
@@ -195,7 +195,7 @@ export async function POST(req) {
       case "deleteAccount":
         return NextResponse.json({ message: "Account deletion is disabled for this store." }, { status: 403 });
       case "cancelOrder": {
-        const order = await Order.findOne({ _id: data.orderId, "customer.userId": session.user.id });
+        const order = await Order.findOne({ _id: data.orderId, "customer.userId": session.user.id, isDeleted: { $ne: true } });
         if (!order) return NextResponse.json({ message: "Order not found" }, { status: 404 });
         
         // Cancellation Logic: Only if not already shipped/packed
@@ -207,7 +207,8 @@ export async function POST(req) {
         const oldStatus = order.status;
 
         // Restore stock, matching the dedicated /api/profile/orders/[id]/cancel route.
-        const stockRollbacks = order.items.map((item) => {
+        // (A duplicated draft never took any stock, so there is nothing to give back.)
+        const stockRollbacks = (order.stockDeducted === false ? [] : order.items).map((item) => {
           const variantTitle = item.selectedVariant?.title || "Standard";
           if (variantTitle !== "Standard") {
             return Product.updateOne(
@@ -221,6 +222,7 @@ export async function POST(req) {
           );
         });
         await Promise.all(stockRollbacks);
+        if (order.stockDeducted !== false) order.stockRestockedAt = new Date();
 
         order.status = 'Cancelled';
         order.timeline.push({
@@ -240,7 +242,7 @@ export async function POST(req) {
 
         // Dispatch event for listeners (like email)
         const pairoEvents = (await import("@/lib/events")).default;
-        pairoEvents.dispatch('ORDER_CANCELLED', order);
+        pairoEvents.dispatch('ORDER_CANCELLED', { order, origin: 'customer' });
 
         return NextResponse.json({ message: "Order cancelled successfully" });
       }

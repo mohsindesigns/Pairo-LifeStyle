@@ -29,10 +29,8 @@ const TaxClassSchema = new mongoose.Schema({
 }, { _id: false });
 
 // ─── Tax Settings Schema ───────────────────────────────────────────────────────
-// One document per tenant (upserted by tenantId).
+// Single document for the store.
 const TaxSettingsSchema = new mongoose.Schema({
-  tenantId: { type: String, required: true, default: 'DEFAULT_STORE', unique: true, index: true },
-
   // Master switch — if false, no tax is applied anywhere.
   enabled: { type: Boolean, default: false },
 

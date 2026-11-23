@@ -5,14 +5,16 @@ import PendingCheckout from "@/models/PendingCheckout";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import stripe from "@/lib/stripe";
-import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { assertValidCartItems, computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { getContextLogger, LogCategory } from "@/lib/logger";
+import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
+import { getClientIp } from "@/lib/rateLimit";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
   const correlationId = req.headers.get("x-correlation-id") || crypto.randomUUID();
-  const tenantId = req.headers.get("x-tenant-id") || "DEFAULT_STORE";
-  const log = getContextLogger(correlationId, { path: '/api/checkout/create-payment-intent', tenantId });
+  const log = getContextLogger(correlationId, { path: '/api/checkout/create-payment-intent' });
 
   try {
     await dbConnect();
@@ -26,8 +28,25 @@ export async function POST(req) {
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
     }
+    try {
+      assertValidCartItems(items);
+    } catch (invalidCart) {
+      return NextResponse.json({ error: invalidCart.message }, { status: 400 });
+    }
+    // Fail before charging the card, not after — the order-creation chokepoint
+    // (createOrderFromCheckoutPayload, called from the Stripe webhook once payment succeeds)
+    // enforces this too and would trigger an auto-refund, but it's a much worse experience to
+    // charge a customer and then immediately refund them for a mistake that's catchable here.
+    const requiredAddressFields = ['fullName', 'street', 'city', 'country'];
+    const missingAddressFields = requiredAddressFields.filter(f => !String(shippingAddress?.[f] || '').trim());
+    if (missingAddressFields.length > 0) {
+      return NextResponse.json({ error: `Shipping address is incomplete (missing: ${missingAddressFields.join(', ')}).` }, { status: 400 });
+    }
+    if (isRestrictedCountry(shippingAddress?.country, shippingAddress?.countryCode)) {
+      return NextResponse.json({ error: RESTRICTED_COUNTRY_MESSAGE }, { status: 400 });
+    }
 
-    const existingOrder = await Order.findOne({ idempotencyKey, tenantId });
+    const existingOrder = await Order.findOne({ idempotencyKey });
     if (existingOrder) {
       return NextResponse.json({ error: "This order has already been placed." }, { status: 409 });
     }
@@ -36,10 +55,14 @@ export async function POST(req) {
     const orderUserId = authSession?.user?.id || null;
     const checkoutEmail = (customerEmail || authSession?.user?.email || "").trim().toLowerCase();
     const isGuestSession = !orderUserId;
-    const ipAddress = req.headers.get("x-forwarded-for") || "unknown";
+    if (!checkoutEmail) {
+      return NextResponse.json({ error: "A valid email address is required to place an order." }, { status: 400 });
+    }
+    const ipAddress = getClientIp(req);
 
     const itemProductIds = items.map(item => item.id || item._id);
-    const foundProducts = await Product.find({ _id: { $in: itemProductIds }, tenantId });
+    // A Draft is hidden from the shop (the product page only hides "Draft"), so a stale cart must not buy it either.
+    const foundProducts = await Product.find({ _id: { $in: itemProductIds }, isDeleted: { $ne: true }, status: { $ne: "Draft" } });
     const productById = new Map(foundProducts.map(p => [p._id.toString(), p]));
 
     for (const item of items) {
@@ -50,6 +73,14 @@ export async function POST(req) {
       if (product.manageStock && product.stock < item.quantity) {
         return NextResponse.json({ error: `Insufficient stock for ${product.name}.` }, { status: 400 });
       }
+      // Corporate Gifting — same check checkoutFulfillment.js performs at order-creation time
+      // (shared helper, so the two can never disagree), run here too so a stale cart (feature
+      // disabled, item deactivated, or no longer meeting the minimum-selection count) fails
+      // before the card is charged instead of charging then failing at webhook fulfillment.
+      const corporateGiftingCheck = validateCorporateGiftingSelections(item, product);
+      if (!corporateGiftingCheck.valid) {
+        return NextResponse.json({ error: corporateGiftingCheck.error }, { status: 400 });
+      }
     }
 
     const pricing = await computeAuthoritativeCheckout({
@@ -58,7 +89,6 @@ export async function POST(req) {
       referralCode,
       checkoutEmail,
       orderUserId,
-      tenantId,
       // Must pass shipping context so the PaymentIntent amount includes the real shipping
       // cost — otherwise card orders are charged subtotal-minus-discounts with NO shipping,
       // while the webhook fulfillment (which does pass these) records the full total.
@@ -85,9 +115,9 @@ export async function POST(req) {
       shippingSnapshot,
       referralCode,
     };
-    const storedContext = { tenantId, orderUserId, checkoutEmail, isGuestSession, ipAddress };
+    const storedContext = { orderUserId, checkoutEmail, isGuestSession, ipAddress };
 
-    let existingPending = await PendingCheckout.findOne({ tenantId, idempotencyKey });
+    let existingPending = await PendingCheckout.findOne({ idempotencyKey });
 
     if (existingPending?.status === 'consumed') {
       return NextResponse.json({ error: "This order has already been placed." }, { status: 409 });
@@ -109,14 +139,13 @@ export async function POST(req) {
         automatic_payment_methods: { enabled: true },
         metadata: {
           idempotencyKey,
-          tenantId,
         },
       });
 
       await PendingCheckout.findOneAndUpdate(
-        { tenantId, idempotencyKey },
+        { idempotencyKey },
         {
-          $setOnInsert: { tenantId, idempotencyKey, createdAt: new Date() },
+          $setOnInsert: { idempotencyKey, createdAt: new Date() },
           $set: {
             status: 'pending',
             payload: { payload: storedPayload, context: storedContext },

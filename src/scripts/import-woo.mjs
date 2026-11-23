@@ -15,7 +15,6 @@ import Category from '../models/Category.js';
 
 const CSV_FILE_PATH = 'wc-product-export-2-6-2026-1780399951676.csv';
 const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads', 'products');
-const TENANT_ID = 'root';
 
 // Utility to create slug
 function slugify(text) {
@@ -70,7 +69,7 @@ async function run() {
   console.log('Connected.');
 
   console.log('Wiping existing Products...');
-  await Product.deleteMany({ tenantId: TENANT_ID });
+  await Product.deleteMany({});
   
   const results = [];
   console.log(`Parsing CSV: ${CSV_FILE_PATH}`);
@@ -220,7 +219,6 @@ async function run() {
     const name = parentRow['Name'] || 'Unnamed Product';
     const slug = slugify(name) + '-' + Math.random().toString(36).substring(2, 6);
     const productDoc = {
-      tenantId: TENANT_ID,
       name: name,
       slug: slug,
       shortDescription: parentRow['Short description'] || '',

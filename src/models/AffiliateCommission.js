@@ -15,8 +15,7 @@ const AffiliateCommissionSchema = new mongoose.Schema({
     index: true 
   },
   payoutId: { type: mongoose.Schema.Types.ObjectId, ref: 'AffiliatePayout', index: true },
-  tenantId: { type: String, default: 'default', index: true }, // SaaS multi-tenancy
-  
+
   // Snapshot rules to guarantee historical data integrity
   snapshot: {
     commissionRate: { type: Number, required: true },

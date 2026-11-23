@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, Search, Upload, Check, Loader2, Image as ImageIcon, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Upload, Check, Loader2, Image as ImageIcon, ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
  * MediaPickerModal — WordPress-style global media picker
@@ -90,6 +90,17 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
     onClose();
   };
 
+  // Double-click: insert the clicked item directly (state from toggleSelect isn't updated yet)
+  const insertItem = (item) => {
+    if (multiple) {
+      const merged = selected.some(s => s._id === item._id) ? selected : [...selected, item];
+      onSelect(merged);
+    } else {
+      onSelect(item);
+    }
+    onClose();
+  };
+
   // Upload handling
   const handleFiles = async (files) => {
     if (!files || files.length === 0) return;
@@ -139,65 +150,87 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
 
   if (!open) return null;
 
+  const tile = (sel) => ({
+    background: "#f0f0f1", border: 0, padding: 0, cursor: "pointer",
+    boxShadow: sel
+      ? "inset 0 0 0 3px #fff, inset 0 0 0 7px #2271b1"
+      : "inset 0 0 15px rgba(0,0,0,0.1), inset 0 0 0 1px rgba(0,0,0,0.05)",
+  });
+
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm p-1 xs:p-2 sm:p-4">
-      <div className="bg-white w-full max-w-[1100px] h-[94vh] sm:h-[85vh] flex flex-col shadow-2xl border border-[#c3c4c7] rounded-sm overflow-hidden min-w-0">
+    <div className="wp-modal-backdrop" style={{ zIndex: 500, padding: 8 }}>
+      <div
+        className="wp-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="media-picker-title"
+        style={{ maxWidth: 1100, height: "min(85vh, 900px)", display: "flex", flexDirection: "column", overflow: "hidden" }}
+      >
 
         {/* ── Header ── */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-2 sm:py-3 border-b border-[#c3c4c7] bg-[#f6f7f7] shrink-0">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4 min-w-0">
-            <h2 className="text-[13px] sm:text-[15px] font-semibold text-[#1d2327] truncate">{title}</h2>
-            <div className="flex rounded-sm overflow-hidden border border-[#8c8f94]">
-              <button 
-                type="button"
-                onClick={() => setTab("library")} 
-                className={`px-2.5 xs:px-3 py-1 text-[11px] sm:text-[12px] font-medium transition-colors ${tab === "library" ? "bg-[#2271b1] text-white" : "bg-white text-[#646970] hover:bg-[#f0f0f1]"}`}
-              >
-                Library
-              </button>
-              <button 
-                type="button"
-                onClick={() => setTab("upload")} 
-                className={`px-2.5 xs:px-3 py-1 text-[11px] sm:text-[12px] font-medium border-l border-[#8c8f94] transition-colors ${tab === "upload" ? "bg-[#2271b1] text-white" : "bg-white text-[#646970] hover:bg-[#f0f0f1]"}`}
-              >
-                Upload Files
-              </button>
-            </div>
-          </div>
-          <button 
+        <div className="wp-modal-head shrink-0" style={{ borderBottom: 0, paddingBottom: 4 }}>
+          <h2 id="media-picker-title" className="truncate">{title}</h2>
+          <button
             type="button"
-            onClick={onClose} 
-            className="p-1 hover:bg-[#e0e0e0] rounded-sm transition-colors shrink-0"
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="flex items-center justify-center shrink-0"
+            style={{ width: 40, height: 40, background: "none", border: 0, color: "#646970", cursor: "pointer" }}
           >
-            <X className="w-5 h-5 text-[#646970]" />
+            <X className="w-5 h-5" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="wp-tabs shrink-0" role="tablist" aria-label="Media source" style={{ margin: 0, padding: "0 16px" }}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "upload"}
+            onClick={() => setTab("upload")}
+            className="wp-tab"
+          >
+            Upload files
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "library"}
+            onClick={() => setTab("library")}
+            className="wp-tab"
+          >
+            Media Library
           </button>
         </div>
 
         {tab === "upload" ? (
           /* ── Upload Tab ── */
-          <div className="flex-1 flex items-center justify-center p-3 sm:p-10 overflow-y-auto">
+          <div className="flex-1 flex items-center justify-center overflow-y-auto" style={{ padding: 16 }}>
             <div
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onClick={() => fileInputRef.current?.click()}
-              className={`w-full max-w-xl border-2 border-dashed rounded-sm p-6 sm:p-16 text-center cursor-pointer transition-all ${dragOver ? "border-[#2271b1] bg-[#f0f6fa]" : "border-[#c3c4c7] hover:border-[#2271b1] bg-[#f9f9f9]"}`}
+              className="w-full text-center cursor-pointer"
+              style={{
+                maxWidth: 640,
+                border: `4px dashed ${dragOver ? "#2271b1" : "#c3c4c7"}`,
+                background: dragOver ? "#f0f6fc" : "#fff",
+                padding: "48px 16px",
+              }}
             >
               <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={e => handleFiles(e.target.files)} />
               {uploading ? (
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2 className="w-8 sm:w-10 h-8 sm:h-10 text-[#2271b1] animate-spin" />
-                  <p className="text-[13px] sm:text-[14px] text-[#646970]">Uploading to Cloudinary...</p>
+                <div className="flex flex-col items-center gap-3" role="status">
+                  <Loader2 className="w-8 h-8 animate-spin" aria-hidden="true" style={{ color: "#2271b1" }} />
+                  <p className="wp-muted" style={{ margin: 0 }}>Uploading to Cloudinary...</p>
                 </div>
               ) : (
                 <>
-                  <Upload className="w-8 sm:w-12 h-8 sm:h-12 text-[#8c8f94] mx-auto mb-2 sm:mb-4" />
-                  <h3 className="text-[16px] sm:text-[20px] font-light text-[#1d2327] mb-1 sm:mb-2">Drop files to upload</h3>
-                  <p className="text-[12px] sm:text-[13px] text-[#646970] mb-2 sm:mb-4">or</p>
-                  <span className="bg-white border border-[#2271b1] text-[#2271b1] px-3 sm:px-4 py-1.5 sm:py-2 text-[12px] sm:text-[13px] font-medium rounded-sm hover:bg-[#f0f6fa] inline-block">
-                    Select Files
+                  <h3 style={{ fontSize: 20, fontWeight: 400, color: "#1d2327", margin: "0 0 8px" }}>Drop files to upload</h3>
+                  <p className="wp-muted" style={{ margin: "0 0 12px" }}>or</p>
+                  <span className="wp-btn" style={{ minHeight: 40, padding: "0 16px" }}>
+                    <Upload className="w-4 h-4" aria-hidden="true" /> Select Files
                   </span>
-                  <p className="mt-3 sm:mt-4 text-[10px] sm:text-[11px] text-[#8c8f94]">JPG, PNG, GIF, WebP, SVG — Max 8MB</p>
+                  <p className="wp-desc" style={{ marginTop: 16 }}>JPG, PNG, GIF, WebP, SVG — Max 8MB</p>
                 </>
               )}
             </div>
@@ -209,84 +242,88 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
             {/* Left: Grid */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
               {/* Toolbar */}
-              <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-[#f0f0f1] bg-[#fcfcfc] shrink-0">
-                <div className="relative flex-1 min-w-0 max-w-xs">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8c8f94]" />
-                  <input
-                    value={search}
-                    onChange={e => handleSearch(e.target.value)}
-                    placeholder="Search media..."
-                    className="w-full pl-8 pr-3 py-1 border border-[#c3c4c7] text-[12px] outline-none focus:border-[#2271b1] rounded-sm bg-white"
-                  />
-                </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0" style={{ padding: "10px 16px" }}>
                 {multiple && selected.length > 0 && (
-                  <span className="text-[11px] text-[#646970] shrink-0">{selected.length} selected</span>
+                  <span className="wp-muted">{selected.length} selected</span>
                 )}
+                <span style={{ flex: 1 }} />
+                <label htmlFor="media-picker-search" className="sr-only">Search media</label>
+                <input
+                  id="media-picker-search"
+                  type="search"
+                  value={search}
+                  onChange={e => handleSearch(e.target.value)}
+                  placeholder="Search media items..."
+                  className="wp-input"
+                  style={{ width: "100%", maxWidth: 260 }}
+                />
               </div>
 
               {/* Grid */}
-              <div className="flex-1 overflow-y-auto p-1.5 xs:p-2 bg-[#f0f0f1]">
+              <div className="flex-1 overflow-y-auto" style={{ padding: "0 16px 16px" }}>
                 {loading ? (
-                  <div className="flex items-center justify-center h-40">
-                    <Loader2 className="w-8 h-8 text-[#2271b1] animate-spin" />
+                  <div className="flex items-center justify-center h-40" role="status" aria-label="Loading media">
+                    <Loader2 className="w-7 h-7 animate-spin" aria-hidden="true" style={{ color: "#2271b1" }} />
                   </div>
                 ) : items.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-40 gap-2">
-                    <ImageIcon className="w-8 sm:w-10 h-8 sm:h-10 text-[#c3c4c7]" />
-                    <p className="text-[12px] text-[#8c8f94] italic text-center">No media found. Upload files to get started.</p>
+                    <ImageIcon className="w-9 h-9" aria-hidden="true" style={{ color: "#c3c4c7" }} />
+                    <p className="wp-muted text-center" style={{ margin: 0 }}>No media found. Upload files to get started.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-1">
+                  <ul className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-2" style={{ listStyle: "none", margin: 0, padding: 0 }}>
                     {items.map(item => (
-                      <div
-                        key={item._id}
-                        onClick={() => toggleSelect(item)}
-                        onDoubleClick={() => { toggleSelect(item); handleInsert(); }}
-                        className={`relative aspect-square cursor-pointer group overflow-hidden border-[2px] xs:border-[3px] transition-all ${
-                          isSelected(item)
-                            ? "border-[#2271b1]"
-                            : "border-transparent hover:border-[#2271b1]/40"
-                        }`}
-                      >
-                        <img
-                          src={gridUrl(item.url)}
-                          alt={item.altText || item.filename}
-                          className="w-full h-full object-cover bg-white"
-                          loading="lazy"
-                        />
-                        {isSelected(item) && (
-                          <div className="absolute top-1 right-1 w-4 h-4 xs:w-5 xs:h-5 bg-[#2271b1] rounded-full flex items-center justify-center shadow">
-                            <Check className="w-2.5 h-2.5 xs:w-3 xs:h-3 text-white" />
-                          </div>
-                        )}
-                        <div className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[9px] px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity truncate">
-                          {item.filename}
-                        </div>
-                      </div>
+                      <li key={item._id}>
+                        <button
+                          type="button"
+                          onClick={() => toggleSelect(item)}
+                          onDoubleClick={() => insertItem(item)}
+                          aria-pressed={isSelected(item)}
+                          aria-label={item.filename || item.title || "Media item"}
+                          title={item.filename}
+                          className="relative block w-full aspect-square overflow-hidden"
+                          style={tile(isSelected(item))}
+                        >
+                          <img
+                            src={gridUrl(item.url)}
+                            alt={item.altText || item.filename}
+                            className="w-full h-full object-cover"
+                            style={isSelected(item) ? { padding: 7 } : undefined}
+                            loading="lazy"
+                          />
+                          {isSelected(item) && (
+                            <span aria-hidden="true" className="absolute flex items-center justify-center" style={{ top: 0, right: 0, width: 24, height: 24, background: "#2271b1", boxShadow: "0 0 0 1px #fff, 0 0 0 2px #2271b1" }}>
+                              <Check className="w-4 h-4" style={{ color: "#fff" }} />
+                            </span>
+                          )}
+                        </button>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
               </div>
 
               {/* Pagination */}
               {pagination.pages > 1 && (
-                <div className="flex items-center justify-center gap-2 py-1.5 border-t border-[#f0f0f1] bg-white shrink-0">
-                  <button 
+                <div className="wp-pages shrink-0" style={{ justifyContent: "center", padding: "8px 16px", borderTop: "1px solid #dcdcde" }}>
+                  <button
                     type="button"
-                    disabled={page <= 1} 
-                    onClick={() => { setPage(p => p-1); fetchMedia(search, page-1); }} 
-                    className="p-1 disabled:opacity-30 hover:bg-[#f0f0f1] rounded"
+                    disabled={page <= 1}
+                    onClick={() => { setPage(p => p-1); fetchMedia(search, page-1); }}
+                    className="wp-pager"
+                    aria-label="Previous page"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                   </button>
-                  <span className="text-[11px] text-[#646970]">Page {page} of {pagination.pages}</span>
-                  <button 
+                  <span>Page {page} of {pagination.pages}</span>
+                  <button
                     type="button"
-                    disabled={page >= pagination.pages} 
-                    onClick={() => { setPage(p => p+1); fetchMedia(search, page+1); }} 
-                    className="p-1 disabled:opacity-30 hover:bg-[#f0f0f1] rounded"
+                    disabled={page >= pagination.pages}
+                    onClick={() => { setPage(p => p+1); fetchMedia(search, page+1); }}
+                    className="wp-pager"
+                    aria-label="Next page"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
               )}
@@ -294,91 +331,97 @@ export default function MediaPickerModal({ open, onClose, onSelect, multiple = f
 
             {/* Right: Detail Panel */}
             {(detailItem || (selected.length === 1 && !multiple)) && (
-              <div className="w-full md:w-[260px] max-h-[35vh] md:max-h-none border-t md:border-t-0 md:border-l border-[#c3c4c7] bg-white flex flex-col shrink-0 overflow-y-auto">
+              <aside aria-labelledby="media-picker-details-title" className="w-full md:w-[280px] max-h-[35vh] md:max-h-none shrink-0 overflow-y-auto border-t md:border-t-0 md:border-l border-[#dcdcde]" style={{ background: "#f6f7f7" }}>
                 {(() => {
                   const item = detailItem || selected[0];
                   if (!item) return null;
                   return (
-                    <div className="p-3 sm:p-4 space-y-3">
-                      <h3 className="text-[10px] sm:text-[11px] font-bold text-[#1d2327] uppercase tracking-wider">Attachment Details</h3>
-                      <div className="aspect-[3/2] md:aspect-square bg-[#f0f0f1] overflow-hidden rounded-sm max-h-28 md:max-h-none">
-                        <img src={item.url} alt="" className="w-full h-full object-contain" />
-                      </div>
-                      <div className="text-[11px] text-[#646970] space-y-0.5">
-                        <p className="font-medium text-[#1d2327] truncate">{item.filename}</p>
-                        {item.width && <p>{item.width} × {item.height}px</p>}
-                        {item.fileSize && <p>{(item.fileSize / 1024).toFixed(0)} KB</p>}
-                        <p>{new Date(item.createdAt).toLocaleDateString()}</p>
+                    <div style={{ padding: 16 }}>
+                      <h3 id="media-picker-details-title" style={{ fontSize: 12, fontWeight: 600, color: "#646970", margin: "0 0 10px", textTransform: "uppercase" }}>Attachment details</h3>
+                      <div className="flex gap-3" style={{ paddingBottom: 12, marginBottom: 8, borderBottom: "1px solid #dcdcde" }}>
+                        <div style={{ width: 120, height: 120, flexShrink: 0, background: "#fff", boxShadow: "0 0 0 1px rgba(0,0,0,0.08)" }}>
+                          <img src={item.url} alt="" className="w-full h-full object-contain" />
+                        </div>
+                        <div className="wp-small min-w-0" style={{ color: "#3c434a" }}>
+                          <p className="wp-strong" style={{ margin: "0 0 4px", wordBreak: "break-all" }}>{item.filename}</p>
+                          <p style={{ margin: 0 }}>{new Date(item.createdAt).toLocaleDateString()}</p>
+                          {item.fileSize && <p style={{ margin: 0 }}>{(item.fileSize / 1024).toFixed(0)} KB</p>}
+                          {item.width && <p style={{ margin: 0 }}>{item.width} by {item.height} pixels</p>}
+                        </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <div>
-                          <label className="text-[10px] font-bold text-[#1d2327] block mb-0.5">Alt Text</label>
-                          <input
-                            value={detailItem?.altText ?? item.altText ?? ''}
-                            onChange={e => setDetailItem(prev => ({ ...(prev || item), altText: e.target.value }))}
-                            className="w-full border border-[#8c8f94] p-1 text-[11px] outline-none focus:border-[#2271b1] rounded-sm"
-                            placeholder="Describe this image..."
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-[#1d2327] block mb-0.5">Title</label>
-                          <input
-                            value={detailItem?.title ?? item.title ?? ''}
-                            onChange={e => setDetailItem(prev => ({ ...(prev || item), title: e.target.value }))}
-                            className="w-full border border-[#8c8f94] p-1 text-[11px] outline-none focus:border-[#2271b1] rounded-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-[#1d2327] block mb-0.5">Caption</label>
-                          <textarea
-                            rows={2}
-                            value={detailItem?.caption ?? item.caption ?? ''}
-                            onChange={e => setDetailItem(prev => ({ ...(prev || item), caption: e.target.value }))}
-                            className="w-full border border-[#8c8f94] p-1 text-[11px] outline-none focus:border-[#2271b1] rounded-sm resize-none"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={saveMetadata}
-                          disabled={saving}
-                          className="w-full bg-[#2271b1] text-white py-1 text-[11px] font-semibold rounded-sm hover:bg-[#135e96] transition-colors disabled:opacity-60"
-                        >
-                          {saving ? "Saving..." : "Save Metadata"}
-                        </button>
+                      <div className="wp-frow">
+                        <label htmlFor="mp-alt" className="wp-flabel" style={{ width: "100%" }}>Alternative Text</label>
+                        <input
+                          id="mp-alt"
+                          value={detailItem?.altText ?? item.altText ?? ''}
+                          onChange={e => setDetailItem(prev => ({ ...(prev || item), altText: e.target.value }))}
+                          className="wp-input"
+                          style={{ flex: "1 1 100%", minWidth: 0 }}
+                          placeholder="Describe this image..."
+                        />
                       </div>
+                      <div className="wp-frow">
+                        <label htmlFor="mp-title" className="wp-flabel" style={{ width: "100%" }}>Title</label>
+                        <input
+                          id="mp-title"
+                          value={detailItem?.title ?? item.title ?? ''}
+                          onChange={e => setDetailItem(prev => ({ ...(prev || item), title: e.target.value }))}
+                          className="wp-input"
+                          style={{ flex: "1 1 100%", minWidth: 0 }}
+                        />
+                      </div>
+                      <div className="wp-frow">
+                        <label htmlFor="mp-caption" className="wp-flabel" style={{ width: "100%" }}>Caption</label>
+                        <textarea
+                          id="mp-caption"
+                          rows={2}
+                          value={detailItem?.caption ?? item.caption ?? ''}
+                          onChange={e => setDetailItem(prev => ({ ...(prev || item), caption: e.target.value }))}
+                          className="wp-textarea"
+                          style={{ flex: "1 1 100%", minWidth: 0 }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={saveMetadata}
+                        disabled={saving}
+                        className="wp-btn"
+                        style={{ marginTop: 8 }}
+                      >
+                        {saving ? "Saving..." : "Save Metadata"}
+                      </button>
                     </div>
                   );
                 })()}
-              </div>
+              </aside>
             )}
           </div>
         )}
 
         {/* ── Footer Action Bar ── */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-2 sm:py-3 border-t border-[#c3c4c7] bg-[#f6f7f7] shrink-0">
-          <p className="text-[11px] sm:text-[12px] text-[#646970] truncate max-w-[140px] xs:max-w-none">
+        <div className="wp-modal-foot shrink-0" style={{ alignItems: "center" }}>
+          <p className="wp-muted truncate" style={{ margin: 0, marginRight: "auto", minWidth: 0 }}>
             {selected.length > 0
               ? `${selected.length} item${selected.length > 1 ? 's' : ''} selected`
               : "Select an image"}
           </p>
-          <div className="flex gap-2 shrink-0">
-            <button 
-              type="button"
-              onClick={onClose} 
-              className="px-3 py-1 text-[12px] text-[#646970] border border-[#c3c4c7] hover:bg-[#f0f0f1] rounded-sm transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleInsert}
-              disabled={selected.length === 0}
-              className="px-3 py-1 text-[12px] font-semibold bg-[#2271b1] text-white rounded-sm hover:bg-[#135e96] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {multiple ? `Insert (${selected.length})` : "Select Image"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="wp-btn"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleInsert}
+            disabled={selected.length === 0}
+            className="wp-btn wp-btn-primary"
+            style={{ minHeight: 36 }}
+          >
+            {multiple ? `Select (${selected.length})` : "Select"}
+          </button>
         </div>
       </div>
     </div>

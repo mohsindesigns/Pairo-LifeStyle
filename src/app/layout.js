@@ -12,11 +12,13 @@ import { SiteProvider } from "@/context/SiteContext";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import ScriptLoader from "@/components/common/ScriptLoader";
 import ThemeStyle from "@/components/common/ThemeStyle";
-import { Toaster } from "react-hot-toast";
+import ClientToaster from "@/components/common/ClientToaster";
 import { PopupProvider } from "@/context/PopupContext";
 import { cache, Suspense } from "react";
 import CookieConsent from "@/components/common/CookieConsent";
 import AffiliateTracker from "@/components/common/AffiliateTracker";
+import SiteAnalyticsTracker from "@/components/common/SiteAnalyticsTracker";
+import SecurityShield from "@/components/common/SecurityShield";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const poppins = Poppins({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-poppins" });
@@ -84,10 +86,11 @@ export default async function RootLayout({ children }) {
     headerConfig: { logoUrl: '', navItems: [], megaCategoryIds: [], topOffers: ["Welcome to Pairo Store"] },
     footerConfig: { logoUrl: '', newsletterHeading: 'Elite List', newsletterPlaceholder: 'JOIN THE LIST', footerCategoryIds: [], footerBlogIds: [], footerCustomLinks: [], footerCustomLinksHeading: 'Information' },
     socialLinks: [],
-    hero: { slides: [], labels: { viewCollection: "View Collection" } },
+    hero: { slides: [], badge: "", labels: { viewCollection: "View Collection" } },
     footer: { sections: [{}, { links: [] }] },
     categories: { items: [] },
     popup: { enabled: false },
+    floatingReviews: { enabled: true, label: 'Reviews', topOffset: 50 },
     _dbCategories: [],
     _dbPages: [],
     _dbBlogs: [],
@@ -111,17 +114,17 @@ export default async function RootLayout({ children }) {
     // Run remaining DB reads in parallel
     const [catsResult, pagesResult, blogsResult, prodsResult] = await Promise.allSettled([
       Category.find({ status: 'Published', isDeleted: { $in: [false, null] } })
-        .select('name slug image banner description content type faqs faqSchemaCustom showInFilters')
+        .select('name slug image banner showBannerOverlay description content type faqs faqSchemaCustom showInFilters')
         .sort({ name: 1 })
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),
-      Page.find({ status: 'Published' })
+      Page.find({ status: 'Published', isDeleted: { $ne: true } })
         .select('title slug template')
         .sort({ title: 1 })
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),
       Blog.find({ status: 'Published', isDeleted: { $ne: true } })
-        .select('title slug')
+        .select('title slug image category createdAt')
         .sort({ createdAt: -1 })
         .limit(50)
         .maxTimeMS(QUERY_TIMEOUT_MS)
@@ -158,7 +161,9 @@ export default async function RootLayout({ children }) {
       }
     });
 
-    const dbCategories = dbCategoriesRaw.map((cat) => {
+    // Every page ships this list to the client (Navbar/Footer/Search/Shop), so drop the heavy
+    // per-category page content (rich HTML, FAQs, SEO, size charts) — it made each page ~1MB+ heavier.
+    const dbCategories = dbCategoriesRaw.map(({ content, faqs, faqSchemaCustom, seo, sizeChart, deletedAt, ...cat }) => {
       if (cat.type === 'product' || !cat.type) {
         return { ...cat, productCount: countMap[cat._id.toString()] || 0 };
       }
@@ -170,13 +175,17 @@ export default async function RootLayout({ children }) {
         ...sanitizedConfig,
         ...JSON.parse(JSON.stringify(config)),
         popup: config.popup || { enabled: false },
+        floatingReviews: { enabled: true, label: 'Reviews', topOffset: 50, ...(config.floatingReviews || {}) },
       };
     }
 
     // Inject resolved DB data for Navbar/Footer dynamic rendering
     sanitizedConfig._dbCategories = JSON.parse(JSON.stringify(dbCategories));
     sanitizedConfig._dbPages = JSON.parse(JSON.stringify(dbPages));
-    sanitizedConfig._dbBlogs = JSON.parse(JSON.stringify(dbBlogs));
+    // Menu/footer only need title + slug; the home "journal" section needs the card fields. Both come from
+    // the same query, so the very first paint already shows the real latest posts (no demo content, no flash).
+    sanitizedConfig._dbBlogs = JSON.parse(JSON.stringify(dbBlogs.map((b) => ({ _id: b._id, title: b.title, slug: b.slug }))));
+    sanitizedConfig._homeBlogs = JSON.parse(JSON.stringify(dbBlogs.slice(0, 12)));
     sanitizedConfig._dbProducts = JSON.parse(JSON.stringify(dbProducts));
 
   } catch (error) {
@@ -184,20 +193,158 @@ export default async function RootLayout({ children }) {
     console.error("Layout DB connection failed:", error.message);
   }
 
+  // Anti-inspect lockdown is OFF by default: its DevTools heuristics (outer/inner window size gap,
+  // debugger timing) false-positive on mobile and in-app browsers (Instagram/Facebook ad traffic),
+  // calling window.stop() and blanking the page for real shoppers. Opt in with
+  // PAIRO_ENABLE_ANTI_INSPECT=true only if you accept that risk.
+  const isProduction = process.env.PAIRO_ENABLE_ANTI_INSPECT === "true";
+
   return (
-    <html lang="en">
-      <head>
-        <ScriptLoader location="head" />
-        <ThemeStyle />
-      </head>
-      <body className={`${inter.variable} ${poppins.variable} ${montserrat.variable} font-sans antialiased`}>
-        <ScriptLoader location="body_top" />
+      <html lang="en">
+        <head>
+          <ScriptLoader location="head" />
+          <ThemeStyle />
+          {isProduction && (
+            <script
+              id="pairo-anti-inspect-init"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  (function() {
+                    try {
+                      var p = window.location.pathname || '';
+                      if (p.startsWith('/admin')) return;
+
+                      var abortAndLockdown = function() {
+                        try {
+                          if (typeof window.stop === 'function') window.stop();
+                        } catch(e) {}
+                        try {
+                          document.documentElement.innerHTML = '';
+                        } catch(e) {}
+                        try {
+                          Function('debugger')();
+                        } catch(e) {}
+                      };
+
+                      // 1. Instant check for Docked DevTools (bottom, side)
+                      var wDiff = window.outerWidth - window.innerWidth;
+                      var hDiff = window.outerHeight - window.innerHeight;
+                      if (wDiff > 320 || hDiff > 250) {
+                        abortAndLockdown();
+                        return;
+                      }
+
+                      // 2. Instant check for Detached DevTools (Network tab, Elements, etc.)
+                      var t0 = performance.now();
+                      debugger;
+                      var t1 = performance.now();
+                      if (t1 - t0 > 200) {
+                        abortAndLockdown();
+                        return;
+                      }
+
+                      // 3. Continuous anti-debugger trap loop (silent lockdown, no page shown)
+                      setInterval(function() {
+                        if (document.hidden) return;
+                        var start = performance.now();
+                        (function() { return Function('debugger')(); })();
+                        if (performance.now() - start > 200) {
+                          abortAndLockdown();
+                        }
+                      }, 250);
+
+                      // Early contextmenu & drag prevention
+                      document.addEventListener('contextmenu', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                      }, true);
+
+                      document.addEventListener('dragstart', function(e) {
+                        e.preventDefault();
+                        return false;
+                      }, true);
+
+                      // Early copy, cut & selection prevention outside form inputs
+                      document.addEventListener('copy', function(e) {
+                        var t = (e.target && e.target.tagName || '').toLowerCase();
+                        if (t !== 'input' && t !== 'textarea') {
+                          e.preventDefault();
+                          return false;
+                        }
+                      }, true);
+
+                      document.addEventListener('cut', function(e) {
+                        var t = (e.target && e.target.tagName || '').toLowerCase();
+                        if (t !== 'input' && t !== 'textarea') {
+                          e.preventDefault();
+                          return false;
+                        }
+                      }, true);
+
+                      document.addEventListener('selectstart', function(e) {
+                        var t = (e.target && e.target.tagName || '').toLowerCase();
+                        if (t !== 'input' && t !== 'textarea') {
+                          e.preventDefault();
+                          return false;
+                        }
+                      }, true);
+
+                      // Early DevTools and Screenshot shortcuts interception
+                      window.addEventListener('keydown', function(e) {
+                        var k = (e.key || '').toLowerCase();
+                        var isCtrl = e.ctrlKey || e.metaKey;
+
+                        // PrintScreen or Snipping Tool
+                        if (e.keyCode === 44 || k === 'printscreen' || (isCtrl && e.shiftKey && (k === 's' || e.keyCode === 83))) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          return false;
+                        }
+
+                        // F12 key
+                        if (e.keyCode === 123 || k === 'f12') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          abortAndLockdown();
+                          return false;
+                        }
+
+                        // Ctrl/Cmd + Shift + (I, J, C, K, E, P)
+                        if (isCtrl && e.shiftKey && (k === 'i' || k === 'j' || k === 'c' || k === 'k' || k === 'e' || k === 'p')) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          abortAndLockdown();
+                          return false;
+                        }
+
+                        // Ctrl/Cmd + U (View Source) or S (Save Page)
+                        if (isCtrl && (k === 'u' || e.keyCode === 85 || k === 's' || e.keyCode === 83)) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (k === 'u') abortAndLockdown();
+                          return false;
+                        }
+                      }, true);
+                    } catch(err) {}
+                  })();
+                `,
+              }}
+            />
+          )}
+        </head>
+        <body className={`${inter.variable} ${poppins.variable} ${montserrat.variable} font-sans antialiased`}>
+          {isProduction && <SecurityShield />}
+          <ScriptLoader location="body_top" />
         <AuthProvider>
           <PopupProvider>
-            <Toaster position="top-right" />
+            <ClientToaster position="top-right" />
             <CookieConsent />
             <Suspense fallback={null}>
               <AffiliateTracker />
+            </Suspense>
+            <Suspense fallback={null}>
+              <SiteAnalyticsTracker />
             </Suspense>
             <SiteProvider initialData={sanitizedConfig}>
               <CartProvider>

@@ -12,6 +12,7 @@ import ProductMainSection from "@/components/product/ProductMainSection";
 import ProductProcessSection from "@/components/product/ProductProcessSection";
 import { checkAndApplyRedirect } from "@/lib/redirect-resolver";
 import { resolveSEOMetadata, escapeJsonLd } from "@/lib/seo-resolver";
+import { sanitizeRichHtml } from "@/lib/sanitize";
 import Review from "@/models/Review";
 import mongoose from "mongoose";
 import { permanentRedirect, notFound } from "next/navigation";
@@ -201,6 +202,19 @@ export default async function ProductDetailPage({ params, searchParams }) {
     reviews
   });
 
+  // Best approved review with real text: featured first, then highest rating
+  const topReviewDoc = [...reviews]
+    .filter((r) => r.comment && r.comment.trim())
+    .sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0) || b.rating - a.rating)[0];
+  const topReview = topReviewDoc
+    ? {
+        rating: topReviewDoc.rating,
+        comment: topReviewDoc.comment.trim().slice(0, 220),
+        customerName: topReviewDoc.customerName,
+        verifiedPurchase: !!topReviewDoc.verifiedPurchase,
+      }
+    : null;
+
   return (
     <div className="bg-white min-h-screen font-sans overflow-x-visible">
       {structuredData && (
@@ -211,7 +225,21 @@ export default async function ProductDetailPage({ params, searchParams }) {
       )}
       <div className="container mx-auto px-2 sm:px-4 md:px-8 py-2 md:py-4">
 
-        <ProductMainSection product={sanitizedProduct} />
+        <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-[13px] md:text-[14px] text-primary/60 pb-4">
+          <Link href="/" className="hover:text-primary hover:underline underline-offset-2">Home</Link>
+          <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+          {primaryCategory && (
+            <>
+              <Link href={`/${primaryCategory.slug}`} className="hover:text-primary hover:underline underline-offset-2">
+                {primaryCategory.name}
+              </Link>
+              <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+            </>
+          )}
+          <span className="text-primary font-medium">{product.name}</span>
+        </nav>
+
+        <ProductMainSection product={sanitizedProduct} topReview={topReview} />
 
         <ClientTabSystem product={sanitizedProduct} />
 
@@ -228,7 +256,7 @@ export default async function ProductDetailPage({ params, searchParams }) {
                 {product.name} <br />
                 <span className="text-primary/30 font-normal">Masterpiece Narrative</span>
               </p>
-              <div className="text-sm md:text-base text-primary/70 leading-relaxed font-normal" dangerouslySetInnerHTML={{ __html: product.narrative.content.replace(/\n/g, '<br/>') }} />
+              <div className="text-sm md:text-base text-primary/70 leading-relaxed font-normal" dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(product.narrative.content).replace(/\n/g, '<br/>') }} />
             </div>
           </div>
         )}

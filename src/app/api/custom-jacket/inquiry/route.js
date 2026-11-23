@@ -70,8 +70,7 @@ export async function POST(req) {
       referenceImages: Array.isArray(referenceImages) ? referenceImages : [],
       additionalNotes: additionalNotes?.trim() || "",
       ipAddress: ip,
-      userAgent,
-      tenantId: "DEFAULT_STORE"
+      userAgent
     });
 
     // Send emails (non-blocking)

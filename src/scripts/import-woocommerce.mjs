@@ -130,7 +130,6 @@ async function importProducts() {
           images: images,
           categories: productCategories,
           attributes: attributes,
-          tenantId: 'DEFAULT_STORE',
           isDeleted: false
         };
 

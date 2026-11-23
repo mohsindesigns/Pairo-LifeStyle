@@ -17,7 +17,7 @@ export async function GET(req) {
 
     const query = {};
     if (search) {
-      query.email = { $regex: search, $options: 'i' };
+      query.email = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
     }
 
     const subscribers = await Subscriber.find(query).sort({ createdAt: -1 }).lean();

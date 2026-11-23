@@ -4,6 +4,7 @@ import Promotion from "@/models/Promotion";
 import PromotionCustomerUsage from "@/models/PromotionCustomerUsage";
 import stripe from "@/lib/stripe";
 import { createOrderFromCheckoutPayload } from "@/lib/checkoutFulfillment";
+import { autoSendSizeConfirmation } from "@/lib/sizeConfirmationService";
 
 /**
  * Fulfills a succeeded Stripe PaymentIntent into an Order, if it hasn't been already.
@@ -13,13 +14,12 @@ import { createOrderFromCheckoutPayload } from "@/lib/checkoutFulfillment";
  * webhook is delayed, missed, or (in local dev) never reaches this server at all
  * because no `stripe listen` forwarder is running.
  *
- * Idempotency is enforced by Order's unique { tenantId, idempotencyKey } index:
+ * Idempotency is enforced by Order's unique { idempotencyKey } index:
  * concurrent callers racing here will have exactly one succeed and the rest will
  * re-fetch the resulting order on a duplicate-key error.
  */
 export async function fulfillSucceededPaymentIntent(paymentIntent, log) {
-  const tenantId = paymentIntent.metadata?.tenantId || "DEFAULT_STORE";
-  const pending = await PendingCheckout.findOne({ tenantId, stripePaymentIntentId: paymentIntent.id });
+  const pending = await PendingCheckout.findOne({ stripePaymentIntentId: paymentIntent.id });
 
   if (!pending) {
     log?.warn?.({ paymentIntentId: paymentIntent.id }, "No PendingCheckout found for succeeded PaymentIntent");
@@ -68,7 +68,6 @@ export async function fulfillSucceededPaymentIntent(paymentIntent, log) {
   let order;
   try {
     order = await createOrderFromCheckoutPayload(payload, {
-      tenantId: context.tenantId,
       orderUserId: context.orderUserId,
       checkoutEmail: context.checkoutEmail,
       isGuestSession: context.isGuestSession,
@@ -77,8 +76,12 @@ export async function fulfillSucceededPaymentIntent(paymentIntent, log) {
     });
   } catch (error) {
     if (error?.code === 11000) {
-      order = await Order.findOne({ tenantId: context.tenantId, idempotencyKey: payload.idempotencyKey });
-    } else {
+      // A duplicate key is only a harmless replay when the order for THIS checkout already exists. Any other duplicate
+      // (an order number that was already taken, say) means no order was created for a payment that did succeed:
+      // that is refunded like every other unfulfillable payment instead of leaving the customer charged with nothing.
+      order = await Order.findOne({ idempotencyKey: payload.idempotencyKey });
+    }
+    if (!order) {
       log?.error?.({ paymentIntentId: paymentIntent.id, error: error.message }, "Order fulfillment failed after payment succeeded. Issuing refund.");
       await refundUnfulfillablePayment(pending, paymentIntent, error, log);
       return null;
@@ -153,7 +156,7 @@ async function reconcilePromotionUsageForPaymentLink(order, session, discountAmo
       : discountEntry?.promotion_code?.id;
     if (!stripePromotionCodeId) return;
 
-    const promotion = await Promotion.findOne({ tenantId: order.tenantId, stripePromotionCodeId });
+    const promotion = await Promotion.findOne({ stripePromotionCodeId });
     if (!promotion) {
       log?.warn?.({ stripePromotionCodeId, orderId: order._id }, "Payment Link promo code has no matching local Promotion");
       return;
@@ -197,7 +200,7 @@ async function reconcilePromotionUsageForPaymentLink(order, session, discountAmo
       // payment already went through and can't be undone, so this only needs
       // to record the usage for next time, not gate this one.
       await PromotionCustomerUsage.findOneAndUpdate(
-        { tenantId: order.tenantId, promotionId: promotion._id, customerKey },
+        { promotionId: promotion._id, customerKey },
         { $inc: { usageCount: 1 } },
         { upsert: true }
       );
@@ -272,6 +275,10 @@ export async function fulfillPaymentLinkSession(session, log) {
 
   await order.save();
   log?.info?.({ orderId, orderNumber: order.orderNumber, sessionId: session.id }, "Custom order marked Paid from Payment Link checkout");
+
+  // Payment just landed for this order — ask the customer to confirm their size (no-op if not applicable / already sent).
+  autoSendSizeConfirmation(order).catch(() => {});
+  import("@/lib/events").then((m) => m.default.dispatch("ORDER_PAYMENT_UPDATED", { order, origin: "system", oldPaymentStatus: "Pending", newPaymentStatus: "Paid" })).catch(() => {});
   return order;
 }
 

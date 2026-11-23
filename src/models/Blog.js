@@ -11,7 +11,6 @@ const BlogSchema = new mongoose.Schema({
   status: { type: String, enum: ['Draft', 'Published'], default: 'Draft' },
   isFeatured: { type: Boolean, default: false },
   tags: [String],
-  tenantId: { type: String, required: true, default: "DEFAULT_STORE" },
   heritage: { type: String, default: "" },
   process: { type: String, default: "" },
   style: { type: String, default: "" },
@@ -23,7 +22,10 @@ const BlogSchema = new mongoose.Schema({
   },
   showFeaturedProduct: { type: Boolean, default: true },
   showSidebarIndex: { type: Boolean, default: true },
-  isDeleted: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
+  // Status the post had when it was moved to Trash, so Restore can put it back
+  statusBeforeTrash: { type: String, default: null },
   seo: {
     title: String,
     description: String,

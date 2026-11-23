@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 /**
  * Atomic sequence counter for race-safe sequential numbers (e.g. order numbers).
- * `_id` is the sequence name (e.g. "order:DEFAULT_STORE"); `seq` is incremented
+ * `_id` is the sequence name (e.g. "order:global"); `seq` is incremented
  * atomically via findByIdAndUpdate($inc), so concurrent callers never collide.
  */
 const CounterSchema = new mongoose.Schema({

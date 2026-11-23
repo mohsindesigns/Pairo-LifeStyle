@@ -15,7 +15,6 @@ async function main() {
     
     console.time("Find products");
     const products = await db.collection('products').find({
-      tenantId: 'DEFAULT_STORE',
       status: 'Published',
       isDeleted: { $ne: true }
     }).toArray();
@@ -47,7 +46,7 @@ async function main() {
     console.timeEnd("Creating media URL index");
 
     console.time("Creating products query index");
-    await db.collection('products').createIndex({ tenantId: 1, status: 1, isDeleted: 1, createdAt: -1 });
+    await db.collection('products').createIndex({ status: 1, isDeleted: 1, createdAt: -1 });
     console.timeEnd("Creating products query index");
 
     // Measure again after indexes are created!
@@ -55,7 +54,6 @@ async function main() {
 
     console.time("Find products (with index)");
     const productsAfter = await db.collection('products').find({
-      tenantId: 'DEFAULT_STORE',
       status: 'Published',
       isDeleted: { $ne: true }
     }).sort({ createdAt: -1 }).toArray();
