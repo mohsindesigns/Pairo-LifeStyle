@@ -161,7 +161,9 @@ export default async function RootLayout({ children }) {
       }
     });
 
-    const dbCategories = dbCategoriesRaw.map((cat) => {
+    // Every page ships this list to the client (Navbar/Footer/Search/Shop), so drop the heavy
+    // per-category page content (rich HTML, FAQs, SEO, size charts) — it made each page ~1MB+ heavier.
+    const dbCategories = dbCategoriesRaw.map(({ content, faqs, faqSchemaCustom, seo, sizeChart, deletedAt, ...cat }) => {
       if (cat.type === 'product' || !cat.type) {
         return { ...cat, productCount: countMap[cat._id.toString()] || 0 };
       }
