@@ -11,6 +11,7 @@ export const SECTION_REGISTRY = {
   category_showcase: dynamic(() => import("@/components/home/CategoryBanner")),
   blog_grid: dynamic(() => import("@/components/home/BlogSection")),
   testimonials: dynamic(() => import("@/components/home/Testimonials")),
+  rack_3d: dynamic(() => import("@/components/home/Rack3DSection")),
   about_hero: dynamic(() => import("@/components/sections/AboutHero")),
   story_section: dynamic(() => import("@/components/sections/StorySection")),
   studio_gallery: dynamic(() => import("@/components/sections/StudioGallery")),
@@ -23,6 +24,10 @@ export const SECTION_REGISTRY = {
   custom_jacket_hero: dynamic(() => import("@/components/sections/CustomJacketHero")),
   custom_jacket_process: dynamic(() => import("@/components/sections/CustomJacketProcess")),
   custom_jacket_form: dynamic(() => import("@/components/sections/CustomJacketForm")),
+  // Corporate Gifting Page
+  corporate_gifting_hero: dynamic(() => import("@/components/sections/CorporateGiftingHero")),
+  corporate_gifting_process: dynamic(() => import("@/components/sections/CorporateGiftingProcess")),
+  corporate_gifting_form: dynamic(() => import("@/components/sections/CorporateGiftingForm")),
   // Gallery Page
   gallery_hero: dynamic(() => import("@/components/sections/GalleryHero")),
   gallery_grid: dynamic(() => import("@/components/sections/GalleryGrid")),

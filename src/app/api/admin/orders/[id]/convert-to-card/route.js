@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
-import Order from "@/models/Order";
 import { can } from "@/lib/rbac";
+import { orderLookupQuery } from "@/lib/orderLookup";
 import { sendOrderInvoiceEmail } from "@/lib/email";
 import { createStripePaymentLinkForOrder } from "@/lib/orderPaymentLink";
 
@@ -22,7 +22,7 @@ export async function POST(req, { params }) {
   await dbConnect();
 
   try {
-    const order = await Order.findById(id);
+    const order = await orderLookupQuery(id);
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     if (order.payment?.method !== "Cash on Delivery") {
       return NextResponse.json({ error: "Only Cash on Delivery orders can be updated to Card" }, { status: 400 });

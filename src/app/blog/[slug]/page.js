@@ -15,10 +15,12 @@ export async function generateMetadata({ params }) {
   await dbConnect();
   
   const currentPath = `/blog/${slug}`;
-  await checkAndApplyRedirect(currentPath);
-
   const post = await Blog.findOne({ slug, isDeleted: { $ne: true } }).lean();
-  if (!post) return { title: 'Post Not Found' };
+  if (!post) {
+    // Only follow a redirect when no live post exists at this URL, so a stale redirect can never hide a real post.
+    await checkAndApplyRedirect(currentPath);
+    return { title: 'Post Not Found' };
+  }
 
   if (post.status === "Draft") {
     const { getServerSession } = await import("next-auth");
@@ -48,13 +50,14 @@ export default async function BlogDetail({ params }) {
   const { slug } = await params;
   
   const currentPath = `/blog/${slug}`;
-  await checkAndApplyRedirect(currentPath);
 
   await dbConnect();
 
   const post = await Blog.findOne({ slug, isDeleted: { $ne: true } }).lean();
 
   if (!post) {
+    // Only follow a redirect when no live post exists at this URL (a stale redirect must not hide a real post).
+    await checkAndApplyRedirect(currentPath);
     notFound();
   }
 

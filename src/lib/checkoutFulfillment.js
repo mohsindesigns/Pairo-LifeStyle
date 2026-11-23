@@ -4,12 +4,13 @@ import dbConnect from "@/lib/db";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import Customer from "@/models/Customer";
-import Counter from "@/models/Counter";
 import AbandonedCart from "@/models/AbandonedCart";
+import { ensureOrderCounter, getNextOrderNumber } from "@/lib/orderNumber";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 import pairoEvents from "@/lib/events";
-import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { assertValidCartItems, computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
+import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { sendPinterestPurchaseEvent } from "@/lib/pinterestCapi";
 import {
@@ -18,47 +19,9 @@ import {
 } from "@/lib/guestCheckoutAccount";
 import { resolveIpLocation } from "@/lib/geoIp";
 
-/**
- * Ensures the order-number counter exists, seeded from the highest existing
- * order number so numbering stays continuous with any orders created before this counter
- * was introduced. Idempotent and safe to call concurrently (a duplicate-key from a racing
- * seed is harmless). Runs OUTSIDE the order transaction so first-ever concurrent orders
- * don't collide on the counter's insert.
- */
-async function ensureOrderCounter() {
-  const counterId = 'order:global';
-  const existing = await Counter.findById(counterId);
-  if (existing) return;
-
-  const lastOrder = await Order.findOne().sort({ createdAt: -1 }).select("orderNumber");
-  const lastSeq = parseInt(String(lastOrder?.orderNumber || "").match(/(\d+)\s*$/)?.[1] || "1000", 10);
-  try {
-    await Counter.updateOne(
-      { _id: counterId },
-      { $setOnInsert: { seq: Number.isFinite(lastSeq) ? lastSeq : 1000 } },
-      { upsert: true }
-    );
-  } catch (e) {
-    // Another concurrent checkout seeded it first — that's fine.
-    if (e?.code !== 11000) throw e;
-  }
-}
-
-/**
- * Atomic, race-safe order number generation, shared by customer checkout and
- * admin-created orders so numbering stays single-sourced. Two concurrent
- * callers $inc the same counter doc, which produces a WriteConflict (retried
- * by the caller's transaction) rather than duplicate order numbers.
- */
-export async function getNextOrderNumber(mongoSession = null) {
-  await ensureOrderCounter();
-  const bumped = await Counter.findByIdAndUpdate(
-    'order:global',
-    { $inc: { seq: 1 } },
-    { session: mongoSession, new: true, upsert: true }
-  );
-  return `PAI-${bumped.seq}`;
-}
+// Order numbering lives in its own module so lightweight routes can use it without loading checkout; re-exported
+// here because the admin order routes import it from this file.
+export { getNextOrderNumber };
 
 export async function createOrderFromCheckoutPayload(payload, {
   orderUserId = null,
@@ -85,6 +48,8 @@ export async function createOrderFromCheckoutPayload(payload, {
   if (isRestrictedCountry(shippingAddress?.country, shippingAddress?.countryCode)) {
     throw new Error(RESTRICTED_COUNTRY_MESSAGE);
   }
+  // Same rule as the pricing step, checked first so a bad cart fails before a database transaction is even opened.
+  assertValidCartItems(items);
   const resolvedEmail = (customerEmail || checkoutEmail || '').trim();
   if (!resolvedEmail) {
     throw new Error('A valid email address is required to place an order.');
@@ -130,7 +95,12 @@ export async function createOrderFromCheckoutPayload(payload, {
         const product = await Product.findOne({ _id: item.id || item._id }).session(mongoSession);
         if (!product) throw new Error(`Product ${item.id} not found.`);
 
-        if (product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
+        // Corporate Gifting replaces the standard variant/attribute picker with its own
+        // item-selection UI entirely, so a line with corporateGifting selections never carries
+        // selectedOptions by design — the required-attribute gate below doesn't apply to it,
+        // same as made-to-measure replacing the Size attribute with custom measurements.
+        const isCorporateGifting = !!item.corporateGifting?.enabled;
+        if (!isCorporateGifting && product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
           const isMadeToMeasure = !!item.madeToMeasure?.enabled;
           const missingAttrs = product.attributes.filter((attr) => {
             // Made-to-measure orders replace the standard Size selection with custom measurements.
@@ -159,6 +129,14 @@ export async function createOrderFromCheckoutPayload(payload, {
             || Object.values(selectedOptions).join(" / ")
           : null;
 
+        // Corporate Gifting — re-validate the minimum-selection gate and re-resolve each
+        // selected item against the product's own catalog server-side (never trusting the
+        // client's name/priceDelta), the same way variant stock/attrs are re-checked above.
+        // Shared with create-payment-intent's pre-charge check so the two can never disagree.
+        const corporateGiftingResult = validateCorporateGiftingSelections(item, product);
+        if (!corporateGiftingResult.valid) throw new Error(corporateGiftingResult.error);
+        const corporateGiftingData = corporateGiftingResult.data;
+
         orderItems.push({
           productId: product._id,
           name: product.name,
@@ -168,7 +146,8 @@ export async function createOrderFromCheckoutPayload(payload, {
           quantity: item.quantity,
           ...(variantTitle ? { selectedVariant: { title: variantTitle, options: selectedOptions } } : {}),
           ...(item.madeToMeasure?.enabled ? { madeToMeasure: item.madeToMeasure } : {}),
-          ...(item.customization?.enabled ? { customization: item.customization } : {})
+          ...(item.customization?.enabled ? { customization: item.customization } : {}),
+          ...(corporateGiftingData ? { corporateGifting: corporateGiftingData } : {})
         });
       }
 
@@ -353,7 +332,7 @@ export async function createOrderFromCheckoutPayload(payload, {
   }
 
   if (checkoutResult) {
-    pairoEvents.dispatch('ORDER_CREATED', checkoutResult);
+    pairoEvents.dispatch('ORDER_CREATED', { order: checkoutResult, origin: 'website' });
     // Server-side Pinterest purchase conversion (Conversions API). Fire-and-forget — never
     // awaited so it can't slow or break checkout; no-ops unless PINTEREST_* env vars are set.
     // Dedupes with the browser pixel via a shared event_id (`checkout_<orderNumber>`).

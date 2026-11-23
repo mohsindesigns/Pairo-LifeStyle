@@ -5,6 +5,7 @@ import dbConnect from "@/lib/db";
 import ProductQuestion from "@/models/ProductQuestion";
 import { can } from "@/lib/rbac";
 import mongoose from "mongoose";
+import { escapeRegex } from "@/lib/admin-products-utils";
 
 export async function GET(req) {
   try {
@@ -18,8 +19,8 @@ export async function GET(req) {
     }
 
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page")) || 1;
-    const limit = parseInt(searchParams.get("limit")) || 10;
+    const page = Math.max(1, parseInt(searchParams.get("page")) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit")) || 10));
     
     // Filters
     const status = searchParams.get("status"); // Pending, Approved, Hidden, All, Trash
@@ -28,19 +29,23 @@ export async function GET(req) {
 
     await dbConnect();
 
-    const query = { isDeleted: { $ne: true } };
+    const isTrash = status === "Trash";
+    const query = isTrash ? { isDeleted: true } : { isDeleted: { $ne: true } };
 
-    if (status && status !== "All") {
+    if (status && status !== "All" && !isTrash) {
       query.status = status;
     }
     if (productId && mongoose.isValidObjectId(productId)) {
       query.productId = new mongoose.Types.ObjectId(productId);
     }
-    if (search) {
+    const term = (search || "").trim();
+    if (term) {
+      const rx = { $regex: escapeRegex(term), $options: "i" };
       query.$or = [
-        { customerName: { $regex: search, $options: "i" } },
-        { customerEmail: { $regex: search, $options: "i" } },
-        { question: { $regex: search, $options: "i" } }
+        { customerName: rx },
+        { customerEmail: rx },
+        { question: rx },
+        { "replies.answer": rx }
       ];
     }
 
@@ -52,15 +57,16 @@ export async function GET(req) {
         path: "productId",
         select: "name slug image images"
       })
-      .sort({ createdAt: -1 })
+      .sort(isTrash ? { deletedAt: -1, createdAt: -1 } : { createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
 
-    const [pendingCount, approvedCount, hiddenCount] = await Promise.all([
+    const [pendingCount, approvedCount, hiddenCount, trashCount] = await Promise.all([
       ProductQuestion.countDocuments({ status: "Pending", isDeleted: { $ne: true } }),
       ProductQuestion.countDocuments({ status: "Approved", isDeleted: { $ne: true } }),
-      ProductQuestion.countDocuments({ status: "Hidden", isDeleted: { $ne: true } })
+      ProductQuestion.countDocuments({ status: "Hidden", isDeleted: { $ne: true } }),
+      ProductQuestion.countDocuments({ isDeleted: true })
     ]);
 
     return NextResponse.json({
@@ -69,12 +75,13 @@ export async function GET(req) {
         total,
         page,
         limit,
-        totalPages
+        totalPages: Math.max(1, totalPages)
       },
       stats: {
         pendingCount,
         approvedCount,
-        hiddenCount
+        hiddenCount,
+        trashCount
       }
     });
   } catch (error) {

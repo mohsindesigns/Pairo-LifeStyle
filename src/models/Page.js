@@ -51,14 +51,19 @@ const PageSchema = new mongoose.Schema({
   },
   template: {
     type: String,
-    enum: ["home", "about", "contact", "default", "custom-jacket", "gallery", "size-chart"],
+    enum: ["home", "about", "contact", "default", "custom-jacket", "corporate-gifting", "gallery", "size-chart"],
     default: "default",
     required: true
   },
-  isSystem: { 
-    type: Boolean, 
-    default: false 
+  isSystem: {
+    type: Boolean,
+    default: false
   },
+  // Soft delete (Trash). System pages can never be trashed.
+  isDeleted: { type: Boolean, default: false },
+  deletedAt: { type: Date, default: null },
+  // Status the page had when trashed, so a restore can put it back.
+  statusBeforeTrash: { type: String, enum: ["Draft", "Published", null], default: null },
   sections: [SectionSchema],
   seo: {
     title: String,

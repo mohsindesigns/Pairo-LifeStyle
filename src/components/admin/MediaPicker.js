@@ -40,28 +40,35 @@ export default function MediaPicker({ value, onChange, label, multiple = false, 
     ? (Array.isArray(value) ? value : [])
     : (value ? [value] : []);
 
+  const linkBtn = { background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit", textDecoration: "underline", minHeight: 30 };
+
   return (
     <>
-      <div className={`space-y-2 ${className}`}>
+      <div className={`flex flex-col gap-2 ${className}`}>
         {label && (
-          <label className="text-[12px] font-semibold text-[#1d2327] block">{label}</label>
+          <span className="wp-label">{label}</span>
         )}
 
         {/* Preview area */}
         {images.length > 0 && (
           <div className={`${multiple ? "flex flex-wrap gap-2" : ""}`}>
             {images.map((url, i) => (
-              <div key={i} className="relative group">
-                <div className={`overflow-hidden bg-[#f0f0f1] border border-[#c3c4c7] ${multiple ? "w-20 h-20" : "w-full h-40"}`}>
-                  <img src={url} alt="" className="w-full h-full object-cover" />
+              <div key={i} className="relative">
+                <div style={{ overflow: "hidden", background: "#f0f0f1", border: "1px solid #dcdcde" }} className={multiple ? "w-20 h-20" : "w-full h-40"}>
+                  <img src={url} alt="" className={`w-full h-full ${multiple ? "object-cover" : "object-contain"}`} />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeImage(url)}
-                  className="absolute top-0.5 right-0.5 bg-red-600 text-white p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-3 h-3" />
-                </button>
+                {multiple && (
+                  <button
+                    type="button"
+                    onClick={() => removeImage(url)}
+                    aria-label="Remove image"
+                    title="Remove image"
+                    className="absolute flex items-center justify-center"
+                    style={{ top: -8, right: -8, width: 24, height: 24, borderRadius: "50%", background: "#fff", border: "1px solid #c3c4c7", color: "#b32d2e", cursor: "pointer", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }}
+                  >
+                    <X className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                )}
               </div>
             ))}
             {/* Add more button for gallery */}
@@ -69,9 +76,12 @@ export default function MediaPicker({ value, onChange, label, multiple = false, 
               <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="w-20 h-20 border-2 border-dashed border-[#c3c4c7] hover:border-[#2271b1] flex items-center justify-center transition-colors group"
+                aria-label="Add images"
+                title="Add images"
+                className="w-20 h-20 flex items-center justify-center"
+                style={{ border: "1px dashed #8c8f94", background: "#f6f7f7", color: "#2271b1", cursor: "pointer" }}
               >
-                <Plus className="w-5 h-5 text-[#8c8f94] group-hover:text-[#2271b1]" />
+                <Plus className="w-5 h-5" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -82,21 +92,31 @@ export default function MediaPicker({ value, onChange, label, multiple = false, 
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="w-full border-2 border-dashed border-[#c3c4c7] hover:border-[#2271b1] p-6 flex flex-col items-center gap-2 transition-colors group"
+            className="w-full flex flex-col items-center gap-2"
+            style={{ border: "1px dashed #8c8f94", background: "#f6f7f7", padding: 20, cursor: "pointer", color: "#2271b1" }}
           >
-            <ImageIcon className="w-8 h-8 text-[#8c8f94] group-hover:text-[#2271b1]" />
-            <span className="text-[12px] text-[#646970] group-hover:text-[#2271b1]">
+            <ImageIcon className="w-7 h-7" aria-hidden="true" style={{ color: "#8c8f94" }} />
+            <span style={{ textDecoration: "underline" }}>
               {multiple ? "Add Images" : "Select Image"}
             </span>
           </button>
         ) : !multiple ? (
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="text-[12px] text-[#2271b1] hover:text-[#135e96] font-medium"
-          >
-            Change Image
-          </button>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              style={{ ...linkBtn, color: "#2271b1" }}
+            >
+              Change Image
+            </button>
+            <button
+              type="button"
+              onClick={() => removeImage(images[0])}
+              style={{ ...linkBtn, color: "#b32d2e" }}
+            >
+              Remove image
+            </button>
+          </div>
         ) : null}
       </div>
 

@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
-import Order from "@/models/Order";
 import stripe from "@/lib/stripe";
+import Order from "@/models/Order";
+import { orderLookupQuery } from "@/lib/orderLookup";
 import { can } from "@/lib/rbac";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
 import { reconcilePromotionUsage, isUsageReleasingTransition } from "@/lib/promotionUsageReconciliation";
+import { formatRefundAmount, buildRefundIdempotencyKey, refundedAmountMatch } from "./helpers";
 
 export async function POST(req, { params }) {
   try {
@@ -25,7 +27,7 @@ export async function POST(req, { params }) {
     const body = await req.json().catch(() => ({}));
     const requestedAmount = body?.amount;
 
-    const order = await Order.findById(id);
+    const order = await orderLookupQuery(id);
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     if (order.payment?.provider !== 'stripe' || !order.payment?.stripePaymentIntentId) {
@@ -43,40 +45,74 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Refund amount must be greater than zero." }, { status: 400 });
     }
     if (refundAmount > remaining + 0.01) {
-      return NextResponse.json({ error: `Refund amount exceeds remaining refundable balance of ${remaining}.` }, { status: 400 });
+      return NextResponse.json({ error: `Refund amount exceeds remaining refundable balance of ${formatRefundAmount(remaining, order.financials?.currency)}.` }, { status: 400 });
     }
-
-    const refund = await stripe.refunds.create({
-      payment_intent: order.payment.stripePaymentIntentId,
-      amount: Math.round(refundAmount * 100),
-    });
 
     const newRefundedAmount = Math.round((alreadyRefunded + refundAmount) * 100) / 100;
     const isFullyRefunded = newRefundedAmount >= (order.financials.total || 0) - 0.01;
+    const oldStatus = order.status;
 
-    order.payment.refundedAmount = newRefundedAmount;
-    order.payment.status = isFullyRefunded ? 'Refunded' : 'Partially Refunded';
+    // Claim the refund atomically before touching Stripe: the compare-and-set only
+    // succeeds while payment.refundedAmount still holds the value read above, so two
+    // concurrent requests (double click, two admins) can't both refund the same balance.
+    const claimed = await Order.findOneAndUpdate(
+      { _id: order._id, "payment.refundedAmount": refundedAmountMatch(alreadyRefunded) },
+      { $set: { "payment.refundedAmount": newRefundedAmount } },
+      { new: true }
+    );
+    if (!claimed) {
+      return NextResponse.json(
+        { error: "Another refund was just recorded for this order. Reload the order and try again." },
+        { status: 409 }
+      );
+    }
 
-    order.timeline.push({
-      status: order.status,
-      message: `${isFullyRefunded ? 'Full' : 'Partial'} refund of $${refundAmount.toFixed(2)} issued via Stripe (${refund.id}).`,
+    let refund;
+    try {
+      refund = await stripe.refunds.create(
+        {
+          payment_intent: order.payment.stripePaymentIntentId,
+          amount: Math.round(refundAmount * 100),
+        },
+        { idempotencyKey: buildRefundIdempotencyKey(order._id, alreadyRefunded, refundAmount) }
+      );
+    } catch (stripeErr) {
+      // Stripe refused: release the claim (only if nothing else changed it since).
+      await Order.updateOne(
+        { _id: order._id, "payment.refundedAmount": newRefundedAmount },
+        { $set: { "payment.refundedAmount": alreadyRefunded } }
+      ).catch((e) => console.error("[Refund Claim Release Error]", e));
+      throw stripeErr;
+    }
+
+    const currency = order.financials?.currency || "USD";
+    claimed.payment.status = isFullyRefunded ? 'Refunded' : 'Partially Refunded';
+    claimed.timeline.push({
+      status: claimed.status,
+      message: `${isFullyRefunded ? 'Full' : 'Partial'} refund of ${formatRefundAmount(refundAmount, currency)} issued via Stripe (${refund.id}).`,
       source: "Admin",
       adminUser: session.user.id,
     });
-
-    const oldStatus = order.status;
     if (isFullyRefunded) {
-      order.status = 'Refunded';
+      claimed.status = 'Refunded';
     }
 
-    await order.save();
+    await claimed.save();
 
-    if (isFullyRefunded && isUsageReleasingTransition(oldStatus, order.status)) {
+    if (isFullyRefunded && isUsageReleasingTransition(oldStatus, claimed.status)) {
       try {
-        await reconcilePromotionUsage(order, -1);
+        await reconcilePromotionUsage(claimed, -1);
       } catch (e) {
         console.error("[Refund Promotion Usage Reconciliation Error]", e);
       }
+    }
+
+    try {
+      const { default: pairoEvents } = await import("@/lib/events");
+      pairoEvents.dispatch("ORDER_PAYMENT_UPDATED", { order: claimed, origin: "admin", oldPaymentStatus: order.payment.status, newPaymentStatus: claimed.payment.status });
+      if (isFullyRefunded && oldStatus !== claimed.status) pairoEvents.dispatch("ORDER_STATUS_UPDATED", { order: claimed, origin: "admin", oldStatus, newStatus: claimed.status });
+    } catch (e) {
+      console.error("[Refund Event Dispatch Error]", e);
     }
 
     if (order.affiliateId) {
@@ -87,7 +123,7 @@ export async function POST(req, { params }) {
       }
     }
 
-    return NextResponse.json({ success: true, order, refundId: refund.id });
+    return NextResponse.json({ success: true, order: claimed, refundId: refund.id });
 
   } catch (error) {
     console.error("Refund Error:", error);

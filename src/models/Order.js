@@ -56,6 +56,19 @@ const OrderSchema = new mongoose.Schema({
         back:       { url: String, name: String },
         other:      { url: String, name: String, note: String }
       }
+    },
+    // Corporate Gifting selection data — which configurable items the shopper picked
+    // for this line, with a snapshot of each item's name/price and the uploaded logo/artwork.
+    corporateGifting: {
+      enabled: { type: Boolean, default: false },
+      minSelections: { type: Number, default: 3 },
+      selections: [{
+        itemId: { type: mongoose.Schema.Types.ObjectId },
+        name: { type: String },
+        image: { type: String },
+        priceDelta: { type: Number, default: 0 },
+        artwork: { url: String, name: String }
+      }]
     }
   }],
 
@@ -184,6 +197,35 @@ const OrderSchema = new mongoose.Schema({
 
   affiliateId: { type: mongoose.Schema.Types.ObjectId, ref: 'Affiliate', index: true },
   affiliateReferralCode: { type: String, index: true },
+
+  // Soft delete ("Trash"). Trashed orders are hidden from admin lists/counts/stats
+  // until restored; only an explicit "Delete Permanently" removes the document.
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
+
+  // False only for an admin "Duplicate" draft, which never took stock out of inventory. Cancelling such an order must
+  // not put stock back (it would invent inventory). Every other order took its stock when it was created.
+  stockDeducted: { type: Boolean, default: true },
+  // Set when a cancellation put the order's stock back, so it is never put back twice (and re-taken if the order is reactivated).
+  stockRestockedAt: { type: Date, default: null },
+
+  // Shipment details, set by the CRM (or staff). Also written to the timeline / adminNotes for the dashboard.
+  tracking: {
+    number: String,
+    carrier: String,
+    url: String,
+    updatedAt: Date,
+  },
+
+  // The post-delivery "how did we do?" email (src/lib/feedbackEmailService.js). `sendingSince` is a short claim so two
+  // senders can never mail the same order.
+  feedbackEmail: {
+    sentAt: Date,
+    messageId: String,
+    lastError: String,
+    lastAttemptAt: Date,
+    sendingSince: Date,
+  },
 
   timeline: [{
     status: String,

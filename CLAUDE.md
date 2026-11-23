@@ -59,5 +59,5 @@ Rendering a page (`src/lib/page-cache.js` → `resolvePageAndTemplate`, `src/lib
 ## Notable non-obvious things
 
 - `next.config.mjs` disables Next's image optimization (`images.unoptimized: true`) and allows all remote image hosts — do not assume `next/image` optimization is active.
-- `db-export.json` at repo root is a large (~3.7MB) data dump, likely used by `src/scripts/seed-from-export.js`; treat it as a data fixture, not something to read wholesale.
+- `db-export.json` at repo root is a large (~3.7MB) data dump of store data; treat it as a data fixture, not something to read wholesale.
 - `fix_replica.sh` is a deployment/ops script for enabling MongoDB replica sets on the production host — it is not part of the app runtime.

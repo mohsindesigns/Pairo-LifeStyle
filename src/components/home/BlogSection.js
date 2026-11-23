@@ -8,10 +8,9 @@ import { useSiteData } from "@/context/SiteContext";
 
 const BlogCard = ({ post, readMoreLabel }) => (
   <Link href={`/blog/${post.slug}`} className="group cursor-pointer w-full block">
-    <div className="relative aspect-square bg-[#F7F7F7] rounded-[16px] md:rounded-[24px] overflow-hidden border border-black/5">
-      <div className="absolute inset-0">
-        <Image src={post.image || "/placeholder.jpg"} alt={post.title} fill className="object-cover transition-transform duration-1000 group-hover:scale-105" />
-      </div>
+    <div className="relative rounded-[16px] md:rounded-[24px] overflow-hidden">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={post.image || "/placeholder.jpg"} alt={post.title} loading="lazy" className="block w-full h-auto transition-transform duration-1000 group-hover:scale-105" />
       {post.category && (
         <div className="absolute top-2 md:top-4 left-2 md:left-4 z-10">
           <p className="bg-black/80 backdrop-blur-md text-white text-[6px] md:text-[8px] font-bold px-2 py-1 md:px-3 md:py-1.5 rounded-md md:rounded-lg tracking-[0.1em] md:tracking-[0.2em] uppercase shadow-lg">{post.category}</p>
@@ -50,8 +49,10 @@ export default function BlogSection({
   const carouselRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  const [dbBlogs, setDbBlogs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Real posts rendered by the server on this very request: no placeholder content, so no "old then new" flash.
+  const serverBlogs = Array.isArray(siteData?._homeBlogs) ? siteData._homeBlogs : [];
+  const [dbBlogs, setDbBlogs] = useState(serverBlogs.slice(0, limit || 6));
+  const [loading, setLoading] = useState(serverBlogs.length === 0);
 
   const blogsConfig = {
     title: title || siteData?.blogs?.title || "OUR JOURNAL",
@@ -73,7 +74,8 @@ export default function BlogSection({
       .then(data => {
         if (Array.isArray(data)) setDbBlogs(data);
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, [blogsConfig.limit]);
 
   const scroll = (direction) => {
@@ -107,8 +109,12 @@ export default function BlogSection({
     slug: b.slug,
     image: b.image,
     category: b.category,
-    date: new Date(b.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  })) : (siteData?.blogs?.posts || []);
+    // UTC so the server and the browser format the same date identically (no hydration mismatch)
+    date: new Date(b.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+  })) : [];
+
+  // No real posts yet: show nothing rather than built-in demo posts.
+  if (!loading && posts.length === 0) return null;
 
   return (
     <section className="container mx-auto px-2 sm:px-4 md:px-8 py-2 md:py-4 overflow-hidden">
@@ -118,7 +124,7 @@ export default function BlogSection({
             <div className="inline-flex items-center bg-black text-white px-3 py-1 rounded-full">
               <p className="text-[8px] md:text-[10px] font-bold tracking-[0.2em] uppercase">{blogsConfig.label}</p>
             </div>
-            <h2 className="text-[22px] md:text-[30px] font-bold heading-font tracking-tighter text-[#000000] uppercase leading-none truncate">{blogsConfig.title}</h2>
+            <h2 className="text-[22px] md:text-[30px] font-bold heading-font tracking-tighter text-[#000000] uppercase leading-tight break-words">{blogsConfig.title}</h2>
           </div>
           <div className="flex items-center gap-3 md:gap-6 shrink-0">
             <div className="flex gap-1.5 md:gap-2">

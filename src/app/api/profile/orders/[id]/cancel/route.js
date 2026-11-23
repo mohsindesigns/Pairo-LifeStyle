@@ -13,14 +13,16 @@ export async function PATCH(req, { params }) {
     const session = await getServerSession(authOptions);
     const { id } = await params;
 
-    if (!session) {
+    // Needs a real account id: a missing id would be sent to MongoDB as null and match every guest order.
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Atomic fetch-and-update to prevent race conditions during cancellation
     const order = await Order.findOne({ 
       _id: id, 
-      "customer.userId": session.user.id 
+      "customer.userId": session.user.id,
+      isDeleted: { $ne: true }
     });
 
     if (!order) {
@@ -37,8 +39,8 @@ export async function PATCH(req, { params }) {
 
     const oldStatus = order.status;
 
-    // 1. Restore Stock Atomically
-    const stockRollbacks = order.items.map(async (item) => {
+    // 1. Restore Stock Atomically (a duplicated draft never took any, so there is nothing to give back)
+    const stockRollbacks = (order.stockDeducted === false ? [] : order.items).map(async (item) => {
       const variantTitle = item.selectedVariant?.title || "Standard";
       if (variantTitle !== "Standard") {
          return Product.updateOne(
@@ -54,6 +56,7 @@ export async function PATCH(req, { params }) {
     });
 
     await Promise.all(stockRollbacks);
+    if (order.stockDeducted !== false) order.stockRestockedAt = new Date();
 
     // 2. Update Status & Timeline
     order.status = "Cancelled";
@@ -74,7 +77,7 @@ export async function PATCH(req, { params }) {
     }
 
     // 3. Dispatch Event
-    pairoEvents.dispatch('ORDER_CANCELLED', order);
+    pairoEvents.dispatch('ORDER_CANCELLED', { order, origin: 'customer' });
 
     return NextResponse.json({ 
       success: true, 

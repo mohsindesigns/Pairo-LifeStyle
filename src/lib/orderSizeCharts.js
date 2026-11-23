@@ -68,10 +68,16 @@ function toEmailChart(resolved, productName) {
 /**
  * Returns the distinct size charts for the products in an order (several
  * products sharing a chart produce one entry). Made-to-measure lines are
- * skipped — those customers already supplied exact measurements.
+ * skipped — those customers already supplied exact measurements. Corporate
+ * Gifting lines are skipped too — that product type has no size selection at
+ * all (checkoutFulfillment.js explicitly bypasses the size/attribute gate for
+ * it), so including it here would email a customer an irrelevant size chart
+ * for a gift-box order that was never about sizing.
  */
 export async function resolveOrderSizeCharts(order) {
-  const lines = (order.items || []).filter((it) => it.productId && !it.madeToMeasure?.enabled);
+  const lines = (order.items || []).filter(
+    (it) => it.productId && !it.madeToMeasure?.enabled && !it.corporateGifting?.enabled
+  );
   const ids = [...new Set(lines.map((it) => String(it.productId)))];
   if (ids.length === 0) return [];
 

@@ -4,6 +4,7 @@ import { authOptions } from "../../auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import Media from "@/models/Media";
 import { can } from "@/lib/rbac";
+import { mediaListQuery, parsePaging } from "./helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -11,32 +12,31 @@ export const dynamic = "force-dynamic";
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!can(session.user, "media.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // "media.manage" is the only media permission a role can be given (and what the Media menu itself requires);
+  // "media.view" does not exist, so asking for it locked everyone but the Super Admin out of the library.
+  if (!can(session.user, "media.manage")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   await dbConnect();
   const { searchParams } = new URL(req.url);
 
-  const search   = searchParams.get('search') || '';
-  const type     = searchParams.get('type') || 'all';    // all, image, video, document
-  const trash    = searchParams.get('trash') === 'true';
-  const page     = parseInt(searchParams.get('page') || '1');
-  const limit    = parseInt(searchParams.get('limit') || '30');
-  const sort     = searchParams.get('sort') || 'newest'; // newest, oldest, name
+  const trash = searchParams.get('trash') === 'true';
+  const sort  = searchParams.get('sort') || 'newest'; // newest, oldest, name
 
-  const query = { isDeleted: trash };
-
-  if (search) {
-    query.$or = [
-      { filename: { $regex: search, $options: 'i' } },
-      { title: { $regex: search, $options: 'i' } },
-      { altText: { $regex: search, $options: 'i' } },
-      { tags: { $in: [new RegExp(search, 'i')] } },
-    ];
+  // ?counts=true -> numbers for the "All media | Trash" views
+  if (searchParams.get('counts') === 'true') {
+    const [library, trashCount] = await Promise.all([
+      Media.countDocuments(mediaListQuery({ trash: false })),
+      Media.countDocuments(mediaListQuery({ trash: true })),
+    ]);
+    return NextResponse.json({ success: true, library, trash: trashCount });
   }
 
-  if (type !== 'all') {
-    query.mediaType = type;
-  }
+  const query = mediaListQuery({
+    trash,
+    search: searchParams.get('search') || '',
+    type: searchParams.get('type') || 'all', // all, image, video, document
+  });
+  const { page, limit, skip } = parsePaging(searchParams.get('page'), searchParams.get('limit'));
 
   const sortMap = {
     newest: { createdAt: -1 },
@@ -44,7 +44,6 @@ export async function GET(req) {
     name: { filename: 1 },
   };
 
-  const skip = (page - 1) * limit;
   const [items, total] = await Promise.all([
     Media.find(query).sort(sortMap[sort] || { createdAt: -1 }).skip(skip).limit(limit).lean(),
     Media.countDocuments(query),

@@ -12,7 +12,7 @@ import { SiteProvider } from "@/context/SiteContext";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
 import ScriptLoader from "@/components/common/ScriptLoader";
 import ThemeStyle from "@/components/common/ThemeStyle";
-import { Toaster } from "react-hot-toast";
+import ClientToaster from "@/components/common/ClientToaster";
 import { PopupProvider } from "@/context/PopupContext";
 import { cache, Suspense } from "react";
 import CookieConsent from "@/components/common/CookieConsent";
@@ -90,6 +90,7 @@ export default async function RootLayout({ children }) {
     footer: { sections: [{}, { links: [] }] },
     categories: { items: [] },
     popup: { enabled: false },
+    floatingReviews: { enabled: true, label: 'Reviews', topOffset: 50 },
     _dbCategories: [],
     _dbPages: [],
     _dbBlogs: [],
@@ -117,13 +118,13 @@ export default async function RootLayout({ children }) {
         .sort({ name: 1 })
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),
-      Page.find({ status: 'Published' })
+      Page.find({ status: 'Published', isDeleted: { $ne: true } })
         .select('title slug template')
         .sort({ title: 1 })
         .maxTimeMS(QUERY_TIMEOUT_MS)
         .lean(),
       Blog.find({ status: 'Published', isDeleted: { $ne: true } })
-        .select('title slug')
+        .select('title slug image category createdAt')
         .sort({ createdAt: -1 })
         .limit(50)
         .maxTimeMS(QUERY_TIMEOUT_MS)
@@ -160,7 +161,9 @@ export default async function RootLayout({ children }) {
       }
     });
 
-    const dbCategories = dbCategoriesRaw.map((cat) => {
+    // Every page ships this list to the client (Navbar/Footer/Search/Shop), so drop the heavy
+    // per-category page content (rich HTML, FAQs, SEO, size charts) — it made each page ~1MB+ heavier.
+    const dbCategories = dbCategoriesRaw.map(({ content, faqs, faqSchemaCustom, seo, sizeChart, deletedAt, ...cat }) => {
       if (cat.type === 'product' || !cat.type) {
         return { ...cat, productCount: countMap[cat._id.toString()] || 0 };
       }
@@ -172,13 +175,17 @@ export default async function RootLayout({ children }) {
         ...sanitizedConfig,
         ...JSON.parse(JSON.stringify(config)),
         popup: config.popup || { enabled: false },
+        floatingReviews: { enabled: true, label: 'Reviews', topOffset: 50, ...(config.floatingReviews || {}) },
       };
     }
 
     // Inject resolved DB data for Navbar/Footer dynamic rendering
     sanitizedConfig._dbCategories = JSON.parse(JSON.stringify(dbCategories));
     sanitizedConfig._dbPages = JSON.parse(JSON.stringify(dbPages));
-    sanitizedConfig._dbBlogs = JSON.parse(JSON.stringify(dbBlogs));
+    // Menu/footer only need title + slug; the home "journal" section needs the card fields. Both come from
+    // the same query, so the very first paint already shows the real latest posts (no demo content, no flash).
+    sanitizedConfig._dbBlogs = JSON.parse(JSON.stringify(dbBlogs.map((b) => ({ _id: b._id, title: b.title, slug: b.slug }))));
+    sanitizedConfig._homeBlogs = JSON.parse(JSON.stringify(dbBlogs.slice(0, 12)));
     sanitizedConfig._dbProducts = JSON.parse(JSON.stringify(dbProducts));
 
   } catch (error) {
@@ -186,7 +193,11 @@ export default async function RootLayout({ children }) {
     console.error("Layout DB connection failed:", error.message);
   }
 
-  const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_FORCE_SECURITY_SHIELD === "true";
+  // Anti-inspect lockdown is OFF by default: its DevTools heuristics (outer/inner window size gap,
+  // debugger timing) false-positive on mobile and in-app browsers (Instagram/Facebook ad traffic),
+  // calling window.stop() and blanking the page for real shoppers. Opt in with
+  // PAIRO_ENABLE_ANTI_INSPECT=true only if you accept that risk.
+  const isProduction = process.env.PAIRO_ENABLE_ANTI_INSPECT === "true";
 
   return (
       <html lang="en">
@@ -327,7 +338,7 @@ export default async function RootLayout({ children }) {
           <ScriptLoader location="body_top" />
         <AuthProvider>
           <PopupProvider>
-            <Toaster position="top-right" />
+            <ClientToaster position="top-right" />
             <CookieConsent />
             <Suspense fallback={null}>
               <AffiliateTracker />

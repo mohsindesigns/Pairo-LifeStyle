@@ -19,7 +19,8 @@ const ProductQuestionSchema = new mongoose.Schema({
     index: true
   },
   replies: [QuestionReplySchema],
-  isDeleted: { type: Boolean, default: false, index: true }
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null } // when the question was moved to trash
 }, { timestamps: true });
 
 // Performance index for fetching product questions (approved, sorted by date)

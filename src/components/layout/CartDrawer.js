@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus, ShoppingBag, ArrowRight, Trash2 } from "lucide-react";
 import Image from "next/image";
-import { useCart } from "@/context/CartContext";
+import { useCart, getCartItemKey } from "@/context/CartContext";
 import { useSiteData } from "@/context/SiteContext";
 import Link from "next/link";
 import { getProductUrl } from "@/lib/routes";
@@ -85,7 +85,7 @@ export default function CartDrawer() {
                 </div>
               ) : (
                 cartItems.map((item, idx) => {
-                  const uniqueKey = `${item.id}-${item.selectedSize}-${item.selectedColor}`;
+                  const uniqueKey = getCartItemKey(item);
                   const itemImage = item.image || (Array.isArray(item.images) && item.images[0]) || "/placeholder.jpg";
                   return (
                     <motion.div

@@ -8,6 +8,8 @@ const ProductSchema = new mongoose.Schema({
   shortDescription: { type: String },
   description: { type: String }, // Long Description (Rich Text)
   status: { type: String, enum: ['Draft', 'Published'], default: 'Draft' },
+  // Status before the product was trashed, so restoring puts it back (cleared on restore).
+  statusBeforeTrash: { type: String, enum: ['Draft', 'Published'] },
   isFeatured: { type: Boolean, default: false },
   category: { type: String }, // Main category string (Legacy)
   categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }], // Multi-category support
@@ -108,8 +110,9 @@ const ProductSchema = new mongoose.Schema({
   upsellProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
 
   // Meta
-  productType: { type: String, enum: ['simple', 'variable'], default: 'simple' },
-  isDeleted: { type: Boolean, default: false },
+  productType: { type: String, enum: ['simple', 'variable', 'gifting'], default: 'simple' },
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null }, // when the product was moved to trash
   rating: { type: Number, default: 0 },
   reviewCount: { type: Number, default: 0 },
   ratingBreakdown: {
@@ -146,7 +149,21 @@ const ProductSchema = new mongoose.Schema({
     }]
   },
   sizeChartSource: { type: String, enum: ['category_default', 'custom', 'none'], default: 'category_default' },
-  sizeChart: { type: mongoose.Schema.Types.ObjectId, ref: 'SizeChart', default: null }
+  sizeChart: { type: mongoose.Schema.Types.ObjectId, ref: 'SizeChart', default: null },
+
+  // Corporate Gifting — multi-select customizable add-on items (e.g. belt, bottle, bag),
+  // each with its own price delta and a per-item logo/artwork upload on the storefront.
+  corporateGifting: {
+    enabled: { type: Boolean, default: false },
+    minSelections: { type: Number, default: 3 },
+    items: [{
+      name: { type: String },
+      description: { type: String, default: '' },
+      image: { type: String },
+      priceDelta: { type: Number, default: 0 },
+      active: { type: Boolean, default: true }
+    }]
+  }
 }, { timestamps: true });
 
 // Ensure unique slugs

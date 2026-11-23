@@ -185,3 +185,24 @@ export async function PUT(req) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
+
+// PATCH — update only the `enabled` flag (used by the "Enable taxes" switch so
+// it never persists unsaved class/rate edits from the page).
+export async function PATCH(req) {
+  try {
+    if (!await requireSettings()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    await dbConnect();
+    const body = await req.json();
+    if (typeof body?.enabled !== 'boolean') {
+      return NextResponse.json({ error: '`enabled` must be true or false.' }, { status: 400 });
+    }
+    const settings = await TaxSettings.findOneAndUpdate(
+      {},
+      { $set: { enabled: body.enabled } },
+      { upsert: true, new: true, runValidators: true }
+    ).lean();
+    return NextResponse.json({ success: true, settings });
+  } catch (e) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}

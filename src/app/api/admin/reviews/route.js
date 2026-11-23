@@ -20,8 +20,8 @@ export async function GET(req) {
     }
 
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page")) || 1;
-    const limit = parseInt(searchParams.get("limit")) || 10;
+    const page = Math.max(1, parseInt(searchParams.get("page")) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit")) || 10));
     
     // Filters
     const status = searchParams.get("status"); // Pending, Approved, Rejected, Spam, Featured, Trash, All
@@ -53,12 +53,14 @@ export async function GET(req) {
     if (productId && mongoose.isValidObjectId(productId)) {
       query.productId = new mongoose.Types.ObjectId(productId);
     }
-    if (search) {
+    if (search && search.trim()) {
+      // Escape the text so characters like "(" or "*" are searched literally
+      const rx = new RegExp(search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       query.$or = [
-        { customerName: { $regex: search, $options: "i" } },
-        { customerEmail: { $regex: search, $options: "i" } },
-        { title: { $regex: search, $options: "i" } },
-        { comment: { $regex: search, $options: "i" } }
+        { customerName: rx },
+        { customerEmail: rx },
+        { title: rx },
+        { comment: rx }
       ];
     }
     if (dateFrom || dateTo) {
@@ -155,12 +157,17 @@ export async function POST(req) {
     await dbConnect();
 
     // Fetch reviews to get productIds before updating/deleting (needed for aggregations)
+    const validIds = ids.filter((id) => mongoose.isValidObjectId(id));
+    if (validIds.length !== ids.length) {
+      return NextResponse.json({ error: "Invalid review ID" }, { status: 400 });
+    }
     const reviewsToUpdate = await Review.find({ _id: { $in: ids } }).select("productId").lean();
     const productIdsToReaggregate = [...new Set(reviewsToUpdate.map(r => r.productId?.toString()).filter(Boolean))];
 
     let result;
     if (action === "delete_permanently") {
-      result = await Review.deleteMany({ _id: { $in: ids } });
+      // Permanent delete only for reviews already in Trash
+      result = await Review.deleteMany({ _id: { $in: ids }, isDeleted: true });
     } else {
       let updateDoc = {};
       if (action === "approve") {
@@ -170,9 +177,9 @@ export async function POST(req) {
       } else if (action === "spam") {
         updateDoc = { status: "Spam" };
       } else if (action === "delete") {
-        updateDoc = { isDeleted: true };
+        updateDoc = { isDeleted: true, deletedAt: new Date() };
       } else if (action === "restore") {
-        updateDoc = { isDeleted: false, status: "Pending" };
+        updateDoc = { isDeleted: false, deletedAt: null, status: "Pending" };
       }
       result = await Review.updateMany(
         { _id: { $in: ids } },
@@ -188,14 +195,14 @@ export async function POST(req) {
 
     // Log the audit event
     await logAction(req, session, `BULK_${action.toUpperCase()}_REVIEWS`, "reviews", {
-      affectedCount: result.deletedCount || result.modifiedCount,
+      affectedCount: result.deletedCount ?? result.modifiedCount ?? 0,
       ids,
-      message: `Bulk ${action} executed on ${result.deletedCount || result.modifiedCount} reviews`
+      message: `Bulk ${action} executed on ${result.deletedCount ?? result.modifiedCount ?? 0} reviews`
     });
 
     return NextResponse.json({
       success: true,
-      modifiedCount: result.deletedCount || result.modifiedCount
+      modifiedCount: result.deletedCount ?? result.modifiedCount ?? 0
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

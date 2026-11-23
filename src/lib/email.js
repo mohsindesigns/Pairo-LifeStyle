@@ -139,7 +139,7 @@ const BRAND = {
   danger: '#9A3B3B',
 };
 
-function isSmtpConfigured() {
+export function isSmtpConfigured() {
   return Boolean(smtpConfig?.auth?.user && smtpConfig?.auth?.pass);
 }
 
@@ -231,7 +231,7 @@ async function resolveAdminEmail(label) {
       await dbConnect();
       const superAdminRole = await Role.findOne({ slug: 'super-admin' });
       if (superAdminRole) {
-        const superAdmin = await Staff.findOne({ roleId: superAdminRole._id });
+        const superAdmin = await Staff.findOne({ roleId: superAdminRole._id, status: 'Active', isDeleted: { $ne: true } });
         if (superAdmin) adminEmail = superAdmin.email;
       }
     } catch (e) {
@@ -1265,4 +1265,303 @@ export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, char
     throw new Error('Email was not sent — SMTP is not configured (set EMAIL_SERVER / EMAIL_USER / EMAIL_PASS).');
   }
   return { messageId: info.messageId || messageId, subject };
+}
+
+// ─── ABANDONED CART EMAILS ──────────────────────────────────────────────────────
+
+/**
+ * Sends the automatic "come back" win-back email for an abandoned checkout
+ * (see src/lib/abandonedCartService.js). `cartSnapshot` is an AbandonedCart
+ * doc (or plain object with the same shape: items, cartSubtotal, cartTotal,
+ * contact, shippingAddress). `voucherCode` is the sitewide percentage-discount
+ * code to feature.
+ */
+export function buildAbandonedCartEmail(cartSnapshot, voucherCode, { discountPercent = 15, discountLabel = null, oneTime = false } = {}) {
+  const offerText = discountLabel || `${discountPercent}% off`;
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+  const firstName = (cartSnapshot?.shippingAddress?.fullName || cartSnapshot?.contact?.firstName || '').split(' ')[0] || 'there';
+
+  const items = Array.isArray(cartSnapshot?.items) ? cartSnapshot.items : [];
+  const itemsRows = items.map((item) => `
+    <tr>
+      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};">
+        ${item.image ? `<img src="${escapeHtml(item.image)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid ${BRAND.border};vertical-align:middle;margin-right:10px;" />` : ''}
+        <strong style="color:${BRAND.ink};">${escapeHtml(item.name || 'Item')}</strong>
+      </td>
+      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};text-align:center;color:${BRAND.ink};">${item.quantity || 1}</td>
+      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};text-align:right;color:${BRAND.ink};font-weight:700;">$${(((item.price || 0) * (item.quantity || 1))).toLocaleString()}</td>
+    </tr>`).join('');
+
+  const itemsTable = items.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin-bottom:8px;">
+        <thead><tr style="background:${BRAND.surface};">
+          <th style="text-align:left;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Item</th>
+          <th style="padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Qty</th>
+          <th style="text-align:right;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Price</th>
+        </tr></thead>
+        <tbody>${itemsRows}</tbody>
+      </table>`
+    : '';
+
+  const voucherHtml = emailPanel(`
+    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here's <strong>${offerText}</strong> your order — on us. Enter this code in the promo code box at checkout, using the same email address this message was sent to:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
+      <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(voucherCode)}</span>
+    </td></tr></table>
+    ${emailButton(`${storeUrl}/checkout`, 'Complete My Order', { align: 'left' })}
+  `, { title: 'A Little Something For You', accentColor: BRAND.ink });
+
+  const html = emailShell({
+    eyebrow: 'We Saved Your Cart',
+    heading: 'Still Thinking It Over?',
+    subheading: `Hi ${escapeHtml(firstName)}, we noticed you left some items in your cart at ${escapeHtml(storeName)}. They're still waiting for you — and we've added a little incentive to help you decide.`,
+    bodyHtml: `${itemsTable}<div style="margin-top:24px;">${voucherHtml}</div>
+      <p style="margin:24px 0 0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:20px;">
+        ${oneTime ? 'This code was created just for you and can be used once.' : 'This code is valid sitewide for a limited time.'} If you've already completed your order, you can safely ignore this email.
+      </p>`,
+    preheader: `We saved your cart — here's ${offerText} to come back.`,
+  });
+
+  return { subject: `You left something behind — here's ${offerText}`, html };
+}
+
+/**
+ * Sends the abandoned-cart email. THROWS if SMTP is not configured or the send fails, so the caller
+ * (abandonedCartService) can report the real reason and retry on the next run instead of falsely
+ * marking the cart as emailed.
+ */
+export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, options = {}) {
+  if (!isSmtpConfigured()) throw new Error('SMTP is not configured (SMTP_USER / SMTP_PASS missing) - email was not sent');
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const { subject, html } = buildAbandonedCartEmail(cartSnapshot, voucherCode, options);
+  const info = await dispatchEmail({
+    to: email,
+    subject,
+    html,
+    from: getFromAddress(storeName),
+    label: `Abandoned cart recovery (${email})`,
+    critical: true,
+  });
+  // Hand back the mail server response (messageId, accepted...) plus the subject, for the activity log.
+  return { ...(info || {}), subject };
+}
+
+// ─── CUSTOMER-SPECIFIC COUPON EMAILS ────────────────────────────────────────────
+
+/**
+ * Notifies a customer they've been personally given a discount code, sent
+ * automatically when an admin adds their email to a coupon's "specific
+ * customers" list and the coupon is active (see src/app/api/admin/discounts/route.js).
+ * Never throws — best-effort, mirrors sendAbandonedCartEmail's resilience.
+ */
+export async function sendCouponAssignedEmail(email, discount) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+
+  const valueText = discount.type === 'percentage'
+    ? `${Number(discount.value)}% off`
+    : `$${Number(discount.value).toLocaleString()} off`;
+
+  const conditions = [
+    discount.minPurchase > 0 && `Minimum purchase of $${Number(discount.minPurchase).toLocaleString()}`,
+    discount.maxDiscountAmount && `Capped at $${Number(discount.maxDiscountAmount).toLocaleString()} off`,
+    discount.endDate && `Valid until ${new Date(discount.endDate).toLocaleDateString()}`,
+  ].filter(Boolean).join(' · ');
+
+  const voucherHtml = emailPanel(`
+    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">You've been personally given <strong>${escapeHtml(valueText)}</strong> at ${escapeHtml(storeName)}. Use this code at checkout:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
+      <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(discount.code)}</span>
+    </td></tr></table>
+    ${conditions ? `<p style="margin:0 0 16px;color:${BRAND.muted};font-size:12px;">${escapeHtml(conditions)}</p>` : ''}
+    ${emailButton(`${storeUrl}/shop`, 'Start Shopping', { align: 'left' })}
+  `, { title: 'A Gift For You', accentColor: BRAND.ink });
+
+  const html = emailShell({
+    eyebrow: 'Just For You',
+    heading: 'You’ve Got A Discount Code',
+    subheading: `Hi there, we've set aside a special discount code just for you at ${escapeHtml(storeName)}.`,
+    bodyHtml: voucherHtml,
+    preheader: `You've been given ${valueText} at ${storeName}.`,
+  });
+
+  return dispatchEmail({
+    to: email,
+    subject: `A discount code just for you — ${valueText}`,
+    html,
+    from: getFromAddress(storeName),
+    label: `Customer-specific coupon assigned (${email})`,
+  });
+}
+
+/**
+ * Confirmation to the company that submitted a Corporate Gifting quote request.
+ */
+export async function sendCorporateGiftingConfirmation(toEmail, contactName, inquiry) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pairolifestyle.com';
+
+  const rows = [
+    inquiry.company && fieldRow('Company', escapeHtml(inquiry.company)),
+    inquiry.occasion && fieldRow('Occasion', escapeHtml(inquiry.occasion)),
+    inquiry.quantity && fieldRow('Packs', escapeHtml(inquiry.quantity)),
+    inquiry.items?.length > 0 && fieldRow('Items', escapeHtml(inquiry.items.join(', '))),
+    inquiry.budget && fieldRow('Budget / pack', escapeHtml(inquiry.budget)),
+    inquiry.deliveryDate && fieldRow('Needed by', escapeHtml(inquiry.deliveryDate)),
+  ].filter(Boolean).join('');
+
+  const html = emailShell({
+    eyebrow: 'Corporate Gifting',
+    heading: `Thank You, ${escapeHtml(contactName)}!`,
+    subheading: `We've received your corporate gifting request. Our team will review it and send you a quote within <strong>24 hours</strong>.`,
+    bodyHtml: `
+      ${emailPanel(fieldTable(rows), { title: 'Your Request Summary' })}
+      <p style="margin:0 0 24px;color:${BRAND.muted};font-size:14px;line-height:1.7;">No payment is required at this stage.</p>
+      ${buttonBlock(`${storeUrl}/shop`, 'Explore Collection')}
+    `,
+    preheader: 'We’ve received your corporate gifting request.',
+  });
+
+  await dispatchEmail({
+    to: toEmail,
+    subject: `Your Corporate Gifting Request — We'll Be In Touch!`,
+    html,
+    from: getFromAddress(storeName),
+    label: 'Corporate gifting confirmation',
+    critical: true,
+  });
+}
+
+/**
+ * Notify admin of a new Corporate Gifting quote request.
+ */
+export async function sendCorporateGiftingAdminNotification(inquiry) {
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.STORE_EMAIL || 'support@pairolifestyle.com';
+  const storeUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pairolifestyle.com';
+
+  const contactRows = [
+    fieldRow('Company', escapeHtml(inquiry.company)),
+    fieldRow('Contact', escapeHtml(inquiry.contactName)),
+    fieldRow('Email', escapeHtml(inquiry.email)),
+    inquiry.phone && fieldRow('Phone', escapeHtml(inquiry.phone)),
+    inquiry.country && fieldRow('Location', `${inquiry.city ? escapeHtml(inquiry.city) + ', ' : ''}${escapeHtml(inquiry.country)}`),
+  ].filter(Boolean).join('');
+
+  const packRows = [
+    inquiry.occasion && fieldRow('Occasion', escapeHtml(inquiry.occasion)),
+    inquiry.quantity && fieldRow('Packs', escapeHtml(inquiry.quantity)),
+    inquiry.budget && fieldRow('Budget / pack', escapeHtml(inquiry.budget)),
+    inquiry.deliveryDate && fieldRow('Needed by', escapeHtml(inquiry.deliveryDate)),
+    inquiry.items?.length > 0 && fieldRow('Items', escapeHtml(inquiry.items.join(', '))),
+    inquiry.branding && fieldRow('Branding', escapeHtml(inquiry.branding)),
+    inquiry.packaging && fieldRow('Packaging', escapeHtml(inquiry.packaging)),
+    inquiry.leather && fieldRow('Leather', escapeHtml(inquiry.leather)),
+    inquiry.brandColors && fieldRow('Brand colors', escapeHtml(inquiry.brandColors)),
+    inquiry.greetingCard && fieldRow('Greeting card', 'Yes'),
+  ].filter(Boolean).join('');
+
+  const html = emailShell({
+    eyebrow: 'Admin Notification',
+    heading: 'New Corporate Gifting Request',
+    bodyHtml: `
+      ${emailPanel(fieldTable(contactRows), { title: 'Company' })}
+      ${emailPanel(fieldTable(packRows), { title: 'Pack Details' })}
+      ${inquiry.notes ? emailPanel(`<p style="margin:0;font-size:13px;color:${BRAND.ink};line-height:1.7;">${escapeHtml(inquiry.notes)}</p>`, { title: 'Notes' }) : ''}
+      <p style="margin:0 0 16px;font-size:13px;color:${BRAND.muted};"><strong>Uploads:</strong> ${inquiry.logos?.length || 0} logo file(s), ${inquiry.referenceImages?.length || 0} reference image(s)</p>
+      ${buttonBlock(`${storeUrl}/admin/corporate-gifting-inquiries`, 'View In Dashboard')}
+    `,
+    preheader: `New corporate gifting request from ${inquiry.company}.`,
+  });
+
+  await dispatchEmail({
+    to: adminEmail,
+    subject: `New Corporate Gifting Request — ${inquiry.company}`,
+    html,
+    from: getFromAddress('PAIRO System'),
+    label: 'Corporate gifting admin notification',
+    critical: true,
+  });
+}
+
+// ─── VIDEO REVIEW THANK-YOU ─────────────────────────────────────────────────────
+
+/**
+ * Thank-you email sent when a customer's video review was approved: carries their personal one-time code.
+ * THROWS on a send failure so the caller can record it (approval must never depend on it).
+ */
+export async function sendReviewRewardEmail(email, firstName, code, percent = 10) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+  const name = escapeHtml(String(firstName || '').trim() || 'there');
+
+  const codeHtml = emailPanel(`
+    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here is your personal <strong>${percent}% off</strong> code for your next order:</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
+      <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(code)}</span>
+    </td></tr></table>
+    ${emailButton(`${storeUrl}/shop`, 'Shop Now', { align: 'left' })}
+  `, { title: 'Your Thank-You Code', accentColor: BRAND.ink });
+
+  const html = emailShell({
+    eyebrow: 'Thank You',
+    heading: 'Thanks For Your Video Review',
+    subheading: `Hi ${name}, your video review is now live on ${escapeHtml(storeName)}. It means a lot to us and helps other shoppers.`,
+    bodyHtml: `${codeHtml}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:20px;">
+        This code was created just for you. It can be used once, and only with the email address this message was sent to.
+      </p>`,
+    preheader: `Thank you! Here is ${percent}% off your next order.`,
+  });
+
+  return dispatchEmail({
+    to: email,
+    subject: `Thank you! Here is ${percent}% off your next order`,
+    html,
+    from: getFromAddress(storeName),
+    label: `Video review thank-you (${email})`,
+    critical: true,
+  });
+}
+
+// ─── POST-DELIVERY FEEDBACK REQUEST ─────────────────────────────────────────────
+
+const TRUSTPILOT_URL = 'https://www.trustpilot.com/review/pairolifestyle.com';
+
+/** Pure: builds the "how was your order?" email (Trustpilot link + video-review invitation). */
+export function buildFeedbackEmail(order) {
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+  const firstName = String(order?.shippingAddress?.fullName || '').trim().split(' ')[0] || 'there';
+  const items = (Array.isArray(order?.items) ? order.items : []).filter((i) => i && i.productId).slice(0, 3);
+
+  const productButtons = items.map((item) => `<div style="margin:0 0 10px;">${emailButton(`${storeUrl}/product/${encodeURIComponent(String(item.productId))}`, `Review: ${String(item.name || 'your item').slice(0, 40)}`, { align: 'left', secondary: true })}</div>`).join('');
+
+  const html = emailShell({
+    eyebrow: 'Your Order Was Delivered',
+    heading: 'How Did We Do?',
+    subheading: `Hi ${escapeHtml(firstName)}, your order #${escapeHtml(order?.orderNumber || '')} has been delivered. We hope you love it! Your feedback helps other customers and means the world to us.`,
+    bodyHtml: `
+      ${emailPanel(`<p style="margin:0 0 16px;color:${BRAND.ink};font-size:14px;line-height:1.7;">It takes a minute: tell the world what you think of PAIRO on Trustpilot.</p>${emailButton(TRUSTPILOT_URL, 'Review us on Trustpilot', { align: 'left' })}`, { title: 'Leave a Review', accentColor: BRAND.ink })}
+      ${emailPanel(`<p style="margin:0 0 14px;color:${BRAND.ink};font-size:14px;line-height:1.7;">Record a short video of your PAIRO piece and post it as a review on our website. Once our team approves it, we will email you a personal <strong>10% off</strong> code for your next order.</p>${productButtons}`, { title: 'Share a video review and get 10% off your next order', accentColor: BRAND.ink })}
+      <p style="margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;">Thank you for choosing ${escapeHtml(storeName)}. If anything is not right with your order, just reply to this email and we will make it right.</p>
+    `,
+    preheader: 'Tell us how we did, and get 10% off your next order with a video review.',
+  });
+  return { subject: `How was your PAIRO order? Share a video review & get 10% off`, html };
+}
+
+/** Sends the feedback request. THROWS when SMTP is missing or the send fails; returns the mail server info. */
+export async function sendFeedbackRequestEmail(order, { to } = {}) {
+  if (!isSmtpConfigured()) throw new Error('SMTP is not configured (SMTP_USER / SMTP_PASS missing) - email was not sent');
+  const { subject, html } = buildFeedbackEmail(order);
+  const info = await dispatchEmail({
+    to: to || order?.customer?.email,
+    subject,
+    html,
+    from: getFromAddress(process.env.STORE_NAME || 'PAIRO Lifestyle'),
+    label: `Feedback request (${to || order?.customer?.email})`,
+    critical: true,
+  });
+  return { ...(info || {}), subject };
 }

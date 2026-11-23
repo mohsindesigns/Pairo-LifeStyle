@@ -4,6 +4,7 @@ const CustomerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  phone: { type: String, default: null },
   role: { type: String, default: 'user' },
   emailVerified: { type: Boolean, default: false },
   verificationToken: { type: String, default: null },
@@ -45,7 +46,12 @@ const CustomerSchema = new mongoose.Schema({
     action: String,
     details: String,
     timestamp: { type: Date, default: Date.now }
-  }]
+  }],
+  // Soft delete ("Trash"). A trashed customer can't sign in and is hidden from
+  // admin customer lists/counts until restored; only "Delete permanently" (from
+  // the Trash) removes the document. Their orders keep their customer snapshot.
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 export default mongoose.models.Customer || mongoose.model('Customer', CustomerSchema);

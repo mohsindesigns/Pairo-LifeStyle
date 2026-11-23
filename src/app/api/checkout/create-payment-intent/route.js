@@ -5,7 +5,8 @@ import PendingCheckout from "@/models/PendingCheckout";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import stripe from "@/lib/stripe";
-import { computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { assertValidCartItems, computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { getContextLogger, LogCategory } from "@/lib/logger";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 import { getClientIp } from "@/lib/rateLimit";
@@ -26,6 +27,11 @@ export async function POST(req) {
     }
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
+    }
+    try {
+      assertValidCartItems(items);
+    } catch (invalidCart) {
+      return NextResponse.json({ error: invalidCart.message }, { status: 400 });
     }
     // Fail before charging the card, not after — the order-creation chokepoint
     // (createOrderFromCheckoutPayload, called from the Stripe webhook once payment succeeds)
@@ -55,7 +61,8 @@ export async function POST(req) {
     const ipAddress = getClientIp(req);
 
     const itemProductIds = items.map(item => item.id || item._id);
-    const foundProducts = await Product.find({ _id: { $in: itemProductIds } });
+    // A Draft is hidden from the shop (the product page only hides "Draft"), so a stale cart must not buy it either.
+    const foundProducts = await Product.find({ _id: { $in: itemProductIds }, isDeleted: { $ne: true }, status: { $ne: "Draft" } });
     const productById = new Map(foundProducts.map(p => [p._id.toString(), p]));
 
     for (const item of items) {
@@ -65,6 +72,14 @@ export async function POST(req) {
       }
       if (product.manageStock && product.stock < item.quantity) {
         return NextResponse.json({ error: `Insufficient stock for ${product.name}.` }, { status: 400 });
+      }
+      // Corporate Gifting — same check checkoutFulfillment.js performs at order-creation time
+      // (shared helper, so the two can never disagree), run here too so a stale cart (feature
+      // disabled, item deactivated, or no longer meeting the minimum-selection count) fails
+      // before the card is charged instead of charging then failing at webhook fulfillment.
+      const corporateGiftingCheck = validateCorporateGiftingSelections(item, product);
+      if (!corporateGiftingCheck.valid) {
+        return NextResponse.json({ error: corporateGiftingCheck.error }, { status: 400 });
       }
     }
 

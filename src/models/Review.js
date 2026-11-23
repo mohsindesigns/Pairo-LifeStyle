@@ -36,12 +36,21 @@ const ReviewSchema = new mongoose.Schema({
     type: { type: String, enum: ["image", "video"] }
   }],
   recommend: { type: Boolean, default: true },
+  // The thank-you code emailed when a review with a video was approved (see src/lib/reviewReward.js).
+  reward: {
+    code: String,
+    percent: Number,
+    sentAt: Date,
+    messageId: String,
+    note: String, // why no code was sent, when that is the case
+  },
   ipAddress: { type: String },
   userAgent: { type: String },
   spamScore: { type: Number, default: 0 },
   fingerprint: { type: String, index: true },
   shadowBanned: { type: Boolean, default: false, index: true },
-  isDeleted: { type: Boolean, default: false, index: true } // Soft delete support
+  isDeleted: { type: Boolean, default: false, index: true }, // Soft delete support
+  deletedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 // Compound unique index: prevent duplicate reviews for the same product in the same order

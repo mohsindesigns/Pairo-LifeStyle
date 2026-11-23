@@ -92,7 +92,7 @@ export default async function ScriptLoader({ location = "head" }) {
     }
 
     // 2. Fetch active scripts
-    const activeScripts = await ScriptModel.find({ isActive: true })
+    const activeScripts = await ScriptModel.find({ isActive: true, isDeleted: { $ne: true } })
       .select('name type code location templateConfig loadStrategy targeting priority')
       .sort({ priority: 1 })
       .lean();

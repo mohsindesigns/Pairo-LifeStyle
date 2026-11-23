@@ -6,8 +6,9 @@ import Category from "@/models/Category";
 import Product from "@/models/Product";
 import { can } from "@/lib/rbac";
 import { NextResponse } from "next/server";
+import { sizeChartViewQuery, pickEditableSizeChartFields } from "./helpers";
 
-// GET: List all size charts
+// GET: List size charts. ?trash=true lists the trash instead of live charts.
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -15,7 +16,12 @@ export async function GET(req) {
 
   await dbConnect();
   try {
-    const sizeCharts = await SizeChart.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
+    const { searchParams } = new URL(req.url);
+    const view = searchParams.get("trash") === "true" ? "trash" : "all";
+    const sizeCharts = await SizeChart.find(sizeChartViewQuery(view))
+      .select("-trashedRefs")
+      .sort({ createdAt: -1 })
+      .lean();
 
     // Fetch related category and product details for assignments
     const categoryIds = sizeCharts
@@ -26,8 +32,8 @@ export async function GET(req) {
       .map((sc) => sc.assignmentTargetId);
 
     const [categories, products, activeProducts] = await Promise.all([
-      Category.find({ _id: { $in: categoryIds } }).select("name slug").lean(),
-      Product.find({ _id: { $in: productIds } }).select("name slug").lean(),
+      Category.find({ _id: { $in: categoryIds } }).select("name slug isDeleted").lean(),
+      Product.find({ _id: { $in: productIds } }).select("name slug isDeleted").lean(),
       Product.find({ isDeleted: { $ne: true } }).select("primaryCategory categories sizeChartSource sizeChart").lean()
     ]);
 
@@ -42,7 +48,7 @@ export async function GET(req) {
 
       if (sc.assignmentType === "category" && sc.assignmentTargetId) {
         const cat = categoryMap[sc.assignmentTargetId.toString()];
-        assignedTo = cat ? { type: "Category", name: cat.name, slug: cat.slug, id: cat._id } : null;
+        assignedTo = cat ? { type: "Category", name: cat.name, slug: cat.slug, id: cat._id, trashed: !!cat.isDeleted } : null;
 
         // Count products inheriting this category default
         const catIdStr = sc.assignmentTargetId.toString();
@@ -53,7 +59,7 @@ export async function GET(req) {
         ).length;
       } else if (sc.assignmentType === "product" && sc.assignmentTargetId) {
         const prod = productMap[sc.assignmentTargetId.toString()];
-        assignedTo = prod ? { type: "Product", name: prod.name, slug: prod.slug, id: prod._id } : null;
+        assignedTo = prod ? { type: "Product", name: prod.name, slug: prod.slug, id: prod._id, trashed: !!prod.isDeleted } : null;
 
         // Directly assigned to this product
         usageCount = activeProducts.filter(
@@ -87,15 +93,21 @@ export async function POST(req) {
 
   await dbConnect();
   try {
-    const data = await req.json();
-    
-    // Check for duplicate label
-    const existing = await SizeChart.findOne({ label: data.label, isDeleted: { $ne: true } }).lean();
+    const data = pickEditableSizeChartFields(await req.json());
+    if (typeof data.label === "string") data.label = data.label.trim();
+    if (!data.label) return NextResponse.json({ error: "Size chart label is required." }, { status: 400 });
+
+    // Labels are unique across live AND trashed charts (unique index).
+    const existing = await SizeChart.findOne({ label: data.label }).select("isDeleted").lean();
     if (existing) {
-      return NextResponse.json({ error: "A size chart with this label already exists." }, { status: 400 });
+      return NextResponse.json({
+        error: existing.isDeleted
+          ? "A size chart in the Trash already uses this label. Restore it or delete it permanently first."
+          : "A size chart with this label already exists."
+      }, { status: 400 });
     }
 
-    const sizeChart = await SizeChart.create({ ...data });
+    const sizeChart = await SizeChart.create(data);
 
     const scId = sizeChart._id;
 

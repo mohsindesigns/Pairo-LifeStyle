@@ -4,15 +4,20 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Ruler } from "lucide-react";
 
+// Stable reference: a fresh [] default on every render would re-run the loading effect forever.
+const NO_CHARTS = [];
+
 export default function SizeChartDisplay({
   sectionTitle = "SIZE CHARTS",
   sectionLabel = "MEASUREMENTS",
   sectionDescription = "Use these detailed size charts to find your perfect fit.",
   headingLevel = "h2",
-  customCharts = []
+  customCharts = NO_CHARTS
 }) {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Start from the charts configured in the dashboard so the first paint is already the real content.
+  const hasCustom = Array.isArray(customCharts) && customCharts.length > 0;
+  const [items, setItems] = useState(hasCustom ? customCharts : []);
+  const [loading, setLoading] = useState(!hasCustom);
   const Heading = headingLevel;
 
   useEffect(() => {

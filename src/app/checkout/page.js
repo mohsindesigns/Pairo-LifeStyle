@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CreditCard, Truck, ShieldCheck, ArrowRight, Loader2, ChevronDown, Search } from "lucide-react";
 import { Elements } from "@stripe/react-stripe-js";
-import { useCart } from "@/context/CartContext";
+import { useCart, getCartItemKey } from "@/context/CartContext";
 import { useSiteData } from "@/context/SiteContext";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -15,6 +15,7 @@ import { usePopup } from "@/context/PopupContext";
 import { getProductUrl } from "@/lib/routes";
 import { trackBeginCheckout, trackAddShippingInfo, trackAddPaymentInfo } from "@/lib/analytics";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const STRIPE_APPEARANCE = {
   theme: "flat",
@@ -257,8 +258,9 @@ export default function CheckoutPage() {
     lastName: "",
     email: "",
     phone: "",
-    country: "United States",
-    countryCode: "US",
+    // No country is pre-selected: the shopper must pick their real one, so the country we record is always their own choice.
+    country: "",
+    countryCode: "",
     state: "",
     stateCode: "",
     street: "",
@@ -454,7 +456,7 @@ export default function CheckoutPage() {
           city: addr.city,
           state: addr.state || "",
           zip: addr.zipCode || addr.zip || "",
-          country: addr.country || "United States",
+          country: addr.country || "",
           phone: addr.phone || ""
         });
       });
@@ -477,7 +479,7 @@ export default function CheckoutPage() {
               city: addr.city,
               state: addr.state || "",
               zip: addr.zip || addr.zipCode || "",
-              country: addr.country || "United States",
+              country: addr.country || "",
               phone: addr.phone || ""
             });
           }
@@ -1062,7 +1064,7 @@ export default function CheckoutPage() {
                   <div className="space-y-1 bg-[#FAF9F6] border border-black/[0.04] p-4 rounded-[4px] mb-2">
                     <label className={`${labelClass} text-black font-bold`}>Use Saved Address for Faster Checkout</label>
                     <div className="relative">
-                      <select
+                      <ThemedSelect
                         onChange={(e) => {
                           const idx = parseInt(e.target.value);
                           if (!isNaN(idx) && savedAddresses[idx]) {
@@ -1078,7 +1080,7 @@ export default function CheckoutPage() {
                               city: addr.city,
                               state: addr.state,
                               zip: addr.zip,
-                              country: addr.country || "United States",
+                              country: addr.country || "",
                               phone: addr.phone || prev.phone
                             }));
                             setErrors({});
@@ -1093,8 +1095,7 @@ export default function CheckoutPage() {
                             {addr.fullName} — {addr.street}, {addr.city} ({addr.type})
                           </option>
                         ))}
-                      </select>
-                      <ChevronDown className="w-4 h-4 text-black absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </ThemedSelect>
                     </div>
                   </div>
                 )}
@@ -1508,7 +1509,7 @@ export default function CheckoutPage() {
               {(cartItems || []).map((item, index) => {
                 const itemImage = item.image || (Array.isArray(item.images) && item.images[0]) || "/placeholder.jpg";
                 const itemKey = `${item.id || item._id}-${item.selectedSize || "Standard"}-${item.selectedColor || "Standard"}-${index}`;
-                const uniqueKeyForCart = `${item.id}-${item.selectedSize || "Standard"}-${item.selectedColor || "Standard"}`;
+                const uniqueKeyForCart = getCartItemKey(item);
                 return (
                   <div key={itemKey} className="flex gap-4 items-center py-3.5 first:pt-0 last:pb-0">
                     <div className="relative shrink-0 w-14 h-18">
@@ -1551,6 +1552,25 @@ export default function CheckoutPage() {
                                 <span key={k}><span className="font-bold capitalize text-black">{k.replace(/([A-Z])/g, ' $1')}</span>: {v} {item.madeToMeasure.unit}</span>
                               ) : null)}
                               {item.madeToMeasure.notes && <span className="col-span-2 italic text-black/80 font-semibold">Note: {item.madeToMeasure.notes}</span>}
+                            </div>
+                          </details>
+                        </div>
+                      )}
+
+                      {/* Corporate Gifting Badge */}
+                      {item.corporateGifting?.enabled && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-wide">
+                            ✦ Corporate Gifting — {(item.corporateGifting.selections || []).length} items
+                          </span>
+                          <details className="mt-1">
+                            <summary className="text-[9px] text-black/60 cursor-pointer hover:text-black transition-colors select-none">View selected items</summary>
+                            <div className="mt-1.5 space-y-0.5 text-[9px] text-black font-semibold">
+                              {(item.corporateGifting.selections || []).map((sel, selIdx) => (
+                                <div key={sel.itemId || selIdx}>
+                                  {sel.name}{sel.priceDelta > 0 ? ` (+$${Number(sel.priceDelta).toFixed(2)})` : ""}{sel.artwork?.name ? ` — logo: ${sel.artwork.name}` : " — no logo uploaded"}
+                                </div>
+                              ))}
                             </div>
                           </details>
                         </div>

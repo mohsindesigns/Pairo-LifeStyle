@@ -4,13 +4,14 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import dbConnect from "@/lib/db";
 import { can } from "@/lib/rbac";
 import {
-  BOUNCE_EXPR, FUNNEL_EVENTS, PAGE_TYPES, PRICE_BANDS, isBounced,
+  BOUNCE_EXPR, FUNNEL_EVENTS, PAGE_TYPES, PRICE_BANDS, priceBandLabel, isBounced,
 } from "@/lib/analyticsDimensions";
 import AnalyticsSession from "@/models/AnalyticsSession";
 import AnalyticsPageView from "@/models/AnalyticsPageView";
 import AnalyticsEvent from "@/models/AnalyticsEvent";
 import Order from "@/models/Order";
 import Customer from "@/models/Customer";
+import SiteConfig from "@/models/SiteConfig";
 
 const DEVICES = ["desktop", "mobile", "tablet"];
 const SEGMENTS = ["customer", "guest"];
@@ -879,6 +880,7 @@ async function retention(f) {
         createdAt: { $lte: f.until },
         status: { $nin: ["Cancelled", "Refunded"] },
         "customer.userId": { $ne: null },
+        isDeleted: { $ne: true },
       },
     },
     { $sort: { createdAt: 1 } },
@@ -898,7 +900,7 @@ async function retention(f) {
   const mid = Math.floor(gaps.length / 2);
   const median = gaps.length === 0 ? 0 : gaps.length % 2 ? gaps[mid] : (gaps[mid - 1] + gaps[mid]) / 2;
 
-  const created = await Customer.find({ createdAt: { $gte: f.since, $lte: f.until } }).select("_id").lean();
+  const created = await Customer.find({ createdAt: { $gte: f.since, $lte: f.until }, isDeleted: { $ne: true } }).select("_id").lean();
   const buyerIds = new Set(rows.map((r) => String(r._id)));
   const accountsPurchased = created.filter((c) => buyerIds.has(String(c._id))).length;
 
@@ -1082,6 +1084,17 @@ const TABS = {
   speed,
 };
 
+// Store currency: the configured store currency, else the most recent order's currency, else USD.
+async function resolveStoreCurrency() {
+  const config = await SiteConfig.findOne({ key: "main" }).select("commerce.storeCurrency").lean();
+  if (config?.commerce?.storeCurrency) return config.commerce.storeCurrency;
+  const order = await Order.findOne({ isDeleted: { $ne: true }, "financials.currency": { $nin: [null, ""] } })
+    .sort({ createdAt: -1 })
+    .select("financials.currency")
+    .lean();
+  return order?.financials?.currency || "USD";
+}
+
 export async function GET(req) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.isStaff) {
@@ -1096,16 +1109,27 @@ export async function GET(req) {
     const sp = new URL(req.url).searchParams;
     const tab = sp.get("tab") || "overview";
 
-    if (tab === "options") return NextResponse.json({ success: true, data: await options() });
+    if (tab === "options") {
+      const [data, currency] = await Promise.all([options(), resolveStoreCurrency()]);
+      const priceBands = PRICE_BANDS.map((b) => ({ key: b.key, label: priceBandLabel(b, currency) }));
+      return NextResponse.json({ success: true, data: { ...data, priceBands, currency } });
+    }
 
     const handler = TABS[tab];
     if (!handler) return NextResponse.json({ error: "Unknown tab" }, { status: 400 });
 
     const filters = parseFilters(sp);
-    const data = await handler(filters);
+    const [raw, currency] = await Promise.all([handler(filters), resolveStoreCurrency()]);
+    const data = Array.isArray(raw?.bands)
+      ? { ...raw, bands: raw.bands.map((r) => {
+          const band = PRICE_BANDS.find((b) => b.key === r.key);
+          return band ? { ...r, label: priceBandLabel(band, currency) } : r;
+        }) }
+      : raw;
     return NextResponse.json({
       success: true,
       tab,
+      currency,
       filters: { since: filters.since, until: filters.until },
       data,
     });

@@ -29,8 +29,13 @@ export async function PATCH(req, { params }) {
   const { id } = await params;
   await dbConnect();
   try {
-    const body = await req.json();
-    const updated = await Subscriber.findByIdAndUpdate(id, body, { new: true });
+    const body = await req.json().catch(() => ({}));
+    // Only these fields may be edited (never email uniqueness-bypassing writes or arbitrary keys).
+    const update = {};
+    if (body.status !== undefined) update.status = body.status;
+    if (body.source !== undefined) update.source = String(body.source).slice(0, 100);
+    if (Object.keys(update).length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    const updated = await Subscriber.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true });
     if (!updated) return NextResponse.json({ error: "Subscriber not found" }, { status: 404 });
     return NextResponse.json(updated);
   } catch (error) {

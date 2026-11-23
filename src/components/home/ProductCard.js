@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { ShoppingBag, Eye, Star } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -14,6 +15,7 @@ export default function ProductCard({ product, listName = "Product List" }) {
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { addToCart } = useCart();
+  const router = useRouter();
 
   // GA4 Event: select_item — the shopper clicked this product within a list.
   const handleSelect = () => trackSelectItem(product, listName);
@@ -29,7 +31,10 @@ export default function ProductCard({ product, listName = "Product List" }) {
   const handleAddToBag = (e) => {
     e.stopPropagation();
     e.preventDefault();
-    if (needsOptions) {
+    if (product.productType === "gifting") {
+      // Gifting products need the customer to pick items and upload logos — can't be quick-added.
+      router.push(getProductUrl(product));
+    } else if (needsOptions) {
       setIsOptionsModalOpen(true);
     } else {
       addToCart(product);
@@ -118,7 +123,7 @@ export default function ProductCard({ product, listName = "Product List" }) {
       <div className="mt-3 md:mt-4 space-y-1 md:space-y-2 px-1">
         <h3
           style={{ fontFamily: "var(--brand-font)" }}
-          className="text-[11px] md:text-[13px] font-bold uppercase tracking-wider text-foreground/85 group-hover:text-foreground transition-colors truncate"
+          className="text-[11px] md:text-[13px] font-bold uppercase tracking-wider text-foreground/85 group-hover:text-foreground transition-colors line-clamp-2 leading-snug md:min-h-[2.6em]"
         >
           {product.name}
         </h3>

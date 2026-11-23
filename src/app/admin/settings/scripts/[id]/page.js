@@ -1,58 +1,101 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import Link from "next/link";
+import { Page, PageHeader, Notice } from "@/components/admin/ui";
 import ScriptEditor from "@/components/admin/ScriptEditor";
 import { toast } from "react-hot-toast";
+import RequirePermission from "@/components/admin/RequirePermission";
 
 export default function EditScriptPage() {
+  return (
+    <RequirePermission permission="scripts.view">
+      <EditScript />
+    </RequirePermission>
+  );
+}
+
+function EditScript() {
   const { id } = useParams();
   const [script, setScript] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
-  useEffect(() => {
-    const fetchScript = async () => {
-      try {
-        const res = await fetch(`/api/admin/scripts/${id}`);
-        const data = await res.json();
-        if (res.ok) {
-          setScript(data);
-        } else {
-          toast.error(data.error || "Failed to load script");
-        }
-      } catch (err) {
-        toast.error("Network error");
-      } finally {
-        setLoading(false);
+  const fetchScript = useCallback(async () => {
+    setLoading(true);
+    setNotFound(false);
+    setLoadError("");
+    try {
+      const res = await fetch(`/api/admin/scripts/${id}`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setScript(data);
+      } else if (res.status === 404) {
+        setNotFound(true);
+      } else {
+        setLoadError(data.error || `Failed to load script (HTTP ${res.status}).`);
+        toast.error(data.error || "Failed to load script");
       }
-    };
-    fetchScript();
+    } catch (err) {
+      setLoadError("Network error — the script could not be loaded. Check your connection and try again.");
+      toast.error("Network error");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    Promise.resolve().then(() => {
+      fetchScript();
+    });
+  }, [id, fetchScript]);
+
   if (loading) return (
-     <AdminPageLayout title="Edit Script" breadcrumbs={[]}>
-        <div className="p-6 md:p-20 text-center italic text-gray-400">Loading script configuration...</div>
-     </AdminPageLayout>
+    <Page>
+      <PageHeader title="Edit script" />
+      <p className="wp-muted" role="status">Loading script configuration…</p>
+    </Page>
   );
 
-  if (!script) return (
-     <AdminPageLayout title="Script Not Found" breadcrumbs={[]}>
-        <div className="p-6 md:p-20 text-center text-red-500">The requested script configuration could not be found.</div>
-     </AdminPageLayout>
+  if (loadError) return (
+    <Page>
+      <PageHeader title="Edit script" />
+      <Notice type="error">{loadError}</Notice>
+      <p style={{ margin: "0 0 14px" }}>
+        <button type="button" className="wp-btn" onClick={fetchScript}>Retry</button>
+      </p>
+      <Link href="/admin/settings/scripts" className="wp-link">← Back to Scripts</Link>
+    </Page>
+  );
+
+  if (notFound || !script) return (
+    <Page>
+      <PageHeader title="Script not found" />
+      <Notice type="error">The requested script configuration could not be found.</Notice>
+      <Link href="/admin/settings/scripts" className="wp-link">← Back to Scripts</Link>
+    </Page>
   );
 
   return (
-    <AdminPageLayout 
-      title={`Edit: ${script.name}`} 
-      subtitle={`Version ${script.version || 1} • Last updated ${new Date(script.updatedAt).toLocaleString()}`}
-      breadcrumbs={[
-        { label: "Settings", href: "/admin/settings" },
-        { label: "Scripts", href: "/admin/settings/scripts" },
-        { label: "Edit Script" }
-      ]}
-    >
+    <Page>
+      <PageHeader
+        title="Edit script"
+        actions={<Link href="/admin/settings/scripts/new" className="wp-btn">Add new script</Link>}
+      />
+      <p style={{ margin: "0 0 14px" }}>
+        <Link href="/admin/settings/scripts" className="wp-link">← Back to Scripts</Link>
+        <span className="wp-muted" suppressHydrationWarning> · Version {script.version || 1} · Last updated {new Date(script.updatedAt).toLocaleString()}</span>
+      </p>
+      {script.isDeleted && (
+        <Notice type="warning">
+          This script is in the Trash and will not load on the store. Restore it from the{" "}
+          <Link href="/admin/trash?tab=scripts" className="wp-link">Trash</Link> to use it again.
+        </Notice>
+      )}
       <ScriptEditor initialData={script} isEdit={true} />
-    </AdminPageLayout>
+    </Page>
   );
 }

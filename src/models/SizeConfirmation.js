@@ -35,6 +35,10 @@ const SizeConfirmationSchema = new mongoose.Schema({
   replies: [ReplySchema],
   unreadReplies: { type: Number, default: 0, index: true },
   lastReplyAt: { type: Date },
+
+  // Soft delete (Trash)
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
 }, { timestamps: true });
 
 export default mongoose.models.SizeConfirmation || mongoose.model('SizeConfirmation', SizeConfirmationSchema);

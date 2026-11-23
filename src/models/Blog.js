@@ -22,7 +22,10 @@ const BlogSchema = new mongoose.Schema({
   },
   showFeaturedProduct: { type: Boolean, default: true },
   showSidebarIndex: { type: Boolean, default: true },
-  isDeleted: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
+  // Status the post had when it was moved to Trash, so Restore can put it back
+  statusBeforeTrash: { type: String, default: null },
   seo: {
     title: String,
     description: String,

@@ -64,17 +64,12 @@ export default function DualCategoryBanner({
                 </div>
               )}
 
-              {/* Bottom Shadow Gradient (Only rendered if heading OR button is provided) */}
-              {hasOverlayContent && (
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent pointer-events-none transition-opacity duration-300" />
-              )}
-
               {/* Bottom Center Content (Strictly hidden if neither heading nor button is provided) */}
               {hasOverlayContent && (
                 <div className="absolute inset-x-0 bottom-6 sm:bottom-8 md:bottom-10 flex flex-col items-center justify-center text-center px-4 md:px-8 z-10 pointer-events-auto">
                   {/* Heading - strictly conditional */}
                   {hasHeading && (
-                    <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-wider mb-3 sm:mb-4 drop-shadow-lg leading-tight max-w-[90%]">
+                    <h3 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-wider mb-3 sm:mb-4 drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] leading-tight max-w-[90%]">
                       {headingText}
                     </h3>
                   )}

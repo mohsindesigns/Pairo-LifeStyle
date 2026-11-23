@@ -12,10 +12,11 @@ import MadeToMeasureModal from "@/components/product/MadeToMeasureModal";
 import CustomizeProductModal from "@/components/product/CustomizeProductModal";
 import SizeGuideModal from "@/components/product/SizeGuideModal";
 import SelectOptionsPopup from "@/components/product/SelectOptionsPopup";
+import CorporateGiftingActions from "@/components/product/CorporateGiftingActions";
 
 import { recordOptionSelect } from "@/lib/siteAnalytics";
 
-export default function ClientProductActions({ product, onVariantChange, unitPrice }) {
+export default function ClientProductActions({ product, onVariantChange, unitPrice, onGiftingExtraChange }) {
   const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
   const [addedFeedback, setAddedFeedback] = useState(false);
@@ -243,6 +244,13 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
     setMissingAttrsModal({ isOpen: false, missing: [] });
     focusMissingAttributes(missing);
   };
+
+  // Gifting products get their own item-picker UI — never the variant picker or the jacket-only
+  // "Made to measure" / "Customize" buttons below. Keyed on the product type as well as the
+  // derived flag so a gifting product can't fall through to the jacket UI.
+  if (product.productType === "gifting" || product.corporateGifting?.enabled) {
+    return <CorporateGiftingActions product={product} unitPrice={unitPrice} onExtraChange={onGiftingExtraChange} />;
+  }
 
   return (
     <>

@@ -76,8 +76,12 @@ export async function fulfillSucceededPaymentIntent(paymentIntent, log) {
     });
   } catch (error) {
     if (error?.code === 11000) {
+      // A duplicate key is only a harmless replay when the order for THIS checkout already exists. Any other duplicate
+      // (an order number that was already taken, say) means no order was created for a payment that did succeed:
+      // that is refunded like every other unfulfillable payment instead of leaving the customer charged with nothing.
       order = await Order.findOne({ idempotencyKey: payload.idempotencyKey });
-    } else {
+    }
+    if (!order) {
       log?.error?.({ paymentIntentId: paymentIntent.id, error: error.message }, "Order fulfillment failed after payment succeeded. Issuing refund.");
       await refundUnfulfillablePayment(pending, paymentIntent, error, log);
       return null;
@@ -274,6 +278,7 @@ export async function fulfillPaymentLinkSession(session, log) {
 
   // Payment just landed for this order — ask the customer to confirm their size (no-op if not applicable / already sent).
   autoSendSizeConfirmation(order).catch(() => {});
+  import("@/lib/events").then((m) => m.default.dispatch("ORDER_PAYMENT_UPDATED", { order, origin: "system", oldPaymentStatus: "Pending", newPaymentStatus: "Paid" })).catch(() => {});
   return order;
 }
 

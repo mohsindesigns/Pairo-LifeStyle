@@ -10,7 +10,8 @@ import { TEMPLATE_REGISTRY } from "@/lib/templates";
  */
 export const getCachedPageBySlug = cache(async (slug) => {
   await dbConnect();
-  return Page.findOne({ slug: slug.toLowerCase() }).lean();
+  // Trashed pages are never served on the storefront.
+  return Page.findOne({ slug: slug.toLowerCase(), isDeleted: { $ne: true } }).lean();
 });
 
 /**
@@ -18,7 +19,7 @@ export const getCachedPageBySlug = cache(async (slug) => {
  */
 export const getCachedPageById = cache(async (id) => {
   await dbConnect();
-  return Page.findById(id).lean();
+  return Page.findOne({ _id: id, isDeleted: { $ne: true } }).lean();
 });
 
 /**
@@ -38,7 +39,7 @@ export async function resolvePageAndTemplate(slug, defaultTemplate = "default") 
 
   if (!page && ["about", "contact", "home"].includes(defaultTemplate)) {
     await dbConnect();
-    page = await Page.findOne({ template: defaultTemplate, status: { $ne: "Deleted" } }).lean();
+    page = await Page.findOne({ template: defaultTemplate, status: { $ne: "Deleted" }, isDeleted: { $ne: true } }).lean();
   }
 
   if (!page) {

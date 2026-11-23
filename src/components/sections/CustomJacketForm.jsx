@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { Upload, X, Check, AlertCircle, ArrowRight, Loader2, ImageIcon } from "lucide-react";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
+import ThemedSelect from "@/components/ui/ThemedSelect";
 
 const JACKET_TYPES = ["Biker Jacket", "Bomber Jacket", "Racer Jacket", "Aviator / Shearling", "Trench Coat", "Blazer", "Vest / Gilet", "Custom / Other"];
 const LEATHER_TYPES = ["Full-Grain Cowhide", "Top-Grain Lambskin", "Genuine Suede", "Shearling", "Nappa Leather", "Distressed Leather", "Vegan Leather", "Custom Specification"];
@@ -14,7 +15,7 @@ const COUNTRIES = ["United States", "United Kingdom", "Canada", "Australia", "Ge
 
 const InputField = ({ label, required, error, children }) => (
   <div className="space-y-1.5">
-    <label className="block text-[12px] font-bold uppercase tracking-wider text-foreground/50">
+    <label className="block text-[12px] font-bold uppercase tracking-wider text-foreground/70">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     {children}
@@ -26,7 +27,7 @@ const InputField = ({ label, required, error, children }) => (
   </div>
 );
 
-const inputClass = "w-full bg-white border border-border rounded-lg px-4 py-3 text-[14px] text-foreground placeholder:text-foreground/30 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200";
+const inputClass = "w-full bg-white border border-border rounded-lg px-4 py-3 text-[14px] text-foreground placeholder:text-foreground/50 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all duration-200";
 const selectClass = `${inputClass} cursor-pointer`;
 
 export default function CustomJacketForm({
@@ -169,10 +170,10 @@ export default function CustomJacketForm({
             <Check className="w-10 h-10 text-white" />
           </div>
           <h3 className="font-heading text-3xl font-black text-foreground mb-4">Inquiry Received!</h3>
-          <p className="text-foreground/60 text-base leading-relaxed mb-8">
+          <p className="text-foreground/80 text-base leading-relaxed mb-8">
             Thank you for your interest in a bespoke Pairo jacket. Our expert team will review your specifications and contact you within <strong>24 hours</strong> to begin crafting your vision.
           </p>
-          <p className="text-[12px] text-foreground/40 uppercase tracking-widest">Check your inbox for a confirmation email</p>
+          <p className="text-[12px] text-foreground/60 uppercase tracking-widest">Check your inbox for a confirmation email</p>
         </motion.div>
       </section>
     );
@@ -189,13 +190,13 @@ export default function CustomJacketForm({
           transition={{ duration: 0.6 }}
           className="text-center mb-14"
         >
-          <span className="inline-block text-[11px] font-bold uppercase tracking-[4px] text-primary/60 mb-4">
+          <span className="inline-block text-[11px] font-bold uppercase tracking-[4px] text-primary/80 mb-4">
             Bespoke Inquiry
           </span>
           <Heading className="font-heading text-4xl md:text-5xl font-black text-foreground tracking-tight mb-4">
             {formTitle}
           </Heading>
-          <p className="text-foreground/60 max-w-xl mx-auto text-base leading-relaxed">{formSubtitle}</p>
+          <p className="text-foreground/80 max-w-xl mx-auto text-base leading-relaxed">{formSubtitle}</p>
         </motion.div>
 
         {/* 2-Column Form Layout */}
@@ -230,10 +231,10 @@ export default function CustomJacketForm({
                     <input type="tel" name="phone" value={form.phone} onChange={handleChange} placeholder="+1 (555) 000-0000" className={inputClass} />
                   </InputField>
                   <InputField label="Country" error={errors.country}>
-                    <select name="country" value={form.country} onChange={handleChange} className={selectClass}>
+                    <ThemedSelect name="country" value={form.country} onChange={handleChange} className={selectClass}>
                       <option value="">Select country...</option>
                       {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    </ThemedSelect>
                   </InputField>
                   <InputField label="City" error={errors.city}>
                     <input type="text" name="city" value={form.city} onChange={handleChange} placeholder="New York" className={inputClass} />
@@ -252,34 +253,34 @@ export default function CustomJacketForm({
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <InputField label="Jacket Type" required error={errors.jacketType}>
-                    <select name="jacketType" value={form.jacketType} onChange={handleChange} className={selectClass}>
+                    <ThemedSelect name="jacketType" value={form.jacketType} onChange={handleChange} className={selectClass}>
                       <option value="">Select jacket type...</option>
                       {JACKET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                    </ThemedSelect>
                   </InputField>
                   <InputField label="Gender" error={errors.gender}>
-                    <select name="gender" value={form.gender} onChange={handleChange} className={selectClass}>
+                    <ThemedSelect name="gender" value={form.gender} onChange={handleChange} className={selectClass}>
                       <option value="">Select gender...</option>
                       <option value="Men">Men</option>
                       <option value="Women">Women</option>
                       <option value="Unisex">Unisex</option>
-                    </select>
+                    </ThemedSelect>
                   </InputField>
                   <InputField label="Preferred Leather" required error={errors.preferredLeather}>
-                    <select name="preferredLeather" value={form.preferredLeather} onChange={handleChange} className={selectClass}>
+                    <ThemedSelect name="preferredLeather" value={form.preferredLeather} onChange={handleChange} className={selectClass}>
                       <option value="">Select leather type...</option>
                       {LEATHER_TYPES.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
+                    </ThemedSelect>
                   </InputField>
                   <InputField label="Preferred Color" error={errors.preferredColor}>
                     <input type="text" name="preferredColor" value={form.preferredColor} onChange={handleChange} placeholder="e.g. Cognac Brown, Jet Black" className={inputClass} />
                   </InputField>
                   <div className="sm:col-span-2">
                     <InputField label="Size" error={errors.size}>
-                      <select name="size" value={form.size} onChange={handleChange} className={selectClass}>
+                      <ThemedSelect name="size" value={form.size} onChange={handleChange} className={selectClass}>
                         <option value="">Select size...</option>
                         {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                      </ThemedSelect>
                     </InputField>
                   </div>
                 </div>
@@ -300,9 +301,9 @@ export default function CustomJacketForm({
               <h3 className="font-heading text-lg font-black text-foreground mb-2 flex items-center gap-3">
                 <span className="w-7 h-7 rounded-full bg-primary text-white text-[12px] font-bold flex items-center justify-center">3</span>
                 Reference Images
-                <span className="text-[12px] font-normal text-foreground/40">(optional, max 5)</span>
+                <span className="text-[12px] font-normal text-foreground/60">(optional, max 5)</span>
               </h3>
-              <p className="text-foreground/50 text-[13px] mb-5 leading-relaxed">Upload photos of designs, colors, or styles that inspire you. JPG, PNG, WebP — max 8MB each.</p>
+              <p className="text-foreground/70 text-[13px] mb-5 leading-relaxed">Upload photos of designs, colors, or styles that inspire you. JPG, PNG, WebP — max 8MB each.</p>
 
               {/* Upload Area */}
               <div
@@ -322,7 +323,7 @@ export default function CustomJacketForm({
                     </div>
                     <div>
                       <p className="font-bold text-foreground text-sm">Click to upload reference images</p>
-                      <p className="text-foreground/40 text-xs mt-1">or drag and drop here</p>
+                      <p className="text-foreground/60 text-xs mt-1">or drag and drop here</p>
                     </div>
                   </div>
                 )}
@@ -367,7 +368,7 @@ export default function CustomJacketForm({
                     className={`${inputClass} resize-none`}
                   />
                 </InputField>
-                <p className="text-[11px] text-foreground/30 mt-1.5 text-right">
+                <p className="text-[11px] text-foreground/50 mt-1.5 text-right">
                   {form.additionalNotes.length}/2000
                 </p>
               </div>
@@ -396,7 +397,7 @@ export default function CustomJacketForm({
                     </>
                   )}
                 </button>
-                <p className="text-[11px] text-foreground/45 mt-3 leading-relaxed">
+                <p className="text-[11px] text-foreground/65 mt-3 leading-relaxed">
                   By submitting, you agree that we may contact you regarding your inquiry. No payment is required at this stage.
                 </p>
               </div>

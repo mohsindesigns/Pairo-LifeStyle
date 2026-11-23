@@ -1,12 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import AdminPageLayout from "@/components/admin/AdminPageLayout";
+import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import MediaPicker from "@/components/admin/MediaPicker";
-import { ArrowUp, ArrowDown, Trash2, Plus, Edit2, Check, X, Move, ImageIcon } from "lucide-react";
+import { GripVertical, ImageIcon } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { usePopup } from "@/context/PopupContext";
 import RequirePermission from "@/components/admin/RequirePermission";
+import { Page, PageHeader, Postbox, Notice, Skeleton, formatDate } from "@/components/admin/ui";
+import { reindexSteps, duplicateStepIn, trashStepIn, restoreStepIn, validateProcessSteps } from "@/lib/admin-products-utils";
+
+// Unique id for a new process step (crypto.randomUUID where available).
+function makeStepId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 11)}`;
+}
 
 export default function AdminProductProcessPage() {
   const { showConfirm } = usePopup();
@@ -15,6 +25,12 @@ export default function AdminProductProcessPage() {
   const [title, setTitle] = useState("Our Craftsmanship Process");
   const [subtitle, setSubtitle] = useState("How we create our signature shearling masterpiece garments");
   const [steps, setSteps] = useState([]);
+  const [trashedSteps, setTrashedSteps] = useState([]);
+  const [savedSnapshot, setSavedSnapshot] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  // Id of a step added but never confirmed with "Update step": Cancel removes it again.
+  const [newStepId, setNewStepId] = useState(null);
   
   // Step editing modal or inline form state
   const [editingStepId, setEditingStepId] = useState(null);
@@ -23,39 +39,80 @@ export default function AdminProductProcessPage() {
   const [editSubheading, setEditSubheading] = useState("");
   const [editDescription, setEditDescription] = useState("");
 
-  useEffect(() => {
-    fetchProcess();
-  }, []);
 
   const fetchProcess = async () => {
     try {
       const res = await fetch("/api/admin/product-process");
-      if (!res.ok) throw new Error("Failed to fetch product process");
-      const data = await res.json();
-      setTitle(data.title);
-      setSubtitle(data.subtitle);
-      setSteps(data.steps || []);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to load the product process");
+      applyServerData(data);
+      setLoadError("");
     } catch (error) {
       console.error(error);
-      toast.error("Error loading process config");
+      setLoadError(error.message || "Failed to load the product process");
     } finally {
       setLoading(false);
     }
   };
 
+  const snapshotOf = (t, st, sub, tr) => JSON.stringify({ t, st, sub, tr });
+
+  const applyServerData = (data) => {
+    // Every step needs a stable id (row key + duplicate/trash target); very old rows may lack one
+    const withId = (s) => (s.id ? s : { ...s, id: String(s._id || makeStepId()) });
+    const nextSteps = reindexSteps((data.steps || []).map(withId));
+    const nextTrash = (data.trashedSteps || []).map(withId);
+    setTitle(data.title || "");
+    setSubtitle(data.subtitle || "");
+    setSteps(nextSteps);
+    setTrashedSteps(nextTrash);
+    setSavedSnapshot(snapshotOf(data.title || "", nextSteps, data.subtitle || "", nextTrash));
+  };
+
+  useEffect(() => {
+    // Load once on mount (deferred so no state is set synchronously inside the effect)
+    Promise.resolve().then(fetchProcess);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const isDirty = useMemo(
+    () => !loading && savedSnapshot !== snapshotOf(title, steps, subtitle, trashedSteps),
+    [loading, savedSnapshot, title, steps, subtitle, trashedSteps]
+  );
+
+  // Applies the step form that is still open (so "Save Changes" never drops typed edits).
+  const stepsWithOpenEdit = () => {
+    if (!editingStepId) return steps;
+    return steps.map((s) => s.id === editingStepId
+      ? { ...s, image: editImage, heading: editHeading, subheading: editSubheading, description: editDescription }
+      : s);
+  };
+
   const handleSave = async () => {
+    const toSave = stepsWithOpenEdit();
+    const stepError = validateProcessSteps(toSave);
+    if (stepError) {
+      setSaveError(stepError);
+      toast.error(stepError);
+      return;
+    }
     setSaving(true);
+    setSaveError("");
     try {
       const res = await fetch("/api/admin/product-process", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, subtitle, steps })
+        body: JSON.stringify({ title, subtitle, steps: toSave, trashedSteps })
       });
-      if (!res.ok) throw new Error("Failed to save product process");
-      toast.success("Product process config saved successfully");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Failed to save the product process");
+      cancelEditing();
+      applyServerData(data);
+      toast.success("Product process saved");
     } catch (error) {
       console.error(error);
-      toast.error("Error saving process config");
+      setSaveError(error.message || "Failed to save the product process");
+      toast.error(error.message || "Failed to save the product process");
     } finally {
       setSaving(false);
     }
@@ -64,29 +121,69 @@ export default function AdminProductProcessPage() {
   // Add Step
   const handleAddStep = () => {
     const newStep = {
-      id: Math.random().toString(36).substring(2, 11),
+      id: makeStepId(),
       image: "",
-      heading: "New Step Heading",
-      subheading: "Step Subheading",
-      description: "Description of the step process...",
+      heading: "",
+      subheading: "",
+      description: "",
       order: steps.length
     };
-    setSteps([...steps, newStep]);
+    // Close (and keep) any step that is still open before starting a new one
+    const base = stepsWithOpenEdit();
+    setSteps([...base, newStep]);
     startEditing(newStep);
+    setNewStepId(newStep.id);
   };
 
-  // Delete Step
-  const handleDeleteStep = async (id) => {
-    const ok = await showConfirm("Are you sure you want to delete this step?");
-    if (ok) {
-      const filtered = steps.filter(s => s.id !== id);
-      // Re-index orders
-      const reindexed = filtered.map((s, i) => ({ ...s, order: i }));
-      setSteps(reindexed);
-      if (editingStepId === id) {
-        cancelEditing();
-      }
+  const handleDuplicateStep = (id) => {
+    const base = stepsWithOpenEdit();
+    cancelEditing();
+    setSteps(duplicateStepIn(base, id, makeStepId));
+    toast.success("Step duplicated (remember to Save Changes)");
+  };
+
+  // Trash / restore / delete permanently (all kept locally until Save Changes)
+  const handleTrashStep = (id) => {
+    const base = editingStepId === id ? steps : stepsWithOpenEdit();
+    if (editingStepId) cancelEditing();
+    // A brand-new empty step has nothing worth keeping: drop it instead of trashing it
+    const step = base.find((s) => s.id === id);
+    if (id === newStepId && step && !step.heading && !step.image) {
+      setSteps(reindexSteps(base.filter((s) => s.id !== id)));
+      return;
     }
+    const next = trashStepIn(base, trashedSteps, id);
+    setSteps(next.steps);
+    setTrashedSteps(next.trashed);
+    toast.success("Step moved to trash (remember to Save Changes)");
+  };
+
+  const handleRestoreStep = (id) => {
+    const next = restoreStepIn(steps, trashedSteps, id);
+    setSteps(next.steps);
+    setTrashedSteps(next.trashed);
+    toast.success("Step restored (remember to Save Changes)");
+  };
+
+  const handleDeleteStepPermanently = async (id) => {
+    const step = trashedSteps.find((s) => s.id === id);
+    const ok = await showConfirm(
+      `Permanently delete "${step?.heading || "this step"}"? It is removed for good when you click Save Changes.`,
+      "Delete permanently",
+      { confirmText: "Delete permanently", danger: true }
+    );
+    if (!ok) return;
+    setTrashedSteps((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const handleEmptyTrash = async () => {
+    if (trashedSteps.length === 0) return;
+    const ok = await showConfirm(
+      `Permanently delete all ${trashedSteps.length} trashed step${trashedSteps.length === 1 ? "" : "s"}? They are removed for good when you click Save Changes.`,
+      "Empty trash",
+      { confirmText: "Empty trash", danger: true }
+    );
+    if (ok) setTrashedSteps([]);
   };
 
   // Start Editing Step
@@ -126,8 +223,16 @@ export default function AdminProductProcessPage() {
     toast.success("Step updated (remember to click Save Changes)");
   };
 
-  // Cancel Editing Step
+  // Cancel the step form; a new step that was never confirmed is removed again
+  const handleCancelStep = () => {
+    if (editingStepId && editingStepId === newStepId) {
+      setSteps((prev) => reindexSteps(prev.filter((s) => s.id !== newStepId)));
+    }
+    cancelEditing();
+  };
+
   const cancelEditing = () => {
+    setNewStepId(null);
     setEditingStepId(null);
     setEditImage("");
     setEditHeading("");
@@ -187,236 +292,247 @@ export default function AdminProductProcessPage() {
     setDraggedIndex(null);
   };
 
+  const openStep = (step) => {
+    // Keep whatever was typed into the step that is currently open
+    if (editingStepId && editingStepId !== step.id) setSteps(stepsWithOpenEdit());
+    setNewStepId(null);
+    startEditing(step);
+  };
+
   if (loading) {
     return (
-      <div className="bg-[#f0f2f1] min-h-screen p-8 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 border-2 border-[#2271b1] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-[13px] text-[#646970]">Loading Product Process config...</p>
+      <RequirePermission permission="products.view">
+      <Page>
+        <PageHeader title="Product Process" />
+        <div className="wp-cols" aria-busy="true" aria-label="Loading product process">
+          <div className="wp-col-main">
+            <Postbox title="Section heading"><Skeleton height={30} /><div style={{ height: 12 }} /><Skeleton height={30} /></Postbox>
+            <Postbox title="Process steps">{[0, 1, 2].map((i) => <Skeleton key={i} height={52} style={{ marginBottom: 8 }} />)}</Postbox>
+          </div>
+          <div className="wp-col-side"><Postbox title="Publish"><Skeleton height={40} /></Postbox></div>
         </div>
-      </div>
+      </Page>
+      </RequirePermission>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <RequirePermission permission="products.view">
+      <Page>
+        <PageHeader title="Product Process" aside={<Link href="/admin/products" className="wp-link">← Products</Link>} />
+        <Notice type="error">{loadError}</Notice>
+        <button type="button" className="wp-btn" onClick={() => { setLoading(true); fetchProcess(); }}>Try again</button>
+      </Page>
+      </RequirePermission>
     );
   }
 
   return (
     <RequirePermission permission="products.view">
-    <AdminPageLayout
-      title="Product Process Management"
-      subtitle="Configure the craftsmanship process section shown on all product pages"
-      breadcrumbs={[{ label: "Products", href: "/admin/products" }, { label: "Product Process" }]}
-    >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left 1 Column: General Settings */}
-        <div className="bg-white p-3 sm:p-6 border border-[#ccd0d4] rounded-[3px] shadow-sm space-y-4 h-fit">
-          <h2 className="text-[14px] font-bold text-[#1d2327] border-b border-[#ccd0d4] pb-2 uppercase tracking-wide">
-            General Options
-          </h2>
+    <Page>
+      <PageHeader
+        title="Product Process"
+        aside={<Link href="/admin/products" className="wp-link">← Products</Link>}
+      />
+      <p className="wp-desc" style={{ marginTop: 0, marginBottom: 12 }}>Configure the craftsmanship process section shown on all product pages.</p>
 
-          <div className="space-y-1">
-            <label className="text-[12px] font-semibold text-[#1d2327]">Section Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-[#f6f7f7] border border-[#dcdcde] px-3 py-2 text-[13px] focus:outline-none focus:border-[#2271b1] focus:bg-white transition-all rounded-[3px]"
-              placeholder="e.g., The Craftsmanship Behind Pairo"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[12px] font-semibold text-[#1d2327]">Section Subtitle</label>
-            <input
-              type="text"
-              value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
-              className="w-full bg-[#f6f7f7] border border-[#dcdcde] px-3 py-2 text-[13px] focus:outline-none focus:border-[#2271b1] focus:bg-white transition-all rounded-[3px]"
-              placeholder="e.g., Each jacket is handcrafted through a rigorous master process."
-            />
-          </div>
-
-          <div className="pt-2 border-t border-[#ccd0d4]">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full bg-[#2271b1] text-white py-2 px-4 rounded-[3px] text-[13px] font-bold hover:bg-[#135e96] transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-            >
-              {saving ? "Saving Changes..." : "Save Changes"}
-            </button>
-          </div>
-        </div>
-
-        {/* Right 2 Columns: Steps List */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-3 sm:p-6 border border-[#ccd0d4] rounded-[3px] shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#ccd0d4] pb-2">
-              <h2 className="text-[14px] font-bold text-[#1d2327] uppercase tracking-wide">
-                Process Steps ({steps.length})
-              </h2>
-              <button
-                type="button"
-                onClick={handleAddStep}
-                className="bg-white border border-[#2271b1] text-[#2271b1] hover:bg-[#f0f6fb] px-3 py-1.5 rounded-[3px] text-[12px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add Process Step
-              </button>
+      <div className="wp-cols">
+        <div className="wp-col-main">
+          <Postbox title="Section heading" id="pp-general">
+            <div className="wp-field">
+              <label htmlFor="pp-title" className="wp-label">Section title</label>
+              <input
+                id="pp-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="wp-input wp-full"
+                placeholder="e.g., The Craftsmanship Behind Pairo"
+              />
             </div>
+            <div className="wp-field" style={{ marginBottom: 0 }}>
+              <label htmlFor="pp-subtitle" className="wp-label">Section subtitle</label>
+              <input
+                id="pp-subtitle"
+                type="text"
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
+                className="wp-input wp-full"
+                placeholder="e.g., Each jacket is handcrafted through a rigorous master process."
+              />
+            </div>
+          </Postbox>
 
+          <Postbox
+            title={`Process steps (${steps.length})`}
+            id="pp-steps"
+            aside={
+              <button type="button" onClick={handleAddStep} className="wp-btn">
+                Add process step
+              </button>
+            }
+          >
             {steps.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-[#ccd0d4] rounded bg-[#f6f7f7]">
-                <p className="text-[13px] text-[#646970]">No steps configured yet. Click "Add Process Step" to start!</p>
-              </div>
+              <p className="wp-empty" style={{ margin: 0, padding: 0 }}>No steps yet. Click &ldquo;Add process step&rdquo; to add the first one. With no steps, the section is hidden on product pages.</p>
             ) : (
-              <div className="space-y-3">
-                {steps.map((step, index) => {
-                  const isEditing = editingStepId === step.id;
-                  return (
-                    <div
-                      key={step.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
-                      className={`border rounded bg-white transition-all ${
-                        isEditing ? "border-[#2271b1] ring-1 ring-[#2271b1]/20 shadow-md" : "border-[#ccd0d4] hover:shadow-sm"
-                      }`}
-                    >
-                      {/* Accordion header / main bar */}
-                      <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-2.5 sm:p-3.5 bg-[#fcfcfc] border-b border-[#f0f0f1] cursor-move">
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                          <Move className="w-4 h-4 text-[#8c8f94] shrink-0" />
-                          <span className="text-[11px] font-bold text-white bg-black/80 px-2 py-0.5 rounded-[3px] shrink-0">
-                            {index + 1}
-                          </span>
-                          {step.image ? (
-                            <img src={step.image} alt="" className="w-8 h-8 rounded object-cover border border-black/10 shrink-0" />
-                          ) : (
-                            <div className="w-8 h-8 rounded bg-[#f0f0f1] border border-[#ccd0d4] flex items-center justify-center shrink-0">
-                              <ImageIcon className="w-4 h-4 text-[#8c8f94]" />
+              <>
+                <p className="wp-desc" style={{ marginTop: 0, marginBottom: 10 }}>Drag steps by their bar to reorder, or use Move up / Move down.</p>
+                <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {steps.map((step, index) => {
+                    const isEditing = editingStepId === step.id;
+                    return (
+                      <li
+                        key={step.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnd={handleDragEnd}
+                        style={{
+                          border: `1px solid ${isEditing ? "#2271b1" : "#dcdcde"}`,
+                          boxShadow: isEditing ? "0 0 0 1px #2271b1" : undefined,
+                          background: "#fff",
+                        }}
+                      >
+                        <div
+                          style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#f6f7f7", cursor: "move", minWidth: 0 }}
+                        >
+                          <GripVertical className="w-4 h-4" style={{ color: "#8c8f94", flex: "none" }} aria-hidden="true" />
+                          <span className="wp-muted wp-small" style={{ flex: "none", minWidth: 18 }}>{index + 1}.</span>
+                          <div className="wp-thumb">
+                            {step.image ? <img src={step.image} alt="" /> : <ImageIcon className="w-4 h-4" aria-hidden="true" />}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div className="wp-strong" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{step.heading || "(No title)"}</div>
+                            {step.subheading && <div className="wp-muted wp-small" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{step.subheading}</div>}
+                            <div className="wp-row-actions" style={{ visibility: "visible" }}>
+                              <span><button type="button" onClick={() => moveUp(index)} disabled={index === 0} style={index === 0 ? { color: "#a7aaad", cursor: "default" } : undefined} aria-label={`Move step ${index + 1} up`}>Move up</button></span>
+                              <span><button type="button" onClick={() => moveDown(index)} disabled={index === steps.length - 1} style={index === steps.length - 1 ? { color: "#a7aaad", cursor: "default" } : undefined} aria-label={`Move step ${index + 1} down`}>Move down</button></span>
+                              {!isEditing ? (
+                                <span><button type="button" onClick={() => openStep(step)}>Edit</button></span>
+                              ) : null}
+                              <span><button type="button" onClick={() => handleDuplicateStep(step.id)}>Duplicate</button></span>
+                              <span><button type="button" onClick={() => handleTrashStep(step.id)} className="is-danger">Trash</button></span>
                             </div>
-                          )}
-                          <div className="truncate min-w-0">
-                            <p className="text-[13px] font-bold text-[#1d2327] truncate">{step.heading || "(No title)"}</p>
-                            {step.subheading && <p className="text-[11px] text-[#646970] truncate">{step.subheading}</p>}
                           </div>
                         </div>
 
-                        {/* Reorder and Action controls */}
-                        <div className="flex items-center gap-1 shrink-0 ml-auto sm:ml-4">
-                          <button
-                            type="button"
-                            onClick={() => moveUp(index)}
-                            disabled={index === 0}
-                            className="p-1.5 hover:bg-[#f0f0f1] text-[#646970] disabled:opacity-30 rounded transition-colors"
-                            title="Move Up"
-                          >
-                            <ArrowUp className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveDown(index)}
-                            disabled={index === steps.length - 1}
-                            className="p-1.5 hover:bg-[#f0f0f1] text-[#646970] disabled:opacity-30 rounded transition-colors"
-                            title="Move Down"
-                          >
-                            <ArrowDown className="w-4 h-4" />
-                          </button>
-                          <div className="h-4 w-[1px] bg-[#ccd0d4] mx-1" />
-                          {!isEditing ? (
-                            <button
-                              type="button"
-                              onClick={() => startEditing(step)}
-                              className="p-1.5 hover:bg-[#f0f6fb] text-[#2271b1] rounded transition-colors"
-                              title="Edit Step"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteStep(step.id)}
-                            className="p-1.5 hover:bg-red-50 text-red-600 rounded transition-colors"
-                            title="Delete Step"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Editing panel (rendered inside when active) */}
-                      {isEditing && (
-                        <div className="p-4 border-t border-[#ccd0d4] bg-[#f9f9fa] space-y-4 animate-in slide-in-from-top-2 duration-300">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-1">
-                              <MediaPicker
-                                value={editImage}
-                                onChange={(url) => setEditImage(url)}
-                                label="Step Image"
-                              />
-                            </div>
-                            <div className="md:col-span-2 space-y-3">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <label className="text-[11px] font-semibold text-[#1d2327]">Step Heading</label>
-                                  <input
-                                    type="text"
-                                    value={editHeading}
-                                    onChange={(e) => setEditHeading(e.target.value)}
-                                    className="w-full bg-white border border-[#dcdcde] px-2 py-1.5 text-[12px] focus:outline-none focus:border-[#2271b1] rounded-[3px]"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-[11px] font-semibold text-[#1d2327]">Step Subheading</label>
-                                  <input
-                                    type="text"
-                                    value={editSubheading}
-                                    onChange={(e) => setEditSubheading(e.target.value)}
-                                    className="w-full bg-white border border-[#dcdcde] px-2 py-1.5 text-[12px] focus:outline-none focus:border-[#2271b1] rounded-[3px]"
-                                  />
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-semibold text-[#1d2327]">Description</label>
-                                <textarea
-                                  value={editDescription}
-                                  onChange={(e) => setEditDescription(e.target.value)}
-                                  rows={3}
-                                  className="w-full bg-white border border-[#dcdcde] px-2 py-1.5 text-[12px] focus:outline-none focus:border-[#2271b1] rounded-[3px]"
+                        {isEditing && (
+                          <div style={{ padding: 12, borderTop: "1px solid #dcdcde" }}>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="md:col-span-1">
+                                <MediaPicker
+                                  value={editImage}
+                                  onChange={(url) => setEditImage(url)}
+                                  label="Step Image"
                                 />
                               </div>
+                              <div className="md:col-span-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3">
+                                  <div className="wp-field">
+                                    <label htmlFor={`pp-heading-${step.id}`} className="wp-label">Step heading</label>
+                                    <input
+                                      id={`pp-heading-${step.id}`}
+                                      type="text"
+                                      value={editHeading}
+                                      onChange={(e) => setEditHeading(e.target.value)}
+                                      className="wp-input wp-full"
+                                    />
+                                  </div>
+                                  <div className="wp-field">
+                                    <label htmlFor={`pp-subheading-${step.id}`} className="wp-label">Step subheading</label>
+                                    <input
+                                      id={`pp-subheading-${step.id}`}
+                                      type="text"
+                                      value={editSubheading}
+                                      onChange={(e) => setEditSubheading(e.target.value)}
+                                      className="wp-input wp-full"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="wp-field">
+                                  <label htmlFor={`pp-desc-${step.id}`} className="wp-label">Description</label>
+                                  <textarea
+                                    id={`pp-desc-${step.id}`}
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    rows={3}
+                                    className="wp-textarea wp-full"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 8, borderTop: "1px solid #f0f0f1", paddingTop: 10 }}>
+                              <button type="button" onClick={handleCancelStep} className="wp-btn">
+                                Cancel
+                              </button>
+                              <button type="button" onClick={() => saveStepEdit(step.id)} className="wp-btn wp-btn-primary">
+                                Update step
+                              </button>
                             </div>
                           </div>
-                          
-                          <div className="flex items-center justify-end gap-2 border-t border-[#f0f0f1] pt-3">
-                            <button
-                              type="button"
-                              onClick={cancelEditing}
-                              className="bg-white border border-[#dcdcde] text-[#3c434a] hover:bg-[#f6f7f7] px-3 py-1.5 rounded-[3px] text-[12px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => saveStepEdit(step.id)}
-                              className="bg-[#2271b1] text-white hover:bg-[#135e96] px-3 py-1.5 rounded-[3px] text-[12px] font-bold transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              Update Step
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </>
             )}
-          </div>
+          </Postbox>
+
+          {trashedSteps.length > 0 && (
+            <Postbox
+              title={`Trash (${trashedSteps.length})`}
+              id="pp-trash"
+              aside={<button type="button" onClick={handleEmptyTrash} className="wp-link" style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: "#b32d2e" }}>Empty trash</button>}
+            >
+              <p className="wp-desc" style={{ marginTop: 0, marginBottom: 10 }}>Trashed steps are not shown on product pages. Restore puts a step back at the end of the list.</p>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                {trashedSteps.map((step) => (
+                  <li key={step.id} className="wp-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "1px solid #dcdcde", background: "#f6f7f7", minWidth: 0 }}>
+                    <div className="wp-thumb">
+                      {step.image ? <img src={step.image} alt="" /> : <ImageIcon className="w-4 h-4" aria-hidden="true" />}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="wp-strong" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{step.heading || "(No title)"}</div>
+                      {step.deletedAt && <div className="wp-muted wp-small">Trashed {formatDate(step.deletedAt)}</div>}
+                      <div className="wp-row-actions" style={{ visibility: "visible" }}>
+                        <span><button type="button" onClick={() => handleRestoreStep(step.id)}>Restore</button></span>
+                        <span><button type="button" onClick={() => handleDeleteStepPermanently(step.id)} className="is-danger">Delete permanently</button></span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Postbox>
+          )}
+        </div>
+
+        <div className="wp-col-side">
+          <Postbox
+            title="Publish"
+            id="pp-publish"
+            footer={
+              <>
+                <span className="wp-spacer" />
+                <button type="button" onClick={handleSave} disabled={saving} className="wp-btn wp-btn-primary">
+                  {saving ? "Saving…" : "Save Changes"}
+                </button>
+              </>
+            }
+          >
+            {saveError && <Notice type="error" onDismiss={() => setSaveError("")}>{saveError}</Notice>}
+            <p className="wp-muted" style={{ margin: 0 }}>
+              {steps.length} step{steps.length === 1 ? "" : "s"}{trashedSteps.length ? `, ${trashedSteps.length} in trash` : ""}.
+            </p>
+            <p className="wp-small" style={{ margin: "6px 0 0", color: isDirty ? "#996800" : "#646970" }} role="status">
+              {isDirty ? "You have unsaved changes. Step edits, duplicates and trash are saved when you click Save Changes." : "All changes saved."}
+            </p>
+          </Postbox>
         </div>
       </div>
-    </AdminPageLayout>
+    </Page>
     </RequirePermission>
   );
 }

@@ -208,6 +208,11 @@ export async function registerRedirect(rawOldPath, rawNewPath, statusCode = 301)
     return null;
   }
   
+  // The new path is the live URL from now on. A redirect that starts AT it is stale (typically a slug
+  // renamed away and later back again) and would shadow the real page, so remove it first.
+  const [livePathOnly] = newPath.split("?");
+  await Redirect.deleteMany({ oldPath: normalizePath(livePathOnly) });
+
   // Resolve where the destination currently points to avoid chain
   const resolvedTarget = await resolveRedirect(newPath);
   const finalDestination = resolvedTarget ? resolvedTarget.newPath : newPath;

@@ -143,6 +143,46 @@ describe("CRM & Orders Integration Suite", () => {
       expect(data.error).toContain("Unauthorized");
     });
 
+    it("on a production server with no CRM_API_KEY set, refuses everyone instead of leaving every order open", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      try {
+        const { GET, PATCH } = await import("@/app/api/crm/orders/route");
+        const res = await GET(new Request("http://localhost:3000/api/crm/orders"));
+        expect(res.status).toBe(401);
+        expect((await res.json()).success).toBe(false);
+
+        const patch = await PATCH(new Request("http://localhost:3000/api/crm/orders", {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderNumber: "PL-1001", status: "Cancelled" }),
+        }));
+        expect(patch.status).toBe(401);
+
+        // A guessed or empty key does not help either.
+        const guess = await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "" } }));
+        expect(guess.status).toBe(401);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("on a production server the configured key still works, and a key of the wrong length is refused", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      process.env.CRM_API_KEY = "k".repeat(40);
+      try {
+        const { GET } = await import("@/app/api/crm/orders/route");
+        expect((await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "k".repeat(40) } }))).status).toBe(200);
+        expect((await GET(new Request("http://localhost:3000/api/crm/orders", { headers: { "x-api-key": "k".repeat(39) } }))).status).toBe(401);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("never lists orders that were moved to the Trash", async () => {
+      const { GET } = await import("@/app/api/crm/orders/route");
+      const Order = (await import("@/models/Order")).default;
+      await GET(new Request("http://localhost:3000/api/crm/orders"));
+      expect(Order.find).toHaveBeenCalledWith(expect.objectContaining({ isDeleted: { $ne: true } }));
+    });
+
     it("should authorize request when CRM_API_KEY matches via header or bearer token", async () => {
       process.env.CRM_API_KEY = "secret-crm-key-123";
       const { GET } = await import("@/app/api/crm/orders/route");
@@ -275,5 +315,22 @@ describe("CRM & Orders Integration Suite", () => {
       expect(ordersRoute.PATCH).toBe(crmOrdersRoute.PATCH);
       expect(ordersRoute.OPTIONS).toBe(crmOrdersRoute.OPTIONS);
     });
+  });
+});
+
+describe("CRM key hardening", () => {
+  it("verify endpoint accepts the right key, refuses others, ignores the URL, and locks out repeated guesses", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    process.env.CRM_API_KEY = "z".repeat(48);
+    try {
+      const { GET } = await import("@/app/api/crm/verify/route");
+      const req = (h, q = "") => new Request("http://localhost:3000/api/crm/verify" + q, { headers: { "x-forwarded-for": "9.9.9.9", ...h } });
+      expect((await GET(req({ "x-api-key": "z".repeat(48) }))).status).toBe(200);
+      expect((await GET(req({}, "?api_key=" + "z".repeat(48)))).status).toBe(401);
+      for (let i = 0; i < 10; i++) await GET(req({ "x-api-key": "wrong" + i }));
+      expect((await GET(req({ "x-api-key": "z".repeat(48) }))).status).toBe(401);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

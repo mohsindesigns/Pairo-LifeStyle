@@ -127,6 +127,13 @@ const SiteConfigSchema = new mongoose.Schema({
     frequency: { type: String, enum: ['session', 'daily', 'always'], default: 'session' },
   },
 
+  // ─── Floating "Reviews" side tab ────────────────────
+  floatingReviews: {
+    enabled: { type: Boolean, default: true },
+    label: { type: String, default: 'Reviews' },
+    topOffset: { type: Number, default: 50 }, // vertical position, % of viewport height
+  },
+
   // ─── Store Commerce Settings ───────────────────────────────────────────────
   // Global defaults used by the shipping engine, tax service, and checkout
   commerce: {
@@ -138,6 +145,15 @@ const SiteConfigSchema = new mongoose.Schema({
       codEnabled:  { type: Boolean, default: true },
     },
     shippingEnabled: { type: Boolean, default: true },
+    // Abandoned-cart recovery emails (Admin > Orders > Abandoned Carts > Recovery emails)
+    abandonedCart: {
+      enabled:      { type: Boolean },                           // default on
+      idleMinutes:  { type: Number },                            // quiet time before a cart is emailed (default 30)
+      maxAgeHours:  { type: Number },                            // never email carts older than this (default 72)
+      lastRun: {                                                 // result of the latest scan: shows if the scheduler is alive
+        at: { type: Date }, trigger: { type: String }, scanned: { type: Number }, sent: { type: Number }, failed: { type: Number }, error: { type: String },
+      },
+    },
   },
 
   // ─── Legacy fields kept for backward compatibility ─────────

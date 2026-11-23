@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { ArrowLeft, ArrowRight, Share2, ArrowUpRight, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { motion, useScroll, useSpring, AnimatePresence } from "framer-motion";
 import { getProductUrl } from "@/lib/routes";
+import { extractTocSections } from "@/lib/blogToc";
 
 function makeInternalLinksDofollow(html) {
   if (!html) return "";
@@ -38,12 +39,12 @@ const BlogCard = ({ post }) => (
   <Link href={`/blog/${post.slug}`} className="group block h-full">
     <article className="h-full flex flex-col bg-white border border-neutral-100 overflow-hidden hover:shadow-[0_4px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300">
       {/* Thumbnail */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100 shrink-0">
+      <div className="relative overflow-hidden shrink-0">
         {post.image ? (
           <img
             src={post.image}
             alt={post.title}
-            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            className="block w-full h-auto transition-transform duration-500 ease-out group-hover:scale-[1.04]"
             loading="lazy"
           />
         ) : (
@@ -89,31 +90,58 @@ const BlogCard = ({ post }) => (
 );
 
 import { useCart } from "@/context/CartContext";
+import { createPortal } from "react-dom";
+import SizeSelectionModal from "@/components/product/SizeSelectionModal";
 import { useRouter } from "next/navigation";
 
 export default function BlogDetailClient({ post, posts, featuredProduct, postDate }) {
    const { addToCart } = useCart();
    const router = useRouter();
 
+   // Same purchase rules as the homepage product cards (src/components/home/ProductCard.js):
+   //  - gifting products need their own page (pick items, upload a logo),
+   //  - products with options (size, colour...) open the SizeSelectionModal so the shopper must choose,
+   //  - simple products are added directly.
+   // Previously this added the product immediately with a made-up size ("Standard" / first size), so
+   // shoppers could skip choosing a size or option.
+   const [optionsModal, setOptionsModal] = useState({ open: false, buyNow: false });
+
+   const featuredAttributes =
+      featuredProduct?.attributes || featuredProduct?.variants?.map((v) => ({ name: v.name, values: v.values })) || [];
+   const featuredNeedsOptions = featuredProduct?.productType === "variable" && featuredAttributes.length > 0;
+
+   const startPurchase = (buyNow) => {
+      if (!featuredProduct) return;
+      if (featuredProduct.productType === "gifting") {
+         router.push(getProductUrl(featuredProduct));
+         return;
+      }
+      if (featuredNeedsOptions) {
+         setOptionsModal({ open: true, buyNow });
+         return;
+      }
+      addToCart(featuredProduct, !buyNow);
+      if (buyNow) router.push("/checkout");
+   };
+
    const handleAddToCart = (e) => {
       e.preventDefault();
-      addToCart({
-         ...featuredProduct,
-         quantity: 1,
-         selectedSize: featuredProduct.sizes?.[0] || "Standard",
-         selectedColor: featuredProduct.colors?.[0]?.name || "Original"
-      });
+      startPurchase(false);
    };
 
    const handleBuyNow = (e) => {
       e.preventDefault();
-      addToCart({
-         ...featuredProduct,
-         quantity: 1,
-         selectedSize: featuredProduct.sizes?.[0] || "Standard",
-         selectedColor: featuredProduct.colors?.[0]?.name || "Original"
-      });
-      router.push("/checkout");
+      startPurchase(true);
+   };
+
+   // The shopper confirmed their options in the modal.
+   const handleOptionsConfirmed = (cartItem) => {
+      const buyNow = optionsModal.buyNow;
+      addToCart(cartItem, !buyNow);
+      if (buyNow) {
+         setOptionsModal({ open: false, buyNow: false });
+         router.push("/checkout");
+      }
    };
 
    const carouselRef = useRef(null);
@@ -179,30 +207,9 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
     };
 
     // Dynamically extract H1, H2, H3 headings from all post content for the sidebar TOC
-    const [tocSections, setTocSections] = useState([]);
-
-    useEffect(() => {
-       const allContent = post.content || "";
-
-       if (!allContent) {
-          setTocSections([]);
-          return;
-       }
-
-       try {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(allContent, "text/html");
-          const headings = Array.from(doc.querySelectorAll("h1, h2, h3"));
-          const extracted = headings.map((el, i) => {
-             const text = el.textContent.trim();
-             const id = `toc-${text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${i}`;
-             return { id, title: text };
-          });
-          setTocSections(extracted);
-       } catch (e) {
-          setTocSections([]);
-       }
-    }, [post]);
+    // Computed during render (not in an effect), so the server HTML already contains the real table of
+    // contents instead of "No sections found" until the browser finishes loading.
+    const tocSections = useMemo(() => extractTocSections(post.content || ""), [post.content]);
 
     // Add IDs to elements in the rendered blog content after mount with safety delay
     useEffect(() => {
@@ -211,7 +218,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
        const assignIds = () => {
           const contentEl = document.querySelector(".blog-content");
           if (!contentEl) return;
-          const headings = contentEl.querySelectorAll("h1, h2, h3");
+          const headings = contentEl.querySelectorAll("h2");
           headings.forEach((el, i) => {
              if (tocSections[i]) {
                 el.id = tocSections[i].id;
@@ -230,7 +237,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
            // Fallback: search headings in .blog-content for matching text
            const contentEl = document.querySelector(".blog-content");
            if (contentEl) {
-              const headings = Array.from(contentEl.querySelectorAll("h1, h2, h3"));
+              const headings = Array.from(contentEl.querySelectorAll("h2"));
               element = headings.find(h => h.textContent.trim() === title);
            }
         }
@@ -262,7 +269,7 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
          .blog-content p {
            margin-bottom: 1.25rem !important;
          }
-        .blog-content h1, .blog-content h2, .blog-content h3, .blog-content h4 {
+        .blog-content h1, .blog-content h2, .blog-content h3, .blog-content h4, .blog-content h5, .blog-content h6 {
           font-family: var(--brand-font), sans-serif !important;
           text-transform: uppercase !important;
           margin-top: 2rem !important;
@@ -271,10 +278,13 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
           font-weight: 800 !important;
           letter-spacing: -0.01em !important;
         }
-        .blog-content h1 { font-size: 22px !important; }
-        .blog-content h2 { font-size: 18px !important; }
-        .blog-content h3 { font-size: 16px !important; }
-        .blog-content h4 { font-size: 14px !important; }
+        /* A clear step between each level; h5/h6 were unstyled and looked like body text */
+        .blog-content h1 { font-size: 26px !important; line-height: 1.25 !important; }
+        .blog-content h2 { font-size: 22px !important; line-height: 1.3 !important; }
+        .blog-content h3 { font-size: 19px !important; line-height: 1.35 !important; }
+        .blog-content h4 { font-size: 17px !important; line-height: 1.4 !important; }
+        .blog-content h5 { font-size: 15px !important; line-height: 1.4 !important; }
+        .blog-content h6 { font-size: 14px !important; line-height: 1.4 !important; letter-spacing: 0.04em !important; }
         .blog-content a {
           color: #1a1a1a !important;
           text-decoration: underline !important;
@@ -395,8 +405,8 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
          <div className="container mx-auto px-2 sm:px-4 md:px-8 py-4 md:py-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-14">
                <div id="blog-main-content" className="lg:col-span-8">
-                  <div className="aspect-[16/9] rounded-[4px] overflow-hidden border border-black/5 shadow-sm mb-6">
-                     <img src={post.image} alt={post.imageAlts?.[post.image] || post.title || "Blog Image"} className="w-full h-full object-cover" />
+                  <div className="rounded-[4px] overflow-hidden mb-6">
+                     <img src={post.image} alt={post.imageAlts?.[post.image] || post.title || "Blog Image"} className="block w-full h-auto" />
                   </div>
 
                   <div className="block lg:hidden bg-[#FAF9F6] border border-black/[0.04] rounded-[4px] p-5 mb-6 space-y-6">
@@ -631,6 +641,15 @@ export default function BlogDetailClient({ post, posts, featuredProduct, postDat
                                  </button>
                               </div>
                            </div>
+                           {optionsModal.open && featuredNeedsOptions && createPortal(
+                              <SizeSelectionModal
+                                 product={featuredProduct}
+                                 isOpen={optionsModal.open}
+                                 onClose={() => setOptionsModal({ open: false, buyNow: false })}
+                                 onConfirm={handleOptionsConfirmed}
+                              />,
+                              document.body
+                           )}
                         </div>
                      )}
 

@@ -23,7 +23,7 @@ export default async function AdminAffiliatesPage() {
   return (
     <RequirePermission permission="affiliates.view">
       <Suspense fallback={<div className="min-h-screen bg-[#f6f7f7]" />}>
-        <AffiliatesManagerClient userSession={session} />
+        <AffiliatesManagerClient />
       </Suspense>
     </RequirePermission>
   );

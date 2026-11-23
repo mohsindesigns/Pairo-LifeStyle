@@ -5,6 +5,10 @@ import dbConnect from "@/lib/db";
 import Review from "@/models/Review";
 import { can } from "@/lib/rbac";
 import { logAction } from "@/lib/audit";
+import { maybeRewardVideoReview } from "@/lib/reviewReward";
+import mongoose from "mongoose";
+
+const notFound = () => NextResponse.json({ error: "Review not found" }, { status: 404 });
 
 export async function GET(req, { params }) {
   try {
@@ -20,6 +24,7 @@ export async function GET(req, { params }) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (!mongoose.isValidObjectId(id)) return notFound();
     await dbConnect();
 
     const review = await Review.findById(id).populate({
@@ -65,7 +70,8 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = await req.json();
+    if (!mongoose.isValidObjectId(id)) return notFound();
+    const body = await req.json().catch(() => ({}));
     const { status, isFeatured, replyComment, restore, customerName, customerEmail, rating, title, comment, createdAt } = body;
 
     await dbConnect();
@@ -80,8 +86,25 @@ export async function PUT(req, { params }) {
     // Update restore state
     if (restore === true) {
       review.isDeleted = false;
+      review.deletedAt = null;
       review.status = "Pending";
     }
+
+    // Validate edited fields up front so a bad value returns a clear message, not a 500
+    if (rating !== undefined) {
+      const r = Number(rating);
+      if (!Number.isInteger(r) || r < 1 || r > 5) {
+        return NextResponse.json({ error: "Rating must be a whole number from 1 to 5." }, { status: 400 });
+      }
+    }
+    if (customerName !== undefined && !String(customerName).trim()) {
+      return NextResponse.json({ error: "Author name is required." }, { status: 400 });
+    }
+    if (customerEmail !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(customerEmail).trim())) {
+      return NextResponse.json({ error: "Enter a valid author email." }, { status: 400 });
+    }
+
+    const wasApproved = review.status === "Approved";
 
     // Update status
     if (status && ["Pending", "Approved", "Rejected", "Spam"].includes(status)) {
@@ -95,10 +118,10 @@ export async function PUT(req, { params }) {
 
     // Update author and review details (Quick Edit)
     if (customerName !== undefined) {
-      review.customerName = customerName;
+      review.customerName = String(customerName).trim();
     }
     if (customerEmail !== undefined) {
-      review.customerEmail = customerEmail;
+      review.customerEmail = String(customerEmail).trim();
     }
     if (rating !== undefined) {
       review.rating = parseInt(rating);
@@ -135,6 +158,11 @@ export async function PUT(req, { params }) {
 
     await review.save();
 
+    // A video review that was just approved earns the customer a thank-you code (never blocks the approval).
+    if (!wasApproved && review.status === "Approved") {
+      try { await maybeRewardVideoReview(review); } catch (e) { console.error("[ReviewReward]", e.message); }
+    }
+
     // Trigger re-aggregation for product ratings
     if (review.productId) {
       const { aggregateProductRatings } = await import("@/lib/review-aggregator");
@@ -168,6 +196,7 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    if (!mongoose.isValidObjectId(id)) return notFound();
     await dbConnect();
 
     const review = await Review.findById(id);
@@ -176,6 +205,18 @@ export async function DELETE(req, { params }) {
     }
 
     const beforeState = JSON.parse(JSON.stringify(review));
+
+    // ?mode=trash only ever moves a review to the Trash (never deletes), ?mode=permanent only ever deletes one that is
+    // already there. Without a mode the older "toggle" behaviour stays for existing callers: a live review is trashed,
+    // a trashed one is deleted. The Reviews screen and the Trash page send an explicit mode, so a stale click on
+    // "Move to Trash" can no longer destroy a review that someone else already trashed.
+    const mode = new URL(req.url).searchParams.get("mode");
+    if (mode === "permanent" && !review.isDeleted) {
+      return NextResponse.json({ error: "Move the review to the Trash before deleting it permanently." }, { status: 409 });
+    }
+    if (mode === "trash" && review.isDeleted) {
+      return NextResponse.json({ success: true, message: "Review is already in the Trash" });
+    }
 
     if (review.isDeleted === true) {
       // Permanent delete
@@ -197,6 +238,7 @@ export async function DELETE(req, { params }) {
     } else {
       // Soft delete
       review.isDeleted = true;
+      review.deletedAt = new Date();
       await review.save();
 
       // Trigger re-aggregation for product ratings
