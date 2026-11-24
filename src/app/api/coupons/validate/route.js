@@ -2,20 +2,40 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Discount from "@/models/Discount";
 import Order from "@/models/Order";
+import AbandonedCart from "@/models/AbandonedCart";
 import Engine from "@/lib/promotionEngine/Engine";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { validateLegacyDiscount, calculateEligibleSubtotal, applyDiscountCap } from "@/lib/couponValidator";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { hashRecoveryToken, isWellFormedRecoveryToken, RECOVERY_TOKEN_TTL_MS } from "@/lib/abandonedCartRecovery";
+
+// Resolves the email an abandoned-cart recovery link belongs to, server-side only: the token (sent only in that
+// shopper's own email) is the proof, so their personal, email-locked voucher can apply the moment the link opens —
+// with no email ever sent to, or typed by, the client. Mirrors the same checks /api/checkout/recover uses.
+async function emailFromRecoveryToken(req, recoveryToken) {
+  if (!isWellFormedRecoveryToken(recoveryToken)) return null;
+  const rateCheck = await checkRateLimit(req, { limit: 30, window: 60, keyPrefix: "COUPON_RECOVER" });
+  if (!rateCheck.success) return null;
+  const hash = hashRecoveryToken(recoveryToken);
+  const cart = await AbandonedCart.findOne({ "recoveryTokens.hash": hash, isDeleted: { $ne: true }, status: "active" })
+    .select("+recoveryTokens contact.email")
+    .lean();
+  const entry = cart && (cart.recoveryTokens || []).find((t) => t.hash === hash);
+  if (!entry || Date.now() - new Date(entry.createdAt).getTime() > RECOVERY_TOKEN_TTL_MS) return null;
+  return String(cart.contact?.email || "").trim() || null;
+}
 
 export async function POST(req) {
   try {
     await dbConnect();
-    const { code, cartSubtotal, items = [], email: requestEmail } = await req.json();
+    const { code, cartSubtotal, items = [], email: requestEmail, recoveryToken } = await req.json();
     const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
 
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id || null;
-    const email = requestEmail || session?.user?.email || null;
+    let email = requestEmail || session?.user?.email || null;
+    if (!email && recoveryToken) email = await emailFromRecoveryToken(req, recoveryToken);
 
     // Resolve customerType (guest vs logged_in vs new vs returning)
     let customerType = 'guest';

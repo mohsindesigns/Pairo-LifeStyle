@@ -1251,7 +1251,7 @@ function renderRecoveryEmail({ kind, cartSnapshot, voucherCode, offerText, oneTi
     <tr><td style="padding:26px 27px 4px;">
       <p style="margin:0 0 12px;text-align:center;color:${BRAND.ink};font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;">Customer favorites</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${favs.map(favCell).join('')}</tr></table>
-      ${voucherCode ? `<p style="margin:14px 0 0;text-align:center;"><a href="${storeUrl}/shop" style="color:${BRAND.ink};font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;text-decoration:underline;">Use ${escapeHtml(voucherCode)} on anything &rarr;</a></p>` : ''}
+      ${voucherCode ? `<p style="margin:14px 0 0;text-align:center;"><a href="${storeUrl}/shop${recoveryToken ? `?recover=${encodeURIComponent(recoveryToken)}` : ''}" style="color:${BRAND.ink};font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;text-decoration:underline;">Use ${escapeHtml(voucherCode)} on anything &rarr;</a></p>` : ''}
     </td></tr>` : '';
 
   const finePrint = `${voucherCode ? (oneTime ? 'This code was created just for you and can be used once. ' : 'This code is valid for a limited time. ') : ''}${isReminder ? 'Availability is not guaranteed while items are in a cart. ' : ''}If you've already completed your order, you can safely ignore this email.`;

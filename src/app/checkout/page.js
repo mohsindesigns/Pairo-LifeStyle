@@ -443,8 +443,9 @@ export default function CheckoutPage() {
     affiliateDiscount,
     affiliateDiscountAmount,
     removeFromCart,
-    addToCart,
-    isCartLoaded
+    isCartLoaded,
+    recovering,
+    quickAdding
   } = useCart();
   const { data: session } = useSession();
   const [profile, setProfile] = useState(null);
@@ -477,13 +478,6 @@ export default function CheckoutPage() {
   const draftSuppressedRef = useRef(false);
   const router = useRouter();
   const { showPopup } = usePopup();
-
-  // Cart recovery from an abandoned-cart email link (/checkout?recover=<token>): see the restore effect below.
-  // `recovering` starts true when the link is present so the empty-cart redirect to /cart cannot fire before the restore ran.
-  const [recovering, setRecovering] = useState(() => typeof window !== "undefined" && Boolean(new URLSearchParams(window.location.search).get("recover")));
-  const [recoverNotice, setRecoverNotice] = useState("");
-  const [pendingRecoverCode, setPendingRecoverCode] = useState("");
-  const recoverStartedRef = useRef(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -727,74 +721,10 @@ export default function CheckoutPage() {
   }, [session]);
 
   useEffect(() => {
-    if (isCartLoaded && cartItems.length === 0 && !isProcessing && !isSuccess && !recovering) {
+    if (isCartLoaded && cartItems.length === 0 && !isProcessing && !isSuccess && !recovering && !quickAdding) {
       router.push("/cart");
     }
-  }, [isCartLoaded, cartItems, router, isProcessing, isSuccess, recovering]);
-
-  // Restore the cart from an abandoned-cart email link on a device/browser that never had it. Only when the local cart is
-  // empty (a cart the shopper already has is never overwritten). The `recover` param is always removed so a refresh does
-  // not repeat this; items are re-priced server-side from the catalogue, and sold-out/removed ones are dropped.
-  useEffect(() => {
-    if (!isCartLoaded || recoverStartedRef.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("recover");
-    if (!token) return;
-    recoverStartedRef.current = true;
-
-    const stripParam = () => {
-      params.delete("recover");
-      const qs = params.toString();
-      router.replace(qs ? `/checkout?${qs}` : "/checkout");
-    };
-
-    (async () => {
-      if (cartItems.length > 0) {
-        stripParam();
-        setRecovering(false);
-        return;
-      }
-      let data = null;
-      try {
-        const res = await fetch(`/api/checkout/recover?token=${encodeURIComponent(token)}`, { cache: "no-store" });
-        if (res.ok) data = await res.json();
-      } catch (e) {
-        data = null;
-      }
-      stripParam();
-      if (data?.success && Array.isArray(data.items) && data.items.length > 0) {
-        // Same item shape the product page builds; addToCart adds one unit per call and merges identical lines.
-        for (const item of data.items) {
-          for (let i = 0; i < (Number(item.quantity) || 1); i++) addToCart(item, false);
-        }
-        if (data.voucherCode) {
-          setPendingRecoverCode(data.voucherCode);
-          setPromoCode(data.voucherCode);
-        }
-        setRecoverNotice(data.dropped > 0 ? "We restored your cart. Some items are no longer available." : "We restored your cart.");
-      } else if (data?.success) {
-        showPopup?.({ type: "info", title: "Items unavailable", message: "Sorry, the items in that cart are no longer available." });
-      }
-      setRecovering(false);
-    })();
-  }, [isCartLoaded, cartItems.length, addToCart, router, showPopup]);
-
-  // Apply the voucher that came with the recovery link. It is locked to the shopper's email, so it is retried once a complete
-  // email is typed (with no email yet it only works for a non-personal code).
-  useEffect(() => {
-    if (!pendingRecoverCode || cartItems.length === 0) return;
-    const email = String(formData.email || "").trim();
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-    const t = setTimeout(async () => {
-      const res = await applyPromoCode(pendingRecoverCode, emailOk ? email : null);
-      if (res.success) {
-        setPendingRecoverCode("");
-        setPromoCode("");
-        setPromoError("");
-      }
-    }, emailOk ? 500 : 300);
-    return () => clearTimeout(t);
-  }, [pendingRecoverCode, cartItems.length, formData.email, applyPromoCode]);
+  }, [isCartLoaded, cartItems, router, isProcessing, isSuccess, recovering, quickAdding]);
 
   const savedAddresses = useMemo(() => {
     if (!profile) return [];
@@ -1524,7 +1454,7 @@ export default function CheckoutPage() {
   const inputClass = "w-full bg-white border border-neutral-300 rounded-[4px] px-3.5 py-2.5 text-base sm:text-[13px] placeholder:text-neutral-400 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all duration-200 text-black";
   const labelClass = "block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1";
 
-  if (!isCartLoaded || recovering) {
+  if (!isCartLoaded || recovering || quickAdding) {
     return (
       <div className="bg-white min-h-screen text-black font-sans selection:bg-black selection:text-white">
         <main className="container mx-auto px-2 sm:px-4 md:px-8 py-8 md:py-12">
@@ -1606,13 +1536,6 @@ export default function CheckoutPage() {
         <h1 className="text-[28px] md:text-[36px] font-bold tracking-tight text-black mb-8 leading-none">
           Checkout
         </h1>
-
-        {recoverNotice && (
-          <div role="status" className="mb-6 rounded-[4px] border border-black/10 bg-[#FAF9F6] px-4 py-3 text-[13px] text-black">
-            {recoverNotice}
-            {pendingRecoverCode ? ` Enter the email we sent your reminder to and your discount code ${pendingRecoverCode} will be applied.` : ""}
-          </div>
-        )}
 
         {/* Mobile / tablet: collapsible order summary at the TOP (desktop keeps the sticky sidebar) */}
         <div className="lg:hidden mb-6 bg-[#FAF9F6] border border-black/[0.04] rounded-[4px]">

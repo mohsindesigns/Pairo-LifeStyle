@@ -3,10 +3,14 @@ import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
 import SiteConfig from "@/models/SiteConfig";
 import { isSoldOut } from "@/lib/stock";
+import { requireMerchantFeedAuth } from "@/lib/merchantFeedAuth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req) {
+  const authError = requireMerchantFeedAuth(req);
+  if (authError) return authError;
+
   try {
     await dbConnect();
 
