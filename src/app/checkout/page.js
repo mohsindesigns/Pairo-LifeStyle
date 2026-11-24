@@ -212,6 +212,13 @@ function SearchableDropdown({
   );
 }
 
+// Money shown to the customer: whole dollars stay "$199", cents always show two digits ("$24.50", not "$24.5"), and the
+// separators do not depend on the visitor's browser language.
+const money = (n) => {
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  return v.toLocaleString("en-US", { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 });
+};
+
 export default function CheckoutPage() {
   const siteData = useSiteData();
   const {
@@ -494,12 +501,12 @@ export default function CheckoutPage() {
     if (!promoCode) return;
     setApplyingPromo(true);
     setPromoError("");
-    const res = await applyPromoCode(promoCode, formData.email);
+    const res = await applyPromoCode(promoCode.trim(), formData.email);
     setApplyingPromo(false);
     if (res.success) {
       setPromoCode("");
     } else {
-      setPromoError(res.error);
+      setPromoError(res.error || "This code could not be applied. Please try again.");
     }
   };
 
@@ -526,11 +533,19 @@ export default function CheckoutPage() {
           setSelectedShipping(FREE_DELIVERY_METHOD);
           return;
         }
-        setShippingRates(data.rates || []);
+        const rates = data.rates || [];
+        setShippingRates(rates);
         setShippingRatesFetched(true);
-        // Auto-select first rate if none selected
-        if (!selectedShipping && data.rates?.length > 0) {
-          setSelectedShipping(data.rates[0]);
+        // Keep the selection in step with the rates just fetched. A rate's cost (e.g. "free over $100") and its availability
+        // change with the subtotal and the country, and a stale selection made the page show one total while the server
+        // charged another, or failed at payment with "shipping method no longer available".
+        const same = selectedShipping ? rates.find((r) => r.methodId === selectedShipping.methodId) : null;
+        if (same) {
+          if (same.cost !== selectedShipping.cost) setSelectedShipping(same);
+        } else if (rates.length > 0) {
+          setSelectedShipping(rates[0]);
+        } else if (selectedShipping) {
+          setSelectedShipping(null);
         }
       }
     } catch (e) { console.error('Failed to fetch shipping rates', e); }
@@ -546,20 +561,23 @@ export default function CheckoutPage() {
 
   // Debounced email-change promo code validation
   useEffect(() => {
-    if (appliedPromo && formData.email) {
+    // Only a code the customer typed is re-checked against their email, and only once the email looks complete (not on
+    // fragments like "john@gmail.c"). A coupon that no longer applies is really taken off, not just reported as removed.
+    if (appliedPromo?.code && formData.email && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+.[a-zA-Z]{2,}$/.test(formData.email.trim())) {
       const delayDebounceFn = setTimeout(() => {
         const revalidate = async () => {
           setPromoError("");
           const res = await applyPromoCode(appliedPromo.code, formData.email);
           if (!res.success) {
-            setPromoError(`Coupon removed: ${res.error}`);
+            removePromoCode();
+            setPromoError(`Coupon removed: ${res.error || "it does not apply to this email"}`);
           }
         };
         revalidate();
       }, 500);
       return () => clearTimeout(delayDebounceFn);
     }
-  }, [formData.email, appliedPromo?.code, applyPromoCode]);
+  }, [formData.email, appliedPromo?.code, applyPromoCode, removePromoCode]);
 
   const [errors, setErrors] = useState({});
 
@@ -589,7 +607,7 @@ export default function CheckoutPage() {
         }
         break;
       case "phone":
-        if (cleanVal && !/^\+?[0-9\s\-\(\)]{7,20}$/.test(cleanVal)) {
+        if (cleanVal && (!/^\+?[0-9\s\-\(\)]{7,20}$/.test(cleanVal) || cleanVal.replace(/\D/g, "").length < 7)) {
           error = "Please enter a valid phone number (7-20 digits)";
         }
         break;
@@ -681,10 +699,21 @@ export default function CheckoutPage() {
       }
     });
 
+    // The country must be one of the real countries: free text such as "Pakist" has no country code, which silently
+    // skipped the ZIP rules, the restricted-country check and the shipping-zone match. (Only enforced while the list is loaded.)
+    if (countries.length > 0 && formData.country && !formData.countryCode) {
+      const found = countries.find((c) => c.name.toLowerCase() === formData.country.trim().toLowerCase());
+      if (found) {
+        setFormData((prev) => ({ ...prev, country: found.name, countryCode: found.isoCode }));
+      } else {
+        newErrors.country = "Please choose your country from the list";
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       const firstErrKey = Object.keys(newErrors)[0];
-      const el = document.getElementsByName(firstErrKey)[0];
+      const el = document.getElementsByName(firstErrKey)[0] || (firstErrKey === "country" ? document.querySelector('input[placeholder^="Search Country"]') : null);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.focus();
@@ -934,7 +963,7 @@ export default function CheckoutPage() {
   };
 
   const brandName = siteData?.siteSettings?.general?.brandName || "";
-  const inputClass = "w-full bg-white border border-neutral-300 rounded-[4px] px-3.5 py-2.5 text-[13px] placeholder:text-neutral-400 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all duration-200 text-black";
+  const inputClass = "w-full bg-white border border-neutral-300 rounded-[4px] px-3.5 py-2.5 text-base sm:text-[13px] placeholder:text-neutral-400 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all duration-200 text-black";
   const labelClass = "block text-[11px] font-bold text-neutral-600 uppercase tracking-wider mb-1";
 
   if (!isCartLoaded) {
@@ -1032,22 +1061,27 @@ export default function CheckoutPage() {
               </div>
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <label className={labelClass}>Email Address *</label>
+                  <label htmlFor="co-email" className={labelClass}>Email Address *</label>
                   <input
                     type="email"
                     name="email"
+                    id="co-email"
+                    autoComplete="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    aria-invalid={errors.email ? true : undefined}
                     value={formData.email}
                     onChange={handleInputChange}
                     placeholder="Email"
                     className={`${inputClass} ${errors.email ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     required
                   />
-                  {errors.email && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.email}</p>}
+                  {errors.email && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.email}</p>}
                 </div>
                 <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
                   <input
                     type="checkbox"
-                    defaultChecked
                     className="w-4 h-4 accent-black rounded border-neutral-300"
                   />
                   <span className="text-[12px] text-neutral-600 font-medium leading-none">Email me with news and offers</span>
@@ -1132,46 +1166,55 @@ export default function CheckoutPage() {
                 {/* Names */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div className="space-y-1">
-                    <label className={labelClass}>First name *</label>
+                    <label htmlFor="co-firstName" className={labelClass}>First name *</label>
                     <input
                       type="text"
                       name="firstName"
+                    id="co-firstName"
+                    autoComplete="given-name"
+                    aria-invalid={errors.firstName ? true : undefined}
                       value={formData.firstName}
                       onChange={handleInputChange}
                       placeholder="First name"
                       className={`${inputClass} ${errors.firstName ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                       required
                     />
-                    {errors.firstName && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.firstName}</p>}
+                    {errors.firstName && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.firstName}</p>}
                   </div>
                   <div className="space-y-1">
-                    <label className={labelClass}>Last name *</label>
+                    <label htmlFor="co-lastName" className={labelClass}>Last name *</label>
                     <input
                       type="text"
                       name="lastName"
+                    id="co-lastName"
+                    autoComplete="family-name"
+                    aria-invalid={errors.lastName ? true : undefined}
                       value={formData.lastName}
                       onChange={handleInputChange}
                       placeholder="Last name"
                       className={`${inputClass} ${errors.lastName ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                       required
                     />
-                    {errors.lastName && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.lastName}</p>}
+                    {errors.lastName && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.lastName}</p>}
                   </div>
                 </div>
 
                 {/* Address */}
                 <div className="space-y-1">
-                  <label className={labelClass}>Street Address *</label>
+                  <label htmlFor="co-street" className={labelClass}>Street Address *</label>
                   <input
                     type="text"
                     name="street"
+                    id="co-street"
+                    autoComplete="address-line1"
+                    aria-invalid={errors.street ? true : undefined}
                     value={formData.street}
                     onChange={handleInputChange}
                     placeholder="Address"
                     className={`${inputClass} ${errors.street ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     required
                   />
-                  {errors.street && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.street}</p>}
+                  {errors.street && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.street}</p>}
                 </div>
 
                 {/* State / Province */}
@@ -1250,25 +1293,30 @@ export default function CheckoutPage() {
                     </div>
                   )}
                   <div className="space-y-1">
-                    <label className={labelClass}>Postal code / ZIP <span className="text-red-500">*</span></label>
+                    <label htmlFor="co-zip" className={labelClass}>Postal code / ZIP <span className="text-red-500">*</span></label>
                     <input
                       type="text"
                       name="zip"
+                    id="co-zip"
+                    autoComplete="postal-code"
+                    aria-invalid={errors.zip ? true : undefined}
                       value={formData.zip}
                       onChange={handleInputChange}
                       placeholder="Postal code"
                       className={`${inputClass} ${errors.zip ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     />
-                    {errors.zip && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.zip}</p>}
+                    {errors.zip && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.zip}</p>}
                   </div>
                 </div>
 
                 {/* County */}
                 <div className="space-y-1">
-                  <label className={labelClass}>County / District</label>
+                  <label htmlFor="co-county" className={labelClass}>County / District</label>
                   <input
                     type="text"
                     name="county"
+                    id="co-county"
+                    aria-invalid={errors.county ? true : undefined}
                     value={formData.county}
                     onChange={handleInputChange}
                     placeholder="County (optional)"
@@ -1278,24 +1326,30 @@ export default function CheckoutPage() {
 
                 {/* Phone */}
                 <div className="space-y-1">
-                  <label className={labelClass}>Phone *</label>
+                  <label htmlFor="co-phone" className={labelClass}>Phone *</label>
                   <input
                     type="tel"
                     name="phone"
+                    id="co-phone"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    aria-invalid={errors.phone ? true : undefined}
                     value={formData.phone}
                     onChange={handleInputChange}
                     placeholder="Phone"
                     className={`${inputClass} ${errors.phone ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     required
                   />
-                  {errors.phone && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.phone}</p>}
+                  {errors.phone && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.phone}</p>}
                 </div>
 
                 {/* Customer Note */}
                 <div className="space-y-1">
-                  <label className={labelClass}>Order notes (optional)</label>
+                  <label htmlFor="co-customerNote" className={labelClass}>Order notes (optional)</label>
                   <textarea
                     name="customerNote"
+                    id="co-customerNote"
+                    aria-invalid={errors.customerNote ? true : undefined}
                     value={formData.customerNote}
                     onChange={handleInputChange}
                     placeholder="Notes about your order..."
@@ -1367,7 +1421,7 @@ export default function CheckoutPage() {
                         </div>
                       </div>
                       <span className="text-[13px] font-bold text-black font-mono">
-                        {rate.cost === 0 ? "Free" : `$${rate.cost.toLocaleString()}`}
+                        {rate.cost === 0 ? "Free" : `${money(rate.cost)}`}
                       </span>
                     </label>
                   ))}
@@ -1579,7 +1633,7 @@ export default function CheckoutPage() {
 
                       <div className="flex items-center justify-between pt-1">
                         <p className="text-[12px] font-bold text-black font-mono">
-                          ${(item.price * item.quantity).toLocaleString()}
+                          ${money(item.price * item.quantity)}
                         </p>
                         <button
                           type="button"
@@ -1635,20 +1689,20 @@ export default function CheckoutPage() {
             <div className="space-y-3 pt-5 border-t border-neutral-200/80 text-[13px] text-black font-semibold">
               <div className="flex justify-between items-center">
                 <span className="text-black/80">Subtotal</span>
-                <span className="text-black font-bold font-mono">${(cartSubtotal || 0).toLocaleString()}</span>
+                <span className="text-black font-bold font-mono">${money(cartSubtotal)}</span>
               </div>
 
               {discountTotal > 0 && (
                 <div className="flex justify-between items-center text-black font-semibold">
                   <span>Discount</span>
-                  <span className="font-mono">-${discountTotal.toLocaleString()}</span>
+                  <span className="font-mono">-${money(discountTotal)}</span>
                 </div>
               )}
 
               {affiliateDiscount?.type !== "None" && affiliateDiscountAmount > 0 && (
                 <div className="flex justify-between items-center text-black font-semibold">
                   <span>Referral Discount</span>
-                  <span className="font-mono">-${affiliateDiscountAmount.toLocaleString()}</span>
+                  <span className="font-mono">-${money(affiliateDiscountAmount)}</span>
                 </div>
               )}
 
@@ -1656,14 +1710,14 @@ export default function CheckoutPage() {
                 <span className="text-black/80">Shipping</span>
                 <span className="text-black font-bold font-mono">
                   {selectedShipping
-                    ? (shippingCost === 0 ? "Free" : `$${shippingCost.toLocaleString()}`)
+                    ? (shippingCost === 0 ? "Free" : `${money(shippingCost)}`)
                     : (!shippingEnabled ? "Free" : "Calculated at next step")}
                 </span>
               </div>
 
               <div className="pt-5 flex justify-between items-end border-t border-neutral-200/80">
                 <span className="text-sm font-bold uppercase tracking-wider text-black">Total</span>
-                <span className="text-2xl font-black text-black font-mono">${cartTotal.toLocaleString()}</span>
+                <span className="text-2xl font-black text-black font-mono">${money(cartTotal)}</span>
               </div>
             </div>
 

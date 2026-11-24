@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { Star, X } from "lucide-react";
 import { useSiteData } from "@/context/SiteContext";
 
@@ -14,6 +15,7 @@ function formatDate(value) {
 
 export default function FloatingReviews() {
   const siteData = useSiteData();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const closeRef = useRef(null);
   const [reviews, setReviews] = useState([]);
@@ -32,7 +34,8 @@ export default function FloatingReviews() {
   const rawLabel = String(cfg.label || "").trim();
   const label = !rawLabel || rawLabel === "Google Reviews" ? "Reviews" : rawLabel;
   const top = Number.isFinite(Number(cfg.topOffset)) ? Number(cfg.topOffset) : 50;
-  const visible = enabled && reviews.length > 0;
+  // Not on the checkout: the tab would sit over the form fields and the pay button on a phone.
+  const visible = enabled && reviews.length > 0 && !pathname?.startsWith("/checkout");
 
   useEffect(() => {
     if (!open) return;
