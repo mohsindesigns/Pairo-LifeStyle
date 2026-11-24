@@ -55,9 +55,18 @@ export async function GET(req) {
     // Run all queries in parallel for performance
     const [stats, totalProducts, totalUsers, totalBlogs, recentOrders, statusBreakdown, currency] = await Promise.all([
 
-      // 1. Order Aggregation
+      // 1. Order Aggregation — sales only: cancelled / refunded orders and unpaid card attempts are not revenue.
       Order.aggregate([
-        { $match: { isDeleted: { $ne: true } } },
+        {
+          $match: {
+            isDeleted: { $ne: true },
+            status: { $nin: ["Cancelled", "Refunded"] },
+            $or: [
+              { "payment.status": { $in: ["Paid", "Partially Refunded"] } },
+              { "payment.method": { $in: ["Cash on Delivery", "Manual/Gift", "Custom Order"] } },
+            ],
+          },
+        },
         {
           $facet: {
             overall: [

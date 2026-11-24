@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import ProductCard from "./ProductCard";
+import { trackViewItemList } from "@/lib/analytics";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -28,6 +30,26 @@ export default function ProductSection({
     (p) => p && !p.isDeleted && p.status === "Published"
   );
 
+  // Count a list impression once, when the section actually scrolls into view (not just because the page loaded).
+  const sectionRef = useRef(null);
+  const impressionSent = useRef(false);
+  const listTitle = title || "Home products";
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || impressionSent.current || activeProducts.length === 0) return;
+    const send = () => {
+      if (impressionSent.current) return;
+      impressionSent.current = true;
+      trackViewItemList(activeProducts.slice(0, 16), String(listTitle));
+    };
+    if (typeof IntersectionObserver === "undefined") { send(); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { send(); io.disconnect(); }
+    }, { threshold: 0.25 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [activeProducts, listTitle]);
+
   if (!siteData) return null;
 
   if (activeProducts.length === 0) {
@@ -50,7 +72,7 @@ export default function ProductSection({
   const displayProducts = activeProducts.slice(0, 16);
 
   return (
-    <section className="py-0 md:py-6 bg-background">
+    <section ref={sectionRef} className="py-0 md:py-6 bg-background">
       <div className="container mx-auto px-2 sm:px-4 md:px-8 py-8 md:py-20 overflow-hidden">
         {/* Header Section */}
         <div className="flex flex-row items-end justify-between mb-6 md:mb-14 gap-3 md:gap-6">

@@ -80,7 +80,26 @@ const sessionSegmentMatch = (f) => {
 function eventMatch(f, extra = {}) {
   const m = { createdAt: { $gte: f.since, $lte: f.until }, ...dimMatch(f, EVENT_DIMS), ...eventSegmentMatch(f), ...extra };
   if (hasItemFilter(f)) m.items = { $elemMatch: itemMatch(f) };
+  // A "purchase" event is only a sale while its order is still a real one (not deleted, cancelled, refunded or an unpaid
+  // card attempt). Every other event passes through untouched. Without this, test orders, cancelled orders and forged
+  // events kept showing up as units sold and revenue.
+  if (Array.isArray(f.validSaleRefs)) {
+    m.$and = [...(m.$and || []), { $or: [{ name: { $ne: "purchase" } }, { transaction_id: { $in: f.validSaleRefs } }] }];
+  }
   return m;
+}
+
+// Orders that count as a sale: not deleted, not cancelled/refunded, and either paid or a method that is paid on delivery /
+// by arrangement. Returned as both order numbers and ids, because the storefront reports either as the transaction id.
+const SALE_METHODS = ["Cash on Delivery", "Manual/Gift", "Custom Order"];
+async function validSaleRefs(f) {
+  const rows = await Order.find({
+    isDeleted: { $ne: true },
+    status: { $nin: ["Cancelled", "Refunded"] },
+    createdAt: { $gte: new Date(f.since.getTime() - 7 * 86400000), $lte: new Date(f.until.getTime() + 86400000) },
+    $or: [{ "payment.status": { $in: ["Paid", "Partially Refunded"] } }, { "payment.method": { $in: SALE_METHODS } }],
+  }).select("orderNumber").limit(50000).lean();
+  return rows.flatMap((o) => [String(o.orderNumber), String(o._id)]);
 }
 
 function pageviewMatch(f, sessionIds) {
@@ -395,7 +414,7 @@ async function itemRollup(f, field) {
       $group: {
         _id: `$items.${field}`,
         name: { $first: "$items.item_name" },
-        category: { $first: "$items.item_category" },
+        category: { $max: "$items.item_category" },
         productIds: { $addToSet: "$items.item_id" },
         views: { $sum: { $cond: [{ $eq: ["$name", "view_item"] }, 1, 0] } },
         listImpressions: { $sum: { $cond: [{ $eq: ["$name", "view_item_list"] }, 1, 0] } },
@@ -766,6 +785,7 @@ async function checkout(f) {
     ...dimMatch(f, SESSION_DIMS),
     ...eventSegmentMatch(f),
     ...(ids ? { sessionId: { $in: ids } } : {}),
+    ...(Array.isArray(f.validSaleRefs) ? { $or: [{ name: { $ne: "purchase" } }, { transaction_id: { $in: f.validSaleRefs } }] } : {}),
     ...extra,
   });
 
@@ -1119,6 +1139,7 @@ export async function GET(req) {
     if (!handler) return NextResponse.json({ error: "Unknown tab" }, { status: 400 });
 
     const filters = parseFilters(sp);
+    filters.validSaleRefs = await validSaleRefs(filters);
     const [raw, currency] = await Promise.all([handler(filters), resolveStoreCurrency()]);
     const data = Array.isArray(raw?.bands)
       ? { ...raw, bands: raw.bands.map((r) => {

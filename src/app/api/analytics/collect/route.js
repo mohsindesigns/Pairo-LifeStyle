@@ -12,6 +12,7 @@ import Category from "@/models/Category";
 import AnalyticsSession from "@/models/AnalyticsSession";
 import AnalyticsPageView from "@/models/AnalyticsPageView";
 import AnalyticsEvent from "@/models/AnalyticsEvent";
+import Order from "@/models/Order";
 
 const ID_PATTERN = /^[a-zA-Z0-9-]{8,64}$/;
 const MAX_HEARTBEAT_MS = 60000;
@@ -113,17 +114,49 @@ function sessionContext(session) {
   };
 }
 
+// A purchase is only recorded for a real order, and always from that order's own data (never the browser's numbers),
+// once per order. The endpoint is public, so anything else would let a script or a re-opened page invent sales.
+async function verifiedPurchase(transactionId, seen) {
+  if (!transactionId) return null;
+  const or = [{ orderNumber: transactionId }];
+  if (mongoose.isValidObjectId(transactionId)) or.push({ _id: transactionId });
+  const order = await Order.findOne({ $or: or, isDeleted: { $ne: true } })
+    .select("orderNumber items financials.total financials.currency")
+    .lean();
+  if (!order) return null;
+  const ref = String(order.orderNumber);
+  if (seen.has(ref) || (await AnalyticsEvent.exists({ name: "purchase", transaction_id: ref }))) return null;
+  seen.add(ref);
+  return {
+    transaction_id: ref,
+    value: Number(order.financials?.total) || 0,
+    currency: order.financials?.currency || "",
+    items: (order.items || []).map((i) => ({
+      item_id: String(i.sku || i.productId || ""),
+      item_name: i.name || "",
+      price: Number(i.priceAtPurchase) || 0,
+      quantity: Number(i.quantity) || 1,
+    })),
+  };
+}
+
 async function storeEvents(rawEvents, ctx, now, slugs) {
   const docs = [];
+  const seenPurchases = new Set();
   for (const raw of rawEvents.slice(0, MAX_BATCH)) {
     const name = str(raw?.name, 60);
     if (!ALLOWED_EVENTS.has(name)) continue;
     if (name === "field_interaction" && SENSITIVE_FIELD.test(str(raw.fieldName, 80))) continue;
 
-    const params = raw.params && typeof raw.params === "object" ? raw.params : {};
+    let params = raw.params && typeof raw.params === "object" ? raw.params : {};
+    if (name === "purchase") {
+      const verified = await verifiedPurchase(str(params.transaction_id ?? raw.transaction_id, 80), seenPurchases).catch(() => null);
+      if (!verified) continue;
+      params = verified;
+    }
     const path = str(raw.path, 300);
     const info = pageInfo(path, slugs);
-    const items = await buildItems(params.items ?? raw.items);
+    const items = await buildItems(name === "purchase" ? params.items : params.items ?? raw.items);
     const first = items[0];
 
     docs.push({
@@ -133,7 +166,7 @@ async function storeEvents(rawEvents, ctx, now, slugs) {
       path,
       pageType: info.pageType,
       categorySlug: info.categorySlug,
-      value: num(params.value ?? raw.value),
+      value: num(name === "purchase" ? params.value : params.value ?? raw.value),
       currency: str(params.currency ?? raw.currency, 8),
       items,
       category: first?.item_category || "",
