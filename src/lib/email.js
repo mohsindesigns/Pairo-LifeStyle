@@ -1169,16 +1169,27 @@ function renderRecoveryEmail({ kind, cartSnapshot, voucherCode, offerText, oneTi
     ? 'Your cart is still saved. This is our last nudge.'
     : voucherCode ? `You left it in your cart. We saved it, and added ${escapeHtml(offerText)} to help you decide.` : 'You left it in your cart, so we saved it for you.';
 
-  // ── Hero: first item with a usable image, full width and clickable ──
-  const heroItem = items.find((i) => emailImageUrl(i.image, storeUrl)) || items[0];
-  const heroImg = heroItem ? emailImageUrl(heroItem.image, storeUrl) : '';
-  const heroHtml = heroItem ? `
-    <tr><td style="padding:0;">
-      ${heroImg ? `<a href="${checkoutUrl}" style="display:block;text-decoration:none;"><img src="${attrUrl(heroImg)}" width="600" alt="${escapeHtml(heroItem.name || 'Your jacket')}" style="display:block;width:100%;max-width:600px;height:auto;border:0;background:${BRAND.surface};" /></a>` : ''}
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-        <td style="padding:16px 32px 4px;color:${BRAND.ink};font-size:16px;font-weight:700;line-height:1.4;">${escapeHtml(heroItem.name || 'Item')}${items.length > 1 ? ` <span style="color:${BRAND.muted};font-weight:400;font-size:13px;">+ ${items.length - 1} more</span>` : ''}</td>
-        <td style="padding:16px 32px 4px;text-align:right;color:${BRAND.ink};font-size:16px;font-weight:800;white-space:nowrap;">${emailMoney((heroItem.price || 0) * (heroItem.quantity || 1))}</td>
-      </tr></table>
+  // The cart as a compact card: a small picture beside the name, quantity and price (up to 3 lines). A full-width photo
+  // was far too big; this keeps the picture recognisable without dominating the email.
+  const shown = items.slice(0, 3);
+  const itemRow = (it) => {
+    const img = emailImageUrl(it.image, storeUrl);
+    const qty = Number(it.quantity) || 1;
+    return `<tr>
+      ${img ? `<td width="96" style="padding:12px 0 12px 14px;vertical-align:middle;"><a href="${checkoutUrl}" style="text-decoration:none;"><img src="${attrUrl(img)}" width="96" alt="${escapeHtml(it.name || 'Your jacket')}" style="display:block;width:96px;max-width:96px;height:auto;max-height:120px;border:0;border-radius:10px;background:#ffffff;" /></a></td>` : ''}
+      <td style="padding:12px 14px;vertical-align:middle;">
+        <p style="margin:0;color:${BRAND.ink};font-size:15px;font-weight:700;line-height:1.35;">${escapeHtml(it.name || 'Item')}</p>
+        <p style="margin:4px 0 0;color:${BRAND.muted};font-size:12px;">Qty ${qty}</p>
+      </td>
+      <td style="padding:12px 16px 12px 0;vertical-align:middle;text-align:right;color:${BRAND.ink};font-size:15px;font-weight:800;white-space:nowrap;">${emailMoney((Number(it.price) || 0) * qty)}</td>
+    </tr>`;
+  };
+  const heroHtml = shown.length ? `
+    <tr><td style="padding:0 32px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.surface};border:1px solid ${BRAND.border};border-radius:12px;">
+        ${shown.map(itemRow).join('')}
+        ${items.length > shown.length ? `<tr><td colspan="3" style="padding:0 14px 12px;color:${BRAND.muted};font-size:12px;">+ ${items.length - shown.length} more item${items.length - shown.length === 1 ? '' : 's'} in your cart</td></tr>` : ''}
+      </table>
     </td></tr>` : '';
 
   // ── The offer: one big block, with a real expiry line ──
@@ -1231,7 +1242,7 @@ function renderRecoveryEmail({ kind, cartSnapshot, voucherCode, offerText, oneTi
     const url = `${storeUrl}/product/${encodeURIComponent(p.slug || p._id)}`;
     return `<td width="33%" style="padding:0 5px;vertical-align:top;text-align:center;">
       <a href="${url}" style="text-decoration:none;color:${BRAND.ink};display:block;">
-        ${img ? `<img src="${attrUrl(img)}" width="170" alt="${escapeHtml(p.name || '')}" style="display:block;width:100%;height:auto;border:0;border-radius:8px;background:${BRAND.surface};" />` : ''}
+        ${img ? `<img src="${attrUrl(img)}" width="130" alt="${escapeHtml(p.name || '')}" style="display:block;width:100%;max-width:130px;max-height:150px;height:auto;margin:0 auto;border:0;border-radius:8px;background:${BRAND.surface};" />` : ''}
         <span style="display:block;margin-top:8px;font-size:12px;font-weight:700;line-height:1.3;color:${BRAND.ink};">${escapeHtml(String(p.name || '').slice(0, 48))}</span>
         <span style="display:block;margin-top:2px;font-size:12px;color:${BRAND.muted};">${emailMoney(p.price)}</span>
       </a></td>`;
