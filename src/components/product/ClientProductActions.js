@@ -19,6 +19,10 @@ import { recordOptionSelect } from "@/lib/siteAnalytics";
 export default function ClientProductActions({ product, onVariantChange, unitPrice, onGiftingExtraChange }) {
   const [selectedOptions, setSelectedOptions] = useState({});
   const [quantity, setQuantity] = useState(1);
+  // product.stock is already the stock of the selected variant (or the sum of variants), see ProductMainSection.
+  const stockManaged = product.manageStock !== false;
+  const soldOut = stockManaged && !(Number(product.stock) > 0);
+  const maxQuantity = stockManaged ? Math.max(1, Number(product.stock) || 1) : 99;
   const [addedFeedback, setAddedFeedback] = useState(false);
   const [m2mOpen, setM2mOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
@@ -131,6 +135,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
   const isCustomSizeSelected = sizeAttribute && selectedOptions[sizeAttribute.name]?.toLowerCase() === "custom";
 
   const handleCustomizeClick = () => {
+    if (soldOut) return;
     const updatedOptions = { ...selectedOptions };
     for (const key of Object.keys(updatedOptions)) {
       if (key.toLowerCase().includes("size") || key.toLowerCase().includes("color")) {
@@ -142,6 +147,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
   };
 
   const handleM2mClick = () => {
+    if (soldOut) return;
     const updatedOptions = { ...selectedOptions };
     const sizeAttr = attributes.find(a => a.name.toLowerCase() === "size");
     if (sizeAttr) {
@@ -177,6 +183,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
   };
 
   const handleAddToCart = (openDrawer = true) => {
+    if (soldOut) return;
     if (product.productType === "variable") {
       const missingAttrs = attributes.filter(attr => !selectedOptions[attr.name]);
       if (missingAttrs.length > 0) {
@@ -382,7 +389,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
               <span className="font-bold text-[14px] w-6 text-center text-primary select-none">{quantity}</span>
               <button
                 type="button"
-                onClick={() => setQuantity(quantity + 1)}
+                onClick={() => setQuantity(Math.min(maxQuantity, quantity + 1))}
                 className="text-primary hover:text-primary/70 transition-colors p-1.5"
                 aria-label="Increase quantity"
               >
@@ -391,7 +398,14 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
             </div>
           </div>
 
+          {soldOut && (
+            <div role="status" className="w-full h-14 rounded-[var(--radius,12px)] border-2 border-neutral-300 bg-neutral-100 text-neutral-500 font-bold uppercase tracking-wide text-[15px] flex items-center justify-center">
+              Out of stock
+            </div>
+          )}
+
           {/* Primary CTA — color follows the theme's primary color set in admin */}
+          {!soldOut && (
           <button
             type="button"
             onClick={() => handleAddToCart(true)}
@@ -409,7 +423,10 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
             )}
           </button>
 
+          )}
+
           {/* Secondary CTA — outlined in the same theme color */}
+          {!soldOut && (
           <button
             type="button"
             onClick={handleSecureCheckout}
@@ -417,11 +434,13 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
           >
             Buy now
           </button>
+          )}
 
           <div className="grid grid-cols-2 gap-2 pt-1">
             <button
               type="button"
               onClick={handleM2mClick}
+              disabled={soldOut}
               className="w-full h-10 rounded-[var(--radius,8px)] border border-primary/30 text-primary font-semibold text-[13px] hover:border-primary hover:bg-primary/5 transition-all duration-200 flex items-center justify-center"
             >
               Made to measure (+$25)
@@ -429,6 +448,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
             <button
               type="button"
               onClick={handleCustomizeClick}
+              disabled={soldOut}
               className="w-full h-10 rounded-[var(--radius,8px)] border border-primary/30 text-primary font-semibold text-[13px] hover:border-primary hover:bg-primary/5 transition-all duration-200 flex items-center justify-center"
             >
               Customize

@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { getProductUrl } from "@/lib/routes";
 import { trackSelectItem } from "@/lib/analytics";
+import { isSoldOut } from "@/lib/stock";
 import SizeSelectionModal from "@/components/product/SizeSelectionModal";
 
 export default function ProductCard({ product, listName = "Product List" }) {
@@ -28,9 +29,12 @@ export default function ProductCard({ product, listName = "Product List" }) {
     product.attributes || product.variants?.map((v) => ({ name: v.name, values: v.values })) || [];
   const needsOptions = product.productType === "variable" && productAttributes.length > 0;
 
+  const soldOut = isSoldOut(product);
+
   const handleAddToBag = (e) => {
     e.stopPropagation();
     e.preventDefault();
+    if (soldOut) return;
     if (product.productType === "gifting") {
       // Gifting products need the customer to pick items and upload logos — can't be quick-added.
       router.push(getProductUrl(product));
@@ -105,10 +109,11 @@ export default function ProductCard({ product, listName = "Product List" }) {
         <div className="absolute bottom-2 md:bottom-3 left-2 md:left-3 right-2 md:right-3 flex gap-2 z-20 pointer-events-none group-hover:pointer-events-auto">
           <button
             onClick={handleAddToBag}
-            className="group/btn relative flex-[2] bg-black text-white h-9 md:h-10 rounded-lg md:rounded-xl font-bold text-[9px] md:text-[11px] uppercase tracking-widest flex items-center justify-center gap-1.5 md:gap-2 shadow-xl translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out active:scale-95 hover:bg-neutral-800"
+            disabled={soldOut}
+            className="group/btn relative flex-[2] bg-black text-white h-9 md:h-10 rounded-lg md:rounded-xl font-bold text-[9px] md:text-[11px] uppercase tracking-widest flex items-center justify-center gap-1.5 md:gap-2 shadow-xl translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out active:scale-95 hover:bg-neutral-800 disabled:bg-neutral-400 disabled:cursor-not-allowed disabled:active:scale-100"
           >
             <ShoppingBag className="w-3 h-3 md:w-3.5 md:h-3.5" />
-            {needsOptions ? "Select Options" : "Add to Bag"}
+            {soldOut ? "Out of Stock" : needsOptions ? "Select Options" : "Add to Bag"}
           </button>
 
           <Link href={getProductUrl(product)} onClick={handleSelect} className="flex-1">

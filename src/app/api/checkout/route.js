@@ -27,6 +27,19 @@ export async function POST(req) {
   const rawBody = await req.json().catch(() => ({}));
   const { turnstileToken } = rawBody;
 
+  // A repeat of a checkout that already produced an order (a double tap, or a retry after the response was lost on a flaky
+  // mobile connection) must return that order. It is answered before the captcha check, because the first request already
+  // used up the captcha token, so the retry would otherwise be refused as a failed security check for an order that exists.
+  if (typeof rawBody.idempotencyKey === "string" && rawBody.idempotencyKey) {
+    try {
+      await dbConnect();
+      const earlier = await Order.findOne({ idempotencyKey: rawBody.idempotencyKey }).select("orderNumber").lean();
+      if (earlier) return NextResponse.json({ success: true, orderNumber: earlier.orderNumber, orderId: earlier._id });
+    } catch {
+      // fall through to the normal path
+    }
+  }
+
   // 2. Cloudflare Turnstile Verification
   const turnstileCheck = await verifyTurnstileToken(turnstileToken, ip);
   if (!turnstileCheck.success) {
@@ -56,7 +69,7 @@ export async function POST(req) {
         const existingOrder = await Order.findOne({ idempotencyKey });
         if (existingOrder) {
           log.warn({ idempotencyKey, orderNumber: existingOrder.orderNumber }, "Idempotency hit");
-          return NextResponse.json({ success: true, orderNumber: existingOrder.orderNumber });
+          return NextResponse.json({ success: true, orderNumber: existingOrder.orderNumber, orderId: existingOrder._id });
         }
       }
 

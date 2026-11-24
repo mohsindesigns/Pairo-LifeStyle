@@ -33,18 +33,23 @@ async function categorySlugs() {
   return categoryCache.slugs;
 }
 
-async function resolveProduct(itemId) {
-  const cached = productCache.get(itemId);
+async function resolveProduct(itemId, itemName = "") {
+  const cacheKey = `${itemId}|${itemName}`;
+  const cached = productCache.get(cacheKey);
   if (cached && cached.expires > Date.now()) return cached.value;
 
   const or = [{ sku: itemId }];
   if (mongoose.isValidObjectId(itemId)) or.push({ _id: itemId });
   if (/^\d+$/.test(itemId)) or.push({ id: Number(itemId) });
 
-  const product = await Product.findOne({ $or: or })
+  // SKUs are not unique (duplicated products keep theirs), so when several products match, take the one named like the
+  // item the visitor actually saw.
+  const matches = await Product.find({ $or: or })
     .select("name primaryCategory")
     .populate("primaryCategory", "name")
+    .limit(10)
     .lean();
+  const product = matches.find((p) => itemName && p.name === itemName) || matches[0] || null;
 
   const value = product ? {
     productId: String(product._id),
@@ -54,7 +59,7 @@ async function resolveProduct(itemId) {
   } : null;
 
   if (productCache.size > 5000) productCache.clear();
-  productCache.set(itemId, { value, expires: Date.now() + 10 * 60 * 1000 });
+  productCache.set(cacheKey, { value, expires: Date.now() + 10 * 60 * 1000 });
   return value;
 }
 
@@ -70,7 +75,7 @@ async function buildItems(rawItems) {
   })).filter((i) => i.item_id);
 
   return Promise.all(cleaned.map(async (i) => {
-    const product = await resolveProduct(i.item_id).catch(() => null);
+    const product = await resolveProduct(i.item_id, i.item_name).catch(() => null);
     return {
       ...i,
       item_name: i.item_name || product?.name || "",

@@ -412,8 +412,8 @@ export async function sendOrderConfirmation(order) {
       </tr></thead>
       <tbody>${itemsRows}</tbody>
       <tfoot><tr>
-        <td colspan="2" style="padding:16px 10px;text-align:right;font-weight:700;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">Total Paid</td>
-        <td style="padding:16px 10px;text-align:right;font-weight:800;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">$${(order.financials?.total || 0).toLocaleString()}</td>
+        <td colspan="2" style="padding:16px 10px;text-align:right;font-weight:700;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">${order.payment?.status === "Paid" ? "Total Paid" : "Total Due"}</td>
+        <td style="padding:16px 10px;text-align:right;font-weight:800;color:${BRAND.ink};border-top:2px solid ${BRAND.ink};">${Number(order.financials?.total || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</td>
       </tr></tfoot>
     </table>`;
 

@@ -82,9 +82,15 @@ function attribution() {
   try {
     referrerHost = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, "") : "";
   } catch {}
+  // Ad clicks that carry only an auto-tagging id (Google Ads adds gclid/gbraid/wbraid on its own, no utm_ tags) are paid
+  // traffic, not "direct": without this every such visit was reported as direct/none and ad visits could not be told apart.
+  const adClick = params.get("gclid") || params.get("gbraid") || params.get("wbraid")
+    ? { source: "google", medium: "cpc" }
+    : params.get("msclkid") ? { source: "bing", medium: "cpc" }
+    : params.get("fbclid") ? { source: "facebook", medium: "paid_social" } : null;
   return {
-    source: (utmSource || referrerHost || "direct").slice(0, 120),
-    medium: (utmMedium || (referrerHost ? "referral" : "none")).slice(0, 120),
+    source: (utmSource || adClick?.source || referrerHost || "direct").slice(0, 120),
+    medium: (utmMedium || adClick?.medium || (referrerHost ? "referral" : "none")).slice(0, 120),
     campaign: (utmCampaign || "").slice(0, 160),
   };
 }

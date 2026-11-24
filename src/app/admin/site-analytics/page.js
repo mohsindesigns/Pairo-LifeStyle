@@ -795,6 +795,7 @@ const FILTER_LABELS = {
   category: "Category",
   priceBand: "Price Range",
   productId: "Product",
+  productName: "Product",
 };
 
 function FilterSelect({ label, paramKey, value, onChange, options = [] }) {
@@ -979,6 +980,7 @@ function SiteAnalyticsView() {
     "category",
     "priceBand",
     "productId",
+    "productName",
   ].filter((k) => paramsState.get(k));
 
   const secondaryKeys = [
@@ -992,11 +994,12 @@ function SiteAnalyticsView() {
     "category",
     "priceBand",
     "productId",
+    "productName",
   ];
   const secondaryActiveCount = secondaryKeys.filter((k) => paramsState.get(k)).length;
 
   const openJourney = (visitorId) => setJourneyId(visitorId);
-  const pinProduct = (row) => setParams({ productId: row.productId });
+  const pinProduct = (row) => setParams({ productName: row.name, productId: null });
   const pinCategory = (row) => setParams({ category: row.category });
   const pinPriceBand = (row) => setParams({ priceBand: row.key });
 
@@ -1125,6 +1128,7 @@ function SiteAnalyticsView() {
                 category: null,
                 priceBand: null,
                 productId: null,
+                productName: null,
               });
             }}
             className="wp-btn"
@@ -1203,10 +1207,10 @@ function SiteAnalyticsView() {
             />
             <FilterSelect
               label="Specific Product"
-              paramKey="productId"
-              value={paramsState.get("productId")}
+              paramKey="productName"
+              value={paramsState.get("productName")}
               onChange={onFilter}
-              options={(options?.products || []).map((p) => ({ value: p.id, label: p.name }))}
+              options={(options?.products || []).map((p) => ({ value: p.name, label: p.name }))}
             />
           </div>
         </div>

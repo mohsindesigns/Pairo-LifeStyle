@@ -215,7 +215,7 @@ export async function createOrderFromCheckoutPayload(payload, {
         },
         customer: {
           userId: orderUserId,
-          email: customerEmail || checkoutEmail,
+          email: checkoutEmail || String(customerEmail || "").trim().toLowerCase(),
           isGuest: isGuestSession,
           ipAddress,
           ipLocation

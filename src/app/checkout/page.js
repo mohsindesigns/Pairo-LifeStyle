@@ -574,12 +574,11 @@ export default function CheckoutPage() {
     switch (name) {
       case "firstName":
       case "lastName":
-        if (cleanVal && cleanVal.length < 2) {
-          error = "Must be at least 2 characters";
-        } else if (cleanVal && cleanVal.length > 50) {
+        if (cleanVal && cleanVal.length > 50) {
           error = "Must be at most 50 characters";
-        } else if (cleanVal && !/^[A-Za-z\s\-]+$/.test(cleanVal)) {
-          error = "Only letters, spaces, or hyphens are allowed";
+        } else if (cleanVal && !/^[\p{L}\p{M}\s'’.\-]+$/u.test(cleanVal)) {
+          // Any language's letters, plus apostrophes, dots and hyphens (O'Brien, José, Müller, Jr.).
+          error = "Only letters, spaces, apostrophes, dots or hyphens are allowed";
         }
         break;
       case "email":
@@ -606,7 +605,7 @@ export default function CheckoutPage() {
           error = "Please enter a valid city";
         } else if (cleanVal && cleanVal.length > 50) {
           error = "City name is too long";
-        } else if (cleanVal && !/^[A-Za-z\s\-\.]+$/.test(cleanVal)) {
+        } else if (cleanVal && !/^[\p{L}\p{M}\s'’.\-]+$/u.test(cleanVal)) {
           error = "City contains invalid characters";
         }
         break;
@@ -649,7 +648,7 @@ export default function CheckoutPage() {
     
     // Sanitize input values on the fly: restrict emojis, script tags, HTML tags
     let sanitized = value
-      .replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, "")
+      .replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011\u2600-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, "")
       .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, "")
       .replace(/<\/?[^>]+(>|$)/g, "");
 
@@ -895,6 +894,7 @@ export default function CheckoutPage() {
     }
 
     setIsProcessing(true);
+    let orderPlaced = false;
 
     try {
       const response = await fetch("/api/checkout", {
@@ -906,9 +906,10 @@ export default function CheckoutPage() {
       const data = await response.json();
 
       if (data.success) {
+        orderPlaced = true; // keep the button disabled while the thank-you page loads, so a second tap cannot send a second request
         setIsSuccess(true);
         clearCart();
-        router.push(`/checkout/success?id=${data.orderId}&orderNumber=${data.orderNumber}`);
+        router.push(`/checkout/success?${data.orderId ? `id=${data.orderId}&` : ""}orderNumber=${data.orderNumber}`);
       } else {
         turnstileRef.current?.reset();
         setTurnstileToken("");
@@ -928,7 +929,7 @@ export default function CheckoutPage() {
         type: "error",
       });
     } finally {
-      setIsProcessing(false);
+      if (!orderPlaced) setIsProcessing(false);
     }
   };
 
@@ -1249,7 +1250,7 @@ export default function CheckoutPage() {
                     </div>
                   )}
                   <div className="space-y-1">
-                    <label className={labelClass}>Postal code / ZIP</label>
+                    <label className={labelClass}>Postal code / ZIP <span className="text-red-500">*</span></label>
                     <input
                       type="text"
                       name="zip"

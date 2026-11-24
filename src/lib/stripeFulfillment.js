@@ -75,12 +75,11 @@ export async function fulfillSucceededPaymentIntent(paymentIntent, log) {
       paymentInfo,
     });
   } catch (error) {
-    if (error?.code === 11000) {
-      // A duplicate key is only a harmless replay when the order for THIS checkout already exists. Any other duplicate
-      // (an order number that was already taken, say) means no order was created for a payment that did succeed:
-      // that is refunded like every other unfulfillable payment instead of leaving the customer charged with nothing.
-      order = await Order.findOne({ idempotencyKey: payload.idempotencyKey });
-    }
+    // If the order for THIS checkout already exists, this call lost a race with another one (the Stripe webhook and the
+    // success-page poll both fulfil the same payment) and the order is fine: never refund a payment whose order exists.
+    // Only when no such order exists is the payment really unfulfillable (and refunded below). Checking for any error,
+    // not just a duplicate key, matters because the losing call can fail earlier (stock, a once-per-customer coupon).
+    order = await Order.findOne({ idempotencyKey: payload.idempotencyKey }).catch(() => null);
     if (!order) {
       log?.error?.({ paymentIntentId: paymentIntent.id, error: error.message }, "Order fulfillment failed after payment succeeded. Issuing refund.");
       await refundUnfulfillablePayment(pending, paymentIntent, error, log);

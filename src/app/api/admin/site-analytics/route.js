@@ -59,16 +59,17 @@ function parseFilters(sp) {
     category: pick("category"),
     priceBand: pick("priceBand", PRICE_BANDS.map((b) => b.key)),
     productId: pick("productId"),
+    productName: pick("productName"),
   };
 }
 
 const dimMatch = (f, keys) => Object.fromEntries(keys.filter((k) => f[k]).map((k) => [k, f[k]]));
-const hasItemFilter = (f) => Boolean(f.category || f.priceBand || f.productId);
+const hasItemFilter = (f) => Boolean(f.category || f.priceBand || f.productId || f.productName);
 const itemMatch = (f) => Object.fromEntries(
-  Object.entries({ item_category: f.category, priceBand: f.priceBand, item_id: f.productId }).filter(([, v]) => v)
+  Object.entries({ item_category: f.category, priceBand: f.priceBand, item_id: f.productId, item_name: f.productName }).filter(([, v]) => v)
 );
 const itemStage = (f) => Object.fromEntries(
-  Object.entries({ "items.item_category": f.category, "items.priceBand": f.priceBand, "items.item_id": f.productId }).filter(([, v]) => v)
+  Object.entries({ "items.item_category": f.category, "items.priceBand": f.priceBand, "items.item_id": f.productId, "items.item_name": f.productName }).filter(([, v]) => v)
 );
 const eventSegmentMatch = (f) => (f.segment ? { segment: f.segment } : {});
 const sessionSegmentMatch = (f) => {
@@ -441,7 +442,9 @@ async function itemRollup(f, field) {
 }
 
 async function products(f) {
-  const rows = await itemRollup(f, "item_id");
+  // Keyed by product name, not item_id: a product's SKU is not unique (duplicated products keep the same SKU), so two
+  // different products used to share one row and the row's name/click showed the wrong one.
+  const rows = await itemRollup(f, "item_name");
   return {
     products: rows.map((r) => ({
       productId: r._id,
@@ -688,7 +691,8 @@ async function options() {
     AnalyticsEvent.aggregate([
       { $match: { createdAt: { $gte: since }, name: "view_item" } },
       { $unwind: "$items" },
-      { $group: { _id: "$items.item_id", name: { $first: "$items.item_name" }, views: { $sum: 1 } } },
+      { $match: { "items.item_name": { $nin: [null, ""] } } },
+      { $group: { _id: "$items.item_name", name: { $first: "$items.item_name" }, views: { $sum: 1 } } },
       { $sort: { views: -1 } },
       { $limit: 200 },
     ]),
