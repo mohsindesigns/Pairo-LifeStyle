@@ -10,6 +10,27 @@ import { trackPurchase } from "@/lib/analytics";
 const POLL_INTERVAL_MS = 1500;
 const POLL_MAX_ATTEMPTS = 20;
 
+// The store has no per-method delivery-time data (shipping methods carry no estimate), so the only delivery promise it
+// makes is the one on the product page: ProductMainSection's "Delivered between <date> – <date>", which is 15 to 20
+// calendar days out. Mirror that exact window, anchored to the day the order was placed, so the two pages never
+// disagree. Returns "" (the line is hidden) when the order date is unknown. Keep in step with ProductMainSection.
+const DELIVERY_MIN_DAYS = 15;
+const DELIVERY_MAX_DAYS = 20;
+
+function getEstimatedDelivery(orderDate) {
+  const placed = orderDate ? new Date(orderDate) : null;
+  if (!placed || Number.isNaN(placed.getTime())) return "";
+
+  const start = new Date(placed);
+  start.setDate(start.getDate() + DELIVERY_MIN_DAYS);
+  const end = new Date(placed);
+  end.setDate(end.getDate() + DELIVERY_MAX_DAYS);
+
+  const fmt = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const yearSuffix = end.getFullYear() !== placed.getFullYear() ? ` ${end.getFullYear()}` : "";
+  return `${fmt(start)} – ${fmt(end)}${yearSuffix}`;
+}
+
 export default function SuccessPage() {
   const { clearCart } = useCart();
   const [order, setOrder] = useState(null);
@@ -148,10 +169,6 @@ export default function SuccessPage() {
     window.print();
   };
 
-  const getEstimatedDelivery = () => {
-    return "15–20 Working Days";
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-4 px-6 text-center">
@@ -214,7 +231,45 @@ export default function SuccessPage() {
     );
   }
 
-  const customerName = order?.shippingAddress?.fullName || "Valued Customer";
+  // The order details could not be loaded (the lookup failed, or this page was opened without an order to look up).
+  // Never show the "Thank you, <name>" confirmation card in that case: it would imply we have data we do not have.
+  if (!order) {
+    const hasOrderReference = !!(orderNumber || error);
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center space-y-5 px-6 text-center">
+        <div className="w-14 h-14 rounded-full bg-[#FAF9F6] border border-neutral-200 flex items-center justify-center">
+          <AlertTriangle className="w-6 h-6 text-black" />
+        </div>
+        <div className="space-y-2 max-w-md">
+          <h1 className="text-base font-bold uppercase tracking-wider text-black">
+            {hasOrderReference ? "We Could Not Load Your Order Details" : "No Order To Show"}
+          </h1>
+          {hasOrderReference ? (
+            <p className="text-[13px] text-neutral-600">
+              We could not load your order details, but your order was received.
+              {orderNumber ? <> Your order number is <span className="font-bold text-black">{orderNumber}</span>.</> : null}
+              {" "}Check your email or use Track Order.
+            </p>
+          ) : (
+            <p className="text-[13px] text-neutral-600">
+              We could not find an order to display. If you have just placed an order, check your email for the confirmation or use Track Order.
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-3 justify-center">
+          <Link href="/track-order" className="bg-black text-white hover:bg-neutral-900 px-6 py-3.5 rounded-[4px] text-xs font-bold uppercase tracking-wider transition-all shadow-sm">
+            Track Order
+          </Link>
+          <Link href="/shop" className="border border-neutral-300 hover:border-black text-black px-6 py-3.5 rounded-[4px] text-xs font-bold uppercase tracking-wider bg-white transition-all">
+            Continue Shopping
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const customerName = order.shippingAddress?.fullName || "Valued Customer";
+  const estimatedDelivery = getEstimatedDelivery(order.createdAt);
 
   return (
     <div className="bg-white min-h-screen print:min-h-0 text-black font-sans selection:bg-black selection:text-white print:pb-0">
@@ -351,10 +406,12 @@ export default function SuccessPage() {
                     <Calendar className="w-4 h-4 text-black shrink-0" />
                     <span>Order Date: <span className="font-semibold text-black">{order ? new Date(order.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}</span></span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Truck className="w-4 h-4 text-black shrink-0" />
-                    <span>Delivery Estimate: <span className="font-semibold text-black">{getEstimatedDelivery()}</span></span>
-                  </div>
+                  {estimatedDelivery && (
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-black shrink-0" />
+                      <span>Estimated Delivery: <span className="font-semibold text-black">{estimatedDelivery}</span></span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -379,22 +436,9 @@ export default function SuccessPage() {
                     </div>
                   </div>
 
-                  {/* Billing Address */}
+                  {/* Payment Method. The order only stores one address (the shipping address), so there is no separate
+                      billing address to show; the old block here just repeated the shipping address. */}
                   <div className="space-y-2">
-                    <h2 className="text-[9px] font-bold text-black uppercase tracking-widest flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-black shrink-0" /> Billing Address
-                    </h2>
-                    <div className="text-[13px] text-black space-y-0.5 font-semibold">
-                      <p className="font-bold text-black">{order.shippingAddress.fullName}</p>
-                      <p>{order.shippingAddress.street}</p>
-                      <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}</p>
-                      <p>{order.shippingAddress.country}</p>
-                      <p className="text-black mt-1 font-bold">{order.shippingAddress.phone}</p>
-                    </div>
-                  </div>
-
-                  {/* Payment Method */}
-                  <div className="space-y-2 md:col-span-2 pt-2 border-t border-neutral-100 print:col-span-2">
                     <h2 className="text-[9px] font-bold text-black uppercase tracking-widest flex items-center gap-1.5">
                       <CreditCard className="w-3.5 h-3.5 text-black shrink-0" /> Payment Information
                     </h2>

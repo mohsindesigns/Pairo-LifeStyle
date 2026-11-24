@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useId } from "react";
 import Link from "next/link";
 import { CreditCard, Truck, ShieldCheck, ArrowRight, Loader2, ChevronDown, Search } from "lucide-react";
 import { Elements } from "@stripe/react-stripe-js";
@@ -41,7 +41,7 @@ const STRIPE_APPEARANCE = {
       boxShadow: "0 0 0 1px #000000"
     },
     ".Label": {
-      fontSize: "11px",
+      fontSize: "12px",
       fontWeight: "700",
       textTransform: "uppercase",
       letterSpacing: "0.05em",
@@ -102,6 +102,63 @@ function getReferralCode() {
   return null;
 }
 
+// Spoken / short names people type for a country that differ from the canonical list name.
+const COUNTRY_ALIASES = {
+  usa: "United States",
+  us: "United States",
+  america: "United States",
+  "united states of america": "United States",
+  uk: "United Kingdom",
+  britain: "United Kingdom",
+  "great britain": "United Kingdom",
+  england: "United Kingdom",
+  uae: "United Arab Emirates",
+};
+const NO_ALIASES = {};
+
+const optionName = (opt) => (typeof opt === "string" ? opt : opt?.name || "");
+const optionIso = (opt) => (typeof opt === "string" ? "" : String(opt?.isoCode || ""));
+
+// Countries that do not use postal codes (ISO 3166-1 alpha-2): the postal / ZIP field is optional for these.
+const NO_POSTAL_COUNTRIES = new Set([
+  "AE", "QA", "HK", "AO", "AG", "AW", "BS", "BZ", "BJ", "BO", "BW", "BF", "BI", "CM", "CF", "CG", "CD", "CK", "DJ", "DM",
+  "FJ", "GM", "GH", "GD", "GY", "KI", "KM", "LY", "MO", "ML", "MR", "NR", "NU", "KP", "RW", "KN", "ST", "SC", "SL", "SB",
+  "SO", "SR", "SY", "TL", "TG", "TK", "TO", "TV", "UG", "VU", "YE", "ZW",
+]);
+const isZipRequiredFor = (countryCode) => !NO_POSTAL_COUNTRIES.has(String(countryCode || "").trim().toUpperCase());
+
+// Non-sensitive checkout fields kept in sessionStorage so a refresh does not lose them. Never card data.
+const CHECKOUT_DRAFT_KEY = "pairo-checkout-draft";
+const DRAFT_FIELDS = ["email", "firstName", "lastName", "phone", "country", "countryCode", "state", "stateCode", "street", "city", "county", "zip", "customerNote"];
+
+function readCheckoutDraft() {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeCheckoutDraft(draft) {
+  try {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify(draft));
+  } catch (e) { }
+}
+
+function clearCheckoutDraft() {
+  try {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+  } catch (e) { }
+}
+
+const newIdempotencyKey = () => `pai_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`;
+
 function SearchableDropdown({
   label,
   placeholder,
@@ -110,16 +167,26 @@ function SearchableDropdown({
   options = [],
   loading = false,
   required = false,
-  labelClass
+  labelClass,
+  name,
+  aliases = NO_ALIASES
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  // Until the shopper types, the list shows every option (not only the one already chosen).
+  const [dirty, setDirty] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+  const baseId = `co-dd-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const listId = `${baseId}-list`;
+  const optionId = (i) => `${baseId}-opt-${i}`;
 
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
+        setDirty(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -132,19 +199,131 @@ function SearchableDropdown({
     });
   }, [value]);
 
+  // Exact (case-insensitive) match on name, then alias, then ISO code.
+  const findExact = useCallback((raw) => {
+    const term = String(raw || "").trim().toLowerCase();
+    if (!term) return undefined;
+    const byName = options.find((opt) => optionName(opt).toLowerCase() === term);
+    if (byName) return byName;
+    const aliasTarget = aliases[term];
+    if (aliasTarget) {
+      const byAlias = options.find((opt) => optionName(opt).toLowerCase() === aliasTarget.toLowerCase());
+      if (byAlias) return byAlias;
+    }
+    return options.find((opt) => optionIso(opt).toLowerCase() === term);
+  }, [options, aliases]);
+
   const filteredOptions = useMemo(() => {
-    if (!searchTerm) return options;
-    return options.filter(opt => {
-      const name = typeof opt === 'string' ? opt : opt.name;
-      return name.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.trim().toLowerCase();
+    if (!dirty || !term) return options;
+    const aliasTargets = new Set(
+      Object.entries(aliases).filter(([alias]) => alias.startsWith(term)).map(([, target]) => target.toLowerCase())
+    );
+    const ranked = [];
+    options.forEach((opt) => {
+      const n = optionName(opt).toLowerCase();
+      const iso = optionIso(opt).toLowerCase();
+      let rank = -1;
+      if (n === term || iso === term || aliases[term]?.toLowerCase() === n) rank = 0;
+      else if (n.startsWith(term) || aliasTargets.has(n)) rank = 1;
+      else if (n.includes(term)) rank = 2;
+      if (rank >= 0) ranked.push({ opt, rank });
     });
-  }, [options, searchTerm]);
+    return ranked.sort((a, b) => a.rank - b.rank).map((r) => r.opt);
+  }, [options, searchTerm, dirty, aliases]);
+
+  const selectedIndexIn = (list) => {
+    const current = (value || "").toLowerCase();
+    return current ? list.findIndex((opt) => optionName(opt).toLowerCase() === current) : -1;
+  };
+
+  // Keep the keyboard-highlighted option scrolled into view.
+  useEffect(() => {
+    if (!isOpen || activeIndex < 0) return;
+    document.getElementById(`${baseId}-opt-${activeIndex}`)?.scrollIntoView({ block: "nearest" });
+  }, [isOpen, activeIndex, baseId]);
+
+  const selectOption = (opt) => {
+    const canonical = optionName(opt);
+    setSearchTerm(canonical);
+    setDirty(false);
+    setIsOpen(false);
+    setActiveIndex(-1);
+    onChange(canonical, opt);
+  };
+
+  // Focus left the control: close, and resolve text like "UK" / "pk" to the real option.
+  const closeAndResolve = () => {
+    setIsOpen(false);
+    setDirty(false);
+    setActiveIndex(-1);
+    const typed = inputRef.current ? inputRef.current.value : searchTerm;
+    const found = findExact(typed);
+    if (found && optionName(found) !== (value || "")) {
+      selectOption(found);
+    } else {
+      setSearchTerm(value || typed || "");
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    const count = filteredOptions.length;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        setActiveIndex(selectedIndexIn(filteredOptions));
+        return;
+      }
+      if (count > 0) setActiveIndex((i) => (i + 1 >= count ? 0 : i + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!isOpen) {
+        setIsOpen(true);
+        setActiveIndex(selectedIndexIn(filteredOptions));
+        return;
+      }
+      if (count > 0) setActiveIndex((i) => (i <= 0 ? count - 1 : i - 1));
+    } else if (e.key === "Enter") {
+      if (isOpen) {
+        e.preventDefault(); // never submit/advance the surrounding form while choosing an option
+        const opt = activeIndex >= 0 ? filteredOptions[activeIndex] : findExact(searchTerm);
+        if (opt) selectOption(opt);
+        else setIsOpen(false);
+      }
+    } else if (e.key === "Escape") {
+      if (isOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsOpen(false);
+        setDirty(false);
+        setActiveIndex(-1);
+        setSearchTerm(value || "");
+      }
+    } else if (e.key === "Tab") {
+      // Tab accepts the highlighted match the shopper was typing toward, then lets focus move on.
+      if (isOpen && dirty && activeIndex >= 0 && filteredOptions[activeIndex]) {
+        selectOption(filteredOptions[activeIndex]);
+      } else {
+        setIsOpen(false);
+        setDirty(false);
+      }
+    }
+  };
+
+  const hasOptions = filteredOptions.length > 0;
 
   return (
-    <div className="space-y-1 relative" ref={dropdownRef}>
-      <label className={labelClass}>{label}</label>
+    <div
+      className="space-y-1 relative"
+      ref={dropdownRef}
+      onBlur={(e) => {
+        if (!dropdownRef.current?.contains(e.relatedTarget)) closeAndResolve();
+      }}
+    >
+      <label htmlFor={baseId} className={labelClass}>{label}</label>
       {loading ? (
-        <div className="flex items-center gap-2 px-3.5 py-3 border border-border rounded-[4px] text-[12px] text-foreground/50 bg-background">
+        <div className="flex items-center gap-2 px-3.5 py-3 border border-border rounded-[4px] text-xs text-foreground/50 bg-background">
           <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading options…
         </div>
       ) : (
@@ -153,21 +332,40 @@ function SearchableDropdown({
             <Search className="w-3.5 h-3.5" />
           </span>
           <input
+            ref={inputRef}
+            id={baseId}
+            name={name}
             type="text"
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-controls={isOpen && hasOptions ? listId : undefined}
+            aria-activedescendant={isOpen && activeIndex >= 0 && hasOptions ? optionId(activeIndex) : undefined}
+            aria-autocomplete="list"
+            autoComplete="off"
             placeholder={placeholder}
             value={searchTerm}
             onChange={(e) => {
               const val = e.target.value;
               setSearchTerm(val);
+              setDirty(true);
               setIsOpen(true);
-              const found = options.find(opt => {
-                const name = typeof opt === 'string' ? opt : opt.name;
-                return name.toLowerCase() === val.toLowerCase();
-              });
-              onChange(val, found);
+              setActiveIndex(val.trim() ? 0 : -1);
+              // Only an exact name match is committed while typing (as the canonical spelling). Aliases / ISO codes
+              // such as "UK" or "PK" resolve on Enter / Tab / blur so typing "IN" can still become "India".
+              const found = options.find((opt) => optionName(opt).toLowerCase() === val.trim().toLowerCase());
+              if (found) onChange(optionName(found), found);
+              else onChange(val, undefined);
             }}
-            onFocus={() => setIsOpen(true)}
-            className="w-full bg-background border border-border rounded-[4px] pl-9 pr-10 py-3 text-[13px] text-foreground focus:border-primary outline-none font-semibold placeholder:text-foreground/45 transition-all shadow-sm"
+            onFocus={(e) => {
+              const el = e.target;
+              setIsOpen(true);
+              setDirty(false);
+              setActiveIndex(selectedIndexIn(options));
+              requestAnimationFrame(() => { try { el.select(); } catch (err) { } });
+            }}
+            onClick={() => { if (!isOpen) { setIsOpen(true); setDirty(false); setActiveIndex(selectedIndexIn(options)); } }}
+            onKeyDown={handleKeyDown}
+            className="w-full bg-background border border-border rounded-[4px] pl-9 pr-10 py-3 text-base sm:text-[13px] text-foreground focus:border-primary outline-none font-semibold placeholder:text-foreground/45 transition-all shadow-sm"
             required={required}
           />
           <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-foreground/40 pointer-events-none">
@@ -175,36 +373,45 @@ function SearchableDropdown({
           </span>
 
           {isOpen && (
-            <div className="absolute z-[1000] left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-background border border-border rounded-[4px] shadow-lg animate-in fade-in slide-in-from-top-1 duration-100 divide-y divide-border/20">
-              {filteredOptions.length > 0 ? (
-                filteredOptions.map((opt, idx) => {
-                  const name = typeof opt === 'string' ? opt : opt.name;
-                  const isSelected = name.toLowerCase() === (value || "").toLowerCase();
+            hasOptions ? (
+              <div
+                id={listId}
+                role="listbox"
+                onMouseDown={(e) => e.preventDefault()}
+                aria-label={typeof label === "string" ? label.replace(/\s*\*$/, "") : undefined}
+                className="absolute z-[1000] left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-background border border-border rounded-[4px] shadow-lg animate-in fade-in slide-in-from-top-1 duration-100 divide-y divide-border/20"
+              >
+                {filteredOptions.map((opt, idx) => {
+                  const optName = optionName(opt);
+                  const isSelected = optName.toLowerCase() === (value || "").toLowerCase();
+                  const isActive = idx === activeIndex;
                   return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setSearchTerm(name);
-                        onChange(name, opt);
-                        setIsOpen(false);
-                      }}
+                    <div
+                      key={`${optName}-${idx}`}
+                      id={optionId(idx)}
+                      role="option"
+                      aria-selected={isSelected}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onMouseEnter={() => setActiveIndex(idx)}
+                      onClick={() => selectOption(opt)}
                       className={`w-full text-left px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer ${
-                        isSelected 
-                          ? 'bg-primary text-background' 
-                          : 'text-foreground hover:bg-secondary'
+                        isSelected
+                          ? 'bg-primary text-background'
+                          : isActive
+                            ? 'bg-secondary text-foreground'
+                            : 'text-foreground hover:bg-secondary'
                       }`}
                     >
-                      {name}
-                    </button>
+                      {optName}
+                    </div>
                   );
-                })
-              ) : (
-                <div className="px-4 py-3 text-[10px] text-foreground/50 uppercase tracking-widest text-center italic bg-background">
-                  No matching options
-                </div>
-              )}
-            </div>
+                })}
+              </div>
+            ) : (
+              <div className="absolute z-[1000] left-0 right-0 mt-1 bg-background border border-border rounded-[4px] shadow-lg px-4 py-3 text-xs text-foreground/50 uppercase tracking-widest text-center italic" role="status">
+                No matching options
+              </div>
+            )
           )}
         </div>
       )}
@@ -256,6 +463,17 @@ export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState("");
   const [loadingClientSecret, setLoadingClientSecret] = useState(false);
   const [paymentIntentError, setPaymentIntentError] = useState("");
+  // Bumped each time the server changed an already-mounted PaymentIntent (new amount), so StripePaymentForm can call
+  // elements.fetchUpdates() instead of the card form being unmounted (which would wipe the typed card number).
+  const [intentVersion, setIntentVersion] = useState(0);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  // Location restore helpers: skip the "country changed -> clear state/city" reset for a country that was restored from the
+  // saved draft / a saved address, and remember the last real state so a city is only cleared when the state truly changed.
+  const skipLocationResetRef = useRef(null);
+  const lastStateCodeRef = useRef("");
+  // Form draft persistence
+  const submittedRef = useRef(false);
+  const draftSuppressedRef = useRef(false);
   const router = useRouter();
   const { showPopup } = usePopup();
 
@@ -324,7 +542,9 @@ export default function CheckoutPage() {
   // "Personal information" — everything needed to actually fulfill and contact the customer
   // about this order. No payment method should even be offered until this is filled in, so a
   // shopper can't pay before we have anywhere to ship to or any way to reach them.
-  const requiredFieldsFilled = ["email", "firstName", "lastName", "street", "city", "phone", "zip", "country"]
+  // The postal code is only required for countries that actually use one.
+  const zipRequired = isZipRequiredFor(formData.countryCode);
+  const requiredFieldsFilled = ["email", "firstName", "lastName", "street", "city", "phone", ...(zipRequired ? ["zip"] : []), "country"]
     .every(f => String(formData[f] || "").trim().length > 0);
 
   // Automatically assign FREE_DELIVERY_METHOD when shipping module is off.
@@ -350,10 +570,48 @@ export default function CheckoutPage() {
   }, [shippingEnabled, isFreeOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // Generate unique key for this session to prevent double-orders
+    // Restore the non-sensitive form fields + idempotency key saved before a refresh, or start a fresh key.
+    // A key whose payment was already submitted is never reused (it may belong to a placed/consumed order).
     Promise.resolve().then(() => {
-      setIdempotencyKey(`pai_${Math.random().toString(36).substring(2, 15)}_${Date.now()}`);
+      const draft = readCheckoutDraft();
+      let key = "";
+      if (draft) {
+        const saved = draft.fields && typeof draft.fields === "object" ? draft.fields : {};
+        const restored = {};
+        DRAFT_FIELDS.forEach((f) => {
+          if (typeof saved[f] === "string" && saved[f]) restored[f] = saved[f];
+        });
+        if (Object.keys(restored).length > 0) {
+          if (restored.countryCode) skipLocationResetRef.current = restored.countryCode;
+          if (restored.stateCode) lastStateCodeRef.current = restored.stateCode;
+          setFormData(prev => ({ ...prev, ...restored, email: prev.email || restored.email || "" }));
+        }
+        if (typeof draft.key === "string" && draft.key && !draft.submitted) key = draft.key;
+      }
+      setIdempotencyKey(key || newIdempotencyKey());
     });
+  }, []);
+
+  // Save the draft on every change (cheap; sessionStorage only, so it dies with the tab).
+  useEffect(() => {
+    if (!idempotencyKey || draftSuppressedRef.current) return;
+    const fields = {};
+    DRAFT_FIELDS.forEach((f) => { fields[f] = String(formData[f] || ""); });
+    writeCheckoutDraft({ v: 1, key: idempotencyKey, submitted: submittedRef.current, fields });
+  }, [idempotencyKey, formData]);
+
+  const markPaymentSubmitted = useCallback(() => {
+    // This key is now (potentially) attached to a real payment: a refresh must start a new key, not reuse it.
+    submittedRef.current = true;
+    if (!draftSuppressedRef.current) {
+      const draft = readCheckoutDraft();
+      if (draft) writeCheckoutDraft({ ...draft, submitted: true });
+    }
+  }, []);
+
+  const discardCheckoutDraft = useCallback(() => {
+    draftSuppressedRef.current = true;
+    clearCheckoutDraft();
   }, []);
 
   // GA4 Event: begin_checkout
@@ -402,10 +660,28 @@ export default function CheckoutPage() {
       if (!formData.countryCode) { setStates([]); setCities([]); return; }
       setLoadingStates(true);
       setCities([]);
-      setFormData(prev => ({ ...prev, state: "", stateCode: "", city: "" }));
+      // A country that was just restored (refresh / saved address) keeps its state and city; any other country
+      // change starts the state and city over.
+      if (skipLocationResetRef.current && skipLocationResetRef.current === formData.countryCode) {
+        skipLocationResetRef.current = null;
+      } else {
+        lastStateCodeRef.current = "";
+        setFormData(prev => ({ ...prev, state: "", stateCode: "", city: "" }));
+      }
       fetch(`/api/locations?countryCode=${formData.countryCode}`)
         .then(r => r.json())
-        .then(d => { if (d.success) setStates(d.data); })
+        .then(d => {
+          if (!d.success) return;
+          setStates(d.data);
+          // A restored / saved-address state name has no code yet: resolve it so the city list can load.
+          setFormData(prev => {
+            if (!prev.state || prev.stateCode) return prev;
+            const match = d.data.find(st => st.name.toLowerCase() === prev.state.trim().toLowerCase());
+            if (!match) return prev;
+            lastStateCodeRef.current = match.isoCode;
+            return { ...prev, state: match.name, stateCode: match.isoCode };
+          });
+        })
         .catch(console.error)
         .finally(() => setLoadingStates(false));
     });
@@ -416,7 +692,6 @@ export default function CheckoutPage() {
     Promise.resolve().then(() => {
       if (!formData.countryCode || !formData.stateCode) { setCities([]); return; }
       setLoadingCities(true);
-      setFormData(prev => ({ ...prev, city: "" }));
       fetch(`/api/locations?countryCode=${formData.countryCode}&stateCode=${formData.stateCode}`)
         .then(r => r.json())
         .then(d => { if (d.success) setCities(d.data); })
@@ -629,6 +904,10 @@ export default function CheckoutPage() {
         break;
       case "zip": {
         const countryCode = (formData.countryCode || "").toUpperCase();
+        if (!isZipRequiredFor(countryCode)) {
+          // This country has no postal codes: an empty value is fine and anything entered is accepted as typed.
+          break;
+        }
         if (!cleanVal) {
           error = "Postal code / ZIP is required";
         } else if (countryCode === "US") {
@@ -667,8 +946,10 @@ export default function CheckoutPage() {
     // Sanitize input values on the fly: restrict emojis, script tags, HTML tags
     let sanitized = value
       .replace(/[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011\u2600-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, "")
-      .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, "")
-      .replace(/<\/?[^>]+(>|$)/g, "");
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
+      .replace(/<!--[\s\S]*?-->/g, "")
+      // Only real tags (a "<" followed by a letter, or "</" + letter). "deliver before <10am" keeps its text.
+      .replace(/<\/?[a-z][^>]*>/gi, "");
 
     if (name === "firstName" || name === "lastName" || name === "city") {
       sanitized = sanitized.slice(0, 50);
@@ -792,7 +1073,20 @@ export default function CheckoutPage() {
     buildCheckoutPayloadRef.current = buildCheckoutPayload;
   });
 
+  // Is every required field present AND valid? (Stricter than requiredFieldsFilled, which only checks non-empty and decides
+  // whether the payment section is revealed.) The first PaymentIntent is only created once this holds, so a half-typed
+  // email / phone / zip never snapshots a bogus order.
+  const formValid = ["email", "firstName", "lastName", "street", "city", "phone", "zip", "country"]
+    .every((f) => validateField(f, formData[f]) === "") && (countries.length === 0 || !!formData.countryCode);
+
+  const clientSecretRef = useRef("");
+  useEffect(() => { clientSecretRef.current = clientSecret; }, [clientSecret]);
+  const intentSeqRef = useRef(0);
+
+  // Create the PaymentIntent, or - for the same idempotency key - update its amount. The server returns the SAME
+  // client secret on an update, so a mounted card form is never replaced because the total changed.
   const fetchClientSecret = useCallback(async (payload) => {
+    const seq = ++intentSeqRef.current;
     setLoadingClientSecret(true);
     setPaymentIntentError("");
     try {
@@ -802,40 +1096,50 @@ export default function CheckoutPage() {
         body: JSON.stringify(payload)
       });
       const data = await res.json();
+      if (seq !== intentSeqRef.current) return; // a newer request superseded this one
       if (data.success) {
-        setClientSecret(data.clientSecret);
+        const hadSecret = !!clientSecretRef.current;
+        setClientSecret((prev) => (prev === data.clientSecret ? prev : data.clientSecret));
+        // Same secret already on screen: the amount may have changed, so ask the mounted element to re-read it.
+        if (hadSecret && clientSecretRef.current === data.clientSecret) setIntentVersion((v) => v + 1);
+      } else if (res.status === 409 && !clientSecretRef.current) {
+        // This key already belongs to a placed order (e.g. a restored draft): start over with a fresh key.
+        setIdempotencyKey(newIdempotencyKey());
       } else {
-        setClientSecret("");
+        // Keep any already-mounted card form (and what the shopper typed into it); just surface the problem.
         setPaymentIntentError(data.error || "Unable to initialize payment. Please try again.");
       }
     } catch (err) {
-      setClientSecret("");
+      if (seq !== intentSeqRef.current) return;
       setPaymentIntentError("Unable to initialize payment. Please try again.");
     } finally {
-      setLoadingClientSecret(false);
+      if (seq === intentSeqRef.current) setLoadingClientSecret(false);
     }
   }, []);
 
-  // Debounce: (re)create the PaymentIntent when priced inputs change. Never called for a
-  // free ($0) order — Stripe can't create a $0 PaymentIntent, and there's nothing to pay.
+  // Debounce: create the PaymentIntent (first time) or update its amount (later changes) when priced inputs change. Never
+  // called for a free ($0) order - Stripe can't create a $0 PaymentIntent, and there's nothing to pay. The existing
+  // clientSecret is deliberately NOT cleared here: that would unmount <Elements> and wipe the typed card details.
   useEffect(() => {
     if (paymentMethod !== "card" || isFreeOrder) return;
     if (!idempotencyKey || !cartItems || cartItems.length === 0) return;
-    // Don't create (or leak money-collecting intent for) a PaymentIntent until there's
-    // somewhere to ship to and someone to contact — also avoids ever snapshotting a blank
-    // checkout payload in the first place.
-    if (isRestricted || !requiredFieldsFilled) return;
-
-    Promise.resolve().then(() => {
-      setClientSecret("");
-      setPaymentIntentError("");
-    });
+    // Not until there's somewhere to ship to and someone to contact (valid, not just non-empty) - also avoids ever
+    // snapshotting a blank checkout payload in the first place.
+    if (isRestricted || !formValid) return;
 
     const t = setTimeout(() => {
       fetchClientSecret(buildCheckoutPayloadRef.current());
     }, 600);
     return () => clearTimeout(t);
-  }, [paymentMethod, isFreeOrder, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret, isRestricted, requiredFieldsFilled]);
+  }, [paymentMethod, isFreeOrder, idempotencyKey, cartItems, cartSubtotal, shippingCost, appliedPromo?.code, selectedShipping, fetchClientSecret, isRestricted, formValid]);
+
+  const retryPaymentIntent = () => {
+    if (!formValid) {
+      validateForm();
+      return;
+    }
+    fetchClientSecret(buildCheckoutPayloadRef.current());
+  };
 
   // Autosave an abandoned-cart snapshot once the shopper has actually started entering their
   // details (not just landed on the page with items in cart) — so if they leave without
@@ -936,6 +1240,7 @@ export default function CheckoutPage() {
 
       if (data.success) {
         orderPlaced = true; // keep the button disabled while the thank-you page loads, so a second tap cannot send a second request
+        discardCheckoutDraft();
         setIsSuccess(true);
         clearCart();
         router.push(`/checkout/success?${data.orderId ? `id=${data.orderId}&` : ""}orderNumber=${data.orderNumber}`);
@@ -962,9 +1267,190 @@ export default function CheckoutPage() {
     }
   };
 
+  const elementsOptions = useMemo(() => ({ clientSecret, appearance: STRIPE_APPEARANCE }), [clientSecret]);
+
+  // The CAPTCHA sits directly above whichever button places the order (card pay button or COD / free "Complete Order"),
+  // so the shopper sees it before paying. Only one of the two is ever rendered at a time.
+  const securityCheck = (!isRestricted && requiredFieldsFilled) ? (
+    <TurnstileWidget
+      ref={turnstileRef}
+      onVerify={(token) => setTurnstileToken(token)}
+      onExpire={() => setTurnstileToken("")}
+      onError={() => setTurnstileToken("")}
+    />
+  ) : null;
+
+  // Items + discount code + totals: one block, rendered in the desktop sidebar and in the collapsible mobile summary,
+  // so the coupon / cart state is shared (never duplicated).
+  const orderSummaryBody = (
+    <>
+    {/* Cart Products List */}
+    <div className="divide-y divide-neutral-200/80 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
+      {(cartItems || []).map((item, index) => {
+        const itemImage = item.image || (Array.isArray(item.images) && item.images[0]) || "/placeholder.jpg";
+        const itemKey = `${item.id || item._id}-${item.selectedSize || "Standard"}-${item.selectedColor || "Standard"}-${index}`;
+        const uniqueKeyForCart = getCartItemKey(item);
+        return (
+          <div key={itemKey} className="flex gap-4 items-center py-3.5 first:pt-0 last:pb-0">
+            <div className="relative shrink-0 w-14 h-18">
+              <Link 
+                href={getProductUrl(item)} 
+                className="block w-full h-full bg-[#FAF9F6] rounded-lg border border-black/[0.05] overflow-hidden hover:opacity-85 transition-opacity"
+                title={item.name}
+              >
+                <img src={itemImage} alt={item.name} className="w-full h-full object-cover" />
+              </Link>
+              <span className="absolute -top-1.5 -right-1.5 bg-black text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-bold shadow-md z-10 border border-white pointer-events-none">
+                {item.quantity}
+              </span>
+            </div>
+            <div className="flex-1 space-y-0.5 min-w-0">
+              <Link 
+                href={getProductUrl(item)} 
+                className="text-[13px] font-bold text-black uppercase tracking-wide break-words hover:underline hover:text-black/80 transition-all block"
+                title={item.name}
+              >
+                {item.name}
+              </Link>
+
+              {item.selectedOptions && (
+                <p className="text-xs text-black font-semibold uppercase tracking-wider">
+                  {Object.entries(item.selectedOptions).map(([k, v]) => `${k}: ${v}`).join(" / ")}
+                </p>
+              )}
+
+              {/* Made to Measure Badge */}
+              {item.madeToMeasure?.enabled && (
+                <div className="mt-1">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-xs font-bold uppercase tracking-wide">
+                    ✦ Made to Measure
+                  </span>
+                  <details className="mt-1">
+                    <summary className="text-xs text-black/60 cursor-pointer hover:text-black transition-colors select-none">View measurements</summary>
+                    <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-black font-semibold">
+                      {Object.entries(item.madeToMeasure.measurements || {}).map(([k, v]) => v ? (
+                        <span key={k}><span className="font-bold capitalize text-black">{k.replace(/([A-Z])/g, ' $1')}</span>: {v} {item.madeToMeasure.unit}</span>
+                      ) : null)}
+                      {item.madeToMeasure.notes && <span className="col-span-2 italic text-black/80 font-semibold">Note: {item.madeToMeasure.notes}</span>}
+                    </div>
+                  </details>
+                </div>
+              )}
+
+              {/* Corporate Gifting Badge */}
+              {item.corporateGifting?.enabled && (
+                <div className="mt-1">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-xs font-bold uppercase tracking-wide">
+                    ✦ Corporate Gifting — {(item.corporateGifting.selections || []).length} items
+                  </span>
+                  <details className="mt-1">
+                    <summary className="text-xs text-black/60 cursor-pointer hover:text-black transition-colors select-none">View selected items</summary>
+                    <div className="mt-1.5 space-y-0.5 text-xs text-black font-semibold">
+                      {(item.corporateGifting.selections || []).map((sel, selIdx) => (
+                        <div key={sel.itemId || selIdx}>
+                          {sel.name}{sel.priceDelta > 0 ? ` (+$${Number(sel.priceDelta).toFixed(2)})` : ""}{sel.artwork?.name ? ` — logo: ${sel.artwork.name}` : " — no logo uploaded"}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-[12px] font-bold text-black font-mono">
+                  ${money(item.price * item.quantity)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => removeFromCart(uniqueKeyForCart)}
+                  className="inline-flex items-center justify-center min-h-[32px] min-w-[32px] px-2 -mr-2 text-xs font-bold text-black/60 hover:text-red-500 transition-colors uppercase tracking-wider cursor-pointer"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {/* Coupon Code Input */}
+    <div className="pt-5 border-t border-neutral-200/80 space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Discount code"
+          value={promoCode}
+          onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+          className="flex-1 bg-white border border-neutral-300 rounded-[4px] px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider outline-none focus:border-black placeholder:text-neutral-400 text-black transition-all"
+        />
+        <button
+          type="button"
+          onClick={handleApplyPromo}
+          disabled={!promoCode || applyingPromo}
+          className="px-5 py-2.5 bg-neutral-800 text-white hover:bg-black rounded-[4px] text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 shrink-0 cursor-pointer"
+        >
+          {applyingPromo ? "..." : "Apply"}
+        </button>
+      </div>
+      {promoError && <p className="text-xs text-red-600 font-bold ml-1 uppercase tracking-wider">{promoError}</p>}
+      {appliedPromo && (
+        <div className="flex items-center justify-between px-3 py-2 bg-[#FAF9F6] border border-neutral-200 rounded-[3px]">
+          <span className="text-xs font-bold text-black uppercase tracking-wider">
+            Discount ({appliedPromo.code || appliedPromo.appliedPromotions?.[0]?.title || "Promotion"}) Applied
+          </span>
+          <button
+            type="button"
+            onClick={removePromoCode}
+            className="inline-flex items-center justify-center min-h-[32px] px-2 -mr-2 text-xs font-bold text-black hover:underline uppercase tracking-wider cursor-pointer"
+          >
+            Remove
+          </button>
+        </div>
+      )}
+    </div>
+
+    {/* Pricing Summary */}
+    <div className="space-y-3 pt-5 border-t border-neutral-200/80 text-[13px] text-black font-semibold">
+      <div className="flex justify-between items-center">
+        <span className="text-black/80">Subtotal</span>
+        <span className="text-black font-bold font-mono">${money(cartSubtotal)}</span>
+      </div>
+
+      {discountTotal > 0 && (
+        <div className="flex justify-between items-center text-black font-semibold">
+          <span>Discount</span>
+          <span className="font-mono">-${money(discountTotal)}</span>
+        </div>
+      )}
+
+      {affiliateDiscount?.type !== "None" && affiliateDiscountAmount > 0 && (
+        <div className="flex justify-between items-center text-black font-semibold">
+          <span>Referral Discount</span>
+          <span className="font-mono">-${money(affiliateDiscountAmount)}</span>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center">
+        <span className="text-black/80">Shipping</span>
+        <span className="text-black font-bold font-mono">
+          {selectedShipping
+            ? (shippingCost === 0 ? "Free" : `${money(shippingCost)}`)
+            : (!shippingEnabled ? "Free" : "Calculated at next step")}
+        </span>
+      </div>
+
+      <div className="pt-5 flex justify-between items-end border-t border-neutral-200/80">
+        <span className="text-sm font-bold uppercase tracking-wider text-black">Total</span>
+        <span className="text-2xl font-black text-black font-mono">${money(cartTotal)}</span>
+      </div>
+    </div>
+    </>
+  );
+
   const brandName = siteData?.siteSettings?.general?.brandName || "";
   const inputClass = "w-full bg-white border border-neutral-300 rounded-[4px] px-3.5 py-2.5 text-base sm:text-[13px] placeholder:text-neutral-400 focus:border-black focus:ring-1 focus:ring-black outline-none transition-all duration-200 text-black";
-  const labelClass = "block text-[11px] font-bold text-neutral-600 uppercase tracking-wider mb-1";
+  const labelClass = "block text-xs font-bold text-neutral-600 uppercase tracking-wider mb-1";
 
   if (!isCartLoaded) {
     return (
@@ -1048,6 +1534,31 @@ export default function CheckoutPage() {
         <h1 className="text-[28px] md:text-[36px] font-bold tracking-tight text-black mb-8 leading-none">
           Checkout
         </h1>
+
+        {/* Mobile / tablet: collapsible order summary at the TOP (desktop keeps the sticky sidebar) */}
+        <div className="lg:hidden mb-6 bg-[#FAF9F6] border border-black/[0.04] rounded-[4px]">
+          <button
+            type="button"
+            onClick={() => setSummaryOpen((o) => !o)}
+            aria-expanded={summaryOpen}
+            aria-controls="co-mobile-summary"
+            className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left cursor-pointer"
+          >
+            <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-black">
+              {summaryOpen ? "Hide order summary" : "Show order summary"}
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${summaryOpen ? "rotate-180" : ""}`} />
+            </span>
+            <span className="text-base font-black text-black font-mono">${money(cartTotal)}</span>
+          </button>
+          {summaryOpen && (
+            <div id="co-mobile-summary" className="px-4 pb-5 pt-1 space-y-6 border-t border-neutral-200/80">
+              <div className="pt-4 space-y-6">
+                {orderSummaryBody}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
 
           {/* Left Column: Checkout Forms (60% / 7 Cols) */}
@@ -1077,7 +1588,7 @@ export default function CheckoutPage() {
                     className={`${inputClass} ${errors.email ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     required
                   />
-                  {errors.email && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.email}</p>}
+                  {errors.email && <p role="alert" className="text-xs text-red-500 font-semibold mt-1">{errors.email}</p>}
                 </div>
                 <label className="flex items-center gap-2.5 cursor-pointer select-none py-1">
                   <input
@@ -1107,15 +1618,28 @@ export default function CheckoutPage() {
                             const nameParts = (addr.fullName || "").trim().split(" ");
                             const firstName = nameParts[0] || "";
                             const lastName = nameParts.slice(1).join(" ") || "";
+                            // Resolve the saved country to a real list entry so its states load and the saved state / city
+                            // survive the "country changed" reset.
+                            const savedCountry = countries.find(c => c.name.toLowerCase() === (addr.country || "").trim().toLowerCase());
+                            const sameCountry = !!savedCountry && savedCountry.isoCode === formData.countryCode;
+                            // Different country: its states load next and must keep the saved state / city. Same country:
+                            // the state list is already loaded, so resolve the saved state's code right away.
+                            if (savedCountry && !sameCountry) skipLocationResetRef.current = savedCountry.isoCode;
+                            const savedState = sameCountry
+                              ? states.find(st => st.name.toLowerCase() === String(addr.state || "").trim().toLowerCase())
+                              : null;
+                            lastStateCodeRef.current = savedState ? savedState.isoCode : "";
                             setFormData(prev => ({
                               ...prev,
                               firstName,
                               lastName,
                               street: addr.street,
                               city: addr.city,
-                              state: addr.state,
+                              state: savedState ? savedState.name : addr.state,
+                              stateCode: savedState ? savedState.isoCode : "",
                               zip: addr.zip,
-                              country: addr.country || "",
+                              country: savedCountry ? savedCountry.name : (addr.country || ""),
+                              countryCode: savedCountry ? savedCountry.isoCode : "",
                               phone: addr.phone || prev.phone
                             }));
                             setErrors({});
@@ -1138,20 +1662,24 @@ export default function CheckoutPage() {
                 {/* Country Selection */}
                 <SearchableDropdown
                   label="Country / Region *"
+                  name="country"
                   placeholder="Search Country / Region…"
                   value={formData.country}
                   options={countries}
+                  aliases={COUNTRY_ALIASES}
                   labelClass={labelClass}
                   required
                   onChange={(val, matched) => {
                     const countryCode = matched ? matched.isoCode : "";
-                    setFormData(prev => ({
-                      ...prev,
-                      country: val,
-                      countryCode,
-                      state: "", stateCode: "", city: ""
-                    }));
-                    setErrors(prev => ({ ...prev, country: "" }));
+                    // Re-picking the same country (or the dropdown re-confirming it on blur) must not wipe state / city.
+                    const sameCountry = countryCode === formData.countryCode;
+                    if (!sameCountry) lastStateCodeRef.current = "";
+                    setFormData(prev => (
+                      countryCode === prev.countryCode
+                        ? { ...prev, country: matched ? matched.name : val }
+                        : { ...prev, country: matched ? matched.name : val, countryCode, state: "", stateCode: "", city: "" }
+                    ));
+                    setErrors(prev => ({ ...prev, country: "", zip: "" }));
                     if (isRestrictedCountry(val, countryCode)) {
                       showPopup({
                         title: "Shipping Not Available",
@@ -1161,7 +1689,7 @@ export default function CheckoutPage() {
                     }
                   }}
                 />
-                {errors.country && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.country}</p>}
+                {errors.country && <p role="alert" className="text-xs text-red-500 font-semibold mt-1">{errors.country}</p>}
 
                 {/* Names */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -1179,7 +1707,7 @@ export default function CheckoutPage() {
                       className={`${inputClass} ${errors.firstName ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                       required
                     />
-                    {errors.firstName && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.firstName}</p>}
+                    {errors.firstName && <p role="alert" className="text-xs text-red-500 font-semibold mt-1">{errors.firstName}</p>}
                   </div>
                   <div className="space-y-1">
                     <label htmlFor="co-lastName" className={labelClass}>Last name *</label>
@@ -1195,7 +1723,7 @@ export default function CheckoutPage() {
                       className={`${inputClass} ${errors.lastName ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                       required
                     />
-                    {errors.lastName && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.lastName}</p>}
+                    {errors.lastName && <p role="alert" className="text-xs text-red-500 font-semibold mt-1">{errors.lastName}</p>}
                   </div>
                 </div>
 
@@ -1214,7 +1742,7 @@ export default function CheckoutPage() {
                     className={`${inputClass} ${errors.street ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     required
                   />
-                  {errors.street && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.street}</p>}
+                  {errors.street && <p role="alert" className="text-xs text-red-500 font-semibold mt-1">{errors.street}</p>}
                 </div>
 
                 {/* State / Province */}
@@ -1222,6 +1750,7 @@ export default function CheckoutPage() {
                   <>
                     <SearchableDropdown
                       label="State / Province *"
+                      name="state"
                       placeholder="Search State / Province…"
                       value={formData.state}
                       options={states}
@@ -1229,29 +1758,36 @@ export default function CheckoutPage() {
                       labelClass={labelClass}
                       required
                       onChange={(val, matched) => {
+                        // A city the shopper already typed/selected is only dropped when they switch to a DIFFERENT real
+                        // state (its city list no longer applies) - not when the same state is re-picked, re-typed or autofilled.
+                        const newCode = matched ? matched.isoCode : "";
+                        const switchedState = !!newCode && !!lastStateCodeRef.current && newCode !== lastStateCodeRef.current;
+                        if (newCode) lastStateCodeRef.current = newCode;
                         setFormData(prev => ({
                           ...prev,
-                          state: val,
-                          stateCode: matched ? matched.isoCode : "",
-                          city: ""
+                          state: matched ? matched.name : val,
+                          stateCode: newCode,
+                          city: switchedState ? "" : prev.city
                         }));
                         setErrors(prev => ({ ...prev, state: "" }));
                       }}
                     />
-                    {errors.state && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.state}</p>}
+                    {errors.state && <p role="alert" className="text-xs text-red-500 font-semibold mt-1">{errors.state}</p>}
                   </>
                 ) : (
                   <div className="space-y-1">
-                    <label className={labelClass}>State / Province</label>
+                    <label htmlFor="co-state" className={labelClass}>State / Province</label>
                     <input
                       type="text"
                       name="state"
+                      id="co-state"
+                      autoComplete="address-level1"
                       value={formData.state}
                       onChange={handleInputChange}
                       placeholder="State / Province"
                       className={`${inputClass} ${errors.state ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     />
-                    {errors.state && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.state}</p>}
+                    {errors.state && <p className="text-xs text-red-500 font-semibold mt-1">{errors.state}</p>}
                   </div>
                 )}
 
@@ -1261,6 +1797,7 @@ export default function CheckoutPage() {
                     <div className="space-y-1">
                       <SearchableDropdown
                         label="City *"
+                        name="city"
                         placeholder="Search City…"
                         value={formData.city}
                         options={cities}
@@ -1275,25 +1812,28 @@ export default function CheckoutPage() {
                           setErrors(prev => ({ ...prev, city: "" }));
                         }}
                       />
-                      {errors.city && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.city}</p>}
+                      {errors.city && <p className="text-xs text-red-500 font-semibold mt-1">{errors.city}</p>}
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <label className={labelClass}>City *</label>
+                      <label htmlFor="co-city" className={labelClass}>City *</label>
                       <input
                         type="text"
                         name="city"
+                        id="co-city"
+                        autoComplete="address-level2"
+                        aria-invalid={errors.city ? true : undefined}
                         value={formData.city}
                         onChange={handleInputChange}
                         placeholder="City"
                         className={`${inputClass} ${errors.city ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                         required
                       />
-                      {errors.city && <p className="text-[11px] text-red-500 font-semibold mt-1">{errors.city}</p>}
+                      {errors.city && <p className="text-xs text-red-500 font-semibold mt-1">{errors.city}</p>}
                     </div>
                   )}
                   <div className="space-y-1">
-                    <label htmlFor="co-zip" className={labelClass}>Postal code / ZIP <span className="text-red-500">*</span></label>
+                    <label htmlFor="co-zip" className={labelClass}>Postal code / ZIP {zipRequired ? <span className="text-red-500">*</span> : <span className="normal-case font-medium text-neutral-500">(optional)</span>}</label>
                     <input
                       type="text"
                       name="zip"
@@ -1302,10 +1842,10 @@ export default function CheckoutPage() {
                     aria-invalid={errors.zip ? true : undefined}
                       value={formData.zip}
                       onChange={handleInputChange}
-                      placeholder="Postal code"
+                      placeholder={zipRequired ? "Postal code" : "Postal code (optional)"}
                       className={`${inputClass} ${errors.zip ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     />
-                    {errors.zip && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.zip}</p>}
+                    {errors.zip && <p role="alert" className="text-xs text-red-500 font-semibold mt-1">{errors.zip}</p>}
                   </div>
                 </div>
 
@@ -1340,7 +1880,7 @@ export default function CheckoutPage() {
                     className={`${inputClass} ${errors.phone ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     required
                   />
-                  {errors.phone && <p role="alert" className="text-[11px] text-red-500 font-semibold mt-1">{errors.phone}</p>}
+                  {errors.phone && <p role="alert" className="text-xs text-red-500 font-semibold mt-1">{errors.phone}</p>}
                 </div>
 
                 {/* Customer Note */}
@@ -1366,7 +1906,7 @@ export default function CheckoutPage() {
               {isRestricted ? (
                 <div className="border border-red-200 bg-red-50 rounded-[4px] p-4">
                   <p className="text-[13px] font-bold text-red-800">Shipping Unavailable</p>
-                  <p className="text-[11px] text-red-700 mt-0.5">{RESTRICTED_COUNTRY_MESSAGE}</p>
+                  <p className="text-xs text-red-700 mt-0.5">{RESTRICTED_COUNTRY_MESSAGE}</p>
                 </div>
               ) : isFreeOrder ? (
                 <div className="border border-neutral-200 rounded-[4px] bg-white p-4 flex items-center justify-between">
@@ -1381,7 +1921,7 @@ export default function CheckoutPage() {
                     </div>
                     <div>
                       <p className="text-[13px] font-bold text-black">Free Delivery</p>
-                      <p className="text-[11px] text-neutral-500">Free delivery on all orders</p>
+                      <p className="text-xs text-neutral-500">Free delivery on all orders</p>
                     </div>
                   </div>
                   <span className="text-[13px] font-bold text-black font-mono bg-neutral-100 px-2.5 py-0.5 rounded">
@@ -1417,7 +1957,7 @@ export default function CheckoutPage() {
                         />
                         <div>
                           <p className="text-[13px] font-semibold text-black">{rate.methodName}</p>
-                          {rate.description && <p className="text-[11px] text-neutral-500">{rate.description}</p>}
+                          {rate.description && <p className="text-xs text-neutral-500">{rate.description}</p>}
                         </div>
                       </div>
                       <span className="text-[13px] font-bold text-black font-mono">
@@ -1437,17 +1977,17 @@ export default function CheckoutPage() {
               {isRestricted ? (
                 <div className="border border-red-200 bg-red-50 rounded-[4px] p-4">
                   <p className="text-[13px] font-bold text-red-800">Checkout Unavailable</p>
-                  <p className="text-[11px] text-red-700 mt-0.5">{RESTRICTED_COUNTRY_MESSAGE}</p>
+                  <p className="text-xs text-red-700 mt-0.5">{RESTRICTED_COUNTRY_MESSAGE}</p>
                 </div>
-              ) : !requiredFieldsFilled ? (
+              ) : !requiredFieldsFilled && !clientSecret ? (
                 <div className="border border-neutral-200 bg-[#FAF9F6] rounded-[4px] p-4">
                   <p className="text-[13px] font-semibold text-black">Complete your contact & delivery details above</p>
-                  <p className="text-[11px] text-neutral-500 mt-0.5">Payment options will appear once your name, email, address, and phone number are filled in.</p>
+                  <p className="text-xs text-neutral-500 mt-0.5">Payment options will appear once your name, email, address, and phone number are filled in.</p>
                 </div>
               ) : isFreeOrder ? (
                 <div className="border border-green-200 bg-green-50 rounded-[4px] p-4">
                   <p className="text-[13px] font-bold text-green-800">No payment required</p>
-                  <p className="text-[11px] text-green-700 mt-0.5">Your order total is $0 — nothing to charge.</p>
+                  <p className="text-xs text-green-700 mt-0.5">Your order total is $0 — nothing to charge.</p>
                 </div>
               ) : (
                 <>
@@ -1492,22 +2032,35 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {paymentMethod === "card" && (
-                <div className="pt-1">
-                  {loadingClientSecret && !clientSecret && (
-                    <div className="space-y-3 border border-neutral-200 rounded-[4px] p-4 bg-[#FAF9F6]/40">
+              {/* Stays mounted (just hidden) while Cash on Delivery is selected, so card details already typed survive a switch. */}
+              {cardMethodEnabled && (
+                <div className={paymentMethod === "card" ? "pt-1" : "hidden"}>
+                  {!clientSecret && !formValid && (
+                    <p className="text-xs text-neutral-500 border border-neutral-200 bg-[#FAF9F6]/60 rounded-[4px] p-3">
+                      Fill in and correct the details above to load secure card payment.
+                    </p>
+                  )}
+                  {!clientSecret && formValid && !paymentIntentError && (
+                    <div className="space-y-3 border border-neutral-200 rounded-[4px] p-4 bg-[#FAF9F6]/40" aria-busy="true">
                       <div className="w-full h-10 bg-neutral-100 animate-pulse rounded-[4px]" />
                       <div className="w-full h-10 bg-neutral-100 animate-pulse rounded-[4px]" />
                       <div className="w-2/3 h-10 bg-neutral-100 animate-pulse rounded-[4px]" />
                     </div>
                   )}
                   {!loadingClientSecret && paymentIntentError && (
-                    <p className="text-[11px] text-red-600 font-semibold border border-red-200 bg-red-50 rounded-[4px] p-3">
-                      {paymentIntentError}
-                    </p>
+                    <div role="alert" className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 border border-red-200 bg-red-50 rounded-[4px] p-3 mb-3">
+                      <p className="flex-1 text-xs text-red-600 font-semibold">{paymentIntentError}</p>
+                      <button
+                        type="button"
+                        onClick={retryPaymentIntent}
+                        className="shrink-0 min-h-[32px] px-3 rounded-[4px] border border-red-300 bg-white text-xs font-bold uppercase tracking-wider text-red-700 hover:bg-red-100 transition-colors cursor-pointer"
+                      >
+                        Try again
+                      </button>
+                    </div>
                   )}
                   {clientSecret && (
-                    <Elements stripe={stripePromise} options={{ clientSecret, appearance: STRIPE_APPEARANCE }}>
+                    <Elements stripe={stripePromise} options={elementsOptions}>
                       <StripePaymentForm
                         returnUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/checkout/success?idempotencyKey=${idempotencyKey}`}
                         idempotencyKey={idempotencyKey}
@@ -1518,7 +2071,11 @@ export default function CheckoutPage() {
                             trackAddPaymentInfo(cartItems, cartTotal || cartSubtotal || 0, "Card");
                           }
                         }}
-                        disabled={loadingClientSecret}
+                        onPaymentAttempt={markPaymentSubmitted}
+                        onPaymentSuccess={discardCheckoutDraft}
+                        refreshKey={intentVersion}
+                        securitySlot={paymentMethod === "card" ? securityCheck : null}
+                        disabled={loadingClientSecret || isProcessing}
                       />
                     </Elements>
                   )}
@@ -1527,21 +2084,12 @@ export default function CheckoutPage() {
                 </>
               )}
 
-              {/* Security check — required before any payment method (including a free order) can submit */}
-              {!isRestricted && requiredFieldsFilled && (
-                <div className="pt-4">
-                  <TurnstileWidget
-                    ref={turnstileRef}
-                    onVerify={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken("")}
-                  />
-                </div>
-              )}
             </section>
 
             {/* Submit Action (Cash on Delivery / free order only — Card has its own submit button above) */}
             {!isRestricted && requiredFieldsFilled && (isFreeOrder || paymentMethod === "cod") && (
               <div className="space-y-4">
+                {securityCheck}
                 <button
                   type="button"
                   onClick={handlePayment}
@@ -1556,185 +2104,25 @@ export default function CheckoutPage() {
           </div>
 
           {/* Right Column: Order Summary (40% / 5 Cols) - STICKY */}
-          <div className="lg:col-span-5 bg-[#FAF9F6] border border-black/[0.04] rounded-[4px] p-6 md:p-8 space-y-6 lg:sticky lg:top-28 self-start">
+          <div className="hidden lg:block lg:col-span-5 bg-[#FAF9F6] border border-black/[0.04] rounded-[4px] p-6 md:p-8 space-y-6 lg:sticky lg:top-28 self-start">
             <h2 className="text-xs font-bold uppercase tracking-wider text-black">Order Summary</h2>
 
-            {/* Cart Products List */}
-            <div className="divide-y divide-neutral-200/80 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
-              {(cartItems || []).map((item, index) => {
-                const itemImage = item.image || (Array.isArray(item.images) && item.images[0]) || "/placeholder.jpg";
-                const itemKey = `${item.id || item._id}-${item.selectedSize || "Standard"}-${item.selectedColor || "Standard"}-${index}`;
-                const uniqueKeyForCart = getCartItemKey(item);
-                return (
-                  <div key={itemKey} className="flex gap-4 items-center py-3.5 first:pt-0 last:pb-0">
-                    <div className="relative shrink-0 w-14 h-18">
-                      <Link 
-                        href={getProductUrl(item)} 
-                        className="block w-full h-full bg-[#FAF9F6] rounded-lg border border-black/[0.05] overflow-hidden hover:opacity-85 transition-opacity"
-                        title={item.name}
-                      >
-                        <img src={itemImage} alt={item.name} className="w-full h-full object-cover" />
-                      </Link>
-                      <span className="absolute -top-1.5 -right-1.5 bg-black text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-bold shadow-md z-10 border border-white pointer-events-none">
-                        {item.quantity}
-                      </span>
-                    </div>
-                    <div className="flex-1 space-y-0.5 min-w-0">
-                      <Link 
-                        href={getProductUrl(item)} 
-                        className="text-[13px] font-bold text-black uppercase tracking-wide truncate hover:underline hover:text-black/80 transition-all block"
-                        title={item.name}
-                      >
-                        {item.name}
-                      </Link>
-
-                      {item.selectedOptions && (
-                        <p className="text-[10px] text-black font-semibold uppercase tracking-wider">
-                          {Object.entries(item.selectedOptions).map(([k, v]) => `${k}: ${v}`).join(" / ")}
-                        </p>
-                      )}
-
-                      {/* Made to Measure Badge */}
-                      {item.madeToMeasure?.enabled && (
-                        <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wide">
-                            ✦ Made to Measure
-                          </span>
-                          <details className="mt-1">
-                            <summary className="text-[9px] text-black/60 cursor-pointer hover:text-black transition-colors select-none">View measurements</summary>
-                            <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] text-black font-semibold">
-                              {Object.entries(item.madeToMeasure.measurements || {}).map(([k, v]) => v ? (
-                                <span key={k}><span className="font-bold capitalize text-black">{k.replace(/([A-Z])/g, ' $1')}</span>: {v} {item.madeToMeasure.unit}</span>
-                              ) : null)}
-                              {item.madeToMeasure.notes && <span className="col-span-2 italic text-black/80 font-semibold">Note: {item.madeToMeasure.notes}</span>}
-                            </div>
-                          </details>
-                        </div>
-                      )}
-
-                      {/* Corporate Gifting Badge */}
-                      {item.corporateGifting?.enabled && (
-                        <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[9px] font-bold uppercase tracking-wide">
-                            ✦ Corporate Gifting — {(item.corporateGifting.selections || []).length} items
-                          </span>
-                          <details className="mt-1">
-                            <summary className="text-[9px] text-black/60 cursor-pointer hover:text-black transition-colors select-none">View selected items</summary>
-                            <div className="mt-1.5 space-y-0.5 text-[9px] text-black font-semibold">
-                              {(item.corporateGifting.selections || []).map((sel, selIdx) => (
-                                <div key={sel.itemId || selIdx}>
-                                  {sel.name}{sel.priceDelta > 0 ? ` (+$${Number(sel.priceDelta).toFixed(2)})` : ""}{sel.artwork?.name ? ` — logo: ${sel.artwork.name}` : " — no logo uploaded"}
-                                </div>
-                              ))}
-                            </div>
-                          </details>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between pt-1">
-                        <p className="text-[12px] font-bold text-black font-mono">
-                          ${money(item.price * item.quantity)}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => removeFromCart(uniqueKeyForCart)}
-                          className="text-[10px] font-bold text-black/60 hover:text-red-500 transition-colors uppercase tracking-wider cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Coupon Code Input */}
-            <div className="pt-5 border-t border-neutral-200/80 space-y-2">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Discount code"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                  className="flex-1 bg-white border border-neutral-300 rounded-[4px] px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider outline-none focus:border-black placeholder:text-neutral-400 text-black transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyPromo}
-                  disabled={!promoCode || applyingPromo}
-                  className="px-5 py-2.5 bg-neutral-800 text-white hover:bg-black rounded-[4px] text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 shrink-0 cursor-pointer"
-                >
-                  {applyingPromo ? "..." : "Apply"}
-                </button>
-              </div>
-              {promoError && <p className="text-[10px] text-red-600 font-bold ml-1 uppercase tracking-wider">{promoError}</p>}
-              {appliedPromo && (
-                <div className="flex items-center justify-between px-3 py-2 bg-[#FAF9F6] border border-neutral-200 rounded-[3px]">
-                  <span className="text-[10px] font-bold text-black uppercase tracking-wider">
-                    Discount ({appliedPromo.code || appliedPromo.appliedPromotions?.[0]?.title || "Promotion"}) Applied
-                  </span>
-                  <button
-                    type="button"
-                    onClick={removePromoCode}
-                    className="text-[10px] font-bold text-black hover:underline uppercase tracking-wider"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Pricing Summary */}
-            <div className="space-y-3 pt-5 border-t border-neutral-200/80 text-[13px] text-black font-semibold">
-              <div className="flex justify-between items-center">
-                <span className="text-black/80">Subtotal</span>
-                <span className="text-black font-bold font-mono">${money(cartSubtotal)}</span>
-              </div>
-
-              {discountTotal > 0 && (
-                <div className="flex justify-between items-center text-black font-semibold">
-                  <span>Discount</span>
-                  <span className="font-mono">-${money(discountTotal)}</span>
-                </div>
-              )}
-
-              {affiliateDiscount?.type !== "None" && affiliateDiscountAmount > 0 && (
-                <div className="flex justify-between items-center text-black font-semibold">
-                  <span>Referral Discount</span>
-                  <span className="font-mono">-${money(affiliateDiscountAmount)}</span>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center">
-                <span className="text-black/80">Shipping</span>
-                <span className="text-black font-bold font-mono">
-                  {selectedShipping
-                    ? (shippingCost === 0 ? "Free" : `${money(shippingCost)}`)
-                    : (!shippingEnabled ? "Free" : "Calculated at next step")}
-                </span>
-              </div>
-
-              <div className="pt-5 flex justify-between items-end border-t border-neutral-200/80">
-                <span className="text-sm font-bold uppercase tracking-wider text-black">Total</span>
-                <span className="text-2xl font-black text-black font-mono">${money(cartTotal)}</span>
-              </div>
-            </div>
+            {orderSummaryBody}
 
             {/* Security & Trust Badges */}
             <div className="pt-5 border-t border-neutral-200/80 space-y-4">
               <div className="flex items-center gap-3">
                 <ShieldCheck className="w-5 h-5 shrink-0 text-black" />
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-black">Secure Checkout Guarantee</p>
-                  <p className="text-[10px] text-black/60 font-semibold">Your details are fully protected and processed securely.</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-black">Secure Checkout Guarantee</p>
+                  <p className="text-xs text-black/60 font-semibold">Your details are fully protected and processed securely.</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <Truck className="w-5 h-5 shrink-0 text-black" />
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-black">Reliable Home Delivery</p>
-                  <p className="text-[10px] text-black/60 font-semibold">Orders are packed with care and shipped via trusted carriers.</p>
+                  <p className="text-xs font-bold uppercase tracking-wider text-black">Reliable Home Delivery</p>
+                  <p className="text-xs text-black/60 font-semibold">Orders are packed with care and shipped via trusted carriers.</p>
                 </div>
               </div>
             </div>

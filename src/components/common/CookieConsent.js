@@ -9,6 +9,8 @@ export default function CookieConsent() {
   // Shopper-facing only: never cover the admin or the admin login.
   const pathname = usePathname() || "";
   const isAdminArea = pathname.startsWith("/admin");
+  // On the checkout the full card would cover the form fields and the pay button on a phone, so it is a slim bar there.
+  const isCheckout = pathname.startsWith("/checkout");
 
   useEffect(() => {
     // Check if user has already made a choice
@@ -31,6 +33,16 @@ export default function CookieConsent() {
   };
 
   if (!isVisible || isAdminArea) return null;
+
+  if (isCheckout) {
+    return (
+      <div role="dialog" aria-label="Cookie settings" className="fixed bottom-0 inset-x-0 z-[9999] bg-white border-t border-black/10 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-3 py-2 flex items-center gap-2 text-black font-sans">
+        <p className="flex-1 min-w-0 text-[12px] leading-snug text-neutral-600 font-medium">We use cookies to improve your experience.</p>
+        <button onClick={handleDecline} className="px-3 py-2 rounded-[4px] text-[11px] font-bold uppercase tracking-wider text-neutral-500 border border-neutral-300">Decline</button>
+        <button onClick={handleAccept} className="px-3 py-2 rounded-[4px] text-[11px] font-bold uppercase tracking-wider bg-black text-white">Accept</button>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-500">

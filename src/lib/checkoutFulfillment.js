@@ -8,7 +8,7 @@ import AbandonedCart from "@/models/AbandonedCart";
 import { ensureOrderCounter, getNextOrderNumber } from "@/lib/orderNumber";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
 import pairoEvents from "@/lib/events";
-import { assertValidCartItems, computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { assertValidCartItems, computeAuthoritativeCheckout, getMissingAttributeError } from "@/lib/checkoutPricing";
 import { resolveAuthoritativePrice } from "@/lib/productPricing";
 import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { CommissionEngine } from "@/lib/affiliate/CommissionEngine";
@@ -99,18 +99,9 @@ export async function createOrderFromCheckoutPayload(payload, {
         // item-selection UI entirely, so a line with corporateGifting selections never carries
         // selectedOptions by design — the required-attribute gate below doesn't apply to it,
         // same as made-to-measure replacing the Size attribute with custom measurements.
-        const isCorporateGifting = !!item.corporateGifting?.enabled;
-        if (!isCorporateGifting && product.productType === "variable" && Array.isArray(product.attributes) && product.attributes.length > 0) {
-          const isMadeToMeasure = !!item.madeToMeasure?.enabled;
-          const missingAttrs = product.attributes.filter((attr) => {
-            // Made-to-measure orders replace the standard Size selection with custom measurements.
-            if (isMadeToMeasure && attr.name.toLowerCase().includes("size")) return false;
-            return !item.selectedOptions?.[attr.name];
-          });
-          if (missingAttrs.length > 0) {
-            throw new Error(`Please select ${missingAttrs.map((a) => a.name).join(" and ")} for "${product.name}" before checkout.`);
-          }
-        }
+        // Shared with create-payment-intent's pre-charge check (getMissingAttributeError), so the two can never disagree.
+        const missingAttributeError = getMissingAttributeError(item, product);
+        if (missingAttributeError) throw new Error(missingAttributeError);
 
         if (product.manageStock) {
           const invRes = await Product.findOneAndUpdate(
@@ -221,7 +212,9 @@ export async function createOrderFromCheckoutPayload(payload, {
           ipLocation
         },
         shippingAddress,
-        shippingSnapshot: shippingSnapshot || (authoritativeShippingCost === 0 ? {
+        // When a free-shipping promotion zeroed the charge, the snapshot's cost must say so too (it otherwise carries the
+        // rate the shopper picked), so the order record never shows a shipping price that wasn't charged.
+        shippingSnapshot: (shippingSnapshot && pricing.freeShipping ? { ...shippingSnapshot, cost: 0 } : shippingSnapshot) || (authoritativeShippingCost === 0 ? {
           version: 1,
           zoneId: null,
           zoneName: 'Free Delivery',

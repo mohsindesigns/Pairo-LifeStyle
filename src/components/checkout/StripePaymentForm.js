@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js";
 import { Loader2, ArrowRight } from "lucide-react";
 import { IDEMPOTENCY_STORAGE_KEY } from "@/lib/checkoutStorage";
 
-export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidate, onBeforeSubmit, disabled = false }) {
+// refreshKey: bump it after the server changed the PaymentIntent's amount, so the mounted PaymentElement re-reads it
+// (elements.fetchUpdates) instead of being torn down - which would wipe the card number the shopper already typed.
+// securitySlot: rendered directly above the pay button (the CAPTCHA, so the shopper sees it before paying).
+export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidate, onBeforeSubmit, onPaymentAttempt, onPaymentSuccess, securitySlot = null, refreshKey = 0, disabled = false }) {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
@@ -14,6 +17,19 @@ export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidat
   const [errorMessage, setErrorMessage] = useState("");
 
   const isReady = !!stripe && !!elements;
+
+  useEffect(() => {
+    if (!elements || !refreshKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await elements.fetchUpdates();
+      } catch (err) {
+        if (!cancelled) console.warn("[Stripe] fetchUpdates failed:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [refreshKey, elements]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,6 +46,12 @@ export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidat
 
     if (!isReady) { setIsSubmitting(false); return; }
 
+    // The amount may have just been updated server-side (finalize step re-sends the payload) - make sure the
+    // element reflects it before confirming.
+    try {
+      await elements.fetchUpdates();
+    } catch (err) { }
+
     // GA4 add_payment_info (card path) — after validation, before confirming payment.
     if (typeof onBeforeSubmit === "function") onBeforeSubmit();
 
@@ -38,6 +60,7 @@ export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidat
     try {
       sessionStorage.setItem(IDEMPOTENCY_STORAGE_KEY, idempotencyKey);
     } catch (err) { }
+    if (typeof onPaymentAttempt === "function") onPaymentAttempt();
 
     const result = await stripe.confirmPayment({
       elements,
@@ -52,6 +75,7 @@ export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidat
     }
 
     if (result.paymentIntent?.status === "succeeded") {
+      if (typeof onPaymentSuccess === "function") onPaymentSuccess();
       router.push(`/checkout/success?idempotencyKey=${idempotencyKey}`);
       return;
     }
@@ -71,8 +95,9 @@ export default function StripePaymentForm({ returnUrl, idempotencyKey, onValidat
         <PaymentElement />
       </div>
       {errorMessage && (
-        <p className="text-[11px] text-red-500 font-semibold">{errorMessage}</p>
+        <p role="alert" className="text-xs text-red-500 font-semibold">{errorMessage}</p>
       )}
+      {securitySlot}
       <button
         type="submit"
         disabled={disabled || !isReady || isSubmitting}

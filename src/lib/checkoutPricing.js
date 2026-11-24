@@ -31,6 +31,24 @@ export function assertValidCartItems(items) {
   }
 }
 
+// A variable product's line must carry a value for every attribute. Returns the customer-facing error message when one
+// is missing, or null when the line is fine. The ONE rule shared by create-payment-intent (checked before the card is
+// charged) and order creation (checkoutFulfillment), so the two can never disagree and charge-then-refund.
+//  - Corporate Gifting lines replace the attribute picker with their own item selection, so the gate does not apply.
+//  - Made-to-measure lines replace the Size attribute with custom measurements; every other attribute is still required.
+export function getMissingAttributeError(item, product) {
+  if (item?.corporateGifting?.enabled) return null;
+  if (product?.productType !== "variable" || !Array.isArray(product.attributes) || product.attributes.length === 0) return null;
+
+  const isMadeToMeasure = !!item?.madeToMeasure?.enabled;
+  const missingAttrs = product.attributes.filter((attr) => {
+    if (isMadeToMeasure && attr.name.toLowerCase().includes("size")) return false;
+    return !item?.selectedOptions?.[attr.name];
+  });
+  if (missingAttrs.length === 0) return null;
+  return `Please select ${missingAttrs.map((a) => a.name).join(" and ")} for "${product.name}" before checkout.`;
+}
+
 // Recomputes the cart subtotal from real DB prices rather than trusting the
 // client-submitted financials.subtotal (or per-item price fields) — otherwise a
 // forged request can claim any subtotal for a cart of real products, letting
@@ -344,11 +362,16 @@ export async function computeAuthoritativeCheckout({
   // Shipping-rate eligibility (e.g. "free shipping over $100") is evaluated against what the
   // customer actually pays after discounts, not the pre-discount subtotal — otherwise a cart
   // that only qualifies for a threshold before a coupon is applied would still get it after.
-  const authoritativeShippingCost = preShippingAmount === 0
+  // A "free shipping" promotion (engineResults.freeShipping) makes the shopper's chosen method cost nothing. The
+  // selected method is still validated against the real rates (so a forged/stale method is still refused); only the
+  // charged amount is zeroed. This is the same rule the cart UI applies, so the total shown is the total charged.
+  const freeShipping = engineResults.freeShipping === true;
+  const matchedShippingCost = preShippingAmount === 0
     ? 0
     : await resolveAuthoritativeShippingCost({
         shippingAddress, shippingSnapshot, subtotal: preShippingAmount, items, mongoSession,
       });
+  const authoritativeShippingCost = freeShipping ? 0 : matchedShippingCost;
 
   // Tax is not yet wired into checkout by design (see admin Tax Settings / TaxService) —
   // forced to 0 here rather than trusting a client-submitted financials.tax value.
@@ -379,6 +402,7 @@ export async function computeAuthoritativeCheckout({
     affiliateDiscountValue,
     affiliateDiscountAmount,
     authoritativeShippingCost,
+    freeShipping,
     authoritativeTax,
     authoritativeTotal
   };

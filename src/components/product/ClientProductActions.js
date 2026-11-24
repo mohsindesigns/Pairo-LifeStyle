@@ -148,10 +148,21 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
 
   const handleM2mClick = () => {
     if (soldOut) return;
+    // Made to measure replaces the Size attribute with custom measurements, but every OTHER attribute (e.g. Color) is
+    // still required, exactly as for a normal add-to-cart. Checkout (create-payment-intent and order creation) rejects
+    // a variable-product line that lacks one, so block here with the same "select options" prompt instead.
+    // Same size test the server uses (name contains "size").
+    const isSizeAttr = (attr) => attr.name.toLowerCase().includes("size");
+    if (product.productType === "variable") {
+      const missingAttrs = attributes.filter(attr => !isSizeAttr(attr) && !selectedOptions[attr.name]);
+      if (missingAttrs.length > 0) {
+        setMissingAttrsModal({ isOpen: true, missing: missingAttrs });
+        return;
+      }
+    }
     const updatedOptions = { ...selectedOptions };
-    const sizeAttr = attributes.find(a => a.name.toLowerCase() === "size");
-    if (sizeAttr) {
-      delete updatedOptions[sizeAttr.name];
+    for (const attr of attributes) {
+      if (isSizeAttr(attr)) delete updatedOptions[attr.name];
     }
     setSelectedOptions(updatedOptions);
     setM2mOpen(true);
@@ -461,6 +472,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
         <>
           <MadeToMeasureModal
             product={product}
+            selectedOptions={selectedOptions}
             isOpen={m2mOpen}
             onClose={() => setM2mOpen(false)}
             onAddToCart={(cartItem) => {

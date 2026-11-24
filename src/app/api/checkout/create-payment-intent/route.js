@@ -5,7 +5,7 @@ import PendingCheckout from "@/models/PendingCheckout";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
 import stripe from "@/lib/stripe";
-import { assertValidCartItems, computeAuthoritativeCheckout } from "@/lib/checkoutPricing";
+import { assertValidCartItems, computeAuthoritativeCheckout, getMissingAttributeError } from "@/lib/checkoutPricing";
 import { validateCorporateGiftingSelections } from "@/lib/corporateGiftingValidation";
 import { getContextLogger, LogCategory } from "@/lib/logger";
 import { isRestrictedCountry, RESTRICTED_COUNTRY_MESSAGE } from "@/lib/restrictedCountries";
@@ -72,6 +72,12 @@ export async function POST(req) {
       }
       if (product.manageStock && product.stock < item.quantity) {
         return NextResponse.json({ error: `Insufficient stock for ${product.name}.` }, { status: 400 });
+      }
+      // Required variant attributes (e.g. Color) — the same rule order creation applies, run before the charge so a
+      // line without them can never be charged and then refunded. Made-to-measure lines are exempt from Size only.
+      const missingAttributeError = getMissingAttributeError(item, product);
+      if (missingAttributeError) {
+        return NextResponse.json({ error: missingAttributeError }, { status: 400 });
       }
       // Corporate Gifting — same check checkoutFulfillment.js performs at order-creation time
       // (shared helper, so the two can never disagree), run here too so a stale cart (feature

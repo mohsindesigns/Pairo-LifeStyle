@@ -26,7 +26,7 @@ const PHYSICAL_PROFILE_FIELDS = [
 
 const M2M_SURCHARGE = 25;
 
-export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCart }) {
+export default function MadeToMeasureModal({ product, selectedOptions = {}, isOpen, onClose, onAddToCart }) {
   const [unit, setUnit] = useState("inches");
   const [measurements, setMeasurements] = useState({});
   const [notes, setNotes] = useState("");
@@ -59,6 +59,9 @@ export default function MadeToMeasureModal({ product, isOpen, onClose, onAddToCa
     onAddToCart({
       ...product,
       price: surchargedPrice,
+      // The shopper's chosen attributes (e.g. Color), same as a normal add-to-cart. Without them checkout rejects the line
+      // for a product that has attributes besides Size. The parent has already removed Size (measurements replace it).
+      selectedOptions,
       madeToMeasure: { enabled: true, surcharge: M2M_SURCHARGE, unit, measurements, notes },
     });
     setTimeout(() => {
