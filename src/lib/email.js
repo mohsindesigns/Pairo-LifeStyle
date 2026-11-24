@@ -1105,60 +1105,198 @@ export async function sendSizeConfirmationEmail(order, { sizeChartImageUrl, char
 
 // ─── ABANDONED CART EMAILS ──────────────────────────────────────────────────────
 
-/**
- * Sends the automatic "come back" win-back email for an abandoned checkout
- * (see src/lib/abandonedCartService.js). `cartSnapshot` is an AbandonedCart
- * doc (or plain object with the same shape: items, cartSubtotal, cartTotal,
- * contact, shippingAddress). `voucherCode` is the sitewide percentage-discount
- * code to feature.
- */
-export function buildAbandonedCartEmail(cartSnapshot, voucherCode, { discountPercent = 15, discountLabel = null, oneTime = false } = {}) {
-  const offerText = discountLabel || `${discountPercent}% off`;
+function abandonedCartStoreUrl() {
+  return (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
+}
+
+// With a recovery token the button restores the cart on whatever device the email is opened on; without one (old
+// callers / tests) it is the plain checkout page.
+function abandonedCartCheckoutUrl(storeUrl, recoveryToken) {
+  return recoveryToken ? `${storeUrl}/checkout?recover=${encodeURIComponent(recoveryToken)}` : `${storeUrl}/checkout`;
+}
+
+// Absolute, mail-client-safe image URL (relative /uploads paths were the "broken image box" in the old email). Our own
+// uploads get ?em=1 so the hotlink guard in src/middleware.js lets webmail clients (some send a webmail Referer) load them.
+function emailImageUrl(src, storeUrl) {
+  const s = String(src || '').trim();
+  if (!s || s.startsWith('data:')) return '';
+  let url = s;
+  if (s.startsWith('//')) url = `https:${s}`;
+  else if (s.startsWith('/')) url = `${storeUrl}${s}`;
+  else if (!/^https?:\/\//i.test(s)) return '';
+  if (url.startsWith(storeUrl) && url.includes('/uploads/') && !/[?&]em=1/.test(url)) url += `${url.includes('?') ? '&' : '?'}em=1`;
+  return url;
+}
+
+// "Hi Pairo" happened because the brand name ended up in the name field. Never greet with the store name, an email
+// address, or anything that is not plainly a first name; fall back to "Hey".
+function emailFirstName(cart) {
+  const raw = String(cart?.contact?.firstName || cart?.shippingAddress?.fullName || '').trim().split(/\s+/)[0] || '';
+  const storeWord = String(process.env.STORE_NAME || 'PAIRO Lifestyle').split(/\s+/)[0].toLowerCase();
+  if (raw.length < 2 || raw.includes('@') || /\d/.test(raw) || raw.toLowerCase() === storeWord || /^pairo/i.test(raw)) return '';
+  return raw;
+}
+
+function emailMoney(n) {
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+
+// A real countdown only: it is derived from the code's actual end date, never invented.
+function emailExpiryText(expiresAt) {
+  if (!expiresAt) return '';
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return '';
+  const hours = Math.ceil(ms / 3600000);
+  return hours < 48 ? `Expires in ${hours} hour${hours === 1 ? '' : 's'}` : `Expires in ${Math.ceil(hours / 24)} days`;
+}
+
+// Attribute-safe URL (keeps slashes readable; plain escapeHtml turned every / into &#x2F;, which some mail apps mishandle).
+const attrUrl = (u) => String(u).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const EMAIL_ACCENT = '#B98A4E'; // warm leather tan, used only for small accents next to the brand brown
+
+function renderRecoveryEmail({ kind, cartSnapshot, voucherCode, offerText, oneTime, recoveryToken, extras = {}, expiresAt = null }) {
   const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
-  const storeUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://pairolifestyle.com').replace(/\/$/, '');
-  const firstName = (cartSnapshot?.shippingAddress?.fullName || cartSnapshot?.contact?.firstName || '').split(' ')[0] || 'there';
-
+  const storeUrl = abandonedCartStoreUrl();
+  const checkoutUrl = abandonedCartCheckoutUrl(storeUrl, recoveryToken);
   const items = Array.isArray(cartSnapshot?.items) ? cartSnapshot.items : [];
-  const itemsRows = items.map((item) => `
-    <tr>
-      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};">
-        ${item.image ? `<img src="${escapeHtml(item.image)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid ${BRAND.border};vertical-align:middle;margin-right:10px;" />` : ''}
-        <strong style="color:${BRAND.ink};">${escapeHtml(item.name || 'Item')}</strong>
-      </td>
-      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};text-align:center;color:${BRAND.ink};">${item.quantity || 1}</td>
-      <td style="padding:10px;border-bottom:1px solid ${BRAND.border};text-align:right;color:${BRAND.ink};font-weight:700;">$${(((item.price || 0) * (item.quantity || 1))).toLocaleString()}</td>
-    </tr>`).join('');
+  const firstName = emailFirstName(cartSnapshot);
+  const greeting = firstName ? `Hi ${escapeHtml(firstName)},` : 'Hey,';
+  const isReminder = kind === 'reminder';
+  const headline = isReminder ? 'Still thinking it over?' : 'Your next favorite jacket is <span style="color:' + EMAIL_ACCENT + ';">waiting.</span>';
+  const intro = isReminder
+    ? 'Your cart is still saved. This is our last nudge.'
+    : voucherCode ? `You left it in your cart. We saved it, and added ${escapeHtml(offerText)} to help you decide.` : 'You left it in your cart, so we saved it for you.';
 
-  const itemsTable = items.length
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin-bottom:8px;">
-        <thead><tr style="background:${BRAND.surface};">
-          <th style="text-align:left;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Item</th>
-          <th style="padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Qty</th>
-          <th style="text-align:right;padding:10px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:${BRAND.muted};">Price</th>
-        </tr></thead>
-        <tbody>${itemsRows}</tbody>
-      </table>`
-    : '';
+  // ── Hero: first item with a usable image, full width and clickable ──
+  const heroItem = items.find((i) => emailImageUrl(i.image, storeUrl)) || items[0];
+  const heroImg = heroItem ? emailImageUrl(heroItem.image, storeUrl) : '';
+  const heroHtml = heroItem ? `
+    <tr><td style="padding:0;">
+      ${heroImg ? `<a href="${checkoutUrl}" style="display:block;text-decoration:none;"><img src="${attrUrl(heroImg)}" width="600" alt="${escapeHtml(heroItem.name || 'Your jacket')}" style="display:block;width:100%;max-width:600px;height:auto;border:0;background:${BRAND.surface};" /></a>` : ''}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="padding:16px 32px 4px;color:${BRAND.ink};font-size:16px;font-weight:700;line-height:1.4;">${escapeHtml(heroItem.name || 'Item')}${items.length > 1 ? ` <span style="color:${BRAND.muted};font-weight:400;font-size:13px;">+ ${items.length - 1} more</span>` : ''}</td>
+        <td style="padding:16px 32px 4px;text-align:right;color:${BRAND.ink};font-size:16px;font-weight:800;white-space:nowrap;">${emailMoney((heroItem.price || 0) * (heroItem.quantity || 1))}</td>
+      </tr></table>
+    </td></tr>` : '';
 
-  const voucherHtml = emailPanel(`
-    <p style="margin:0 0 14px;color:${BRAND.ink};font-size:15px;line-height:1.6;">Here's <strong>${offerText}</strong> your order — on us. Enter this code in the promo code box at checkout, using the same email address this message was sent to:</p>
-    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;"><tr><td style="background:${BRAND.paper};border:2px dashed ${BRAND.ink};border-radius:8px;padding:12px 24px;">
-      <span style="font-family:monospace;font-size:20px;font-weight:800;letter-spacing:2px;color:${BRAND.ink};">${escapeHtml(voucherCode)}</span>
-    </td></tr></table>
-    ${emailButton(`${storeUrl}/checkout`, 'Complete My Order', { align: 'left' })}
-  `, { title: 'A Little Something For You', accentColor: BRAND.ink });
+  // ── The offer: one big block, with a real expiry line ──
+  const expiry = voucherCode ? emailExpiryText(expiresAt) : '';
+  const bigOffer = escapeHtml(String(offerText || '').toUpperCase());
+  const offerHtml = voucherCode ? `
+    <tr><td style="padding:24px 32px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.ink};border-radius:14px;">
+        <tr><td style="padding:26px 24px 8px;text-align:center;color:${EMAIL_ACCENT};font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;">${isReminder ? 'Your code is still active' : 'Exclusive for you'}</td></tr>
+        <tr><td style="padding:0 24px;text-align:center;color:#ffffff;font-size:48px;font-weight:800;line-height:1.1;letter-spacing:-1px;">${bigOffer}</td></tr>
+        <tr><td style="padding:6px 24px 16px;text-align:center;color:rgba(255,255,255,0.8);font-size:14px;">your entire order</td></tr>
+        <tr><td style="padding:0 24px 12px;text-align:center;">
+          <span style="display:inline-block;background:#ffffff;border:2px dashed ${EMAIL_ACCENT};border-radius:8px;padding:11px 26px;font-family:'Courier New',monospace;font-size:22px;font-weight:800;letter-spacing:3px;color:${BRAND.ink};">${escapeHtml(voucherCode)}</span>
+        </td></tr>
+        ${expiry ? `<tr><td style="padding:0 24px 10px;text-align:center;color:#FF8A8A;font-size:13px;font-weight:800;letter-spacing:0.5px;">&#9201; ${escapeHtml(expiry)}</td></tr>` : ''}
+        <tr><td style="padding:0 24px 24px;text-align:center;color:rgba(255,255,255,0.75);font-size:12px;line-height:1.5;">We apply it for you at checkout. Just use the same email address this message was sent to.</td></tr>
+      </table>
+    </td></tr>` : '';
 
-  const html = emailShell({
-    eyebrow: 'We Saved Your Cart',
-    heading: 'Still Thinking It Over?',
-    subheading: `Hi ${escapeHtml(firstName)}, we noticed you left some items in your cart at ${escapeHtml(storeName)}. They're still waiting for you — and we've added a little incentive to help you decide.`,
-    bodyHtml: `${itemsTable}<div style="margin-top:24px;">${voucherHtml}</div>
-      <p style="margin:24px 0 0;color:${BRAND.faint};font-size:12px;line-height:1.6;border-top:1px solid ${BRAND.border};padding-top:20px;">
-        ${oneTime ? 'This code was created just for you and can be used once.' : 'This code is valid sitewide for a limited time.'} If you've already completed your order, you can safely ignore this email.
-      </p>`,
-    preheader: `We saved your cart — here's ${offerText} to come back.`,
-  });
+  // ── The button: full width, high contrast ──
+  const buttonHtml = `
+    <tr><td style="padding:22px 32px 6px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="background:${EMAIL_ACCENT};border-radius:12px;">
+        <a href="${checkoutUrl}" style="display:block;padding:19px 24px;font-size:15px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:${BRAND.ink};text-decoration:none;">Complete my order &rarr;</a>
+      </td></tr></table>
+    </td></tr>`;
 
+  // ── Trust row (only claims the site itself makes) ──
+  const trustCell = (title, sub) => `<td width="33%" style="padding:6px 4px;text-align:center;vertical-align:top;"><p style="margin:0;color:${BRAND.ink};font-size:12px;font-weight:800;line-height:1.3;">${title}</p><p style="margin:3px 0 0;color:${BRAND.muted};font-size:11px;line-height:1.35;">${sub}</p></td>`;
+  const trustHtml = `
+    <tr><td style="padding:18px 28px 6px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${BRAND.border};border-bottom:1px solid ${BRAND.border};"><tr>
+        ${trustCell('Secure checkout', 'Encrypted payment')}${trustCell('Made to order', 'Handcrafted for you')}${trustCell('Tracked delivery', 'Worldwide shipping')}
+      </tr></table>
+    </td></tr>`;
+
+  // ── A real, approved, verified review (omitted when there is none) ──
+  const review = extras?.review;
+  const reviewHtml = review?.text ? `
+    <tr><td style="padding:22px 36px 4px;text-align:center;">
+      <p style="margin:0 0 8px;color:${EMAIL_ACCENT};font-size:18px;letter-spacing:3px;">&#9733;&#9733;&#9733;&#9733;&#9733;</p>
+      <p style="margin:0;color:${BRAND.ink};font-size:15px;line-height:1.6;font-style:italic;">&ldquo;${escapeHtml(String(review.text).slice(0, 200))}&rdquo;</p>
+      <p style="margin:8px 0 0;color:${BRAND.muted};font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Verified ${escapeHtml(storeName.split(/\s+/)[0])} customer</p>
+    </td></tr>` : '';
+
+  // ── Customer favorites: three real, in-stock products ──
+  const favs = (Array.isArray(extras?.favorites) ? extras.favorites : []).slice(0, 3);
+  const favCell = (p) => {
+    const img = emailImageUrl(p.image, storeUrl);
+    const url = `${storeUrl}/product/${encodeURIComponent(p.slug || p._id)}`;
+    return `<td width="33%" style="padding:0 5px;vertical-align:top;text-align:center;">
+      <a href="${url}" style="text-decoration:none;color:${BRAND.ink};display:block;">
+        ${img ? `<img src="${attrUrl(img)}" width="170" alt="${escapeHtml(p.name || '')}" style="display:block;width:100%;height:auto;border:0;border-radius:8px;background:${BRAND.surface};" />` : ''}
+        <span style="display:block;margin-top:8px;font-size:12px;font-weight:700;line-height:1.3;color:${BRAND.ink};">${escapeHtml(String(p.name || '').slice(0, 48))}</span>
+        <span style="display:block;margin-top:2px;font-size:12px;color:${BRAND.muted};">${emailMoney(p.price)}</span>
+      </a></td>`;
+  };
+  const favHtml = favs.length ? `
+    <tr><td style="padding:26px 27px 4px;">
+      <p style="margin:0 0 12px;text-align:center;color:${BRAND.ink};font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;">Customer favorites</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${favs.map(favCell).join('')}</tr></table>
+      ${voucherCode ? `<p style="margin:14px 0 0;text-align:center;"><a href="${storeUrl}/shop" style="color:${BRAND.ink};font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;text-decoration:underline;">Use ${escapeHtml(voucherCode)} on anything &rarr;</a></p>` : ''}
+    </td></tr>` : '';
+
+  const finePrint = `${voucherCode ? (oneTime ? 'This code was created just for you and can be used once. ' : 'This code is valid for a limited time. ') : ''}${isReminder ? 'Availability is not guaranteed while items are in a cart. ' : ''}If you've already completed your order, you can safely ignore this email.`;
+
+  const storeNameHtml = escapeHtml(storeName);
+  const preheader = isReminder
+    ? (voucherCode ? `Your saved cart and your ${offerText} code are still waiting.` : 'Your saved cart is still waiting.')
+    : (voucherCode ? `We saved your cart, and added ${offerText} to come back.` : 'We saved your cart for you.');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${storeNameHtml}</title>
+</head>
+<body style="margin:0;padding:0;background:${BRAND.pageBg};font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.pageBg};padding:28px 12px;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${BRAND.paper};border-radius:16px;overflow:hidden;border:1px solid ${BRAND.border};">
+  <tr><td style="background:${BRAND.ink};padding:22px 32px;text-align:center;">
+    <p style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:5px;text-transform:uppercase;">${storeNameHtml}</p>
+    <p style="margin:6px 0 0;color:${EMAIL_ACCENT};font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;">${isReminder ? 'Your cart is still saved' : 'We saved your cart'}</p>
+  </td></tr>
+  <tr><td style="padding:30px 32px 22px;text-align:center;">
+    <p style="margin:0 0 8px;color:${BRAND.muted};font-size:14px;">${greeting}</p>
+    <h1 style="margin:0 0 10px;color:${BRAND.ink};font-size:28px;font-weight:800;line-height:1.2;letter-spacing:-0.5px;">${headline}</h1>
+    <p style="margin:0;color:${BRAND.muted};font-size:15px;line-height:1.5;">${intro}</p>
+  </td></tr>
+  ${heroHtml}
+  ${offerHtml}
+  ${buttonHtml}
+  ${trustHtml}
+  ${reviewHtml}
+  ${favHtml}
+  <tr><td style="padding:22px 32px 26px;"><p style="margin:0;color:${BRAND.faint};font-size:11px;line-height:1.6;text-align:center;">${escapeHtml(finePrint)}</p></td></tr>
+  <tr><td style="background:${BRAND.surface};border-top:1px solid ${BRAND.border};padding:20px 32px;text-align:center;">
+    <p style="margin:0;color:${BRAND.ink};font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;">${storeNameHtml}</p>
+    <p style="margin:6px 0 0;color:${BRAND.faint};font-size:11px;">&copy; ${new Date().getFullYear()} ${storeNameHtml} &middot; <a href="${storeUrl}" style="color:${BRAND.faint};text-decoration:underline;">${storeUrl.replace(/^https?:\/\//, '')}</a></p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+/**
+ * The automatic "come back" email for an abandoned checkout (see src/lib/abandonedCartService.js). `cartSnapshot` is an
+ * AbandonedCart doc (items, contact, shippingAddress...). `voucherCode` is the personal code to feature. `extras` is
+ * { review, favorites } fetched by the service (real data only); `voucherExpiresAt` is the code's real end date.
+ */
+export function buildAbandonedCartEmail(cartSnapshot, voucherCode, { discountPercent = 15, discountLabel = null, oneTime = false, recoveryToken = null, extras = {}, voucherExpiresAt = null } = {}) {
+  const offerText = discountLabel || `${discountPercent}% off`;
+  const html = renderRecoveryEmail({ kind: 'first', cartSnapshot, voucherCode, offerText, oneTime, recoveryToken, extras, expiresAt: voucherExpiresAt });
   return { subject: `You left something behind — here's ${offerText}`, html };
 }
 
@@ -1180,6 +1318,33 @@ export async function sendAbandonedCartEmail(email, cartSnapshot, voucherCode, o
     critical: true,
   });
   // Hand back the mail server response (messageId, accepted...) plus the subject, for the activity log.
+  return { ...(info || {}), subject };
+}
+
+/**
+ * The one-time follow-up sent ~24h after the first abandoned-cart email when the shopper still has not ordered.
+ * It re-mentions the SAME code (no new voucher is created) and carries its own recovery link to the same saved cart.
+ */
+export function buildAbandonedCartReminderEmail(cartSnapshot, voucherCode, { discountLabel = null, discountPercent = 15, oneTime = false, recoveryToken = null, extras = {}, voucherExpiresAt = null } = {}) {
+  const offerText = discountLabel || `${discountPercent}% off`;
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const html = renderRecoveryEmail({ kind: 'reminder', cartSnapshot, voucherCode, offerText, oneTime, recoveryToken, extras, expiresAt: voucherExpiresAt });
+  return { subject: `Your cart is still waiting at ${storeName}`, html };
+}
+
+/** Sends the one-time reminder. THROWS on failure, exactly like sendAbandonedCartEmail, so the caller can retry/back off. */
+export async function sendAbandonedCartReminderEmail(email, cartSnapshot, voucherCode, options = {}) {
+  if (!isSmtpConfigured()) throw new Error('SMTP is not configured (SMTP_USER / SMTP_PASS missing) - email was not sent');
+  const storeName = process.env.STORE_NAME || 'PAIRO Lifestyle';
+  const { subject, html } = buildAbandonedCartReminderEmail(cartSnapshot, voucherCode, options);
+  const info = await dispatchEmail({
+    to: email,
+    subject,
+    html,
+    from: getFromAddress(storeName),
+    label: `Abandoned cart reminder (${email})`,
+    critical: true,
+  });
   return { ...(info || {}), subject };
 }
 

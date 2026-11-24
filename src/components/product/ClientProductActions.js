@@ -15,6 +15,12 @@ import SelectOptionsPopup from "@/components/product/SelectOptionsPopup";
 import CorporateGiftingActions from "@/components/product/CorporateGiftingActions";
 
 import { recordOptionSelect } from "@/lib/siteAnalytics";
+import { isOptionAvailable } from "@/lib/stock";
+
+// Diagonal "crossed out" line drawn over a sold-out option (uses the button's text colour).
+const STRIKE_STYLE = {
+  backgroundImage: "linear-gradient(to top right, transparent calc(50% - 0.75px), currentColor calc(50% - 0.75px), currentColor calc(50% + 0.75px), transparent calc(50% + 0.75px))",
+};
 
 export default function ClientProductActions({ product, onVariantChange, unitPrice, onGiftingExtraChange }) {
   const [selectedOptions, setSelectedOptions] = useState({});
@@ -28,6 +34,27 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Sticky mobile "Add to cart" bar: shown only while the real button is scrolled out of view.
+  const ctaRef = useRef(null);
+  const [ctaVisible, setCtaVisible] = useState(true);
+  const [cookieBarOpen, setCookieBarOpen] = useState(false);
+  useEffect(() => {
+    const el = ctaRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return undefined;
+    const io = new IntersectionObserver(([entry]) => setCtaVisible(entry.isIntersecting), { threshold: 0.1 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [soldOut, mounted]);
+  useEffect(() => {
+    // Keep the bar above the slim cookie notice until the shopper has answered it.
+    const sync = () => {
+      try { setCookieBarOpen(!localStorage.getItem("pairo_cookie_consent")); } catch { setCookieBarOpen(false); }
+    };
+    const t0 = setTimeout(sync, 0);
+    const t = setTimeout(sync, 1700); // the notice appears 1.5s after load
+    window.addEventListener("pairo-cookie-consent", sync);
+    return () => { clearTimeout(t0); clearTimeout(t); window.removeEventListener("pairo-cookie-consent", sync); };
+  }, []);
   const [missingAttrsModal, setMissingAttrsModal] = useState({ isOpen: false, missing: [] });
   const [highlightedAttrs, setHighlightedAttrs] = useState([]);
   const attrRefs = useRef({});
@@ -49,8 +76,18 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
       trackViewItem(product);
     }
   }, [product]);
+  // SizeGuideModal unlocks body scroll when it closes; keep it locked while the made-to-measure modal is still open
+  // (this effect runs after the child modals' effects).
+  useEffect(() => {
+    if (m2mOpen && !sizeGuideOpen) document.body.style.overflow = "hidden";
+  }, [m2mOpen, sizeGuideOpen]);
   const { addToCart } = useCart();
   const router = useRouter();
+
+  // Sold-out options (given what is already selected) are struck through but stay selectable, so the shopper can still
+  // see the "Out of stock" state of that combination.
+  const isUnavailable = (attrName, label) =>
+    product.productType === "variable" && !isOptionAvailable(product, selectedOptions, attrName, label);
 
   const focusMissingAttributes = (missing) => {
     const firstNode = missing[0] && attrRefs.current[missing[0].name];
@@ -313,17 +350,23 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
                 <div className="inline-flex flex-wrap max-w-full rounded-[var(--radius,8px)] border border-primary/30 overflow-hidden divide-x divide-primary/20">
                   {(attr.values || []).map((option) => {
                     const isSelected = selectedOptions[attr.name] === option.label;
+                    const unavailable = isUnavailable(attr.name, option.label);
                     return (
                       <button
                         key={option.label}
                         type="button"
                         onClick={() => handleOptionSelect(attr.name, option)}
-                        className={`h-11 min-w-[3.25rem] px-4 text-[14px] font-semibold uppercase transition-colors duration-200 ${isSelected
+                        aria-pressed={isSelected}
+                        aria-disabled={unavailable || undefined}
+                        aria-label={unavailable ? `${option.label} - Out of stock` : undefined}
+                        title={unavailable ? `${option.label} - Out of stock` : undefined}
+                        className={`relative h-11 min-w-[3.25rem] px-4 text-[14px] font-semibold uppercase transition-colors duration-200 ${isSelected
                           ? "bg-primary text-white"
                           : "bg-white text-primary hover:bg-primary/5"
-                          }`}
+                          } ${unavailable ? "opacity-45 line-through decoration-1" : ""}`}
                       >
                         {option.label}
+                        {unavailable && <span aria-hidden="true" className="pointer-events-none absolute inset-0" style={STRIKE_STYLE} />}
                       </button>
                     );
                   })}
@@ -332,6 +375,10 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
                 <div className="flex flex-wrap gap-2">
                   {(attr.values || []).map((option) => {
                     const isSelected = selectedOptions[attr.name] === option.label;
+                    const unavailable = isUnavailable(attr.name, option.label);
+                    const unavailableProps = unavailable
+                      ? { "aria-disabled": true, "aria-label": `${option.label} - Out of stock`, title: `${option.label} - Out of stock` }
+                      : {};
 
                     if (isColor) {
                       return (
@@ -340,10 +387,12 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
                           type="button"
                           onClick={() => handleOptionSelect(attr.name, option)}
                           title={option.label}
+                          aria-pressed={isSelected}
+                          {...unavailableProps}
                           className={`relative w-10 h-10 md:w-11 md:h-11 rounded-full transition-all duration-200 flex items-center justify-center ${isSelected
                             ? "ring-2 ring-offset-2 ring-primary"
                             : "ring-1 ring-black/15 hover:ring-primary/50 hover:scale-105"
-                            }`}
+                            } ${unavailable ? "opacity-45" : ""}`}
                           style={{
                             backgroundColor: option.hex || "#ddd",
                             backgroundImage: option.image
@@ -352,6 +401,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
                             backgroundSize: "cover",
                           }}
                         >
+                          {unavailable && <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full" style={STRIKE_STYLE} />}
                           {isSelected && (
                             <span className="absolute -bottom-1 -right-1 w-[18px] h-[18px] rounded-full bg-primary border-2 border-white flex items-center justify-center">
                               <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />
@@ -366,12 +416,15 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
                         key={option.label}
                         type="button"
                         onClick={() => handleOptionSelect(attr.name, option)}
-                        className={`h-9 min-w-[2.75rem] px-3 rounded-[var(--radius,0px)] text-[10px] font-medium uppercase tracking-[0.15em] transition-all duration-200 border ${isSelected
+                        aria-pressed={isSelected}
+                        {...unavailableProps}
+                        className={`relative h-9 min-w-[2.75rem] px-3 rounded-[var(--radius,0px)] text-[10px] font-medium uppercase tracking-[0.15em] transition-all duration-200 border ${isSelected
                           ? "bg-black text-white border-black"
                           : "bg-transparent text-black border-black/30 hover:border-black"
-                          }`}
+                          } ${unavailable ? "opacity-45 line-through decoration-1" : ""}`}
                       >
                         {option.label}
+                        {unavailable && <span aria-hidden="true" className="pointer-events-none absolute inset-0" style={STRIKE_STYLE} />}
                       </button>
                     );
                   })}
@@ -418,6 +471,7 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
           {/* Primary CTA — color follows the theme's primary color set in admin */}
           {!soldOut && (
           <button
+            ref={ctaRef}
             type="button"
             onClick={() => handleAddToCart(true)}
             className="w-full h-14 rounded-[var(--radius,12px)] bg-primary text-white font-bold uppercase tracking-wide text-[15px] md:text-[16px] flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:brightness-110 transition-all duration-200 active:scale-[0.99]"
@@ -468,11 +522,32 @@ export default function ClientProductActions({ product, onVariantChange, unitPri
         </div>
       </div>
 
+      {mounted && typeof document !== "undefined" && !soldOut && !ctaVisible && createPortal(
+        <div
+          className="md:hidden fixed inset-x-0 z-[60] bg-white border-t border-black/10 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] px-3 py-2 flex items-center gap-3"
+          style={{ bottom: cookieBarOpen ? 52 : 0 }}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] text-neutral-500 truncate">{product.name || product.title}</p>
+            <p className="text-base font-extrabold text-primary leading-tight">{actionTotal !== null ? `$${actionTotal}` : ""}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleAddToCart(true)}
+            className="h-11 px-5 rounded-[var(--radius,8px)] bg-primary text-white font-bold uppercase tracking-wide text-[13px] flex items-center gap-2 active:scale-[0.98]"
+          >
+            <ShoppingBag className="w-4 h-4" /> Add to cart
+          </button>
+        </div>,
+        document.body
+      )}
+
       {mounted && typeof document !== "undefined" && createPortal(
         <>
           <MadeToMeasureModal
             product={product}
             selectedOptions={selectedOptions}
+            onHowToMeasure={hasSizeChart ? () => setSizeGuideOpen(true) : undefined}
             isOpen={m2mOpen}
             onClose={() => setM2mOpen(false)}
             onAddToCart={(cartItem) => {

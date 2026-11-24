@@ -34,7 +34,7 @@ const sections = [
   section("corporate_gifting_hero"),
   section("feature_marquee", {
     items: [
-      { text: "Free shipping worldwide", icon: "Truck" },
+      { text: "Worldwide shipping", icon: "Truck" },
       { text: "Made to order", icon: "Scissors" },
       { text: "Logo embossing", icon: "Stamp" },
       { text: "Bulk pricing", icon: "Tag" },
@@ -45,7 +45,7 @@ const sections = [
   section("corporate_gifting_form"),
   section("trust_badges", {
     items: [
-      { title: "Free worldwide", description: "Shipping", icon: "Globe" },
+      { title: "Worldwide", description: "Shipping", icon: "Globe" },
       { title: "100% secure", description: "Checkout", icon: "Lock" },
       { title: "32-day", description: "Return policy", icon: "RefreshCw" },
     ],

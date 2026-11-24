@@ -110,7 +110,7 @@ export const TEMPLATE_REGISTRY = {
       { type: "corporate_gifting_hero", config: {} },
       { type: "feature_marquee", config: {
         items: [
-          { text: "Free shipping worldwide", icon: "Truck" },
+          { text: "Worldwide shipping", icon: "Truck" },
           { text: "Made to order", icon: "Scissors" },
           { text: "Logo embossing", icon: "Stamp" },
           { text: "Bulk pricing", icon: "Tag" },
@@ -121,7 +121,7 @@ export const TEMPLATE_REGISTRY = {
       { type: "corporate_gifting_form", config: {} },
       { type: "trust_badges", config: {
         items: [
-          { title: "Free worldwide", description: "Shipping", icon: "Globe" },
+          { title: "Worldwide", description: "Shipping", icon: "Globe" },
           { title: "100% secure", description: "Checkout", icon: "Lock" },
           { title: "32-day", description: "Return policy", icon: "RefreshCw" }
         ]

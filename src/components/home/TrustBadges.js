@@ -4,12 +4,20 @@ import React, { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import * as LucideIcons from "lucide-react";
+import { formatMoney } from "@/lib/money";
+import { useShippingEstimate } from "@/lib/useShippingEstimate";
 import { ChevronLeft, ChevronRight, Shield, Truck, Package, Globe, UserCheck, Star } from "lucide-react";
 
 export default function TrustBadges({
   items: propItems,
 }) {
   const scrollContainerRef = useRef(null);
+  const shippingEstimate = useShippingEstimate();
+
+  // Default shipping badge only claims what the real shipping setup supports (neutral until it loads / if it fails).
+  let shippingBadge = { title: "Worldwide", description: "Shipping" };
+  if (shippingEstimate?.allFree) shippingBadge = { title: "Free Shipping", description: "On every order" };
+  else if (shippingEstimate?.freeShippingOver > 0) shippingBadge = { title: "Free Shipping", description: `Over $${formatMoney(shippingEstimate.freeShippingOver)}` };
 
   const defaultItems = [
     {
@@ -18,8 +26,7 @@ export default function TrustBadges({
       icon: "Shield"
     },
     {
-      title: "Free Shipping",
-      description: "World Wide",
+      ...shippingBadge,
       icon: "Truck"
     },
     {

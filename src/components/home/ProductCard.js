@@ -136,7 +136,7 @@ export default function ProductCard({ product, listName = "Product List" }) {
         <div className="flex items-center justify-between border-t border-border pt-2 md:pt-3">
           <div className="flex items-center gap-2 md:gap-3">
             <span className="text-sm md:text-xl font-bold text-foreground">${product.price}</span>
-            {(product.compareAtPrice || product.oldPrice) && (
+            {Number(product.compareAtPrice || product.oldPrice) > Number(product.price) && (
               <span className="text-[10px] md:text-sm font-medium text-foreground/45 line-through">
                 ${product.compareAtPrice || product.oldPrice}
               </span>

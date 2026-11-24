@@ -4,13 +4,18 @@ import AbandonedCart from '@/models/AbandonedCart';
 import AbandonedCartEmailLog from '@/models/AbandonedCartEmailLog';
 import Order from '@/models/Order';
 import Discount from '@/models/Discount';
-import { sendAbandonedCartEmail, isSmtpConfigured } from './email';
+import Product from '@/models/Product';
+import Review from '@/models/Review';
+import { sendAbandonedCartEmail, sendAbandonedCartReminderEmail, isSmtpConfigured } from './email';
+import { issueRecoveryToken, revokeRecoveryToken } from './abandonedCartRecovery';
 import { getAbandonedCartSettings, recordScanResult } from './abandonedCartSettings';
 
 // Personalized one-time win-back codes are tagged so they are identifiable (and reusable if the
 // same person abandons again before using their code).
 const PERSONAL_VOUCHER_SOURCE = 'abandoned-cart';
 const PERSONAL_VOUCHER_PERCENT = 15;
+// The win-back code really expires (the email shows a countdown taken from this end date, never an invented one).
+const WINBACK_VOUCHER_TTL_HOURS = 48;
 // The checkout autosaves while the shopper is still typing, so a half-typed address can be stored.
 // Only plausible addresses are queued, so junk never sits at the front of the queue starving real carts.
 const EMAIL_PATTERN = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$';
@@ -36,6 +41,41 @@ export function isTemporaryMailError(err) {
   return reply >= 400 && reply < 500; // SMTP 4xx means "try again later" (includes rate limits)
 }
 
+/**
+ * Real data for the recovery email's social-proof blocks: three in-stock "customer favorites" that are not already in
+ * the cart, and one approved, verified 5-star review. Best-effort: anything that fails or is missing is simply left out.
+ */
+export async function getRecoveryEmailExtras(cart) {
+  const extras = { favorites: [], review: null };
+  try {
+    await dbConnect();
+    const inCart = (Array.isArray(cart?.items) ? cart.items : []).map((i) => i?.productId).filter(Boolean);
+    const products = await Product.find({
+      status: 'Published',
+      isDeleted: { $ne: true },
+      ...(inCart.length ? { _id: { $nin: inCart } } : {}),
+      $or: [{ manageStock: false }, { stock: { $gt: 0 } }],
+    })
+      .select('name slug price image images')
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .lean();
+    extras.favorites = products.map((p) => ({ _id: String(p._id), name: p.name, slug: p.slug, price: p.price, image: (p.images && p.images[0]) || p.image || '' }));
+    const review = await Review.findOne({
+      status: 'Approved',
+      verifiedPurchase: true,
+      rating: 5,
+      isDeleted: { $ne: true },
+      shadowBanned: { $ne: true },
+      comment: { $regex: /^[\s\S]{40,260}$/ },
+    }).sort({ createdAt: -1 }).select('comment').lean();
+    if (review?.comment) extras.review = { text: review.comment };
+  } catch (e) {
+    console.error('[AbandonedCart] could not load email extras:', e.message);
+  }
+  return extras;
+}
+
 /** "Donald Spanton" -> "DONALD"; strips accents/symbols; falls back to the email prefix, then "WELCOME". */
 export function personalCodeBase(cart, email) {
   const clean = (v) =>
@@ -55,7 +95,7 @@ export function personalCodeBase(cart, email) {
  * Locked to their email, 1 use total. If they abandon again before using it, the same unused code
  * is reused instead of minting another. Name clashes (another Donald) get a letter suffix.
  */
-export async function getOrCreatePersonalVoucher(cart, email, { percent = PERSONAL_VOUCHER_PERCENT, source = PERSONAL_VOUCHER_SOURCE } = {}) {
+export async function getOrCreatePersonalVoucher(cart, email, { percent = PERSONAL_VOUCHER_PERCENT, source = PERSONAL_VOUCHER_SOURCE, ttlHours = null } = {}) {
   await dbConnect();
   const normalizedEmail = String(email).toLowerCase().trim();
 
@@ -65,8 +105,10 @@ export async function getOrCreatePersonalVoucher(cart, email, { percent = PERSON
     isActive: true,
     isDeleted: { $ne: true },
     usageCount: { $lt: 1 },
+    // When codes of this kind expire, an already-expired unused code is not reused: the shopper gets a fresh one.
+    ...(ttlHours ? { $or: [{ endDate: null }, { endDate: { $exists: false } }, { endDate: { $gt: new Date() } }] } : {}),
   }).lean();
-  if (existing?.code) return { code: existing.code, label: `${percent}% off`, oneTime: true };
+  if (existing?.code) return { code: existing.code, label: `${percent}% off`, oneTime: true, expiresAt: existing.endDate || null };
 
   const base = `${personalCodeBase(cart, normalizedEmail)}${percent}`;
   const suffixes = ['', ...'ABCDEFGHJKLMNPQRSTUVWXYZ'.split('')];
@@ -91,8 +133,9 @@ export async function getOrCreatePersonalVoucher(cart, email, { percent = PERSON
         stripeSyncStatus: 'unsupported',
         source: source,
         isActive: true,
+        ...(ttlHours ? { endDate: new Date(Date.now() + ttlHours * 3600 * 1000) } : {}),
       });
-      return { code, label: `${percent}% off`, oneTime: true };
+      return { code, label: `${percent}% off`, oneTime: true, expiresAt: ttlHours ? new Date(Date.now() + ttlHours * 3600 * 1000) : null };
     } catch (err) {
       if (err?.code === 11000) continue; // code already taken (unique index) - try the next suffix
       throw err;
@@ -209,11 +252,16 @@ async function processCart(cart, { trigger = 'scheduler', idleMinutes = null, st
   const attempt = previousAttempts + 1;
   let voucher;
   let info;
+  let recovery = null;
   try {
     // Only the claim winner creates the personal code, so there are no orphan codes from lost races.
-    voucher = await getOrCreatePersonalVoucher(cart, email);
-    info = await sendAbandonedCartEmail(email, cart, voucher.code, { discountLabel: voucher.label, oneTime: !!voucher.oneTime });
+    voucher = await getOrCreatePersonalVoucher(cart, email, { ttlHours: WINBACK_VOUCHER_TTL_HOURS });
+    // The email's button restores this cart on any device; only the token's hash is stored.
+    recovery = await issueRecoveryToken(cart._id);
+    const extras = await getRecoveryEmailExtras(cart);
+    info = await sendAbandonedCartEmail(email, cart, voucher.code, { discountLabel: voucher.label, oneTime: !!voucher.oneTime, recoveryToken: recovery.token, extras, voucherExpiresAt: voucher.expiresAt || null });
   } catch (err) {
+    if (recovery) await revokeRecoveryToken(cart._id, recovery.hash); // nothing was sent, so the link must not stay valid
     const temporary = isTemporaryMailError(err);
     // Only problems with this shopper's address count towards giving up; an admin pressing "Send now" never gives up a cart.
     const countedAttempts = temporary ? previousAttempts : attempt;
@@ -335,7 +383,179 @@ export async function sendAbandonedCartRecoveryEmails({ trigger = 'scheduler', w
   const sent = results.filter((r) => r.sent).length;
   const failed = results.filter((r) => r.status === 'failed' || r.status === 'gave-up').length;
   await recordScanResult({ trigger, scanned: candidates.length, sent, failed });
-  return { scanned: candidates.length, sent, failed, skipped: candidates.length - sent - failed, results };
+  // The 24h follow-up rides on the same scan (scheduler, cron and admin "scan" alike). A narrowed scan (`filter`) is a
+  // targeted run for specific carts, so it never sends reminders.
+  const reminders = Object.keys(filter).length === 0 ? await sendAbandonedCartReminderEmails() : null;
+  return { scanned: candidates.length, sent, failed, skipped: candidates.length - sent - failed, results, ...(reminders ? { reminders } : {}) };
+}
+
+// ─── second reminder ────────────────────────────────────────────────────────────────────────────
+
+// One follow-up, this long after the first email, only while the cart is still unconverted. Carts whose first email is older
+// than REMINDER_MAX_DELAY_HOURS are skipped (e.g. after a long outage) so a stale nudge never goes out.
+const REMINDER_DELAY_HOURS = 24;
+const REMINDER_MAX_DELAY_HOURS = 72;
+
+async function processReminder(cart) {
+  const email = cart.contact?.email?.trim();
+  const base = { ...cartSummary(cart), email: email ? email.toLowerCase() : '', trigger: 'scheduler', triggeredBy: null, idleMinutes: null };
+  if (!email || !EMAIL_REGEX.test(email)) return { id: cart._id, sent: false, status: 'skipped', reason: 'invalid-email' };
+
+  // Same defensive check as the first email: an order placed from another device/session means this cart is done.
+  const hasRecentOrder = await Order.exists({
+    'customer.email': { $in: [...new Set([email, email.toLowerCase()])] },
+    createdAt: { $gte: cart.createdAt },
+  });
+  if (hasRecentOrder) {
+    await AbandonedCart.updateOne({ _id: cart._id }, { $set: { status: 'recovered', orderId: hasRecentOrder._id } }, { timestamps: false });
+    await writeLog({ ...base, status: 'skipped', reason: 'reminder-order-exists' });
+    return { id: cart._id, sent: false, status: 'skipped', reason: 'order-exists' };
+  }
+
+  // Atomic claim: whoever flips `sendingSince` is the only one that sends; `sent` is only set once the mail server accepted it.
+  const claim = await AbandonedCart.updateOne(
+    {
+      _id: cart._id,
+      status: 'active',
+      isDeleted: { $ne: true },
+      'reminderEmail.sent': { $ne: true },
+      $or: [{ 'reminderEmail.sendingSince': null }, { 'reminderEmail.sendingSince': { $lt: new Date(Date.now() - CLAIM_LEASE_MINUTES * 60 * 1000) } }],
+    },
+    { $set: { 'reminderEmail.sendingSince': new Date() } },
+    { timestamps: false }
+  );
+  if (claim.matchedCount === 0) return { id: cart._id, sent: false, status: 'skipped', reason: 'already-claimed' };
+
+  const previousAttempts = cart.reminderEmail?.attempts || 0;
+  const attempt = previousAttempts + 1;
+  const voucherCode = cart.recoveryEmail?.voucherCode || '';
+  let recovery = null;
+  let info;
+  try {
+    recovery = await issueRecoveryToken(cart._id);
+    // Only mention the code while it is still valid; an expired one is dropped from the reminder (the cart link stays).
+    let reminderCode = voucherCode;
+    let reminderExpiresAt = null;
+    if (voucherCode) {
+      const d = await Discount.findOne({ code: voucherCode }).select('endDate isActive isDeleted usageCount').lean();
+      if (!d || d.isActive === false || d.isDeleted || (d.usageCount || 0) >= 1 || (d.endDate && new Date(d.endDate) <= new Date())) reminderCode = '';
+      else reminderExpiresAt = d.endDate || null;
+    }
+    const extras = await getRecoveryEmailExtras(cart);
+    info = await sendAbandonedCartReminderEmail(email, cart, reminderCode, {
+      oneTime: !!reminderCode,
+      discountLabel: reminderCode ? `${PERSONAL_VOUCHER_PERCENT}% off` : null,
+      recoveryToken: recovery.token,
+      extras,
+      voucherExpiresAt: reminderExpiresAt,
+    });
+  } catch (err) {
+    if (recovery) await revokeRecoveryToken(cart._id, recovery.hash);
+    const temporary = isTemporaryMailError(err);
+    const countedAttempts = temporary ? previousAttempts : attempt;
+    const gaveUp = !temporary && attempt >= MAX_ATTEMPTS;
+    const backoff = temporary ? TEMPORARY_BACKOFF_MINUTES : RETRY_BACKOFF_MINUTES[Math.min(attempt - 1, RETRY_BACKOFF_MINUTES.length - 1)];
+    await AbandonedCart.updateOne(
+      { _id: cart._id },
+      {
+        $set: {
+          'reminderEmail.sendingSince': null,
+          'reminderEmail.attempts': countedAttempts,
+          'reminderEmail.lastAttemptAt': new Date(),
+          'reminderEmail.lastError': String(err.message || err).slice(0, 300),
+          'reminderEmail.nextAttemptAt': gaveUp ? null : new Date(Date.now() + backoff * 60 * 1000),
+          'reminderEmail.gaveUp': gaveUp,
+        },
+      },
+      { timestamps: false }
+    ).catch(() => {});
+    console.error(`[AbandonedCart] Failed to send reminder email for ${email} (attempt ${attempt}${temporary ? ', temporary problem' : ''}):`, err.message);
+    await writeLog({ ...base, status: gaveUp ? 'gave-up' : 'failed', attempt, reason: 'reminder-error', error: String(err.message || err).slice(0, 500) });
+    return { id: cart._id, sent: false, status: gaveUp ? 'gave-up' : 'failed', reason: 'error', temporary };
+  }
+
+  try {
+    await AbandonedCart.updateOne(
+      { _id: cart._id },
+      {
+        $set: {
+          'reminderEmail.sent': true,
+          'reminderEmail.sentAt': new Date(),
+          'reminderEmail.sendingSince': null,
+          'reminderEmail.messageId': info?.messageId || null,
+          'reminderEmail.attempts': attempt,
+          'reminderEmail.lastAttemptAt': new Date(),
+          'reminderEmail.nextAttemptAt': null,
+          'reminderEmail.lastError': null,
+          'reminderEmail.gaveUp': false,
+        },
+      },
+      { timestamps: false }
+    );
+  } catch (err) {
+    console.error(`[AbandonedCart] Reminder to ${email} was sent but the cart could not be updated:`, err.message);
+  }
+  await writeLog({
+    ...base,
+    status: 'sent',
+    reason: 'reminder',
+    attempt,
+    subject: info?.subject || '',
+    voucherCode,
+    voucherKind: voucherCode ? 'personal' : '',
+    messageId: info?.messageId || '',
+    smtpResponse: String(info?.response || '').slice(0, 300),
+    accepted: (info?.accepted || []).map(String),
+    rejected: (info?.rejected || []).map(String),
+  });
+  return { id: cart._id, sent: true, status: 'sent' };
+}
+
+/**
+ * Sends the one-time reminder to carts whose first recovery email went out 24h+ ago and that still have not turned into an
+ * order. Called at the end of every unfiltered recovery scan; safe to call as often as you like. Never throws.
+ */
+export async function sendAbandonedCartReminderEmails({ limit = 50 } = {}) {
+  try {
+    await dbConnect();
+    const settings = await getAbandonedCartSettings();
+    if (!settings.enabled) return { scanned: 0, sent: 0, failed: 0 };
+
+    const now = Date.now();
+    const candidates = await AbandonedCart.find({
+      status: 'active',
+      isDeleted: { $ne: true },
+      'contact.email': { $regex: EMAIL_PATTERN },
+      'recoveryEmail.sent': true,
+      'recoveryEmail.sentAt': { $lte: new Date(now - REMINDER_DELAY_HOURS * 3600 * 1000), $gte: new Date(now - REMINDER_MAX_DELAY_HOURS * 3600 * 1000) },
+      'reminderEmail.sent': { $ne: true },
+      'reminderEmail.gaveUp': { $ne: true },
+      $and: [
+        { $or: [{ 'reminderEmail.nextAttemptAt': null }, { 'reminderEmail.nextAttemptAt': { $lte: new Date(now) } }] },
+        { $or: [{ 'reminderEmail.sendingSince': null }, { 'reminderEmail.sendingSince': { $lt: new Date(now - CLAIM_LEASE_MINUTES * 60 * 1000) } }] },
+      ],
+    })
+      .sort({ 'recoveryEmail.sentAt': 1 })
+      .limit(limit)
+      .lean();
+
+    const results = [];
+    for (const cart of candidates) {
+      try {
+        results.push(await processReminder(cart));
+      } catch (err) {
+        console.error('[AbandonedCart] Unexpected error while sending a reminder:', err);
+        results.push({ id: cart._id, sent: false, status: 'failed' });
+      }
+    }
+    const sent = results.filter((r) => r.sent).length;
+    const failed = results.filter((r) => r.status === 'failed' || r.status === 'gave-up').length;
+    if (candidates.length > 0) console.log(`[AbandonedCart] Reminder scan: scanned=${candidates.length} sent=${sent} failed=${failed}`);
+    return { scanned: candidates.length, sent, failed };
+  } catch (err) {
+    console.error('[AbandonedCart] Reminder scan failed:', err.message);
+    return { scanned: 0, sent: 0, failed: 0, error: err.message };
+  }
 }
 
 /** Admin "Send now" for one cart: ignores the quiet period; may re-send; never emails someone who already ordered. */

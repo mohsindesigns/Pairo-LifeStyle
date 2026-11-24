@@ -467,7 +467,7 @@ export default function Navbar() {
             </div>
 
             <div className="flex items-center space-x-2 md:space-x-4">
-              <button onClick={() => setSearchOpen(true)} className="p-3 hover:bg-black/5 rounded-full transition-all">
+              <button onClick={() => setSearchOpen(true)} aria-label="Search" className="p-3 hover:bg-black/5 rounded-full transition-all">
                 <Search className="w-5 h-5" />
               </button>
 

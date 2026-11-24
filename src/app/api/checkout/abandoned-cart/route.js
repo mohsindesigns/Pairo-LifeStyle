@@ -59,6 +59,8 @@ export async function POST(req) {
             price: i.price,
             quantity: i.quantity,
             selectedOptions: i.selectedOptions || null,
+            // Lines with measurements / picked gift items cannot be rebuilt from a recovery link (see /api/checkout/recover).
+            custom: !!(i.madeToMeasure?.enabled || i.corporateGifting?.enabled),
           })) : [],
           cartSubtotal: Number(cartSubtotal) || 0,
           cartTotal: Number(cartTotal) || 0,

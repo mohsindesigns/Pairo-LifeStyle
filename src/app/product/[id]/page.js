@@ -171,10 +171,18 @@ export default async function ProductDetailPage({ params, searchParams }) {
     ...(product.variantCombinations || []).map(v => v.image)
   ].filter(Boolean);
 
-  const relatedProducts = await Product.find({
-    isDeleted: { $ne: true },
-    status: 'Published'
-  }).populate('categories').populate('primaryCategory').limit(4).lean();
+  // Related = same category first (never the product itself), topped up with other published products.
+  const relatedBase = { isDeleted: { $ne: true }, status: 'Published' };
+  const relatedCatId = product.primaryCategory?._id || product.primaryCategory;
+  let relatedProducts = relatedCatId
+    ? await Product.find({ ...relatedBase, _id: { $ne: product._id }, $or: [{ primaryCategory: relatedCatId }, { categories: relatedCatId }] })
+        .populate('categories').populate('primaryCategory').limit(4).lean()
+    : [];
+  if (relatedProducts.length < 4) {
+    const more = await Product.find({ ...relatedBase, _id: { $nin: [product._id, ...relatedProducts.map((r) => r._id)] } })
+      .populate('categories').populate('primaryCategory').limit(4 - relatedProducts.length).lean();
+    relatedProducts = [...relatedProducts, ...more];
+  }
 
   relatedProducts.forEach(rp => {
     allUrls.push(...(rp.images || []), rp.image);

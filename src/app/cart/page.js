@@ -1,6 +1,9 @@
 "use client";
 
 import { useCart, getCartItemKey } from "@/context/CartContext";
+import { cartColorHex } from "@/lib/cartColor";
+import { formatMoney } from "@/lib/money";
+import { useShippingEstimate, shippingRowText, amountToFreeShipping } from "@/lib/useShippingEstimate";
 import { useSiteData } from "@/context/SiteContext";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,6 +15,7 @@ import { trackBeginCheckout, trackViewCart } from "@/lib/analytics";
 
 export default function CartPage() {
   const siteData = useSiteData();
+  const shippingEstimate = useShippingEstimate();
   const { 
     cartItems, 
     updateQuantity, 
@@ -23,6 +27,7 @@ export default function CartPage() {
     removePromoCode,
     isCartLoaded
   } = useCart();
+  const freeShipLeft = amountToFreeShipping(shippingEstimate, Math.max(0, (cartSubtotal || 0) - (discountTotal || 0)));
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [applying, setApplying] = useState(false);
   const [promoError, setPromoError] = useState("");
@@ -219,8 +224,8 @@ export default function CartPage() {
 
                           {item.selectedColor && item.selectedColor !== "Standard" && item.selectedColor !== "" && (
                             <div className="flex items-center gap-1.5">
-                              <span>Color:</span>
-                              <div className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ backgroundColor: item.selectedColor }} />
+                              <span>Color: {item.selectedColor}</span>
+                              {cartColorHex(item) && <div className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ backgroundColor: cartColorHex(item) }} />}
                             </div>
                           )}
                         </div>
@@ -316,11 +321,24 @@ export default function CartPage() {
               
               <div className="flex justify-between items-center text-[11px] font-bold text-black/60 uppercase tracking-wider">
                 <span>Shipping</span>
-                <span>{siteData?.commerce?.shippingEnabled === false ? "Free" : "Calculated next"}</span>
+                <span>{siteData?.commerce?.shippingEnabled === false ? "Free" : shippingRowText(shippingEstimate, cartSubtotal - (discountTotal || 0))}</span>
               </div>
+              {siteData?.commerce?.shippingEnabled !== false && freeShipLeft !== null && (
+                <div>
+                  <p className="text-[11px] font-semibold text-black/60 normal-case tracking-normal">
+                    Add ${formatMoney(freeShipLeft)} more for free shipping
+                  </p>
+                  <div className="mt-1.5 h-[3px] w-full rounded-full bg-black/[0.06] overflow-hidden">
+                    <div
+                      className="h-full bg-black/70 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, Math.max(0, ((shippingEstimate.freeShippingOver - freeShipLeft) / shippingEstimate.freeShippingOver) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center text-[11px] font-bold text-black/60 uppercase tracking-wider">
                 <span>Estimated Tax</span>
-                <span>Calculated next</span>
+                <span>Calculated at checkout</span>
               </div>
               
               <div className="pt-4 border-t border-neutral-200 flex justify-between items-end">

@@ -24,28 +24,32 @@ export default function CookieConsent() {
 
   const handleAccept = () => {
     localStorage.setItem("pairo_cookie_consent", "accepted");
+    window.dispatchEvent(new Event("pairo-cookie-consent"));
     setIsVisible(false);
   };
 
   const handleDecline = () => {
     localStorage.setItem("pairo_cookie_consent", "declined");
+    window.dispatchEvent(new Event("pairo-cookie-consent"));
     setIsVisible(false);
   };
 
   if (!isVisible || isAdminArea) return null;
 
-  if (isCheckout) {
-    return (
-      <div role="dialog" aria-label="Cookie settings" className="fixed bottom-0 inset-x-0 z-[9999] bg-white border-t border-black/10 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-3 py-2 flex items-center gap-2 text-black font-sans">
+  const slimBar = (
+      <div role="dialog" aria-label="Cookie settings" className={`${isCheckout ? "" : "md:hidden "}fixed bottom-0 inset-x-0 z-[9999] bg-white border-t border-black/10 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-3 py-2 flex items-center gap-2 text-black font-sans`}>
         <p className="flex-1 min-w-0 text-[12px] leading-snug text-neutral-600 font-medium">We use cookies to improve your experience.</p>
         <button onClick={handleDecline} className="px-3 py-2 rounded-[4px] text-[11px] font-bold uppercase tracking-wider text-neutral-500 border border-neutral-300">Decline</button>
         <button onClick={handleAccept} className="px-3 py-2 rounded-[4px] text-[11px] font-bold uppercase tracking-wider bg-black text-white">Accept</button>
       </div>
-    );
-  }
+  );
+
+  if (isCheckout) return slimBar;
 
   return (
-    <div className="fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-500">
+    <>
+    {slimBar}
+    <div className="hidden md:block fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-[9999] animate-in fade-in slide-in-from-bottom-5 duration-500">
       <div className="bg-white border border-black/10 rounded-[4px] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.15)] text-black font-sans flex flex-col gap-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
@@ -91,5 +95,6 @@ export default function CookieConsent() {
         </div>
       </div>
     </div>
+    </>
   );
 }

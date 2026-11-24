@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Product from "@/models/Product";
 import SiteConfig from "@/models/SiteConfig";
+import { isSoldOut } from "@/lib/stock";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,7 @@ export async function GET() {
         mainImgUrl = mainImg.startsWith("http") ? mainImg : `${domain}${mainImg}`;
       }
 
-      const availability = (prod.stock > 0 || prod.availabilityStatus === "In Stock") ? "in stock" : "out of stock";
+      const availability = (!isSoldOut(prod) || prod.availabilityStatus === "In Stock") ? "in stock" : "out of stock";
       const brand = escapeXml(siteConfig?.siteName || "PAIRO");
       const sku = escapeXml(prod.sku || prod._id.toString());
       const gCategory = prod.primaryCategory?.name ? escapeXml(prod.primaryCategory.name) : "Apparel &amp; Accessories &gt; Clothing &gt; Outerwear";

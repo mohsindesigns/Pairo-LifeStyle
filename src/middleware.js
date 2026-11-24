@@ -36,7 +36,10 @@ export async function middleware(req) {
         }
 
         // Block if hotlinked from an external third-party domain (allow same host, CRM app domain, and localhost)
+        // ?em=1 marks images used inside our own emails: some webmail clients send their own site as the Referer, which
+        // made the product pictures in the abandoned-cart email show as broken boxes.
         const isAllowedReferer =
+            req.nextUrl.searchParams.get("em") === "1" ||
             !referer ||
             referer.includes(host) ||
             referer.includes("localhost") ||

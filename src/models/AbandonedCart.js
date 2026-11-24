@@ -15,6 +15,9 @@ const AbandonedCartSchema = new mongoose.Schema({
     price: Number,
     quantity: Number,
     selectedOptions: mongoose.Schema.Types.Mixed,
+    // Made-to-measure / corporate-gifting lines carry measurements or picked items that are not stored here,
+    // so they cannot be rebuilt from an emailed recovery link.
+    custom: { type: Boolean, default: false },
   }],
   cartSubtotal: { type: Number, default: 0 },
   cartTotal: { type: Number, default: 0 },
@@ -77,6 +80,28 @@ const AbandonedCartSchema = new mongoose.Schema({
     sendingSince: { type: Date, default: null },
   },
 
+  // Second, one-time reminder ~24h after the first email if the shopper still has not ordered
+  // (src/lib/abandonedCartService.js). Same claim/lease/back-off scheme as `recoveryEmail`.
+  reminderEmail: {
+    sent: { type: Boolean, default: false },
+    sentAt: { type: Date, default: null },
+    attempts: { type: Number, default: 0 },
+    lastAttemptAt: { type: Date, default: null },
+    nextAttemptAt: { type: Date, default: null },
+    lastError: { type: String, default: null },
+    messageId: { type: String, default: null },
+    gaveUp: { type: Boolean, default: false },
+    sendingSince: { type: Date, default: null },
+  },
+
+  // SHA-256 hashes of the recovery-link tokens sent by email (see src/lib/abandonedCartRecovery.js). The plain token
+  // exists only inside the email. Hidden from normal reads so it can never leak through an admin API response.
+  recoveryTokens: {
+    type: [{ _id: false, hash: { type: String, required: true }, createdAt: { type: Date, default: Date.now } }],
+    default: [],
+    select: false,
+  },
+
   // Admin Trash (soft delete). Trashed carts are hidden from the admin list (except the
   // Trash view) and must not receive recovery emails.
   isDeleted: { type: Boolean, default: false, index: true },
@@ -84,10 +109,11 @@ const AbandonedCartSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 AbandonedCartSchema.index({ status: 1, updatedAt: -1 });
+AbandonedCartSchema.index({ 'recoveryTokens.hash': 1 }, { sparse: true });
 
 // A dev server that hot-reloads this file keeps the model compiled from the old schema,
 // which would silently drop the newer Trash fields; recompile it when they are missing.
-if (mongoose.models.AbandonedCart && !mongoose.models.AbandonedCart.schema.path('isDeleted')) {
+if (mongoose.models.AbandonedCart && (!mongoose.models.AbandonedCart.schema.path('isDeleted') || !mongoose.models.AbandonedCart.schema.path('recoveryTokens'))) {
   mongoose.deleteModel('AbandonedCart');
 }
 

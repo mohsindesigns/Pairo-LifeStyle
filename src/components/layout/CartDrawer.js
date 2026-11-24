@@ -1,6 +1,9 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { cartColorHex } from "@/lib/cartColor";
+import { formatMoney } from "@/lib/money";
+import { useShippingEstimate, shippingRowText, amountToFreeShipping } from "@/lib/useShippingEstimate";
 import { X, Plus, Minus, ShoppingBag, ArrowRight, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useCart, getCartItemKey } from "@/context/CartContext";
@@ -12,6 +15,8 @@ import { trackBeginCheckout } from "@/lib/analytics";
 export default function CartDrawer() {
   const siteData = useSiteData();
   const { isCartOpen, setIsCartOpen, cartItems, updateQuantity, removeFromCart, cartSubtotal, affiliateDiscount, affiliateDiscountAmount } = useCart();
+  const shippingEstimate = useShippingEstimate();
+  const freeShipLeft = amountToFreeShipping(shippingEstimate, (cartSubtotal || 0) - (affiliateDiscountAmount || 0));
 
   const drawerVariants = {
     hidden: { x: "100%" },
@@ -139,8 +144,8 @@ export default function CartDrawer() {
 
                             {item.selectedColor && item.selectedColor !== "Standard" && item.selectedColor !== "" && (
                               <div className="flex items-center gap-1">
-                                <span>Color:</span>
-                                <div className="w-2 h-2 rounded-full border border-black/10" style={{ backgroundColor: item.selectedColor }} />
+                                <span>Color: {item.selectedColor}</span>
+                                {cartColorHex(item) && <div className="w-2 h-2 rounded-full border border-black/10" style={{ backgroundColor: cartColorHex(item) }} />}
                               </div>
                             )}
                           </div>
@@ -162,7 +167,7 @@ export default function CartDrawer() {
                               <Plus className="w-2 h-2" />
                             </button>
                           </div>
-                          <p className="font-bold text-xs sm:text-sm heading-font tracking-tight">${(item.price * item.quantity).toFixed(0)}</p>
+                          <p className="font-bold text-xs sm:text-sm heading-font tracking-tight">${formatMoney(item.price * item.quantity)}</p>
                         </div>
                       </div>
                     </motion.div>
@@ -177,7 +182,7 @@ export default function CartDrawer() {
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
                     <span className="text-black/50 uppercase tracking-widest font-bold text-[10px]">Subtotal</span>
-                    <span className="text-lg font-bold heading-font tracking-tight">${cartSubtotal.toFixed(0)}</span>
+                    <span className="text-lg font-bold heading-font tracking-tight">${formatMoney(cartSubtotal)}</span>
                   </div>
                   {affiliateDiscount?.type !== 'None' && affiliateDiscountAmount > 0 && (
                     <div className="flex justify-between items-center">
@@ -188,9 +193,22 @@ export default function CartDrawer() {
                   <div className="flex justify-between items-center">
                     <span className="text-black/50 uppercase tracking-widest font-bold text-[10px]">Shipping</span>
                     <span className="text-[10px] font-bold text-black/75 uppercase tracking-widest">
-                      {siteData?.commerce?.shippingEnabled === false ? "Free" : "Calculated next"}
+                      {siteData?.commerce?.shippingEnabled === false ? "Free" : shippingRowText(shippingEstimate, cartSubtotal)}
                     </span>
                   </div>
+                  {siteData?.commerce?.shippingEnabled !== false && freeShipLeft !== null && (
+                    <div className="pt-1">
+                      <p className="text-[10px] font-semibold text-black/60 tracking-wide">
+                        Add ${formatMoney(freeShipLeft)} more for free shipping
+                      </p>
+                      <div className="mt-1 h-[3px] w-full rounded-full bg-black/[0.06] overflow-hidden">
+                        <div
+                          className="h-full bg-black/70 rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(100, Math.max(0, ((shippingEstimate.freeShippingOver - freeShipLeft) / shippingEstimate.freeShippingOver) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">

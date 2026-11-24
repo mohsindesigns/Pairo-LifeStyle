@@ -5,6 +5,7 @@ import { useCart } from "@/context/CartContext";
 import { sanitizeRichHtml } from "@/lib/sanitize";
 import ProductGallery from "./ProductGallery";
 import ClientProductActions from "./ClientProductActions";
+import { useShippingEstimate, shippingNoteText } from "@/lib/useShippingEstimate";
 import {
   ShieldCheck,
   Truck,
@@ -63,6 +64,7 @@ export default function ProductMainSection({ product, topReview = null }) {
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [selectedVariantImage, setSelectedVariantImage] = useState("");
   const [deliveryRange, setDeliveryRange] = useState("");
+  const shippingNote = shippingNoteText(useShippingEstimate());
 
   useEffect(() => {
     setDeliveryRange(getDeliveryRange());
@@ -167,7 +169,8 @@ export default function ProductMainSection({ product, topReview = null }) {
               className="flex flex-col items-start gap-1 text-left cursor-pointer group"
               title="Click to view ratings & reviews"
             >
-              <span className="flex items-center gap-0.5">
+              {reviewCount > 0 && (
+                <span className="flex items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <Star
                     key={n}
@@ -175,8 +178,9 @@ export default function ProductMainSection({ product, topReview = null }) {
                   />
                 ))}
               </span>
+              )}
               <span className="text-[14px] md:text-[15px] text-primary/70 group-hover:text-primary group-hover:underline underline-offset-2">
-                {rating.toFixed(1)} ({reviewCount} {reviewCount === 1 ? "review" : "reviews"})
+                {reviewCount > 0 ? `${rating.toFixed(1)} (${reviewCount} ${reviewCount === 1 ? "review" : "reviews"})` : "Be the first to review"}
               </span>
             </button>
           </div>
@@ -226,6 +230,13 @@ export default function ProductMainSection({ product, topReview = null }) {
                 </p>
               </div>
             </div>
+          )}
+
+          {shippingNote && (
+            <p className="-mt-2 flex items-center gap-2 text-[13px] md:text-[14px] font-medium text-neutral-600">
+              <Truck className="w-4 h-4 shrink-0" />
+              {shippingNote}
+            </p>
           )}
 
           {/* Variant Selector + Stock + ATC */}

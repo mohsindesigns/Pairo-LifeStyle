@@ -12,6 +12,8 @@
  */
 import React from "react";
 import { getSectionComponent } from "@/lib/section-registry";
+
+const HIDE_RACK_3D_PUBLICLY = true;
 import SectionErrorBoundary from "@/components/common/SectionErrorBoundary";
 import Reveal from "@/components/common/Reveal";
 
@@ -52,6 +54,9 @@ export default function SectionRenderer({ sections = [] }) {
         .sort((a, b) => (a.order || 0) - (b.order || 0))
         .map((section, index) => {
           if (!section.type) return null;
+          // The 3D rack is switched off on the public site for now (nothing renders and three.js/gsap are never loaded).
+          // The code, the admin pages and the saved data are all still there: set HIDE_RACK_3D_PUBLICLY to false to show it again.
+          if (HIDE_RACK_3D_PUBLICLY && section.type === "rack_3d") return null;
           
           const Component = getSectionComponent(section.type);
           if (!Component) {

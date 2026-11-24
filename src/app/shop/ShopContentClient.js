@@ -945,7 +945,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
             {renderFilterSections(false)}
           </aside>
 
-          <div id="product-grid-main" className="lg:col-span-9 min-h-[200vh]">
+          <div id="product-grid-main" className="lg:col-span-9 min-h-[60vh]">
             <h2 className="sr-only">Collections</h2>
             {loading ? (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-10">

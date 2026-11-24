@@ -1,4 +1,5 @@
 import { normalizePath } from "./redirect-resolver";
+import { isSoldOut } from "./stock";
 
 const DEFAULT_SITE_TITLE = "Pairo | Premium Handcrafted Shearling Jackets";
 const DEFAULT_SITE_DESC = "Experience the ultimate warmth and luxury with Pairo's handcrafted shearling jackets.";
@@ -311,7 +312,7 @@ export async function resolveSEOMetadata(options = {}) {
           "@type": "Offer",
           "priceCurrency": "USD",
           "price": entity.price || 0,
-          "availability": entity.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+          "availability": !isSoldOut(entity) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
         }
       };
 
@@ -539,7 +540,7 @@ export async function resolveSEOMetadata(options = {}) {
               "@type": "Offer",
               "price": prod.price || 0,
               "priceCurrency": "USD",
-              "availability": prod.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
+              "availability": !isSoldOut(prod) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock"
             }
           }
         }))

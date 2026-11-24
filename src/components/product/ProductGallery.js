@@ -1,12 +1,14 @@
 ﻿"use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { getOptimizedImage } from "@/lib/cloudinary";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function ProductGallery({ images = [], variantImage, productName = "", imageAlts = {} }) {
-  const allImages = images.length > 0 ? images : ["/placeholder.jpg"];
+  // Callers often pass a fresh array each render; key the list by its URLs so effects only re-run on real changes.
+  const imagesKey = (images || []).filter(Boolean).join("\n");
+  const allImages = useMemo(() => (imagesKey ? imagesKey.split("\n") : ["/placeholder.jpg"]), [imagesKey]);
   const [mainImage, setMainImage] = useState(allImages[0]);
 
   // Lightbox state
@@ -34,12 +36,6 @@ export default function ProductGallery({ images = [], variantImage, productName 
     }
   }, [variantImage, allImages]);
 
-  useEffect(() => {
-    if (allImages.length > 0) {
-      setMainImage(allImages[0]);
-    }
-  }, [images]);
-
   const thumbsRef = useRef(null);
   const hasMany = allImages.length > 1;
   const stepMain = (dir) => {
@@ -50,6 +46,32 @@ export default function ProductGallery({ images = [], variantImage, productName 
   const scrollThumbs = (dir) => {
     const el = thumbsRef.current;
     if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+  };
+
+  // --- Main image swipe (touch / pen). touch-action: pan-y keeps vertical page scroll native. ---
+  const SWIPE_THRESHOLD = 40;
+  const swipeStart = useRef(null);
+  const swipedRef = useRef(false);
+  const onSwipeDown = (e) => {
+    if (e.pointerType === "mouse") return;
+    swipeStart.current = { x: e.clientX, y: e.clientY };
+  };
+  const onSwipeUp = (e) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start || e.pointerType === "mouse") return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (allImages.length > 1 && Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+      swipedRef.current = true;
+      setTimeout(() => { swipedRef.current = false; }, 350);
+      stepMain(dx < 0 ? 1 : -1);
+    }
+  };
+  const onSwipeCancel = () => { swipeStart.current = null; };
+  const onMainClick = () => {
+    if (swipedRef.current) return; // a swipe must not open the lightbox
+    openLightbox();
   };
 
   const handleThumbClick = (img) => {
@@ -117,21 +139,27 @@ export default function ProductGallery({ images = [], variantImage, productName 
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           onMouseMove={handleMouseMove}
-          onClick={openLightbox}
-          style={{ cursor: "zoom-in" }}
+          onClick={onMainClick}
+          onPointerDown={onSwipeDown}
+          onPointerUp={onSwipeUp}
+          onPointerCancel={onSwipeCancel}
+          style={{ cursor: "zoom-in", touchAction: "pan-y" }}
         >
           <img
             key={displayImage}
             src={getOptimizedImage(displayImage, "gallery")}
             alt={imageAlts[displayImage] || productName}
             loading="eager"
+            fetchPriority="high"
             decoding="async"
+            draggable={false}
             style={{
               position: 'absolute',
               inset: 0,
               width: '100%',
               height: '100%',
               objectFit: 'cover',
+              userSelect: 'none',
               transformOrigin: `${zoomPos.x}% ${zoomPos.y}%`,
               transform: isZoomed ? "scale(2.2)" : "scale(1)",
               transition: 'transform 0.1s ease-out',
@@ -143,7 +171,7 @@ export default function ProductGallery({ images = [], variantImage, productName 
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); stepMain(-1); }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-white/85 backdrop-blur-sm text-black shadow-md hover:bg-white active:scale-95 transition"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-white/85 backdrop-blur-sm text-black shadow-md hover:bg-white active:scale-95 transition"
                 aria-label="Previous image"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -151,13 +179,31 @@ export default function ProductGallery({ images = [], variantImage, productName 
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); stepMain(1); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-white/85 backdrop-blur-sm text-black shadow-md hover:bg-white active:scale-95 transition"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-11 h-11 rounded-full bg-white/85 backdrop-blur-sm text-black shadow-md hover:bg-white active:scale-95 transition"
                 aria-label="Next image"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
               <div className="absolute top-3 right-3 bg-black/55 text-white rounded-full px-2.5 py-1 text-[11px] font-medium pointer-events-none select-none">
                 {Math.max(0, allImages.indexOf(displayImage)) + 1} / {allImages.length}
+              </div>
+              {/* Dot indicators */}
+              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-10 flex items-center" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                {allImages.map((img, i) => {
+                  const active = Math.max(0, allImages.indexOf(displayImage)) === i;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleThumbClick(img)}
+                      className="flex items-center justify-center w-6 h-8"
+                      aria-label={`Go to image ${i + 1}`}
+                      aria-current={active ? "true" : undefined}
+                    >
+                      <span className={`block rounded-full transition-all ${active ? "w-2.5 h-2.5 bg-black" : "w-2 h-2 bg-black/30"}`} />
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}
