@@ -44,6 +44,8 @@ export async function GET(req) {
         openInNewTab: false,
         delaySeconds: 1,
         frequency: 'session',
+        pageRule: 'all',
+        pagePaths: [],
       };
     }
     config.floatingReviews = { enabled: true, label: 'Reviews', topOffset: 50, ...(config.floatingReviews || {}) };

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { isPopupAllowedOnPath } from "@/lib/popup-pages";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { X, ArrowRight } from "lucide-react";
@@ -71,14 +72,22 @@ export default function SitePopup() {
     bannerUrl || badgeText || title || description || hasButton
   );
 
-  // Exclude transactional, checkout, and admin pages
+  // Exclude transactional, checkout, and admin pages (always), then apply the admin's
+  // "show on" page rule (all pages / only selected pages / all except selected pages).
+  const pagePathsKey = Array.isArray(popup?.pagePaths) ? popup.pagePaths.join("\n") : "";
+  const isAllowedByPageRule = useMemo(
+    () => isPopupAllowedOnPath(pathname, popup?.pageRule, pagePathsKey),
+    [pathname, popup?.pageRule, pagePathsKey]
+  );
+
   const isExcludedRoute =
     !pathname ||
     pathname.startsWith("/checkout") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/admin-login") ||
     pathname.startsWith("/profile") ||
-    pathname.startsWith("/affiliate");
+    pathname.startsWith("/affiliate") ||
+    !isAllowedByPageRule;
 
   const dismiss = useCallback(() => {
     if (isDismissingRef.current) return;
@@ -160,14 +169,15 @@ export default function SitePopup() {
 
   // Body scroll locking while modal is active
   useEffect(() => {
-    if (visible && animating) {
+    // Not on a page where the popup is hidden: it renders nothing there, so it must not lock scrolling either
+    if (visible && animating && !isExcludedRoute) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = originalOverflow;
       };
     }
-  }, [visible, animating]);
+  }, [visible, animating, isExcludedRoute]);
 
   if (!visible || !isEnabled || !hasContent || isExcludedRoute) return null;
 

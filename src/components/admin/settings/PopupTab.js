@@ -10,6 +10,7 @@ import MediaPickerModal from "@/components/admin/MediaPickerModal";
 
 import { Postbox, Notice } from "@/components/admin/ui";
 import ThemedSelect from "@/components/ui/ThemedSelect";
+import { POPUP_PAGE_RULES, normalizePopupPaths } from "@/lib/popup-pages";
 
 const ctrlWrap = { flex: "1 1 320px", minWidth: 0 };
 
@@ -25,11 +26,20 @@ export default function PopupTab({ config, onChange }) {
     openInNewTab: false,
     delaySeconds: 1,
     frequency: "session",
+    pageRule: "all",
+    pagePaths: [],
     ...(config.popup || {})
   };
 
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [testModalOpen, setTestModalOpen] = useState(false);
+
+  // The page list is edited as free text (one page per line) and saved as a normalised array.
+  // The raw text is kept locally so typing isn't rewritten under the cursor.
+  const pageRule = POPUP_PAGE_RULES.includes(popup.pageRule) ? popup.pageRule : "all";
+  const savedPagePaths = Array.isArray(popup.pagePaths) ? popup.pagePaths : [];
+  const [pagePathsText, setPagePathsText] = useState(() => savedPagePaths.join("\n"));
+  const parsedPagePaths = normalizePopupPaths(pagePathsText);
 
   const update = (key, val) => {
     onChange({
@@ -305,6 +315,61 @@ export default function PopupTab({ config, onChange }) {
 
           {/* Behavior & Display Rules */}
           <Postbox title="Display rules and timing">
+            <div className="wp-frow">
+              <label className="wp-flabel" htmlFor="popup-page-rule">Show on</label>
+              <ThemedSelect
+                id="popup-page-rule"
+                value={pageRule}
+                onChange={(e) => update("pageRule", e.target.value)}
+                className="wp-select"
+              >
+                <option value="all">All pages</option>
+                <option value="include">Only the pages listed below</option>
+                <option value="exclude">All pages except the ones listed below</option>
+              </ThemedSelect>
+              <p className="wp-hint">
+                Checkout, account, affiliate and admin pages never show the popup, whatever is chosen here.
+              </p>
+            </div>
+
+            {pageRule !== "all" && (
+              <div className="wp-frow items-start">
+                <label className="wp-flabel pt-1" htmlFor="popup-page-paths">
+                  {pageRule === "include" ? "Show only on these pages" : "Hide on these pages"}
+                </label>
+                <div style={ctrlWrap}>
+                  <textarea
+                    id="popup-page-paths"
+                    rows={5}
+                    value={pagePathsText}
+                    onChange={(e) => {
+                      setPagePathsText(e.target.value);
+                      update("pagePaths", normalizePopupPaths(e.target.value));
+                    }}
+                    placeholder={"/collections/christmas-costumes-2026\n/custom-jacket\n/blog/*"}
+                    spellCheck={false}
+                    className="wp-textarea min-h-[110px] max-w-[520px] font-mono"
+                  />
+                  {parsedPagePaths.length > 0 && (
+                    <p className="wp-desc mt-2 mb-0 break-all">
+                      {pageRule === "include" ? "Popup shows only on: " : "Popup is hidden on: "}
+                      <strong>{parsedPagePaths.join(", ")}</strong>
+                    </p>
+                  )}
+                </div>
+                <p className="wp-hint">
+                  One page per line. Paste the page link or just its path. Use <code>/</code> for the home page, and end
+                  a line with <code>{"/*"}</code> to cover every page under it (for example <code>{"/collections/*"}</code>).
+                </p>
+              </div>
+            )}
+
+            {pageRule === "include" && parsedPagePaths.length === 0 && (
+              <Notice type="warning">
+                No pages are listed, so the popup will not show anywhere. Add at least one page or switch back to &quot;All pages&quot;.
+              </Notice>
+            )}
+
             <div className="wp-frow">
               <label className="wp-flabel" htmlFor="popup-frequency">Display frequency</label>
               <ThemedSelect

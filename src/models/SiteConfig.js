@@ -125,6 +125,10 @@ const SiteConfigSchema = new mongoose.Schema({
     openInNewTab: { type: Boolean, default: false },
     delaySeconds: { type: Number, default: 1 },
     frequency: { type: String, enum: ['session', 'daily', 'always'], default: 'session' },
+    // Page targeting: 'all' pages, only the pages in pagePaths ('include'), or every page except them ('exclude').
+    // Paths are stored normalised ("/collections/sale"; a trailing "/*" also covers everything under it).
+    pageRule: { type: String, enum: ['all', 'include', 'exclude'], default: 'all' },
+    pagePaths: { type: [String], default: [] },
   },
 
   // ─── Floating "Reviews" side tab ────────────────────
