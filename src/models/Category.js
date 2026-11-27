@@ -6,6 +6,10 @@ const CategorySchema = new mongoose.Schema({
   image: { type: String },
   banner: { type: String },
   showBannerOverlay: { type: Boolean, default: false },
+  // "Coming soon": while the category has no products, the storefront shows a Coming Soon banner
+  // (with comingSoonText, or a default line) instead of "No products found".
+  showComingSoon: { type: Boolean, default: false },
+  comingSoonText: { type: String, default: "" },
   description: { type: String }, // Short description
   content: { type: String }, // Full description
   status: { type: String, enum: ['Draft', 'Published'], default: 'Published' },

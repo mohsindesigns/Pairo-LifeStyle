@@ -14,6 +14,7 @@ import { getCategoryUrl } from "@/lib/routes";
 import { usePopup } from "@/context/PopupContext";
 import { confirmSlugChange } from "@/components/admin/slugChange";
 import ThemedSelect from "@/components/ui/ThemedSelect";
+import { COMING_SOON_DEFAULT_TEXT } from "@/lib/coming-soon";
 
 export default function CategoryForm({ categoryId = null, type = "product" }) {
   const router = useRouter();
@@ -42,6 +43,8 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
     image: "",
     banner: "",
     showBannerOverlay: false,
+    showComingSoon: false,
+    comingSoonText: "",
     status: "Published",
     isFeatured: false,
     seo: { title: "", description: "", keywords: [], canonicalUrl: "", ogTitle: "", ogDescription: "", ogImage: "", noIndex: false, noFollow: false },
@@ -66,6 +69,8 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
             ...directCat,
             sizeChart: directCat.sizeChart || "",
             showBannerOverlay: Boolean(directCat.showBannerOverlay),
+            showComingSoon: Boolean(directCat.showComingSoon),
+            comingSoonText: directCat.comingSoonText || "",
             faqs: directCat.faqs || [],
             faqSchemaCustom: directCat.faqSchemaCustom || "",
             seo: { ...prev.seo, ...(directCat.seo || {}) }
@@ -87,6 +92,8 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
               ...cat,
               sizeChart: cat.sizeChart || "",
               showBannerOverlay: Boolean(cat.showBannerOverlay),
+              showComingSoon: Boolean(cat.showComingSoon),
+              comingSoonText: cat.comingSoonText || "",
               faqs: cat.faqs || [],
               faqSchemaCustom: cat.faqSchemaCustom || "",
               seo: { ...prev.seo, ...(cat.seo || {}) }
@@ -664,6 +671,54 @@ export default function CategoryForm({ categoryId = null, type = "product" }) {
                 </button>
               </div>
             </section>
+
+            {type === "product" && (
+              <Postbox id="category-coming-soon" title="Coming Soon">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span className="wp-strong" id="coming-soon-label">Show Coming Soon banner</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, showComingSoon: !formData.showComingSoon })}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2271b1] focus-visible:ring-offset-1 ${
+                      formData.showComingSoon ? 'bg-[#2271b1]' : 'bg-[#8c8f94]'
+                    }`}
+                    role="switch"
+                    aria-checked={Boolean(formData.showComingSoon)}
+                    aria-labelledby="coming-soon-label"
+                    title="Toggle Coming Soon banner"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        formData.showComingSoon ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="wp-desc">
+                  {formData.showComingSoon
+                    ? 'On: while this category has no products, shoppers see a Coming Soon banner instead of "No products found". It disappears once you add a product.'
+                    : 'Off: an empty category shows "No products found".'}
+                </p>
+                {formData.showComingSoon && (
+                  <div style={{ marginTop: 12 }}>
+                    <label htmlFor="category-coming-soon-text" className="wp-strong" style={{ display: "block", marginBottom: 4 }}>
+                      Banner text
+                    </label>
+                    <textarea
+                      id="category-coming-soon-text"
+                      rows={3}
+                      maxLength={300}
+                      placeholder={COMING_SOON_DEFAULT_TEXT}
+                      className="wp-textarea"
+                      value={formData.comingSoonText || ""}
+                      onChange={(e) => setFormData({ ...formData, comingSoonText: e.target.value })}
+                    />
+                    <p className="wp-desc">Leave empty to use the default text shown above.</p>
+                  </div>
+                )}
+              </Postbox>
+            )}
 
             {type === "product" && (
               <Postbox id="category-size-chart" title="Default Size Chart">

@@ -16,7 +16,7 @@ export function stripServerManagedFields(data = {}) {
 // (it is not stored on the category document).
 const DUPLICATE_FIELDS = [
   "type", "description", "content", "image", "banner", "showBannerOverlay", "isFeatured",
-  "showInFilters", "faqSchemaCustom",
+  "showInFilters", "faqSchemaCustom", "showComingSoon", "comingSoonText",
 ];
 
 export function buildCategoryDuplicate(cat = {}, linkedItems = []) {

@@ -12,6 +12,7 @@ import { sanitizeRichHtml } from "@/lib/sanitize";
 import { useSiteData } from "@/context/SiteContext";
 import { getSwatchBackground } from "@/lib/swatchRenderer";
 import ThemedSelect from "@/components/ui/ThemedSelect";
+import { COMING_SOON_DEFAULT_TEXT } from "@/lib/coming-soon";
 
 const ITEMS_PER_PAGE = 24;
 
@@ -54,11 +55,14 @@ export default function ShopContentClient({ initialCategory = null, initialType 
 
   const [products, setProducts] = useState(initialProducts);
   const [selectedCategory, setSelectedCategory] = useState(categoryParam || "");
-  const [loading, setLoading] = useState(initialProducts.length === 0);
+  // On a category page (categoryData set) the server already sent every product in that category, so an empty
+  // list means the category really is empty: don't show the loading skeleton or fetch the whole catalogue.
+  const [loading, setLoading] = useState(initialProducts.length === 0 && !categoryData);
   const [openCategoryFaqIndex, setOpenCategoryFaqIndex] = useState(null);
   const { filters } = siteData;
   const siteContextData = useSiteData();
-  const dbCategories = siteContextData?._dbCategories || [];
+  const rawDbCategories = siteContextData?._dbCategories;
+  const dbCategories = useMemo(() => rawDbCategories || [], [rawDbCategories]);
 
   const currentDbCategory = useMemo(() => {
     if (categoryData && (categoryData.slug === selectedCategory || categoryData._id === selectedCategory)) {
@@ -99,8 +103,9 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     setTimeout(() => onDone?.(), delay);
   };
 
+  const isCategoryPage = Boolean(categoryData);
   useEffect(() => {
-    if (products.length > 0) return;
+    if (products.length > 0 || isCategoryPage) return;
     setLoading(true);
     fetch("/api/products")
       .then(res => res.json())
@@ -109,7 +114,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
         setProducts(flatProducts);
         setLoading(false);
       });
-  }, [products.length]);
+  }, [products.length, isCategoryPage]);
 
   // 1. Dynamic Categories from actual product data or dbCategories
   const allCategories = useMemo(() => {
@@ -354,28 +359,32 @@ export default function ShopContentClient({ initialCategory = null, initialType 
   // No reactive scroll effects needed — scrollToGridTop() is called proactively
   // before each state update that changes the product grid contents.
 
-  const filteredProducts = useMemo(() => {
-    let result = products;
-
-    // Category filter
-    if (selectedCategory) {
-      const targetDbCat = dbCategories.find(c =>
-        c.name.toLowerCase() === selectedCategory.toLowerCase() ||
-        c.slug?.toLowerCase() === selectedCategory.toLowerCase() ||
-        c._id === selectedCategory
+  // Products in the selected category, before the shopper's own filters (type, price, colour, size, search).
+  // Kept separate so an empty category (Coming Soon) can be told apart from "your filters matched nothing".
+  const categoryProducts = useMemo(() => {
+    if (!selectedCategory) return products;
+    const targetDbCat = dbCategories.find(c =>
+      c.name.toLowerCase() === selectedCategory.toLowerCase() ||
+      c.slug?.toLowerCase() === selectedCategory.toLowerCase() ||
+      c._id === selectedCategory
+    );
+    return products.filter(p => {
+      const pCat = p.category || '';
+      const pCats = p.categories || [];
+      const matchesString = pCat.toLowerCase() === selectedCategory.toLowerCase() ||
+        (targetDbCat && pCat.toLowerCase() === targetDbCat.name.toLowerCase()) ||
+        (targetDbCat && pCat.toLowerCase() === targetDbCat.slug?.toLowerCase());
+      const matchesId = targetDbCat && pCats.some(c =>
+        (typeof c === 'object' && c !== null ? c._id === targetDbCat._id : c === targetDbCat._id)
       );
-      result = result.filter(p => {
-        const pCat = p.category || '';
-        const pCats = p.categories || [];
-        const matchesString = pCat.toLowerCase() === selectedCategory.toLowerCase() ||
-          (targetDbCat && pCat.toLowerCase() === targetDbCat.name.toLowerCase()) ||
-          (targetDbCat && pCat.toLowerCase() === targetDbCat.slug?.toLowerCase());
-        const matchesId = targetDbCat && pCats.some(c =>
-          (typeof c === 'object' && c !== null ? c._id === targetDbCat._id : c === targetDbCat._id)
-        );
-        return matchesString || matchesId;
-      });
-    }
+      return matchesString || matchesId;
+    });
+  }, [products, selectedCategory, dbCategories]);
+
+  const showComingSoon = Boolean(currentDbCategory?.showComingSoon) && !loading && categoryProducts.length === 0;
+
+  const filteredProducts = useMemo(() => {
+    let result = categoryProducts;
 
     // Type filter
     if (selectedTypes.length > 0) {
@@ -466,7 +475,7 @@ export default function ShopContentClient({ initialCategory = null, initialType 
     }
 
     return result;
-  }, [products, selectedCategory, maxPrice, minPrice, selectedColors, selectedSizes, selectedTypes, selectedCustomAttrs, sortBy, searchQuery]);
+  }, [categoryProducts, maxPrice, minPrice, selectedColors, selectedSizes, selectedTypes, selectedCustomAttrs, sortBy, searchQuery]);
 
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
   const paginatedProducts = filteredProducts.slice(
@@ -961,6 +970,22 @@ export default function ShopContentClient({ initialCategory = null, initialType 
                   ))}
                 </div>
               </>
+            ) : showComingSoon ? (
+              <div role="status" className="flex flex-col items-center justify-center text-center px-6 py-32 md:py-40 border border-border rounded-3xl bg-foreground/[0.03]">
+                <span className="mb-6 inline-flex items-center px-4 py-1.5 rounded-full bg-foreground text-background text-[10px] font-bold uppercase tracking-widest">
+                  {currentDbCategory?.name}
+                </span>
+                <p className="text-3xl md:text-5xl font-bold heading-font uppercase mb-5 text-foreground">Coming Soon</p>
+                <p className="max-w-md text-sm md:text-base text-foreground/70 leading-relaxed mb-10 whitespace-pre-line">
+                  {currentDbCategory?.comingSoonText?.trim() || COMING_SOON_DEFAULT_TEXT}
+                </p>
+                <Link
+                  href="/shop"
+                  className="px-8 py-3 bg-foreground text-background rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-foreground/90 transition-colors"
+                >
+                  Browse All Products
+                </Link>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-40 border border-dashed border-border rounded-3xl">
                 <p className="text-2xl font-bold heading-font uppercase mb-4 text-foreground">No products found</p>

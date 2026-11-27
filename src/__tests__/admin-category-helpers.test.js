@@ -12,6 +12,8 @@ const source = {
   image: "img.jpg",
   banner: "banner.jpg",
   showBannerOverlay: true,
+  showComingSoon: true,
+  comingSoonText: "Landing in December",
   status: "Published",
   isFeatured: true,
   isDeleted: false,
@@ -42,6 +44,8 @@ describe("buildCategoryDuplicate", () => {
       image: "img.jpg",
       banner: "banner.jpg",
       faqSchemaCustom: "{}",
+      showComingSoon: true,
+      comingSoonText: "Landing in December",
       uniqueSlug: true,
       linkedItems: ["p1", "p2"],
     });

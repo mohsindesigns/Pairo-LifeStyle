@@ -111,6 +111,8 @@ export async function POST(req) {
           existing.image = data.image || existing.image;
           existing.banner = data.banner || existing.banner;
           existing.showBannerOverlay = data.showBannerOverlay !== undefined ? data.showBannerOverlay : existing.showBannerOverlay;
+          if (data.showComingSoon !== undefined) existing.showComingSoon = Boolean(data.showComingSoon);
+          if (data.comingSoonText !== undefined) existing.comingSoonText = data.comingSoonText;
           existing.description = data.description || existing.description;
           existing.content = data.content || existing.content;
           existing.status = data.status || existing.status;
