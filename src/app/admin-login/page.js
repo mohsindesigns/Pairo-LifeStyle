@@ -9,6 +9,22 @@ import Image from "next/image";
 import logo from "@/assets/png-file.png";
 import TurnstileWidget from "@/components/common/TurnstileWidget";
 
+// Reasons the sign-in route (api/auth/[...nextauth] + lib/turnstile) throws on purpose. Showing them tells a staff
+// member whether it was the password, the captcha or the rate limit; anything else (e.g. a database error) stays generic.
+const KNOWN_LOGIN_ERRORS = new Set([
+  "Invalid email or password",
+  "Account suspended",
+  "Account locked",
+  "Too many login attempts. Please wait a minute before trying again.",
+  "Captcha verification is required. Please complete the security check.",
+  "Security verification failed. Please check the captcha and try again.",
+  "Unable to verify security challenge. Please try again later.",
+  "Captcha verification failed. Please try again.",
+]);
+
+const loginErrorMessage = (code) =>
+  KNOWN_LOGIN_ERRORS.has(code) ? code : "Sign-in failed. Please try again in a moment.";
+
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,10 +55,14 @@ export default function AdminLoginPage() {
         turnstileToken,
         rememberMe: rememberMe ? "true" : "false",
         redirect: false,
+        // Must be explicit: next-auth defaults callbackUrl to window.location.href and, on success, reports any
+        // ?error= in it as the sign-in error. The middleware sends expired staff sessions to
+        // /admin-login?error=Unauthorized, so without this every successful login from there showed an error.
+        callbackUrl: "/admin",
       });
 
       if (res?.error) {
-        setError("Invalid credentials or security check failed. Please check your admin access.");
+        setError(loginErrorMessage(res.error));
         turnstileRef.current?.reset();
         setTurnstileToken("");
       } else {
